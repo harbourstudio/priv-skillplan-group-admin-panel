@@ -1,0 +1,42 @@
+<?php
+/**
+ * Main plugin file
+ * 
+ * @wordpress-plugin
+ * Plugin Name: Skillplan BYS Group Administrator Plugin
+ * Description: Custom plugin for Skillplan BYS for group management on the frontend
+ * Author: The West Harbour
+ * Version: 1.0.0
+ * License: GPL-2.0+
+ * License URI: http://www.gnu.org/licenses/gpl-2.0.txt
+ * Text Domain: bys
+ * Domain path: /languages
+ */
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+// Define constants
+define( 'BYS_GROUPS_VERSION', '1.0.0' );
+define( 'BYS_GROUPS_PLUGIN_FILE', __FILE__);
+define( 'BYS_GROUPS_PLUGIN_DIR', plugin_dir_path( __FILE__ ));
+define( 'BYS_GROUPS_PLUGIN_URL', plugin_dir_url( __FILE__ ));
+define( 'BYS_GROUPS_PLUGIN_BASENAME', plugin_basename( __FILE__ ));
+
+// File includes
+// require_once BYS_GROUPS_PLUGIN_DIR . 'includes/class-activator.php';
+// require_once BYS_GROUPS_PLUGIN_DIR . 'includes/class-core.php';
+
+// Run on plugin activation
+register_activation_hook( BYS_GROUPS_PLUGIN_FILE, array('BYS_Groups_Activator', 'activate'));
+
+// Run on plugin deactivation
+register_deactivation_hook( BYS_GROUPS_PLUGIN_FILE, array( 'BYS_Groups_Activator', 'deactivate'));
+
+// Plugin initialization
+function run_bys_groups() {
+    $plugin = new BYS_Groups_Core();
+    $plugin->run();
+}
+run_bys_groups();
