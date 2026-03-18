@@ -1,0 +1,19 @@
+.wp-block-bys-groups-group-select {
+
+	.group-selector{
+
+        display: flex;
+        gap: var(--wp--preset--spacing--3);
+        align-items: center;
+
+        &__select{
+            background: white;
+            border-radius: 0.5rem;
+            border: 1px solid var(--wp--preset--color--gray-300);
+            min-width: 23.5rem;
+            padding: var(--wp--preset--spacing--3);
+            min-height: 3.25rem;
+        }
+    }
+
+}

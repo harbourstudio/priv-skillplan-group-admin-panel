@@ -1,0 +1,28 @@
+{
+	"name": "bys-groups",
+	"version": "0.1.0",
+	"description": "Example block scaffolded with Create Block tool.",
+	"author": "The West Harbour",
+	"license": "GPL-2.0-or-later",
+	"main": "build/index.js",
+	"scripts": {
+		"start": "wp-scripts start --webpack-src-dir=src/ --output-path=build/",
+		"build": "wp-scripts build --webpack-src-dir=src/ --output-path=build/"
+	},
+	"devDependencies": {
+		"@wordpress/scripts": "^26.10.0",
+		"postcss-import": "^16.1.0",
+		"postcss-preset-env": "^9.5.15"
+	},
+	"dependencies": {
+		"@10up/block-components": "^1.19.0",
+		"@emotion/react": "^11.11.1",
+		"@emotion/styled": "^11.11.0",
+		"@wordpress/icons": "^9.31.0",
+		"react": "^18.2.0",
+		"react-lottie": "^1.2.4",
+		"react-scripts": "5.0.1",
+		"superagent": "^8.1.2",
+		"web-vitals": "^3.4.0"
+	}
+}

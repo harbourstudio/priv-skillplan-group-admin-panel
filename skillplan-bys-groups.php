@@ -3,7 +3,7 @@
  * Main plugin file
  * 
  * @wordpress-plugin
- * Plugin Name: Skillplan BYS Group Administrator Plugin
+ * Plugin Name: SkillPlan BYS Group Administrator Plugin
  * Description: Custom plugin for Skillplan BYS for group management on the frontend
  * Author: The West Harbour
  * Version: 1.0.0
@@ -25,18 +25,17 @@ define( 'BYS_GROUPS_PLUGIN_URL', plugin_dir_url( __FILE__ ));
 define( 'BYS_GROUPS_PLUGIN_BASENAME', plugin_basename( __FILE__ ));
 
 // File includes
-// require_once BYS_GROUPS_PLUGIN_DIR . 'includes/class-activator.php';
-// require_once BYS_GROUPS_PLUGIN_DIR . 'includes/class-core.php';
+require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/core.php';
+// require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/activator.php';
 
-// Run on plugin activation
-register_activation_hook( BYS_GROUPS_PLUGIN_FILE, array('BYS_Groups_Activator', 'activate'));
+// // Run on plugin activation
+// register_activation_hook( BYS_GROUPS_PLUGIN_FILE, array('BYS_Groups_Activator', 'activate'));
 
-// Run on plugin deactivation
-register_deactivation_hook( BYS_GROUPS_PLUGIN_FILE, array( 'BYS_Groups_Activator', 'deactivate'));
+// // Run on plugin deactivation
+// register_deactivation_hook( BYS_GROUPS_PLUGIN_FILE, array( 'BYS_Groups_Activator', 'deactivate'));
 
 // Plugin initialization
 function run_bys_groups() {
     $plugin = new BYS_Groups_Core();
-    $plugin->run();
 }
-run_bys_groups();
+add_action('plugins_loaded', 'run_bys_groups');
