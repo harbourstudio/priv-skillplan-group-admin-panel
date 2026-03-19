@@ -124,8 +124,9 @@ $wrapper_attributes = get_block_wrapper_attributes();
             </thead>
             <tbody>
                 <tr>
+                    <a href="detailed-user-progress">
                     <td><span class="status-badge status-badge--online"><i class="fa-solid fa-circle"></i></span></td>
-                    <td>Jane Smith</td>
+                    <td><a href="detailed-user-progress">Jane Smith</a></td>
                     <td>jane.smith@email.com</td>
                     <td><span class="completion-badge completion-badge--completed"><i class="fa-solid fa-circle"></i></span></td>
                     <td><span class="completion-badge completion-badge--partial"><i class="fa-solid fa-circle-half-stroke"></i></span></td>
@@ -133,7 +134,7 @@ $wrapper_attributes = get_block_wrapper_attributes();
                 </tr>
                 <tr>
                     <td><span class="status-badge status-badge--offline"><i class="fa-solid fa-circle"></i></span></td>
-                    <td>Mark Johnson</td>
+                    <td><a href="detailed-user-progress">Mark Johnson</a></td>
                     <td>mark.j@email.com</td>
                     <td><span class="completion-badge completion-badge--completed"><i class="fa-solid fa-circle"></i></span></td>
                     <td><span class="completion-badge completion-badge--partial"><i class="fa-solid fa-circle-half-stroke"></i></span></td>
@@ -141,7 +142,7 @@ $wrapper_attributes = get_block_wrapper_attributes();
                 </tr>
                 <tr>
                     <td><span class="status-badge status-badge--never"><i class="fa-solid fa-circle"></i></span></td>
-                    <td>Sarah Lee</td>
+                    <td><a href="detailed-user-progress">Sarah Lee</a></td>
                     <td>sarah.lee@email.com</td>
                     <td><span class="completion-badge completion-badge--completed"><i class="fa-solid fa-circle"></i></span></td>
                     <td><span class="completion-badge completion-badge--partial"><i class="fa-solid fa-circle-half-stroke"></i></span></td>
@@ -149,7 +150,7 @@ $wrapper_attributes = get_block_wrapper_attributes();
                 </tr>
                 <tr>
                     <td><span class="status-badge status-badge--online"><i class="fa-solid fa-circle"></i></span></td>
-                    <td>Tom Harris</td>
+                    <td><a href="detailed-user-progress">Tom Harris</a></td>
                     <td>tom.harris@email.com</td>
                     <td><span class="completion-badge completion-badge--completed"><i class="fa-solid fa-circle"></i></span></td>
                     <td><span class="completion-badge completion-badge--partial"><i class="fa-solid fa-circle-half-stroke"></i></span></td>

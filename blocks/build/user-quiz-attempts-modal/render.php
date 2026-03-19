@@ -20,14 +20,14 @@ $wrapper_attributes = get_block_wrapper_attributes();
 <div <?= $wrapper_attributes; ?>>
 
     <!-- Trigger Button -->
-    <button
+    <!-- <button
         type="button"
         class="quiz-attempts__trigger"
         data-hs-overlay="#quiz-attempts-modal"
     >
         <i class="fa-solid fa-clock-rotate-left"></i>
         View Quiz Attempts
-    </button>
+    </button> -->
 
     <!-- Modal -->
     <div

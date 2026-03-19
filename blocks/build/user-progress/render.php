@@ -20,5 +20,18 @@ $wrapper_attributes = get_block_wrapper_attributes([
 ?>
 
 <div <?= $wrapper_attributes; ?>>
-    <p>Custom block</p>
+    <div class="section__row">
+        <div class="section__col section__col__details">
+            <h6>Course Progress Details</h6>
+            <div class="section__col__card details__accordion">
+                Accordion here
+            </div>
+        </div>
+        <div class="section__col section__col__details">
+            <h6>Acheivements</h6>
+            <div class="section__col__card details__achievements">
+                List here
+            </div>
+        </div>
+    </div>
 </div>

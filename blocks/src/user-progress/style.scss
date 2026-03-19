@@ -1,4 +1,24 @@
 .wp-block-bys-groups-user-progress {
 
-	
+	.section__row{
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: var(--wp--preset--spacing--5);
+    }
+
+    .section__col{
+
+        h6{
+            color: var(--wp--preset--color--gray-700);
+            margin-bottom: var(--wp--preset--spacing--2);
+        }
+
+        &__card{
+            background: white;
+            border: 1px solid var(--wp--preset--color--gray-200);
+            border-radius: 1rem;
+            padding: var(--wp--preset--spacing--5);
+        }
+
+    }
 }

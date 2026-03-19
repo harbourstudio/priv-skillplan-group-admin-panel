@@ -36,7 +36,7 @@
   font-size: var(--wp--preset--font-size--small);
   background: white;
   border-radius: 1.5rem;
-  text-align: left;
+  text-align: right;
   border-collapse: collapse;
 }
 .wp-block-bys-groups-user-activity .table__results table thead th, .wp-block-bys-groups-user-activity .table__results table thead td {
@@ -50,10 +50,10 @@
   color: white;
 }
 .wp-block-bys-groups-user-activity .table__results table thead tr:first-of-type th:first-of-type {
-  border-top-left-radius: 1.5rem;
+  border-top-right-radius: 1.5rem;
 }
 .wp-block-bys-groups-user-activity .table__results table thead tr:first-of-type th:last-of-type {
-  border-top-right-radius: 1.5rem;
+  border-top-left-radius: 1.5rem;
 }
 .wp-block-bys-groups-user-activity .table__results table tbody tr:not(:last-of-type) td {
   border-bottom: 1px solid var(--wp--preset--color--gray-200);
@@ -75,5 +75,3 @@
   border-radius: 9999px;
   background-color: var(--wp--preset--color--cyan-500);
 }
-
-/*# sourceMappingURL=style-index.css.map*/

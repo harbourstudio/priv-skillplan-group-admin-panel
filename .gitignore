@@ -1,4 +1,5 @@
-blocks/node-modules/**
-node-modules/
+blocks/node_modules/**
+node_modules/
 
 .DS_Store
+.claude
