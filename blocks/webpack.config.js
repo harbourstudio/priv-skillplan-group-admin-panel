@@ -9,13 +9,12 @@ glob.sync('./src/*/index.js').forEach((file) => {
     entry[`${blockName}/index`] = path.resolve(__dirname, file);
 });
 
+glob.sync('./src/*/view.js').forEach((file) => {
+    const blockName = file.split('/')[2];
+    entry[`${blockName}/view`] = path.resolve(__dirname, file);
+});
+
 module.exports = {
     ...defaultConfig,
     entry,
-    output: {
-        ...defaultConfig.output,
-        clean: {
-            keep: /view\.module/,
-        },
-    },
 };

@@ -31,5 +31,5 @@
   "editorScript": "file:./index.js",
   "render": "file:./render.php",
   "style": "file:./style-index.css",
-  "viewScriptModule": "file:./view.module.js"
+  "viewScript": "file:./view.js"
 }
