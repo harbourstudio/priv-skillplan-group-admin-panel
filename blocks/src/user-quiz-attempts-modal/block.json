@@ -1,9 +1,9 @@
 {
 	"$schema": "https://schemas.wp.org/trunk/block.json",
 	"apiVersion": 3,
-	"name": "bys-groups/user-quiz-attempts-modal",
+	"name": "bys-groups/user-progress",
 	"version": "0.2.0",
-	"title": "BYS - User Quiz Attempts Modal",
+	"title": "BYS - User Progress",
 	"category": "custom-blocks",
 	"icon": "welcome-write-blog",
 	"description": "Custom block for Build Your Skills group administrator dashboard.",
@@ -12,10 +12,10 @@
 		"anchor": true,
 		"html": false,
 		"spacing": {
-		"margin": true
+			"margin": true
 		}
 	},
-	"keywords": [ "word", "blog", "post", "written" ],
+	"keywords": [ "group", "learndash", "progress", "dashboard" ],
 	"attributes": {
 		"blockId": {
 			"type": "string",
@@ -24,5 +24,7 @@
 	},
 	"editorScript": "file:./index.js",
 	"render": "file:./render.php",
-	"style": "file:./style-index.css"
+	"style": "file:./style-index.css",
+	"viewScriptModule": "file:./view.module.js"
+
 }

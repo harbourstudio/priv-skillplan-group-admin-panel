@@ -15,6 +15,41 @@ foreach ($attrs as $a) {
 }
 
 $wrapper_attributes = get_block_wrapper_attributes();
+
+// ─── Quiz Details Data ───
+// TODO: Replace with REST API call to get user quiz results
+$quizzes = [
+    [
+        'name'          => 'Recognizing Fractions',
+        'last_activity' => 'Sep 3, 2025',
+        'course'        => 'MF EL',
+        'attempts'      => 3,
+        'highest_score' => '9/10 (90%)',
+        'result'        => 'pass',
+    ],
+    [
+        'name'          => 'Recognizing Fractions',
+        'last_activity' => 'Sep 3, 2025',
+        'course'        => 'MF EL',
+        'attempts'      => 3,
+        'highest_score' => '9/10 (90%)',
+        'result'        => 'fail',
+    ],
+    [
+        'name'          => 'Recognizing Fractions',
+        'last_activity' => 'Sep 3, 2025',
+        'course'        => 'MF EL',
+        'attempts'      => 3,
+        'highest_score' => '9/10 (90%)',
+        'result'        => 'ungraded',
+    ],
+];
+
+$result_labels = [
+    'pass'     => 'Passed',
+    'fail'     => 'Failed',
+    'ungraded' => 'Ungraded',
+];
 ?>
 
 <div <?= $wrapper_attributes; ?>>
@@ -85,13 +120,16 @@ $wrapper_attributes = get_block_wrapper_attributes();
                 </tr>
             </thead>
             <tbody>
+                <?php foreach ($quizzes as $quiz) :
+                    $result = $quiz['result'];
+                ?>
                 <tr>
-                    <td>Recognizing Fractions</td>
-                    <td>Sep 3, 2025</td>
-                    <td>MF EL</td>
-                    <td>3</td>
-                    <td>9/10 (90%)</span></td>
-                    <td><span class="status-badge status-badge--pass">Passed</span></td>
+                    <td><?= esc_html($quiz['name']); ?></td>
+                    <td><?= esc_html($quiz['last_activity']); ?></td>
+                    <td><?= esc_html($quiz['course']); ?></td>
+                    <td><?= (int) $quiz['attempts']; ?></td>
+                    <td><?= esc_html($quiz['highest_score']); ?></td>
+                    <td><span class="status-badge status-badge--<?= esc_attr($result); ?>"><?= esc_html($result_labels[$result]); ?></span></td>
                     <td>
                         <button
                             type="button"
@@ -102,40 +140,7 @@ $wrapper_attributes = get_block_wrapper_attributes();
                         </button>
                     </td>
                 </tr>
-                <tr>
-                    <td>Recognizing Fractions</td>
-                    <td>Sep 3, 2025</td>
-                    <td>MF EL</td>
-                    <td>3</td>
-                    <td>9/10 (90%)</span></td>
-                    <td><span class="status-badge status-badge--fail">Failed</span></td>
-                    <td>
-                        <button
-                            type="button"
-                            class="quiz-attempts__trigger btn-unstyled"
-                            data-hs-overlay="#quiz-attempts-modal"
-                        >
-                            <i class="fa-solid fa-ellipsis"></i>
-                        </button>
-                    </td>
-                </tr>
-                <tr>
-                    <td>Recognizing Fractions</td>
-                    <td>Sep 3, 2025</td>
-                    <td>MF EL</td>
-                    <td>3</td>
-                    <td>9/10 (90%)</span></td>
-                    <td><span class="status-badge status-badge--ungraded">Ungraded</span></td>
-                    <td>
-                        <button
-                            type="button"
-                            class="quiz-attempts__trigger btn-unstyled"
-                            data-hs-overlay="#quiz-attempts-modal"
-                        >
-                            <i class="fa-solid fa-ellipsis"></i>
-                        </button>
-                    </td>
-                </tr>
+                <?php endforeach; ?>
             </tbody>
         </table>
     </div>

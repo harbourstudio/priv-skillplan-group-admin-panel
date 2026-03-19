@@ -1,0 +1,57 @@
+.wp-block-bys-groups-user-info {
+
+    .user-progress__header {
+        display: flex;
+        align-items: center;
+        gap: var(--wp--preset--spacing--5);
+    }
+
+    .user-progress__avatar {
+        flex-shrink: 0;
+
+        img {
+            width: 4.5rem;
+            height: 4.5rem;
+            border-radius: 9999px;
+            object-fit: cover;
+        }
+    }
+
+    .user-progress__name {
+        margin: 0 0 var(--wp--preset--spacing--1);
+    }
+
+    .user-progress__email {
+        font-size: var(--wp--preset--font-size--small);
+        color: var(--wp--preset--color--gray-700);
+        margin-right: var(--wp--preset--spacing--3);
+    }
+
+    .user-progress__meta {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: var(--wp--preset--spacing--4);
+    }
+
+    .user-progress__meta-item {
+        font-size: var(--wp--preset--font-size--x-small);
+        color: var(--wp--preset--color--gray-600);
+        display: inline-flex;
+        align-items: center;
+        gap: var(--wp--preset--spacing--2);
+
+        i {
+            font-size: 0.65rem;
+        }
+
+        &--active {
+            color: var(--wp--preset--color--green-500);
+            font-weight: 600;
+
+            i {
+                font-size: 0.5rem;
+            }
+        }
+    }
+}

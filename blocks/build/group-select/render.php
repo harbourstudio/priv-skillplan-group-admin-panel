@@ -15,12 +15,13 @@ foreach ($attrs as $a) {
 }
 
 $wrapper_attributes = get_block_wrapper_attributes([
-    'data-wp-interactive' => 'bys-groups'
+    'data-wp-interactive' => 'bys-groups',
+    'data-wp-init' => 'actions.initGroups'
 ]);
 
 ?>
 <div <?= $wrapper_attributes; ?>>
-    <div class="group-selector" data-wp-init="actions.initGroups">
+    <div class="group-selector">
         <div data-wp-show="state.loading">
             <p>Loading groups...</p>
         </div>
@@ -34,18 +35,9 @@ $wrapper_attributes = get_block_wrapper_attributes([
                 id="group-select"
                 class="group-selector__select"
                 name="group"
-                data-wp-bind--value="state.selectedGroup"
                 data-wp-on--change="actions.selectGroup"
             >
                 <option value="">Select a Group</option>
-                <template data-wp-each--group="state.groups">
-                    <option
-                        data-wp-bind--value="group.id"
-                        data-wp-bind--selected="state.selectedGroup === group.id"
-                    >
-                        <span data-wp-text="group.title"></span>
-                    </option>
-                </template>
             </select>
             <button class="group-selector__button" type="button">
                 Show Group

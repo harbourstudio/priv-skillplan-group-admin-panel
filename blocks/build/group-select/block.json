@@ -3,7 +3,7 @@
   "apiVersion": 3,
   "name": "bys-groups/group-select",
   "version": "0.2.0",
-  "title": "BYS - Group Select",
+  "title": "BYS - Group Select TEST",
   "category": "custom-blocks",
   "icon": "welcome-write-blog",
   "description": "Custom block for Build Your Skills group administrator dashboard.",
@@ -35,5 +35,5 @@
   "editorScript": "file:./index.js",
   "render": "file:./render.php",
   "style": "file:./style-index.css",
-  "viewScript": "file:./view.js"
+  "viewScriptModule": "file:./view.module.js"
 }

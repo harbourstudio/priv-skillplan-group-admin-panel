@@ -15,19 +15,27 @@ foreach ($attrs as $a) {
 }
 
 $wrapper_attributes = get_block_wrapper_attributes();
+
+// ─── Quiz Attempts Modal Data ───
+// TODO: Replace with REST API call to get quiz attempts for a specific quiz
+$quiz = [
+    'name'       => 'Recognizing Fractions',
+    'short_name' => 'MF EL',
+];
+
+$attempts = [
+    ['number' => 1, 'date' => 'Jan 12, 2025', 'score' => '9/10 (90%)', 'result' => 'fail'],
+    ['number' => 2, 'date' => 'Jan 19, 2025', 'score' => '9/10 (90%)', 'result' => 'fail'],
+    ['number' => 3, 'date' => 'Feb 3, 2025',  'score' => '9/10 (90%)', 'result' => 'pass'],
+];
+
+$result_labels = [
+    'pass' => 'Passed',
+    'fail' => 'Failed',
+];
 ?>
 
 <div <?= $wrapper_attributes; ?>>
-
-    <!-- Trigger Button -->
-    <!-- <button
-        type="button"
-        class="quiz-attempts__trigger"
-        data-hs-overlay="#quiz-attempts-modal"
-    >
-        <i class="fa-solid fa-clock-rotate-left"></i>
-        View Quiz Attempts
-    </button> -->
 
     <!-- Modal -->
     <div
@@ -42,10 +50,10 @@ $wrapper_attributes = get_block_wrapper_attributes();
 
                 <div class="modal__header">
                     <h3 id="quiz-attempts-modal-label" class="modal__title course__long-name">
-                        Recognizing Fractions
+                        <?= esc_html($quiz['name']); ?>
                     </h3>
                     <span class="course__short-name">
-                        MF EL
+                        <?= esc_html($quiz['short_name']); ?>
                     </span>
                 </div>
 
@@ -60,24 +68,14 @@ $wrapper_attributes = get_block_wrapper_attributes();
                             </tr>
                         </thead>
                         <tbody>
+                            <?php foreach ($attempts as $attempt) : ?>
                             <tr>
-                                <td>1</td>
-                                <td>Jan 12, 2025</td>
-                                <td>9/10 (90%)</td>
-                                <td><span class="result-badge result-badge--fail">Failed</span></td>
+                                <td><?= (int) $attempt['number']; ?></td>
+                                <td><?= esc_html($attempt['date']); ?></td>
+                                <td><?= esc_html($attempt['score']); ?></td>
+                                <td><span class="result-badge result-badge--<?= esc_attr($attempt['result']); ?>"><?= esc_html($result_labels[$attempt['result']]); ?></span></td>
                             </tr>
-                            <tr>
-                                <td>2</td>
-                                <td>Jan 19, 2025</td>
-                                <td>9/10 (90%)</td>
-                                <td><span class="result-badge result-badge--fail">Failed</span></td>
-                            </tr>
-                            <tr>
-                                <td>3</td>
-                                <td>Feb 3, 2025</td>
-                                <td>9/10 (90%)</td>
-                                <td><span class="result-badge result-badge--pass">Passed</span></td>
-                            </tr>
+                            <?php endforeach; ?>
                         </tbody>
                     </table>
                 </div>

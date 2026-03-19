@@ -7,10 +7,10 @@
 	"main": "build/index.js",
 	"scripts": {
 		"start": "wp-scripts start --webpack-src-dir=src/ --output-path=build/",
-		"build": "wp-scripts build --webpack-src-dir=src/ --output-path=build/"
+		"build": "wp-scripts build --webpack-src-dir=src/ --output-path=build/ && node build-modules.js"
 	},
 	"devDependencies": {
-		"@wordpress/scripts": "^26.10.0",
+		"@wordpress/scripts": "^31.7.0",
 		"esbuild": "^0.25.12",
 		"postcss-import": "^16.1.0",
 		"postcss-preset-env": "^9.5.15"

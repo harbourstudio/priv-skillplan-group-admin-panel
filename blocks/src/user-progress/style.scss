@@ -1,24 +1,342 @@
 .wp-block-bys-groups-user-progress {
 
-	.section__row{
+    // ─── Main Layout ───────────────────────────────
+    .user-progress__layout {
         display: grid;
-        grid-template-columns: 2fr 1fr;
-        gap: var(--wp--preset--spacing--5);
+        grid-template-columns: 1fr 21.25rem;
+        gap: var(--wp--preset--spacing--6);
+        align-items: start;
+
+        @media (max-width: 1024px) {
+            grid-template-columns: 1fr;
+        }
     }
 
-    .section__col{
+    .user-progress__section-title {
+        color: var(--wp--preset--color--gray-500);
+        margin: 0 0 var(--wp--preset--spacing--3);
+    }
 
-        h6{
-            color: var(--wp--preset--color--gray-700);
-            margin-bottom: var(--wp--preset--spacing--2);
+    // ─── Course Accordion (Preline) ────────────────
+    .user-progress__courses {
+        min-width: 0; // prevent overflow in grid
+    }
+
+    .hs-accordion-group {
+        display: flex;
+        flex-direction: column;
+        gap: var(--wp--preset--spacing--3);
+    }
+
+    .hs-accordion {
+        background: white;
+        border-radius: 1rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+        overflow: hidden;
+    }
+
+    .hs-accordion-toggle {
+        display: flex;
+        align-items: center;
+        gap: var(--wp--preset--spacing--3);
+        width: 100%;
+        padding: var(--wp--preset--spacing--4) var(--wp--preset--spacing--5);
+        border: none;
+        background: none;
+        cursor: pointer;
+        text-align: left;
+        font-family: inherit;
+        transition: background-color 0.15s ease;
+
+        &:hover {
+            background-color: var(--wp--preset--color--gray-100);
+        }
+    }
+
+    .accordion-toggle__icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        width: 2rem;
+        height: 2rem;
+        color: var(--wp--preset--color--primary);
+
+        i{
+            font-size: var(--wp--preset--font-size--base);
+        }
+    }
+
+    .accordion-toggle__course-name {
+        font-weight: 600;
+        font-size: var(--wp--preset--font-size--base);
+        white-space: nowrap;
+        min-width: 10rem;
+    }
+
+    .accordion-toggle__details {
+        display: flex;
+        align-items: center;
+        gap: var(--wp--preset--spacing--5);
+        margin-left: auto;
+        font-size: var(--wp--preset--font-size--x-small);
+        color: var(--wp--preset--color--gray-500);
+    }
+
+    .accordion-toggle__last-accessed {
+        white-space: nowrap;
+    }
+
+    .accordion-toggle__status {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--wp--preset--spacing--1);
+        font-weight: 600;
+        white-space: nowrap;
+        border-radius: 9999px;
+        padding: var(--wp--preset--spacing--1) var(--wp--preset--spacing--3);
+
+        &--completed {
+            color: var(--wp--preset--color--green-700);
+            background-color: var(--wp--preset--color--green-50);
+            i{
+                color: var(--wp--preset--color--green-500);
+            }
         }
 
-        &__card{
-            background: white;
-            border: 1px solid var(--wp--preset--color--gray-200);
-            border-radius: 1rem;
-            padding: var(--wp--preset--spacing--5);
+        &--in-progress {
+            color: var(--wp--preset--color--orange-700);
+            background-color: var(--wp--preset--color--orange-100);
+            i{
+                color: var(--wp--preset--color--orange-500);
+            }
         }
 
+        &--not-started {
+            color: var(--wp--preset--color--gray-500);
+            background-color: var(--wp--preset--color--gray-100);
+        }
+    }
+
+    .accordion-toggle__lessons-count {
+        white-space: nowrap;
+        font-weight: 500;
+        color: var(--wp--preset--color--gray-500);
+        background: var(--wp--preset--color--gray-100);
+        padding: var(--wp--preset--spacing--1) var(--wp--preset--spacing--3);
+        border-radius: 9999px;
+    }
+
+    // ─── Accordion Content ─────────────────────────
+    .accordion-content__inner {
+        padding: var(--wp--preset--spacing--5) var(--wp--preset--spacing--5) var(--wp--preset--spacing--5);
+        border-top: 1px solid var(--wp--preset--color--gray-200);
+    }
+
+    // ─── Modules ───────────────────────────────────
+    .module {
+        margin-bottom: var(--wp--preset--spacing--4);
+
+        &:last-child {
+            margin-bottom: 0;
+        }
+    }
+
+    .module__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: var(--wp--preset--spacing--3) var(--wp--preset--spacing--3);
+        background-color: var(--wp--preset--color--gray-50);
+        border-radius: 0.5rem;
+        margin-bottom: var(--wp--preset--spacing--2);
+    }
+
+    .module__name {
+        font-size: var(--wp--preset--font-size--small);
+        font-weight: 600;
+        color: var(--wp--preset--color--gray-800);
+    }
+
+    .module__status {
+        font-size: var(--wp--preset--font-size--small);
+
+        &--completed {
+            color: var(--wp--preset--color--green-500);
+        }
+
+        &--in-progress {
+            color: var(--wp--preset--color--orange-500);
+        }
+
+        &--not-started {
+            color: var(--wp--preset--color--gray-400);
+        }
+    }
+
+    // ─── Lessons Table ─────────────────────────────
+    .lessons-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: var(--wp--preset--font-size--x-small);
+
+        thead {
+            th {
+                text-align: left;
+                font-weight: 600;
+                color: var(--wp--preset--color--gray-500);
+                padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--3);
+                border-bottom: 1px solid var(--wp--preset--color--gray-200);
+                white-space: nowrap;
+                background: transparent;
+                font-size: 0.7rem;
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
+            }
+        }
+
+        tbody {
+            td {
+                padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--3);
+                color: var(--wp--preset--color--gray-700);
+                border-bottom: 1px solid var(--wp--preset--color--gray-100);
+                vertical-align: middle;
+            }
+
+            tr:last-child td {
+                border-bottom: none;
+            }
+        }
+    }
+
+    .lesson-status {
+        display: inline-flex;
+        align-items: center;
+        font-size: var(--wp--preset--font-size--small);
+
+        &--completed {
+            color: var(--wp--preset--color--green-500);
+        }
+
+        &--in-progress {
+            color: var(--wp--preset--color--orange-500);
+        }
+
+        &--not-started {
+            color: var(--wp--preset--color--gray-300);
+        }
+    }
+
+    // ─── Achievements Sidebar ──────────────────────
+    .user-progress__achievements {
+        
+    }
+
+    .achievements__list {
+        display: flex;
+        flex-direction: column;
+        gap: var(--wp--preset--spacing--4);
+        background: white;
+        border-radius: 1rem;
+        padding: var(--wp--preset--spacing--5);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    }
+
+    .achievement {
+        display: flex;
+        gap: var(--wp--preset--spacing--3);
+        align-items: flex-start;
+        padding-bottom: var(--wp--preset--spacing--4);
+        border-bottom: 1px solid var(--wp--preset--color--gray-100);
+
+        &:last-child {
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+    }
+
+    .achievement__icon {
+        flex-shrink: 0;
+
+        img {
+            width: 3rem;
+            height: 3rem;
+            object-fit: contain;
+        }
+
+        &--locked {
+            opacity: 0.5;
+        }
+    }
+
+    .achievement__content {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .achievement__name {
+        font-size: var(--wp--preset--font-size--small);
+        font-weight: 600;
+        margin: 0 0 var(--wp--preset--spacing--1);
+
+        &--locked {
+            color: var(--wp--preset--color--gray-400);
+        }
+    }
+
+    .achievement__progress {
+        display: flex;
+        align-items: center;
+        gap: var(--wp--preset--spacing--2);
+        margin-bottom: var(--wp--preset--spacing--1);
+    }
+
+    .achievement__progress-bar {
+        flex: 1;
+        height: 0.375rem;
+        background: var(--wp--preset--color--gray-200);
+        border-radius: 9999px;
+        overflow: hidden;
+    }
+
+    .achievement__progress-fill {
+        height: 100%;
+        border-radius: 9999px;
+        background: var(--wp--preset--color--green-500);
+        transition: width 0.4s ease;
+    }
+
+    .achievement__progress-label {
+        font-size: 0.7rem;
+        font-weight: 600;
+        color: var(--wp--preset--color--gray-500);
+        white-space: nowrap;
+    }
+
+    .achievement__description {
+        font-size: var(--wp--preset--font-size--x-small);
+        color: var(--wp--preset--color--gray-500);
+        margin: 0;
+        line-height: 1.4;
+    }
+
+    // ─── Responsive ────────────────────────────────
+    @media (max-width: 768px) {
+        .user-progress__header {
+            flex-direction: column;
+            text-align: center;
+        }
+
+        .user-progress__meta {
+            justify-content: center;
+        }
+
+        .accordion-toggle__details {
+            display: none;
+        }
+
+        .accordion-toggle__course-name {
+            min-width: auto;
+        }
     }
 }

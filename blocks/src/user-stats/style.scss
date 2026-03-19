@@ -3,7 +3,7 @@
 	.stats__grid{
         display: grid;
         grid-template-columns: repeat(6, 1fr);
-        gap: var(--wp--preset--spacing--5);
+        gap: var(--wp--preset--spacing--3);
         margin-top: var(--wp--preset--spacing--4);
     }
 

@@ -15,6 +15,19 @@ foreach ($attrs as $a) {
 }
 
 $wrapper_attributes = get_block_wrapper_attributes();
+
+// ─── Activity Log Data ───
+// TODO: Replace with REST API call to get user activity
+$activities = [
+    [
+        'event'         => 'Earned Certificate',
+        'date'          => 'Sep 3, 2025',
+        'time'          => '3:28:38 PM',
+        'resource'      => 'Math for Electrical',
+        'resource_type' => 'Course',
+        'initiated_by'  => 'System',
+    ],
+];
 ?>
 
 <div <?= $wrapper_attributes; ?>>
@@ -65,18 +78,19 @@ $wrapper_attributes = get_block_wrapper_attributes();
                 </tr>
             </thead>
             <tbody>
+                <?php foreach ($activities as $activity) : ?>
                 <tr>
-                    <td>Earned Certificate</td>
-                    <td>Sep 3, 2025<br />
-                        <span class="reporting-table__time">3:28:38 PM</span>
+                    <td><?= esc_html($activity['event']); ?></td>
+                    <td><?= esc_html($activity['date']); ?><br />
+                        <span class="reporting-table__time"><?= esc_html($activity['time']); ?></span>
                     </td>
-                    <td>Math for Electrical</td>
+                    <td><?= esc_html($activity['resource']); ?></td>
                     <td>
                         <div class="reporting-table__resource-type">
-                            <div class="reporting-table__resource-type__dot"></div> Course
+                            <div class="reporting-table__resource-type__dot"></div> <?= esc_html($activity['resource_type']); ?>
                         </div>
                     </td>
-                    <td>System</span></td>
+                    <td><?= esc_html($activity['initiated_by']); ?></td>
                     <td>
                         <button
                             type="button"
@@ -87,6 +101,7 @@ $wrapper_attributes = get_block_wrapper_attributes();
                         </button>
                     </td>
                 </tr>
+                <?php endforeach; ?>
             </tbody>
         </table>
     </div>

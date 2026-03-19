@@ -16,11 +16,13 @@ foreach ($attrs as $a) {
 
 $wrapper_attributes = get_block_wrapper_attributes([
     // 'data-priority' => esc_attr($priority),
+    'data-wp-interactive' => 'bys-groups',
 ]);
 ?>
 
 <div <?= $wrapper_attributes; ?>>
     <h3>Quick Stats</h3>
+    <p>test only</p>
     <div class="stats__grid">
         <div class="stat__box">
             <div class="stat__icon">

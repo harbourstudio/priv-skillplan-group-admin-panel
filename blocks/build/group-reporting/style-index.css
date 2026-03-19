@@ -1,6 +1,6 @@
-/*!*******************************************************************************************************************************************************************************************************************************************************!*\
-  !*** css ./node_modules/css-loader/dist/cjs.js??ruleSet[1].rules[4].use[1]!./node_modules/postcss-loader/dist/cjs.js??ruleSet[1].rules[4].use[2]!./node_modules/sass-loader/dist/cjs.js??ruleSet[1].rules[4].use[3]!./src/group-reporting/style.scss ***!
-  \*******************************************************************************************************************************************************************************************************************************************************/
+/*!***************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ./node_modules/css-loader/dist/cjs.js??ruleSet[1].rules[4].use[1]!./node_modules/postcss-loader/dist/cjs.js??ruleSet[1].rules[4].use[2]!./node_modules/@wordpress/scripts/node_modules/sass-loader/dist/cjs.js??ruleSet[1].rules[4].use[3]!./src/group-reporting/style.scss ***!
+  \***************************************************************************************************************************************************************************************************************************************************************************************/
 .wp-block-bys-groups-group-reporting .section__title {
   display: flex;
   justify-content: space-between;
@@ -45,7 +45,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: var(--wp--preset--spacing--7);
+  margin-top: var(--wp--preset--spacing--6);
   margin-bottom: var(--wp--preset--spacing--4);
   font-size: var(--wp--preset--font-size--small);
 }
@@ -70,30 +70,37 @@
   width: 100%;
   font-size: var(--wp--preset--font-size--small);
   background: white;
-  border-radius: 1.5rem;
+  border-radius: 1rem;
   text-align: left;
   border-collapse: collapse;
 }
-.wp-block-bys-groups-group-reporting .table__results table thead th, .wp-block-bys-groups-group-reporting .table__results table thead td {
+.wp-block-bys-groups-group-reporting .table__results table thead th {
   background-color: var(--wp--preset--color--primary);
   color: white;
   font-weight: 500;
   padding: var(--wp--preset--spacing--3);
   border: none;
+  vertical-align: bottom;
+  white-space: nowrap;
 }
-.wp-block-bys-groups-group-reporting .table__results table thead th a, .wp-block-bys-groups-group-reporting .table__results table thead th i, .wp-block-bys-groups-group-reporting .table__results table thead td a, .wp-block-bys-groups-group-reporting .table__results table thead td i {
+.wp-block-bys-groups-group-reporting .table__results table thead th a, .wp-block-bys-groups-group-reporting .table__results table thead th i {
   color: white;
 }
-.wp-block-bys-groups-group-reporting .table__results table thead th {
-  padding-bottom: 0;
-}
-.wp-block-bys-groups-group-reporting .table__results table thead tr:first-of-type th:first-of-type {
+.wp-block-bys-groups-group-reporting .table__results table thead th:first-child {
   border-top-left-radius: 1.5rem;
 }
-.wp-block-bys-groups-group-reporting .table__results table thead tr:first-of-type th:last-of-type {
+.wp-block-bys-groups-group-reporting .table__results table thead th:last-child {
   border-top-right-radius: 1.5rem;
 }
-.wp-block-bys-groups-group-reporting .table__results table thead .bys-course-toggle {
+.wp-block-bys-groups-group-reporting .table__results table .course-col-header__inner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wp--preset--spacing--1);
+}
+.wp-block-bys-groups-group-reporting .table__results table .course-col-header--expanded {
+  border-left: 2px solid rgba(255, 255, 255, 0.3);
+}
+.wp-block-bys-groups-group-reporting .table__results table .bys-course-toggle {
   background: none;
   border: none;
   color: white;
@@ -101,41 +108,56 @@
   font-weight: 600;
   cursor: pointer;
   padding: 0;
-  display: block;
   text-align: left;
-  white-space: nowrap;
 }
-.wp-block-bys-groups-group-reporting .table__results table thead .bys-course-toggle:hover {
+.wp-block-bys-groups-group-reporting .table__results table .bys-course-toggle:hover {
   text-decoration: underline;
   opacity: 0.9;
 }
-.wp-block-bys-groups-group-reporting .table__results table thead .course-sub-th {
-  background-color: var(--wp--preset--color--primary);
-  padding-top: var(--wp--preset--spacing--3);
-  padding-bottom: 0;
-  white-space: nowrap;
+.wp-block-bys-groups-group-reporting .table__results table .bys-dl-link {
+  font-size: var(--wp--preset--font-size--x-small);
+  opacity: 0.7;
 }
-.wp-block-bys-groups-group-reporting .table__results table thead .course-sub-th .bys-sub-label {
-  display: block;
+.wp-block-bys-groups-group-reporting .table__results table .bys-dl-link:hover {
+  opacity: 1;
+}
+.wp-block-bys-groups-group-reporting .table__results table .bys-dl-link {
+  padding-top: var(--wp--preset--spacing--1);
+}
+.wp-block-bys-groups-group-reporting .table__results table .course-sub-col {
   font-size: var(--wp--preset--font-size--x-small);
   font-weight: 500;
-  opacity: 0.85;
-  margin-top: 0.2rem;
+  opacity: 0.9;
 }
-.wp-block-bys-groups-group-reporting .table__results table thead .course-col-header--expanded {
-  border-left: 2px solid rgba(255, 255, 255, 0.3);
+.wp-block-bys-groups-group-reporting .table__results table .course-sub-col--hidden {
+  display: none;
 }
-.wp-block-bys-groups-group-reporting .table__results table thead .course-sub-th:last-of-type {
-  border-right: 2px solid rgba(255, 255, 255, 0.3);
+.wp-block-bys-groups-group-reporting .table__results table .course-sub-col--progress {
+  min-width: 170px;
+}
+.wp-block-bys-groups-group-reporting .table__results table .course-sub-col--quizzing {
+  min-width: 80px;
+}
+.wp-block-bys-groups-group-reporting .table__results table .course-sub-col--enrolment {
+  min-width: 130px;
+}
+.wp-block-bys-groups-group-reporting .table__results table .course-sub-col--completion {
+  min-width: 130px;
+}
+.wp-block-bys-groups-group-reporting .table__results table .course-col--hidden {
+  display: none;
 }
 .wp-block-bys-groups-group-reporting .table__results table tbody tr:not(:last-of-type) td {
   border-bottom: 1px solid var(--wp--preset--color--gray-200);
+}
+.wp-block-bys-groups-group-reporting .table__results table tbody tr.reporting-table__row {
+  cursor: pointer;
 }
 .wp-block-bys-groups-group-reporting .table__results table tbody tr.reporting-table__row:hover {
   background: #f8faff;
 }
 .wp-block-bys-groups-group-reporting .table__results table tbody td {
-  padding: var(--wp--preset--spacing--3);
+  padding: var(--wp--preset--spacing--4) var(--wp--preset--spacing--3);
   vertical-align: middle;
 }
 .wp-block-bys-groups-group-reporting .table__results table tbody .status-badge {
@@ -159,23 +181,16 @@
 .wp-block-bys-groups-group-reporting .table__results table tbody .completion-badge--none {
   color: var(--wp--preset--color--red-500);
 }
-.wp-block-bys-groups-group-reporting .table__results table tbody .course-cell--progress {
-  display: table-cell;
+.wp-block-bys-groups-group-reporting .table__results table tbody .course-sub-cell {
   white-space: nowrap;
-  min-width: 150px;
 }
-.wp-block-bys-groups-group-reporting .table__results table tbody .course-cell--date {
-  white-space: nowrap;
+.wp-block-bys-groups-group-reporting .table__results table tbody .course-sub-cell--enrolment, .wp-block-bys-groups-group-reporting .table__results table tbody .course-sub-cell--completion {
   color: var(--wp--preset--color--gray-600);
-}
-.wp-block-bys-groups-group-reporting .table__results table tbody .course-cell--date .bys-date-empty {
-  color: var(--wp--preset--color--gray-400);
-  font-style: italic;
 }
 .wp-block-bys-groups-group-reporting .bys-progress-wrap {
   display: inline-block;
-  width: 80px;
-  height: 7px;
+  width: 5rem;
+  height: 0.5rem;
   background: var(--wp--preset--color--gray-200);
   border-radius: 999px;
   overflow: hidden;
@@ -204,25 +219,36 @@
 .wp-block-bys-groups-group-reporting .bys-quiz-empty {
   color: var(--wp--preset--color--gray-400);
 }
+.wp-block-bys-groups-group-reporting .bys-date-empty {
+  color: var(--wp--preset--color--gray-400);
+  font-style: italic;
+}
+.wp-block-bys-groups-group-reporting .reporting-table__name-link {
+  color: var(--wp--preset--color--primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+.wp-block-bys-groups-group-reporting .reporting-table__name-link:hover {
+  text-decoration: underline;
+}
 .wp-block-bys-groups-group-reporting .bys-show-more {
   display: block;
   width: 100%;
   padding: var(--wp--preset--spacing--3);
-  background: var(--wp--preset--color--gray-100);
+  background: var(--wp--preset--color--blue-100);
   border: none;
   border-top: 1px solid var(--wp--preset--color--gray-200);
-  color: var(--wp--preset--color--primary);
+  color: var(--wp--preset--color--blue-700);
   font-weight: 600;
   font-size: var(--wp--preset--font-size--small);
   cursor: pointer;
   text-align: center;
-  border-bottom-left-radius: 1.5rem;
-  border-bottom-right-radius: 1.5rem;
+  border-bottom-left-radius: 1rem;
+  border-bottom-right-radius: 1rem;
 }
 .wp-block-bys-groups-group-reporting .bys-show-more:hover {
-  background: var(--wp--preset--color--gray-200);
+  background: var(--wp--preset--color--blue-200);
 }
-
 .bys-tooltip {
   position: absolute;
   z-index: 9999;
