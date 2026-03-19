@@ -12,10 +12,10 @@
 		"anchor": true,
 		"html": false,
 		"spacing": {
-		"margin": true
+			"margin": true
 		}
 	},
-	"keywords": [ "word", "blog", "post", "written" ],
+	"keywords": [ "group", "learndash", "progress", "dashboard" ],
 	"attributes": {
 		"blockId": {
 			"type": "string",
@@ -23,6 +23,7 @@
 		}
 	},
 	"editorScript": "file:./index.js",
+	"viewScript": "file:./view.js",
 	"render": "file:./render.php",
 	"style": "file:./style-index.css"
 }

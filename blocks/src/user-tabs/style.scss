@@ -19,7 +19,7 @@
         flex-grow: 1;
 
         &:hover {
-            color: var(--wp--preset--color--gray-900);
+            border-color: var(--wp--preset--color--primary);
         }
 
         &--active {

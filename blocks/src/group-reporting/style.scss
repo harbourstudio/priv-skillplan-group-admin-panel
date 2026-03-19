@@ -18,6 +18,10 @@
         padding: var(--wp--preset--spacing--5) var(--wp--preset--spacing--6);
         border-radius: 1rem;
 
+        &.hidden{
+            display: none;
+        }
+
         .filters__fields{
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -71,6 +75,11 @@
     }
 
     .table__results{
+        // Allow horizontal scroll when many courses are expanded
+        .table__scroll{
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
 
         table{
             width: 100%;
@@ -106,19 +115,71 @@
                         border-top-right-radius: 1.5rem;
                     }
                 }
+
+                // ── Course toggle button ──────────────────────────────
+                .bys-course-toggle{
+                    background: none;
+                    border: none;
+                    color: white;
+                    font-size: inherit;
+                    font-weight: 600;
+                    cursor: pointer;
+                    padding: 0;
+                    display: block;
+                    text-align: left;
+                    white-space: nowrap;
+
+                    &:hover{
+                        text-decoration: underline;
+                        opacity: 0.9;
+                    }
+                }
+
+                // ── Sub-column labels (injected by view.js) ───────────
+                .course-sub-th{
+                    background-color: var(--wp--preset--color--primary);
+                    padding-top: var(--wp--preset--spacing--3);
+                    padding-bottom: 0;
+                    white-space: nowrap;
+
+                    .bys-sub-label{
+                        display: block;
+                        font-size: var(--wp--preset--font-size--x-small);
+                        font-weight: 500;
+                        opacity: 0.85;
+                        margin-top: 0.2rem;
+                    }
+                }
+
+                // Left border to visually separate expanded course group
+                .course-col-header--expanded{
+                    border-left: 2px solid rgba(255,255,255,0.3);
+                }
+                .course-sub-th:last-of-type{
+                    border-right: 2px solid rgba(255,255,255,0.3);
+                }
             }
 
             tbody{
-                tr:not(:last-of-type) td{
-                    border-bottom: 1px solid var(--wp--preset--color--gray-200);
+                tr{
+                    &:not(:last-of-type) td{
+                        border-bottom: 1px solid var(--wp--preset--color--gray-200);
+                    }
+
+                    &.reporting-table__row:hover{
+                        background: #f8faff;
+                    }
                 }
                 
                 td{
                     padding: var(--wp--preset--spacing--3);
+                    vertical-align: middle;
                 }
 
+                // ── Status dot ────────────────────────────────────────
                 .status-badge{
                     font-size: var(--wp--preset--font-size--x-small);
+
                     &--online{
                         color: var(--wp--preset--color--green-500);
                     }
@@ -130,19 +191,110 @@
                     }
                 }
 
+                // ── Collapsed course icon ─────────────────────────────
                 .completion-badge{
-                    &--completed{
-                        color: var(--wp--preset--color--green-500);
-                    }
-                    &--partial{
-                        color: var(--wp--preset--color--orange-500);
-                    }
-                    &--none{
-                        color: var(--wp--preset--color--red-500);
+                    &--completed{ color: var(--wp--preset--color--green-500); }
+                    &--partial{   color: var(--wp--preset--color--orange-500); }
+                    &--none{      color: var(--wp--preset--color--red-500); }
+                }
+
+                // ── Expanded: progress bar ────────────────────────────
+                .course-cell--progress{
+                    display: table-cell; // stays a td
+                    white-space: nowrap;
+                    min-width: 150px;
+                }
+
+                // ── Expanded: date cells ──────────────────────────────
+                .course-cell--date{
+                    white-space: nowrap;
+                    color: var(--wp--preset--color--gray-600);
+
+                    .bys-date-empty{
+                        color: var(--wp--preset--color--gray-400);
+                        font-style: italic;
                     }
                 }
             }
         }
     }
 
+    // ── Progress bar ──────────────────────────────────────────────────────
+    .bys-progress-wrap{
+        display: inline-block;
+        width: 80px;
+        height: 7px;
+        background: var(--wp--preset--color--gray-200);
+        border-radius: 999px;
+        overflow: hidden;
+        vertical-align: middle;
+        margin-right: 6px;
+    }
+
+    .bys-progress-bar{
+        height: 100%;
+        border-radius: 999px;
+        transition: width 0.3s ease;
+    }
+
+    .bys-pct{
+        font-size: var(--wp--preset--font-size--x-small);
+        font-weight: 600;
+        vertical-align: middle;
+    }
+
+    // ── Quiz icons ────────────────────────────────────────────────────────
+    .bys-quiz-icons{
+        display: flex;
+        gap: 3px;
+        align-items: center;
+    }
+
+    .bys-quiz-icon{
+        cursor: default;
+        line-height: 1;
+    }
+
+    .bys-quiz-empty{
+        color: var(--wp--preset--color--gray-400);
+    }
+
+    // ── Show more ─────────────────────────────────────────────────────────
+    .bys-show-more{
+        display: block;
+        width: 100%;
+        padding: var(--wp--preset--spacing--3);
+        background: var(--wp--preset--color--gray-100);
+        border: none;
+        border-top: 1px solid var(--wp--preset--color--gray-200);
+        color: var(--wp--preset--color--primary);
+        font-weight: 600;
+        font-size: var(--wp--preset--font-size--small);
+        cursor: pointer;
+        text-align: center;
+        border-bottom-left-radius: 1.5rem;
+        border-bottom-right-radius: 1.5rem;
+
+        &:hover{
+            background: var(--wp--preset--color--gray-200);
+        }
+    }
+}
+
+// ── Tooltip (appended outside block) ─────────────────────────────────────────
+.bys-tooltip{
+    position: absolute;
+    z-index: 9999;
+    background: #1e293b;
+    color: white;
+    border-radius: 0.4rem;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.75rem;
+    pointer-events: none;
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+
+    &[aria-hidden="true"]{
+        display: none;
+    }
 }
