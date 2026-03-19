@@ -6,7 +6,7 @@
 	"license": "GPL-2.0-or-later",
 	"main": "build/index.js",
 	"scripts": {
-		"start": "wp-scripts start --webpack-src-dir=src/ --output-path=build/",
+		"start": "node build-modules.js --watch & wp-scripts start --webpack-src-dir=src/ --output-path=build/",
 		"build": "wp-scripts build --webpack-src-dir=src/ --output-path=build/ && node build-modules.js"
 	},
 	"devDependencies": {

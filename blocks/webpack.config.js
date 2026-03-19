@@ -12,4 +12,10 @@ glob.sync('./src/*/index.js').forEach((file) => {
 module.exports = {
     ...defaultConfig,
     entry,
+    output: {
+        ...defaultConfig.output,
+        clean: {
+            keep: /view\.module/,
+        },
+    },
 };
