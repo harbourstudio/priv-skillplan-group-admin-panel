@@ -75,37 +75,6 @@ if ( $user_id ) {
         }
     }
 }
-
-// ── Helpers ────────────────────────────────────────────────────────────────
-function bys_completion_badge( $progress ) {
-    if ( $progress >= 100 ) return '<span class="completion-badge completion-badge--completed"><i class="fa-solid fa-circle"></i></span>';
-    if ( $progress > 0 )   return '<span class="completion-badge completion-badge--partial"><i class="fa-solid fa-circle-half-stroke"></i></span>';
-    return '<span class="completion-badge completion-badge--none"><i class="fa-regular fa-circle"></i></span>';
-}
-
-function bys_progress_bar( $progress ) {
-    $color = $progress >= 100 ? 'var(--wp--preset--color--green-500)'
-           : ( $progress > 0 ? 'var(--wp--preset--color--orange-500)'
-                              : 'var(--wp--preset--color--gray-300)' );
-    return sprintf(
-        '<div class="bys-progress-wrap"><div class="bys-progress-bar" style="width:%d%%;background:%s;"></div></div><span class="bys-pct" style="color:%s;">%d%%</span>',
-        $progress, $color, $color, $progress
-    );
-}
-
-function bys_quiz_icons( $quizzes ) {
-    if ( empty( $quizzes ) ) return '<span class="bys-quiz-empty">—</span>';
-    $out = '<div class="bys-quiz-icons">';
-    foreach ( $quizzes as $q ) {
-        $s     = $q['score'] ?? 0;
-        $color = $s >= 80 ? 'var(--wp--preset--color--green-500)'
-               : ( $s >= 50 ? 'var(--wp--preset--color--orange-500)'
-                             : 'var(--wp--preset--color--red-500)' );
-        $tip   = esc_attr( $q['title'] . ': ' . $q['points'] . '/' . $q['total'] . ' (' . $s . '%)' );
-        $out  .= '<span class="bys-quiz-icon" data-tip="' . $tip . '" style="color:' . $color . ';"><i class="fa-solid fa-circle" style="font-size:12px;"></i></span>';
-    }
-    return $out . '</div>';
-}
 ?>
 
 <div <?php echo $wrapper_attributes; ?>>
@@ -211,65 +180,7 @@ function bys_quiz_icons( $quizzes ) {
                 </thead>
 
                 <tbody>
-                    <?php foreach ( $users as $user ) : ?>
-                        <tr class="reporting-table__row"
-                            data-user-id="<?php echo esc_attr( $user['id'] ); ?>">
-
-                            <td class="col-status">
-                                <span class="status-badge status-badge--<?php echo esc_attr( $user['online'] ); ?>">
-                                    <i class="fa-solid fa-circle"></i>
-                                </span>
-                            </td>
-
-                            <td class="col-name">
-                                <a href="<?php echo esc_url( add_query_arg( 'user_id', $user['id'], $detail_url ) ); ?>"
-                                   class="reporting-table__name-link"
-                                   onclick="event.stopPropagation();">
-                                    <?php echo esc_html( $user['display_name'] ); ?>
-                                </a>
-                            </td>
-
-                            <td class="col-email"><?php echo esc_html( $user['email'] ); ?></td>
-
-                            <?php foreach ( $courses as $idx => $course ) :
-                                $e        = $user['courses'][ $course['id'] ] ?? [];
-                                $progress = $e['progress'] ?? 0;
-                                $enrol    = $e['enrolment_date'] ?? '';
-                                $comp     = $e['completion_date'] ?? '';
-                                $quizzes  = $e['quizzes'] ?? [];
-                            ?>
-
-                                <!-- Collapsed cell: shows badge only -->
-                                <td class="course-cell course-cell--badge"
-                                    data-course-idx="<?php echo $idx; ?>">
-                                    <?php echo bys_completion_badge( $progress ); ?>
-                                </td>
-
-                                <!-- Sub-cells: hidden until expanded -->
-                                <td class="course-cell course-sub-cell course-sub-cell--progress course-sub-col--hidden"
-                                    data-course-idx="<?php echo $idx; ?>">
-                                    <?php echo bys_progress_bar( $progress ); ?>
-                                </td>
-
-                                <td class="course-cell course-sub-cell course-sub-cell--quizzing course-sub-col--hidden"
-                                    data-course-idx="<?php echo $idx; ?>">
-                                    <?php echo bys_quiz_icons( $quizzes ); ?>
-                                </td>
-
-                                <td class="course-cell course-sub-cell course-sub-cell--enrolment course-sub-col--hidden"
-                                    data-course-idx="<?php echo $idx; ?>">
-                                    <?php echo $enrol ? esc_html( $enrol ) : '<span class="bys-date-empty">Not Started</span>'; ?>
-                                </td>
-
-                                <td class="course-cell course-sub-cell course-sub-cell--completion course-sub-col--hidden"
-                                    data-course-idx="<?php echo $idx; ?>">
-                                    <?php echo $comp ? esc_html( $comp ) : '<span class="bys-date-empty">Not Completed</span>'; ?>
-                                </td>
-
-                            <?php endforeach; ?>
-
-                        </tr>
-                    <?php endforeach; ?>
+                    <!-- Table body populated dynamically by view.js -->
                 </tbody>
 
             </table>

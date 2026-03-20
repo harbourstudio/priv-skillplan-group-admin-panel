@@ -1,16 +1,1 @@
-/*!************************************************************************************************************************************************************************************************************************************************************************************!*\
-  !*** css ./node_modules/css-loader/dist/cjs.js??ruleSet[1].rules[4].use[1]!./node_modules/postcss-loader/dist/cjs.js??ruleSet[1].rules[4].use[2]!./node_modules/@wordpress/scripts/node_modules/sass-loader/dist/cjs.js??ruleSet[1].rules[4].use[3]!./src/group-select/style.scss ***!
-  \************************************************************************************************************************************************************************************************************************************************************************************/
-.wp-block-bys-groups-group-select .group-selector {
-  display: flex;
-  gap: var(--wp--preset--spacing--3);
-  align-items: center;
-}
-.wp-block-bys-groups-group-select .group-selector__select {
-  background: white;
-  border-radius: 0.5rem;
-  border: 1px solid var(--wp--preset--color--gray-300);
-  min-width: 23.5rem;
-  padding: var(--wp--preset--spacing--3);
-  min-height: 3.25rem;
-}
+.wp-block-bys-groups-group-select .group-selector{align-items:center;display:flex;gap:var(--wp--preset--spacing--3)}.wp-block-bys-groups-group-select .group-selector__select{background:#fff;border:1px solid var(--wp--preset--color--gray-300);border-radius:.5rem;min-height:3.25rem;min-width:23.5rem;padding:var(--wp--preset--spacing--3)}
