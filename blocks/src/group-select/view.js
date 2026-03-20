@@ -1,7 +1,7 @@
 import { api } from '../_shared/api-client.js';
 
 jQuery(document).ready(($) => {
-  const $block = $('.wp-block-bys-groups-group-select').first();
+  const $block = $('.wp-block-bys-groups-group-select').first(); // will only have 1 instance of this block per page
   if (!$block) return;
 
   const $select = $block.find('#group-select');
@@ -16,13 +16,16 @@ jQuery(document).ready(($) => {
     if (!groupId) return;
 
     try {
-      const baseStatsUrl = `/wp-json/bys-groups/v1/groups/${groupId}/stats`;
-      const baseStats = await api.get(baseStatsUrl, true); // Force refresh
-      // console.log('baseStats', baseStats);
+      // call custom rest route; callback method makes the request to LD API for the data 
+      // stats data will be available in the document (data payload) and can be accessed by any element listening to the bys:groupSelected event
+      // particularily, it'll be available to use by the group-stats block
+      const groupBaseStatsRoute = `/wp-json/bys-groups/v1/groups/${groupId}/stats`;
+      const groupBaseStats = await api.get(groupBaseStatsRoute, true); // Force refresh
+      console.log('groupBaseStats', groupBaseStats);
 
       $(document).trigger('bys:groupSelected', {
         groupId: parseInt(groupId),
-        stats: baseStats
+        stats: groupBaseStats
       })
     } catch(err) {
       console.error('Failed to fetch data for group-select', err)

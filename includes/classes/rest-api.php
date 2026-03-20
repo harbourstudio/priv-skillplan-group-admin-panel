@@ -38,7 +38,7 @@ if (!class_exists('BYS_Groups_Rest_API')) {
 
             register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/stats', array(
                 'methods'             => 'GET',
-                'callback'            => array($this, 'get_group_stats'),
+                'callback'            => array($this, 'get_base_group_users_stats'),
                 'permission_callback' => array($this, 'check_user_permission'),
             ));
 
@@ -77,26 +77,42 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             return is_user_logged_in();
         }
 
+        /**
+         * Get all LD groups the current user is a leader of.
+         *
+         * LD stores group leadership as user meta with key format:
+         * learndash_group_leaders_{group_id} => group_id
+         */
         public function get_current_user_groups($request) {
             $user_id = get_current_user_id();
 
             if (!$user_id) {
                 return new \WP_REST_Response(array('error' => 'Not logged in'), 401);
             }
-            
-            $args = array(
-                'post_type'      => 'groups',
-                'posts_per_page' => -1
-            );
 
-            $all_groups = get_posts($args);
+            // extract all group IDs from user meta keys
+            $user_group_metas = get_user_meta($user_id);
+            $led_group_ids = array();
+
+            foreach ($user_group_metas as $meta_key => $meta_values) {
+                // look for meta keys matching learndash_group_leaders_{group_id}
+                if (strpos($meta_key, 'learndash_group_leaders_') === 0) {
+                    $group_id = intval(str_replace('learndash_group_leaders_', '', $meta_key));
+                    if ($group_id > 0) {
+                        $led_group_ids[] = $group_id;
+                    }
+                }
+            }
+
+            if (empty($led_group_ids)) {
+                return new \WP_REST_Response(array('groups' => array()), 200);
+            }
+
+            // build response with group post data
             $user_groups = array();
-
-            foreach ($all_groups as $group) {
-                $group_leaders_key = 'learndash_group_leaders_' . $group->ID;
-                $is_leader = get_user_meta($user_id, $group_leaders_key, true);
-                
-                if ($is_leader) {
+            foreach ($led_group_ids as $group_id) {
+                $group = get_post($group_id);
+                if ($group && $group->post_type === 'groups') {
                     $user_groups[] = array(
                         'id'    => $group->ID,
                         'title' => $group->post_title
@@ -107,7 +123,8 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             return new \WP_REST_Response(array('groups' => $user_groups), 200);
         }
 
-        public function get_group_stats($request) {
+
+        public function get_base_group_users_stats($request) {
             $group_id = intval($request['group_id']);
 
             if (!$group_id) {
@@ -130,7 +147,7 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 }
             }
 
-            // return member info and let frontend fetch course data from LearnDash API
+            // return member info
             return new \WP_REST_Response(array(
                 'group_id'                => $group_id,
                 'total_members'           => $total_members,

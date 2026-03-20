@@ -46,12 +46,19 @@ $auth_header = BYS_Groups_Auth::get_auth_header();
 
 	<div class="group-selector">
 		<select id="group-select" class="group-selector__select" name="group">
-			<option value="">Select a Group</option>
-			<?php foreach ($groups as $group): ?>
-				<option class="group-option" value="<?php echo $group["id"]; ?>">
-					<?php echo $group['title']; ?>
-				</option>
-			<?php endforeach; ?>
+			<?php if ($groups > 0) : ?>
+				<?php foreach ($groups as $idx => $group): ?>
+					<option
+						class="group-option"
+						value="<?php echo $group['id']; ?>"
+						<?php echo $idx === 0 ? 'selected' : ''; ?>
+					>
+						<?php echo $group['title']; ?>
+					</option>
+				<?php endforeach; ?>
+			<?php else: ?>
+				<option><?php echo esc_html__('No Groups available', 'bys'); ?></option>
+			<?php endif; ?>
 		</select>
 		<button class="group-selector__button" type="button">Show Group</button>
 	</div>
