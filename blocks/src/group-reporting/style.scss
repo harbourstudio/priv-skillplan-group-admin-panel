@@ -180,16 +180,25 @@
                 // Status dot
                 .status-badge {
                     font-size: var(--wp--preset--font-size--x-small);
-                    &--online  { color: var(--wp--preset--color--green-500); }
+                    // &--online  { color: var(--wp--preset--color--green-500); }
+                    &--online  { color: green; }
                     &--offline { color: transparent; }
-                    &--never   { color: var(--wp--preset--color--gray-400); }
+                    // &--never   { color: var(--wp--preset--color--gray-400); }
+                    &--never   { color: gray; }
+
                 }
 
                 // Completion badge (collapsed state)
                 .completion-badge {
-                    &--completed { color: var(--wp--preset--color--green-500);  }
-                    &--partial   { color: var(--wp--preset--color--orange-500); }
-                    &--none      { color: var(--wp--preset--color--red-500);    }
+                    // &--completed { color: var(--wp--preset--color--green-500);  }
+                    &--completed { color: green;  }
+
+                    // &--partial   { color: var(--wp--preset--color--orange-500); }
+                    &--partial   { color: orange; }
+
+                    // &--none      { color: var(--wp--preset--color--red-500);    }
+                    &--none      { color: red;    }
+
                 }
 
                 // Sub-cells (mirror the header hidden state)
@@ -198,7 +207,9 @@
 
                     &--enrolment,
                     &--completion {
-                        color: var(--wp--preset--color--gray-600);
+                        // color: var(--wp--preset--color--gray-600);
+                        color: gray;
+                        
                     }
                 }
             }

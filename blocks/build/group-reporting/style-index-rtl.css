@@ -164,28 +164,28 @@
   font-size: var(--wp--preset--font-size--x-small);
 }
 .wp-block-bys-groups-group-reporting .table__results table tbody .status-badge--online {
-  color: var(--wp--preset--color--green-500);
+  color: green;
 }
 .wp-block-bys-groups-group-reporting .table__results table tbody .status-badge--offline {
   color: transparent;
 }
 .wp-block-bys-groups-group-reporting .table__results table tbody .status-badge--never {
-  color: var(--wp--preset--color--gray-400);
+  color: gray;
 }
 .wp-block-bys-groups-group-reporting .table__results table tbody .completion-badge--completed {
-  color: var(--wp--preset--color--green-500);
+  color: green;
 }
 .wp-block-bys-groups-group-reporting .table__results table tbody .completion-badge--partial {
-  color: var(--wp--preset--color--orange-500);
+  color: orange;
 }
 .wp-block-bys-groups-group-reporting .table__results table tbody .completion-badge--none {
-  color: var(--wp--preset--color--red-500);
+  color: red;
 }
 .wp-block-bys-groups-group-reporting .table__results table tbody .course-sub-cell {
   white-space: nowrap;
 }
 .wp-block-bys-groups-group-reporting .table__results table tbody .course-sub-cell--enrolment, .wp-block-bys-groups-group-reporting .table__results table tbody .course-sub-cell--completion {
-  color: var(--wp--preset--color--gray-600);
+  color: gray;
 }
 .wp-block-bys-groups-group-reporting .bys-progress-wrap {
   display: inline-block;

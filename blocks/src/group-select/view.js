@@ -29,15 +29,25 @@ jQuery(document).ready(($) => {
       const baseStatsUrl = `/wp-json/bys-groups/v1/groups/${groupId}/stats`;
       const baseStats = await api.get(baseStatsUrl, true); // Force refresh
 
+      // Fetch courses for this group from our custom API
+      const coursesUrl = `/wp-json/bys-groups/v1/groups/${groupId}/courses`;
+      const coursesResponse = await api.get(coursesUrl, true); // Force refresh
+
+      // Extract course data
+      const courses = Array.isArray(coursesResponse)
+        ? coursesResponse.map(course => ({ id: course.id, title: course.title }))
+        : [];
+
       // Trigger custom event so other blocks know the group changed
       $(document).trigger('bys:groupSelected', [
         {
           groupId: parseInt(groupId),
           stats: baseStats,
+          courses: courses,
         },
       ]);
     } catch (err) {
-      console.error('Failed to fetch group stats:', err);
+      console.error('Failed to fetch group stats or courses:', err);
     }
   });
 });
