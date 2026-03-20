@@ -1,0 +1,1 @@
+jQuery(document).ready(t=>{t(document).on("bys:groupSelected",(e,{stats:s})=>{t('[data-bys-stat="total_members"]').text(s.total_members??0),t('[data-bys-stat="completed_courses"]').text(s.completed_courses??0),t('[data-bys-stat="incomplete_courses"]').text(s.incomplete_courses??0),t('[data-bys-stat="total_inactive_members"]').text(s.total_inactive_members??0)})});

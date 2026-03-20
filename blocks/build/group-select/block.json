@@ -13,8 +13,7 @@
     "html": false,
     "spacing": {
       "margin": true
-    },
-    "interactivity": true
+    }
   },
   "keywords": [
     "word",
@@ -33,7 +32,7 @@
     }
   },
   "editorScript": "file:./index.js",
+  "viewScript": "file:./view.js",
   "render": "file:./render.php",
-  "style": "file:./style-index.css",
-  "viewScriptModule": "file:./view.module.js"
+  "style": "file:./style-index.css"
 }

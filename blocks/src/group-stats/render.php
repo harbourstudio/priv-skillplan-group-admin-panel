@@ -14,67 +14,52 @@ foreach ($attrs as $a) {
     }
 }
 
-$wrapper_attributes = get_block_wrapper_attributes([
-    // 'data-priority' => esc_attr($priority),
-    'data-wp-interactive' => 'bys-groups',
-]);
+$wrapper_attributes = get_block_wrapper_attributes();
 ?>
 
-<div <?= $wrapper_attributes; ?>>
-    <h3>Quick Stats</h3>
-    <p>test only</p>
-    <div class="stats__grid">
-        <div class="stat__box">
-            <div class="stat__icon">
-                <img src="<?= esc_url(BYS_GROUPS_PLUGIN_URL . 'assets/img/fire.svg'); ?>" alt="fire" />
-            </div>
-            <div class="stat__text">
-                <span class="stat__number">
-                    16
+<div <?php echo $wrapper_attributes; ?>>
+	<h3>Quick Stats</h3>
+
+	<div class="stats__grid">
+		<div class="stat__box">
+			<div class="stat__icon">
+				<img src="<?php echo esc_url( BYS_GROUPS_PLUGIN_URL . 'assets/img/fire.svg' ); ?>" alt="participants" />
+			</div>
+			<div class="stat__text">
+				<span class="stat__number" data-bys-stat="total_members">0</span>
+				<span class="stat__label">Total Participants</span>
+			</div>
+		</div>
+
+		<div class="stat__box">
+			<div class="stat__icon">
+				<img src="<?php echo esc_url( BYS_GROUPS_PLUGIN_URL . 'assets/img/check-seal.svg' ); ?>" alt="completed" />
+			</div>
+			<div class="stat__text">
+				<span class="stat__number" data-bys-stat="completed_courses">0</span>
+				<span class="stat__label">Completed Courses</span>
+			</div>
+		</div>
+
+		<div class="stat__box">
+			<div class="stat__icon">
+				<img src="<?php echo esc_url( BYS_GROUPS_PLUGIN_URL . 'assets/img/fire.svg' ); ?>" alt="incomplete" />
+			</div>
+			<div class="stat__text">
+				<span class="stat__number" data-bys-stat="incomplete_courses">0</span>
+				<span class="stat__label">Incomplete Courses</span>
+			</div>
+		</div>
+
+		<div class="stat__box">
+			<div class="stat__icon">
+				<img src="<?php echo esc_url( BYS_GROUPS_PLUGIN_URL . 'assets/img/fire.svg' ); ?>" alt="inactive" />
+			</div>
+			<div class="stat__text">
+				<span class="stat__number" data-bys-stat="total_inactive_members">0</span>
+				<span class="stat__label">Inactive Participants
                 </span>
-                <span class="stat__label">
-                    Total Participants
-                </span>
-            </div>
-        </div>
-        <div class="stat__box">
-            <div class="stat__icon">
-                <img src="<?= esc_url(BYS_GROUPS_PLUGIN_URL . 'assets/img/check-seal.svg'); ?>" alt="fire" />
-            </div>
-            <div class="stat__text">
-                <span class="stat__number">
-                    16
-                </span>
-                <span class="stat__label">
-                    Completed Courses
-                </span>
-            </div>
-        </div>
-        <div class="stat__box">
-            <div class="stat__icon">
-                <img src="<?= esc_url(BYS_GROUPS_PLUGIN_URL . 'assets/img/fire.svg'); ?>" alt="fire" />
-            </div>
-            <div class="stat__text">
-                <span class="stat__number">
-                    16
-                </span>
-                <span class="stat__label">
-                    Incomplete Courses
-                </span>
-            </div>
-        </div>
-        <div class="stat__box">
-            <div class="stat__icon">
-                <img src="<?= esc_url(BYS_GROUPS_PLUGIN_URL . 'assets/img/fire.svg'); ?>" alt="fire" />
-            </div>
-            <div class="stat__text">
-                <span class="stat__number">
-                    16
-                </span>
-                <span class="stat__label">
-                    Inactive Participants
-                </span>
-            </div>
-        </div>
-    </div>
+			</div>
+		</div>
+	</div>
 </div>

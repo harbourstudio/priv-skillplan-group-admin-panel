@@ -1,69 +1,43 @@
-import { store } from '@wordpress/interactivity';
+import { api } from '../_shared/api-client.js';
+import { readBlockData } from '../_shared/block-data.js';
 
-// console.log('group-select view.js loaded');
+jQuery(document).ready(($) => {
+  // Read group list from embedded JSON (rendered by render.php)
+  const groups = readBlockData('group-select', []);
 
-store('bys-groups', {
-    state: {
-        groups: [],
-        selectedGroup: null,
-        loading: true,
-        error: null
-    },
-    actions: {
-        async initGroups() {
-            // console.log('initGroups called');
-            const { state } = store('bys-groups');
-            state.loading = true;
-            state.error = null;
+  // Populate select with groups from SSR data
+  const $select = $('#group-select');
+  groups.forEach((group) => {
+    const $option = $('<option></option>')
+      .val(group.id)
+      .text(group.title);
+    $select.append($option);
+  });
 
-            try {
-                const response = await fetch('/wp-json/bys-groups/v1/me/groups');
-                if (!response.ok) {
-                    throw new Error('Failed to fetch data from endpoint');
-                }
+  // When user clicks "Show Group" button, fetch stats from LearnDash API
+  $('.group-selector__button').on('click', async function(e) {
+    e.preventDefault();
 
-                const data = await response.json();
-                state.groups = data.groups || [];
-                // console.log('fetched groups:', state.groups);
+    const groupId = $select.val();
 
-                if (state.groups.length > 0) {
-                    state.selectedGroup = state.groups[0].id;
-                }
-                // console.log('state after init:', { groups: state.groups, selectedGroup: state.selectedGroup, loading: state.loading, error: state.error });
+    if (!groupId) {
+      return;
+    }
 
-                // Populate the select dropdown manually
-                const select = document.getElementById('group-select');
-                if (select) {
-                    // Remove all options except the first one
-                    while (select.options.length > 1) {
-                        select.remove(1);
-                    }
+    try {
+      // Fetch base stats from our custom endpoint
+      const baseStatsUrl = `/wp-json/bys-groups/v1/groups/${groupId}/stats`;
+      const baseStats = await api.get(baseStatsUrl, true); // Force refresh
 
-                    // Add new options
-                    state.groups.forEach(group => {
-                        const option = document.createElement('option');
-                        option.value = group.id;
-                        option.textContent = group.title;
-                        select.appendChild(option);
-                    });
-
-                    // Set the selected value
-                    if (state.selectedGroup) {
-                        select.value = state.selectedGroup;
-                    }
-                }
-            } catch(err) {
-                // console.error('error fetching groups:', err);
-                state.error = err.message;
-            } finally {
-                state.loading = false;
-                // console.log('final state.loading:', state.loading);
-            }
+      // Trigger custom event so other blocks know the group changed
+      $(document).trigger('bys:groupSelected', [
+        {
+          groupId: parseInt(groupId),
+          stats: baseStats,
         },
-        selectGroup(event) {
-            const { state } = store('bys-groups');
-            state.selectedGroup = parseInt(event.target.value) || null;
-            // console.log('selectGroup:', state.selectedGroup);
-        },
-    },
-})
+      ]);
+    } catch (err) {
+      console.error('Failed to fetch group stats:', err);
+    }
+  });
+});

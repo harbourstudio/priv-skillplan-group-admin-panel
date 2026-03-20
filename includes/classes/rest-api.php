@@ -34,28 +34,43 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             register_rest_route($this->namespace, '/me/groups', array(
                 'methods'             => 'GET',
                 'callback'            => array($this, 'get_current_user_groups'),
-                // 'permission_callback' => array($this, 'check_user_permission'),
-                'permission_callback' => '__return_true',
+                'permission_callback' => array($this, 'check_user_permission'),
             ));
 
             register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/stats', array(
                 'methods'             => 'GET',
                 'callback'            => array($this, 'get_group_stats'),
-                'permission_callback' => '__return_true',
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
+
+            register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/users', array(
+                'methods'             => 'GET',
+                'callback'            => array($this, 'get_group_users'),
+                'permission_callback' => array($this, 'check_user_permission'),
             ));
         }
 
-        public function check_user_permission() {
-            if (!is_user_logged_in()) {
+        public function check_user_permission($request) {
+            // Check for nonce in X-WP-Nonce header
+            $nonce = isset($_SERVER['HTTP_X_WP_NONCE']) ? $_SERVER['HTTP_X_WP_NONCE'] : null;
+
+            // Also check for nonce in query parameter (for testing)
+            if (!$nonce && isset($_GET['_wpnonce'])) {
+                $nonce = $_GET['_wpnonce'];
+            }
+
+            // Verify nonce
+            if (!$nonce || !wp_verify_nonce($nonce, 'wp_rest')) {
                 return false;
             }
-            return true;
+
+            // User must be logged in
+            return is_user_logged_in();
         }
 
         public function get_current_user_groups($request) {
-            // $user_id = get_current_user_id();
-            $user_id=27;
-            
+            $user_id = 27; // TODO: Replace with get_current_user_id() when auth is properly set up
+
             if (!$user_id) {
                 return new \WP_REST_Response(array('error' => 'Not logged in'), 401);
             }
@@ -90,67 +105,68 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 return new \WP_REST_Response(array('error' => 'Invalid group ID'), 400);
             }
 
-            // Debug: Log all meta keys for this group
-            error_log('DEBUG: Group ' . $group_id . ' meta keys:');
-            $all_meta = get_post_meta($group_id);
-            foreach ($all_meta as $key => $value) {
-                error_log('  ' . $key . ' => ' . json_encode($value));
-            }
+            // Return only the basic info the server can provide
+            // Frontend will fetch LearnDash API data directly since it has auth
 
-            // Get group members directly from LearnDash post meta
+            // Get group members from post meta
             $group_users_key = 'learndash_group_users_' . $group_id;
             $member_ids = get_post_meta($group_id, $group_users_key, true);
             $member_ids = is_array($member_ids) ? $member_ids : array();
             $total_members = count($member_ids);
 
-            // Get courses assigned to the group
-            // LearnDash stores course-group relationships via post meta on courses
-            // Need to query courses that reference this group
-            global $wpdb;
-
-            // Query: find all sfwd-course posts that have this group in their _groups meta
-            $query = $wpdb->prepare(
-                "SELECT p.ID FROM {$wpdb->posts} p
-                 INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
-                 WHERE p.post_type = %s AND pm.meta_key = %s AND pm.meta_value LIKE %s",
-                'sfwd-courses',
-                '_groups',
-                '%i:' . $group_id . ';%'
-            );
-
-            $course_ids = $wpdb->get_col($query);
-            $course_ids = array_map('intval', $course_ids);
-            $total_courses = count($course_ids);
-
-            // Debug
-            error_log('DEBUG: Group ' . $group_id . ' courses: ' . json_encode($course_ids));
-
-            // Count completed vs incomplete courses for group members
-            $completed_count = 0;
-            $incomplete_count = 0;
-
+            // Count inactive members
+            $inactive_members = 0;
             foreach ($member_ids as $member_id) {
-                foreach ($course_ids as $course_id) {
-                    // Check LearnDash course progress meta
-                    // The format is: course_{$course_id}_completed
-                    $progress_key = 'course_' . $course_id . '_completed';
-                    $completion_date = get_user_meta($member_id, $progress_key, true);
-
-                    if ($completion_date) {
-                        $completed_count++;
-                    } else {
-                        $incomplete_count++;
-                    }
+                $member_id = intval($member_id);
+                $last_login = get_user_meta($member_id, 'last_login', true);
+                if (empty($last_login)) {
+                    $inactive_members++;
                 }
             }
 
+            // Return member info and let frontend fetch course data from LearnDash API
             return new \WP_REST_Response(array(
-                'group_id'             => $group_id,
-                'total_members'        => $total_members,
-                'total_courses'        => $total_courses,
-                'completed_courses'    => $completed_count,
-                'incomplete_courses'   => $incomplete_count,
+                'group_id'                => $group_id,
+                'total_members'           => $total_members,
+                'member_ids'              => $member_ids,
+                'total_inactive_members'  => $inactive_members,
             ), 200);
+        }
+
+        public function get_group_users($request) {
+            $group_id = intval($request['group_id']);
+
+            if (!$group_id) {
+                return new \WP_REST_Response(array('error' => 'Invalid group ID'), 400);
+            }
+
+            // Get group members
+            $group_users_key = 'learndash_group_users_' . $group_id;
+            $member_ids = get_post_meta($group_id, $group_users_key, true);
+            $member_ids = is_array($member_ids) ? $member_ids : array();
+
+            // Fetch user data
+            $users = array();
+            foreach ($member_ids as $user_id) {
+                $user_id = intval($user_id);
+                $user = get_user_by('ID', $user_id);
+
+                if ($user) {
+                    // Check if user has ever logged in
+                    $last_login = get_user_meta($user_id, 'last_login', true);
+                    $has_logged_in = !empty($last_login);
+
+                    $users[] = array(
+                        'id'             => $user->ID,
+                        'display_name'   => $user->display_name,
+                        'email'          => $user->user_email,
+                        'has_logged_in'  => $has_logged_in,
+                        'enrolled_courses' => array(), // Placeholder for now
+                    );
+                }
+            }
+
+            return new \WP_REST_Response($users, 200);
         }
     }
 }

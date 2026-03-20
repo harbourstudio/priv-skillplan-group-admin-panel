@@ -1,23 +1,23 @@
 <?php
-/**
- * render.php — BYS Group Reporting block.
- *
- * Architecture: single-row <thead>. Every course gets one <th> for its title/toggle
- * plus THREE adjacent <th class="course-sub-col"> siblings (Progress, Quizzing,
- * Enrolment Date, Completion Date) that are pre-rendered and hidden.
- * Expand/collapse is purely CSS class toggling — no DOM injection.
- * Body rows mirror this exactly: one collapsed <td> + three hidden <td> siblings per course.
- */
-
-$attrs = [ 'blockId' ];
-foreach ( $attrs as $a ) {
-    $$a = isset( $attributes[ $a ] ) ? $attributes[ $a ] : '';
+$attrs = ['blockId'];
+foreach ($attrs as $a) {
+    if (isset($attributes[$a])) {
+        if (is_bool($attributes[$a])) {
+            ${$a} = $attributes[$a];
+        } elseif (is_string($attributes[$a])) {
+            ${$a} = $attributes[$a] !== '' ? $attributes[$a] : '';
+        } else {
+            ${$a} = $attributes[$a] !== null ? $attributes[$a] : '';
+        }
+    } else {
+        ${$a} = '';
+    }
 }
 
 $wrapper_attributes = get_block_wrapper_attributes();
 $detail_url = home_url( '/administrator-dashboard/user-progress-detail/' );
 
-// ── Static sample data ─────────────────────────────────────────────────────
+// Placeholder courses displayed at all times (until we have actual course data)
 $courses = [
     [ 'id' => 1, 'title' => 'MF EL*' ],
     [ 'id' => 2, 'title' => 'MF EL*' ],
@@ -31,72 +31,50 @@ $courses = [
     [ 'id' => 10, 'title' => 'MF EL' ],
 ];
 
-$users = [
-    [
-        'id' => 1, 'display_name' => 'Jane Smith', 'email' => 'jane.smith@email.com', 'online' => 'online',
-        'courses' => [
-            1  => [ 'progress' => 100, 'enrolment_date' => 'Oct 1, 2026',  'completion_date' => 'Nov 2, 2026',  'quizzes' => [ [ 'title' => 'Rounding Decimals', 'points' => 40, 'total' => 50, 'score' => 80 ], [ 'title' => 'Basic Algebra', 'points' => 45, 'total' => 50, 'score' => 90 ] ] ],
-            2  => [ 'progress' => 100, 'enrolment_date' => 'Oct 2, 2026',  'completion_date' => 'Oct 16, 2026', 'quizzes' => [ [ 'title' => 'Quiz 2A', 'points' => 42, 'total' => 50, 'score' => 84 ] ] ],
-            3  => [ 'progress' => 50,  'enrolment_date' => 'Oct 3, 2026',  'completion_date' => '',             'quizzes' => [ [ 'title' => 'Quiz 3A', 'points' => 25, 'total' => 50, 'score' => 50 ] ] ],
-            4  => [ 'progress' => 50,  'enrolment_date' => 'Oct 4, 2026',  'completion_date' => '',             'quizzes' => [] ],
-            5  => [ 'progress' => 0,   'enrolment_date' => 'Oct 5, 2026',  'completion_date' => '',             'quizzes' => [] ],
-            6  => [ 'progress' => 0,   'enrolment_date' => '',             'completion_date' => '',             'quizzes' => [] ],
-            7  => [ 'progress' => 0,   'enrolment_date' => '',             'completion_date' => '',             'quizzes' => [] ],
-            8  => [ 'progress' => 0,   'enrolment_date' => '',             'completion_date' => '',             'quizzes' => [] ],
-            9  => [ 'progress' => 0,   'enrolment_date' => '',             'completion_date' => '',             'quizzes' => [] ],
-            10 => [ 'progress' => 0,   'enrolment_date' => '',             'completion_date' => '',             'quizzes' => [] ],
-        ],
-    ],
-    [
-        'id' => 2, 'display_name' => 'Mark Johnson', 'email' => 'mark.j@email.com', 'online' => 'offline',
-        'courses' => [
-            1  => [ 'progress' => 100, 'enrolment_date' => 'Oct 2, 2026',  'completion_date' => 'Oct 20, 2026', 'quizzes' => [ [ 'title' => 'Rounding Decimals', 'points' => 45, 'total' => 50, 'score' => 90 ] ] ],
-            2  => [ 'progress' => 50,  'enrolment_date' => 'Oct 2, 2026',  'completion_date' => '',             'quizzes' => [ [ 'title' => 'Quiz 2A', 'points' => 20, 'total' => 50, 'score' => 40 ] ] ],
-            3  => [ 'progress' => 0,   'enrolment_date' => '',             'completion_date' => '',             'quizzes' => [] ],
-            4  => [ 'progress' => 0,   'enrolment_date' => '',             'completion_date' => '',             'quizzes' => [] ],
-            5  => [ 'progress' => 0,   'enrolment_date' => '',             'completion_date' => '',             'quizzes' => [] ],
-            6  => [ 'progress' => 0,   'enrolment_date' => '',             'completion_date' => '',             'quizzes' => [] ],
-            7  => [ 'progress' => 0,   'enrolment_date' => '',             'completion_date' => '',             'quizzes' => [] ],
-            8  => [ 'progress' => 0,   'enrolment_date' => '',             'completion_date' => '',             'quizzes' => [] ],
-            9  => [ 'progress' => 0,   'enrolment_date' => '',             'completion_date' => '',             'quizzes' => [] ],
-            10 => [ 'progress' => 0,   'enrolment_date' => '',             'completion_date' => '',             'quizzes' => [] ],
-        ],
-    ],
-    [
-        'id' => 3, 'display_name' => 'Sarah Lee', 'email' => 'sarah.lee@email.com', 'online' => 'never',
-        'courses' => array_fill_keys( range(1,10), [ 'progress' => 0, 'enrolment_date' => '', 'completion_date' => '', 'quizzes' => [] ] ),
-    ],
-    [
-        'id' => 4, 'display_name' => 'Tom Harris', 'email' => 'tom.harris@email.com', 'online' => 'online',
-        'courses' => [
-            1  => [ 'progress' => 100, 'enrolment_date' => 'Oct 1, 2026',  'completion_date' => 'Nov 4, 2026',  'quizzes' => [ [ 'title' => 'Rounding Decimals', 'points' => 45, 'total' => 50, 'score' => 90 ] ] ],
-            2  => [ 'progress' => 0,   'enrolment_date' => '',             'completion_date' => '',             'quizzes' => [] ],
-            3  => [ 'progress' => 50,  'enrolment_date' => 'Oct 5, 2026',  'completion_date' => '',             'quizzes' => [] ],
-            4  => [ 'progress' => 0,   'enrolment_date' => '',             'completion_date' => '',             'quizzes' => [] ],
-            5  => [ 'progress' => 100, 'enrolment_date' => 'Oct 1, 2026',  'completion_date' => 'Nov 10, 2026', 'quizzes' => [] ],
-            6  => [ 'progress' => 100, 'enrolment_date' => 'Oct 1, 2026',  'completion_date' => 'Nov 15, 2026', 'quizzes' => [] ],
-            7  => [ 'progress' => 0,   'enrolment_date' => '',             'completion_date' => '',             'quizzes' => [] ],
-            8  => [ 'progress' => 0,   'enrolment_date' => '',             'completion_date' => '',             'quizzes' => [] ],
-            9  => [ 'progress' => 0,   'enrolment_date' => '',             'completion_date' => '',             'quizzes' => [] ],
-            10 => [ 'progress' => 0,   'enrolment_date' => '',             'completion_date' => '',             'quizzes' => [] ],
-        ],
-    ],
-    [
-        'id' => 5, 'display_name' => 'Graham Taylor', 'email' => 'graham.t@email.com', 'online' => 'offline',
-        'courses' => [
-            1  => [ 'progress' => 70, 'enrolment_date' => 'Oct 13, 2026', 'completion_date' => '', 'quizzes' => [ [ 'title' => 'Quiz 1A', 'points' => 35, 'total' => 50, 'score' => 70 ] ] ],
-            2  => [ 'progress' => 50, 'enrolment_date' => 'Oct 13, 2026', 'completion_date' => '', 'quizzes' => [ [ 'title' => 'Quiz 2A', 'points' => 20, 'total' => 50, 'score' => 40 ] ] ],
-            3  => [ 'progress' => 0,  'enrolment_date' => '',             'completion_date' => '', 'quizzes' => [] ],
-            4  => [ 'progress' => 0,  'enrolment_date' => '',             'completion_date' => '', 'quizzes' => [] ],
-            5  => [ 'progress' => 0,  'enrolment_date' => '',             'completion_date' => '', 'quizzes' => [] ],
-            6  => [ 'progress' => 0,  'enrolment_date' => '',             'completion_date' => '', 'quizzes' => [] ],
-            7  => [ 'progress' => 0,  'enrolment_date' => '',             'completion_date' => '', 'quizzes' => [] ],
-            8  => [ 'progress' => 0,  'enrolment_date' => '',             'completion_date' => '', 'quizzes' => [] ],
-            9  => [ 'progress' => 0,  'enrolment_date' => '',             'completion_date' => '', 'quizzes' => [] ],
-            10 => [ 'progress' => 0,  'enrolment_date' => '',             'completion_date' => '', 'quizzes' => [] ],
-        ],
-    ],
-];
+// Fetch initial users data for display (will be replaced when group changes)
+$users = array();
+
+// Get the first group ID from the current user's groups if available
+require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/rest-api.php';
+$rest_api = new BYS_Groups_Rest_API();
+$user_id = get_current_user_id();
+
+if ( $user_id ) {
+    $response = $rest_api->get_current_user_groups( null );
+
+    if ( ! is_wp_error( $response ) ) {
+        $data = $response->get_data();
+        $user_groups = isset( $data['groups'] ) ? $data['groups'] : array();
+
+        // If user has groups, fetch users for the first group
+        if ( ! empty( $user_groups ) ) {
+            $first_group_id = intval( $user_groups[0]['id'] );
+
+            // Get group members
+            $group_users_key = 'learndash_group_users_' . $first_group_id;
+            $member_ids = get_post_meta( $first_group_id, $group_users_key, true );
+            $member_ids = is_array( $member_ids ) ? $member_ids : array();
+
+            // Fetch user data
+            foreach ( $member_ids as $member_id ) {
+                $member_id = intval( $member_id );
+                $user = get_user_by( 'ID', $member_id );
+
+                if ( $user ) {
+                    $last_login = get_user_meta( $member_id, 'last_login', true );
+                    $has_logged_in = ! empty( $last_login );
+
+                    $users[] = array(
+                        'id'             => $user->ID,
+                        'display_name'   => $user->display_name,
+                        'email'          => $user->user_email,
+                        'has_logged_in'  => $has_logged_in,
+                    );
+                }
+            }
+        }
+    }
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function bys_completion_badge( $progress ) {

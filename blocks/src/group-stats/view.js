@@ -1,42 +1,20 @@
-import { store } from '@wordpress/interactivity';
+/**
+ * Group Stats Block - Frontend View
+ * Listens for group selection changes and updates stat numbers
+ */
 
-// console.log('group-stats view.js loaded');
-
-// Participate in the shared bys-groups store
-store('bys-groups', {
-    state: {
-        groupStats: null,
-        groupStatsLoading: false,
-        groupStatsError: null,
-    },
-    actions: {
-        async fetchGroupStats() {
-            const { state } = store('bys-groups');
-
-            // Only fetch if a group is actually selected
-            if (!state.selectedGroup) {
-                state.groupStats = null;
-                state.groupStatsLoading = false;
-                return;
-            }
-
-            state.groupStatsLoading = true;
-            state.groupStatsError = null;
-
-            try {
-                const response = await fetch(`/wp-json/bys-groups/v1/groups/${state.selectedGroup}/stats`);
-                if (!response.ok) {
-                    throw new Error('Failed to fetch group stats');
-                }
-
-                state.groupStats = await response.json();
-                // console.log('fetched group stats:', state.groupStats);
-            } catch (err) {
-                // console.error('error fetching group stats:', err);
-                state.groupStatsError = err.message;
-            } finally {
-                state.groupStatsLoading = false;
-            }
-        },
-    },
+jQuery(document).ready(($) => {
+  // Listen for group selection event from group-select block
+  $(document).on('bys:groupSelected', (_, { stats }) => {
+    $('[data-bys-stat="total_members"]').text(stats.total_members ?? 0);
+    $('[data-bys-stat="completed_courses"]').text(
+      stats.completed_courses ?? 0
+    );
+    $('[data-bys-stat="incomplete_courses"]').text(
+      stats.incomplete_courses ?? 0
+    );
+    $('[data-bys-stat="total_inactive_members"]').text(
+      stats.total_inactive_members ?? 0
+    );
+  });
 });
