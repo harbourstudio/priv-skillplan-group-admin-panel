@@ -94,37 +94,6 @@ const api = {
   }
 };
 
-/***/ },
-
-/***/ "./src/_shared/block-data.js"
-/*!***********************************!*\
-  !*** ./src/_shared/block-data.js ***!
-  \***********************************/
-(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
-
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   readBlockData: () => (/* binding */ readBlockData)
-/* harmony export */ });
-/**
- * Reads embedded JSON data from <script type="application/json" data-bys-block="...">
- * This pattern allows render.php to embed data in the initial HTML without network requests.
- */
-
-function readBlockData(blockName, fallback = {}) {
-  const selector = `script[data-bys-block="${blockName}"]`;
-  const el = document.querySelector(selector);
-  if (!el) {
-    return fallback;
-  }
-  try {
-    return JSON.parse(el.textContent);
-  } catch (err) {
-    console.error(`Failed to parse block data for "${blockName}":`, err);
-    return fallback;
-  }
-}
-
 /***/ }
 
 /******/ 	});
@@ -197,50 +166,30 @@ var __webpack_exports__ = {};
   \**********************************/
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../_shared/api-client.js */ "./src/_shared/api-client.js");
-/* harmony import */ var _shared_block_data_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../_shared/block-data.js */ "./src/_shared/block-data.js");
-
 
 jQuery(document).ready($ => {
-  // Read group list from embedded JSON (rendered by render.php)
-  const groups = (0,_shared_block_data_js__WEBPACK_IMPORTED_MODULE_1__.readBlockData)('group-select', []);
-
-  // Populate select with groups from SSR data
-  const $select = $('#group-select');
-  groups.forEach(group => {
-    const $option = $('<option></option>').val(group.id).text(group.title);
-    $select.append($option);
-  });
+  const $block = $('.wp-block-bys-groups-group-select').first();
+  if (!$block) return;
+  const $select = $block.find('#group-select');
+  const $button = $block.find('.group-selector__button');
+  if (!$select.length || !$button.length) return;
 
   // When user clicks "Show Group" button, fetch stats from LearnDash API
-  $('.group-selector__button').on('click', async function (e) {
+  $button.on('click', async function (e) {
     e.preventDefault();
     const groupId = $select.val();
-    if (!groupId) {
-      return;
-    }
+    if (!groupId) return;
     try {
-      // Fetch base stats from our custom endpoint
       const baseStatsUrl = `/wp-json/bys-groups/v1/groups/${groupId}/stats`;
       const baseStats = await _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.api.get(baseStatsUrl, true); // Force refresh
+      // console.log('baseStats', baseStats);
 
-      // Fetch courses for this group from our custom API
-      const coursesUrl = `/wp-json/bys-groups/v1/groups/${groupId}/courses`;
-      const coursesResponse = await _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.api.get(coursesUrl, true); // Force refresh
-
-      // Extract course data
-      const courses = Array.isArray(coursesResponse) ? coursesResponse.map(course => ({
-        id: course.id,
-        title: course.title
-      })) : [];
-
-      // Trigger custom event so other blocks know the group changed
-      $(document).trigger('bys:groupSelected', [{
+      $(document).trigger('bys:groupSelected', {
         groupId: parseInt(groupId),
-        stats: baseStats,
-        courses: courses
-      }]);
+        stats: baseStats
+      });
     } catch (err) {
-      console.error('Failed to fetch group stats or courses:', err);
+      console.error('Failed to fetch data for group-select', err);
     }
   });
 });

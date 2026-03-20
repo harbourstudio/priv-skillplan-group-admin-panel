@@ -2,8 +2,8 @@
   "$schema": "https://schemas.wp.org/trunk/block.json",
   "apiVersion": 3,
   "name": "bys-groups/group-select",
-  "version": "0.2.0",
-  "title": "BYS - Group Select TEST",
+  "version": "0.1.0",
+  "title": "BYS - Group Select",
   "category": "custom-blocks",
   "icon": "welcome-write-blog",
   "description": "Custom block for Build Your Skills group administrator dashboard.",
@@ -16,17 +16,14 @@
     }
   },
   "keywords": [
-    "word",
-    "blog",
-    "post",
-    "written"
+    "group",
+    "learndash",
+    "group leaders",
+    "select",
+    "manage"
   ],
   "attributes": {
     "blockId": {
-      "type": "string",
-      "default": ""
-    },
-    "selectedGroup": {
       "type": "string",
       "default": ""
     }
