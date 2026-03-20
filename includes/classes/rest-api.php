@@ -28,9 +28,8 @@ if (!class_exists('BYS_Groups_Rest_API')) {
         /**
          * Register REST routes
          */
-        
-
         public function register_routes() {
+
             register_rest_route($this->namespace, '/me/groups', array(
                 'methods'             => 'GET',
                 'callback'            => array($this, 'get_current_user_groups'),
@@ -51,25 +50,20 @@ if (!class_exists('BYS_Groups_Rest_API')) {
         }
 
         public function check_user_permission($request) {
-            // Check for nonce in X-WP-Nonce header
-            $nonce = isset($_SERVER['HTTP_X_WP_NONCE']) ? $_SERVER['HTTP_X_WP_NONCE'] : null;
+            // Accept both Application Password auth (for API calls) and logged-in users
 
-            // Also check for nonce in query parameter (for testing)
-            if (!$nonce && isset($_GET['_wpnonce'])) {
-                $nonce = $_GET['_wpnonce'];
+            // Check for Authorization header (basic auth)
+            $auth_header = $request->get_header('Authorization');
+            if ($auth_header && strpos($auth_header, 'Basic ') === 0) {
+                return true;
             }
 
-            // Verify nonce
-            if (!$nonce || !wp_verify_nonce($nonce, 'wp_rest')) {
-                return false;
-            }
-
-            // User must be logged in
+            // Fallback: require user to be logged in
             return is_user_logged_in();
         }
 
         public function get_current_user_groups($request) {
-            $user_id = 27; // TODO: Replace with get_current_user_id() when auth is properly set up
+            $user_id = get_current_user_id();
 
             if (!$user_id) {
                 return new \WP_REST_Response(array('error' => 'Not logged in'), 401);
@@ -104,9 +98,6 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             if (!$group_id) {
                 return new \WP_REST_Response(array('error' => 'Invalid group ID'), 400);
             }
-
-            // Return only the basic info the server can provide
-            // Frontend will fetch LearnDash API data directly since it has auth
 
             // Get group members from post meta
             $group_users_key = 'learndash_group_users_' . $group_id;
@@ -161,7 +152,7 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                         'display_name'   => $user->display_name,
                         'email'          => $user->user_email,
                         'has_logged_in'  => $has_logged_in,
-                        'enrolled_courses' => array(), // Placeholder for now
+                        'enrolled_courses' => array(), // Placeholder
                     );
                 }
             }

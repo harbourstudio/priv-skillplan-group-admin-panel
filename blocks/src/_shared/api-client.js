@@ -1,19 +1,15 @@
 /**
  * Shared API client with in-memory caching and request deduplication.
  * Prevents duplicate requests when multiple blocks fetch the same data.
+ * Uses basic auth via Authorization header (from plugin settings).
  */
 
-function getNonce() {
-  // Read nonce from embedded script tag
-  const el = document.querySelector('script[data-bys-nonce="wp_rest"]');
-  if (!el) {
-    return null;
+// Get basic auth credentials from WP
+function getAuthorizationHeader() {
+  if (window.bysGroupsAuth && window.bysGroupsAuth.header) {
+    return window.bysGroupsAuth.header;
   }
-  try {
-    return JSON.parse(el.textContent);
-  } catch (err) {
-    return null;
-  }
+  return null;
 }
 
 export const api = {
@@ -24,21 +20,21 @@ export const api = {
    * Fetch data with automatic caching and deduplication.
    */
   async get(url, forceRefresh = false) {
-    // Return cached response if available and not force-refreshing
+    // Return cached response if available
     if (!forceRefresh && this._cache.has(url)) {
       return this._cache.get(url);
     }
 
-    // Return existing pending request if one is already in flight
+    // Return existing pending request if existing
     if (this._pending.has(url)) {
       return this._pending.get(url);
     }
 
-    // Make the request and cache the result
-    const nonce = getNonce();
+    // Send request and cache the result
     const headers = {};
-    if (nonce) {
-      headers['X-WP-Nonce'] = nonce;
+    const authHeader = getAuthorizationHeader();
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
     }
 
     const promise = jQuery
@@ -59,7 +55,7 @@ export const api = {
         console.error(`API request failed for ${url}:`, {
           status: jqXHR.status,
           statusText: jqXHR.statusText,
-          responseText: jqXHR.responseText?.substring(0, 500), // Log first 500 chars
+          responseText: jqXHR.responseText?.substring(0, 500),
           textStatus: textStatus,
           errorThrown: errorThrown?.message,
         });
@@ -74,7 +70,7 @@ export const api = {
   },
 
   /**
-   * Invalidate cached responses matching a key fragment.
+   * Invalidate cached responses
    */
   invalidate(keyFragment) {
     for (const key of this._cache.keys()) {
@@ -85,7 +81,7 @@ export const api = {
   },
 
   /**
-   * Clear all cached data.
+   * Clear all cached data
    */
   clear() {
     this._cache.clear();

@@ -2,21 +2,11 @@
  * view.js — BYS Group Reporting block.
  */
 
+import { api } from '../_shared/api-client.js';
+
 console.log('group-reporting view.js loaded');
 
 jQuery(document).ready(function($) {
-  // Get nonce for API requests
-  function getNonce() {
-    const el = document.querySelector('script[data-bys-nonce="wp_rest"]');
-    if (!el) return null;
-    try {
-      return JSON.parse(el.textContent);
-    } catch (err) {
-      return null;
-    }
-  }
-
-  const nonce = getNonce();
   const $block = $('.wp-block-bys-groups-group-reporting').first();
   const $table = $block.find('.reporting-table');
   const detailUrl = $table.data('detailUrl') || '/administrator-dashboard/user-progress-detail/';
@@ -113,24 +103,7 @@ jQuery(document).ready(function($) {
     try {
       console.log('Fetching users for group:', groupId);
       const usersUrl = `/wp-json/bys-groups/v1/groups/${groupId}/users`;
-      const headers = {};
-      if (nonce) {
-        headers['X-WP-Nonce'] = nonce;
-      }
-      const usersResponse = await $.ajax({
-        url: usersUrl,
-        type: 'GET',
-        headers: headers,
-        error: function(jqXHR, textStatus, errorThrown) {
-          console.error('AJAX Error:', {
-            status: jqXHR.status,
-            statusText: jqXHR.statusText,
-            textStatus: textStatus,
-            errorThrown: errorThrown,
-            responseText: jqXHR.responseText?.substring(0, 200)
-          });
-        }
-      });
+      const usersResponse = await api.get(usersUrl, true); // Force refresh
 
       if (!usersResponse || !Array.isArray(usersResponse)) {
         console.error('Invalid users response:', usersResponse);

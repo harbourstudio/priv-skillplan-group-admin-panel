@@ -1,0 +1,129 @@
+<?php
+/**
+ * Admin settings page for BYS Groups plugin
+ *
+ * @package BYS_Groups
+ * @since 1.0.0
+ */
+if (!defined('ABSPATH')) exit;
+
+if (!class_exists('BYS_Groups_Admin_Settings')) {
+    class BYS_Groups_Admin_Settings {
+
+        public function __construct() {
+            add_action('admin_menu', array($this, 'add_settings_page'));
+            add_action('admin_init', array($this, 'handle_settings_form'));
+        }
+
+        /**
+         * Add settings page to admin menu
+         */
+        public function add_settings_page() {
+            add_menu_page(
+                'BYS Groups Settings',
+                'BYS Groups',
+                'manage_options',
+                'bys-groups-settings',
+                array($this, 'render_settings_page'),
+                'dashicons-admin-generic',
+                100
+            );
+        }
+
+        /**
+         * Handle settings form submission
+         */
+        public function handle_settings_form() {
+            if (!isset($_POST['bys_groups_settings_nonce'])) {
+                return;
+            }
+
+            if (!wp_verify_nonce($_POST['bys_groups_settings_nonce'], 'bys_groups_settings')) {
+                wp_die('Security check failed');
+            }
+
+            if (!current_user_can('manage_options')) {
+                wp_die('Unauthorized');
+            }
+
+            if (isset($_POST['action']) && $_POST['action'] === 'save_credentials') {
+                $username = sanitize_text_field($_POST['api_username'] ?? '');
+                $password = sanitize_text_field($_POST['api_password'] ?? '');
+
+                if (!empty($username) && !empty($password)) {
+                    BYS_Groups_Auth::set_credentials($username, $password);
+                    add_action('admin_notices', function() {
+                        echo '<div class="notice notice-success is-dismissible"><p>API credentials saved successfully!</p></div>';
+                    });
+                } else {
+                    add_action('admin_notices', function() {
+                        echo '<div class="notice notice-error is-dismissible"><p>Please fill in both username and password.</p></div>';
+                    });
+                }
+            }
+
+            if (isset($_POST['action']) && $_POST['action'] === 'clear_credentials') {
+                BYS_Groups_Auth::clear_credentials();
+                add_action('admin_notices', function() {
+                    echo '<div class="notice notice-success is-dismissible"><p>API credentials cleared.</p></div>';
+                });
+            }
+        }
+
+        /**
+         * Render settings page
+         */
+        public function render_settings_page() {
+            $is_configured = BYS_Groups_Auth::is_configured();
+            $credentials = BYS_Groups_Auth::get_credentials();
+            $username = $credentials['username'] ?? '';
+            ?>
+            <div>
+                <h1>BYS Groups Settings</h1>
+                <p>Configure your LearnDash API credentials using an Application Password.</p>
+
+                <form method="POST" style="max-width: 500px;">
+                    <?php wp_nonce_field('bys_groups_settings', 'bys_groups_settings_nonce'); ?>
+                    <input type="hidden" name="action" value="save_credentials">
+                    <label for="api_username">
+                        API Username
+                        <input
+                            type="text"
+                            id="api_username"
+                            name="api_username"
+                            value="<?php echo esc_attr($username); ?>"
+                            class="regular-text"
+                            placeholder="WordPress username"
+                        />
+                    </label>
+                    <label for="api_password">
+                        Application Password
+                        <input
+                            type="password"
+                            id="api_password"
+                            name="api_password"
+                            class="regular-text"
+                            placeholder="Generated application password"
+                        />
+                    </label>
+                    <p class="description">
+                        The password field is intentionally blank for security. Enter password to update it.
+                    </p>
+
+                    <?php submit_button('Save Credentials'); ?>
+                </form>
+
+                <?php if ($is_configured) : ?>
+                    <h3>Credentials Status</h3>
+                    <p>API credentials are configured and ready to use.</p>
+                    <form method="POST">
+                        <?php wp_nonce_field('bys_groups_settings', 'bys_groups_settings_nonce'); ?>
+                        <input type="hidden" name="action" value="clear_credentials">
+                        <?php submit_button('Clear Credentials', 'delete'); ?>
+                    </form>
+                <?php endif; ?>
+            </div>
+            <?php
+        }
+    }
+}

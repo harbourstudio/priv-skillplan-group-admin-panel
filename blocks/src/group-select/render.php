@@ -32,19 +32,24 @@ if ( $user_id ) {
 	}
 }
 
-// Create a nonce for REST API requests
-$nonce = wp_create_nonce( 'wp_rest' );
-
 $wrapper_attributes = get_block_wrapper_attributes();
+
+// Get the Authorization header for API requests
+require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/auth.php';
+$auth_header = BYS_Groups_Auth::get_auth_header();
 ?>
 
 <div <?php echo wp_kses_post( $wrapper_attributes ); ?>>
+	<?php if ( $auth_header ) : ?>
+		<script>
+			window.bysGroupsAuth = {
+				header: '<?php echo esc_js( $auth_header ); ?>'
+			};
+		</script>
+	<?php endif; ?>
+
 	<script type="application/json" data-bys-block="group-select">
 		<?php echo wp_json_encode( $groups ); ?>
-	</script>
-
-	<script type="application/json" data-bys-nonce="wp_rest">
-		<?php echo wp_json_encode( $nonce ); ?>
 	</script>
 
 	<div class="group-selector">
