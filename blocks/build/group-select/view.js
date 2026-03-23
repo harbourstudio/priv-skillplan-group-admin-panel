@@ -10,7 +10,8 @@
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   api: () => (/* binding */ api)
+/* harmony export */   api: () => (/* binding */ api),
+/* harmony export */   endpoints: () => (/* binding */ endpoints)
 /* harmony export */ });
 /**
  * Shared API client with in-memory caching and request deduplication.
@@ -25,6 +26,16 @@ function getAuthorizationHeader() {
   }
   return null;
 }
+
+// custom API endpoint definitions
+const endpoints = {
+  currentUserGroups: () => '/wp-json/bys-groups/v1/me/groups',
+  groupBaseUsersStats: groupId => `/wp-json/bys-groups/v1/groups/${groupId}/stats`,
+  groupUsers: groupId => `/wp-json/bys-groups/v1/groups/${groupId}/users`,
+  groupCourses: groupId => `/wp-json/bys-groups/v1/groups/${groupId}/courses`,
+  userCourseProgress: (groupId, userId) => `/wp-json/bys-groups/v1/groups/${groupId}/users/${userId}/courses`,
+  userDetails: (groupId, userId) => `/wp-json/bys-groups/v1/groups/${groupId}/users/${userId}`
+};
 const api = {
   _cache: new Map(),
   _pending: new Map(),
@@ -174,24 +185,34 @@ jQuery(document).ready($ => {
   const $button = $block.find('.group-selector__button');
   if (!$select.length || !$button.length) return;
 
-  // When user clicks "Show Group" button, fetch stats from LearnDash API
+  // When user clicks "Show Group" button, fetch shared data from LearnDash API
   $button.on('click', async function (e) {
     e.preventDefault();
     const groupId = $select.val();
     if (!groupId) return;
     try {
-      // call custom rest route; callback method makes the request to LD API for the data 
-      // stats data will be available in the document (data payload) and can be accessed by any element listening to the bys:groupSelected event
-      // particularily, it'll be available to use by the group-stats block
-      const groupBaseStatsRoute = `/wp-json/bys-groups/v1/groups/${groupId}/stats`;
-      const groupBaseStats = await _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.api.get(groupBaseStatsRoute, true); // Force refresh
-      console.log('groupBaseStats', groupBaseStats);
+      // call custom rest route; callback method makes the request to LD API for the data
+      // shared data will be available in the document (data payload) and can be accessed by any element listening to the bys:groupSelected event
+
+      // Fetch shared data that both group-stats and group-reporting blocks need
+      const baseUsersStats = await _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.api.get(_shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.endpoints.groupBaseUsersStats(groupId), true); // Force refresh
+      const courses = await _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.api.get(_shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.endpoints.groupCourses(groupId), true); // Force refresh
+
+      // store globally for blocks to reference
+      window.bysGroupData = {
+        groupId: parseInt(groupId),
+        baseUsersStats: baseUsersStats,
+        courses: courses
+      };
+
+      // trigger event with all shared data
       $(document).trigger('bys:groupSelected', {
         groupId: parseInt(groupId),
-        stats: groupBaseStats
+        baseUsersStats: baseUsersStats,
+        courses: courses
       });
     } catch (err) {
-      console.error('Failed to fetch data for group-select', err);
+      console.error('Failed to fetch group data', err);
     }
   });
 });

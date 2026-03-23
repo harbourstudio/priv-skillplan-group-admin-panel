@@ -1,4 +1,4 @@
-import { api } from '../_shared/api-client.js';
+import { api, endpoints } from '../_shared/api-client.js';
 
 jQuery(document).ready(($) => {
   const $block = $('.wp-block-bys-groups-group-select').first(); // will only have 1 instance of this block per page
@@ -8,7 +8,7 @@ jQuery(document).ready(($) => {
   const $button = $block.find('.group-selector__button');
   if (!$select.length || !$button.length) return;
 
-  // When user clicks "Show Group" button, fetch stats from LearnDash API
+  // When user clicks "Show Group" button, fetch shared data from LearnDash API
   $button.on('click', async function(e) {
     e.preventDefault();
 
@@ -16,19 +16,28 @@ jQuery(document).ready(($) => {
     if (!groupId) return;
 
     try {
-      // call custom rest route; callback method makes the request to LD API for the data 
-      // stats data will be available in the document (data payload) and can be accessed by any element listening to the bys:groupSelected event
-      // particularily, it'll be available to use by the group-stats block
-      const groupBaseStatsRoute = `/wp-json/bys-groups/v1/groups/${groupId}/stats`;
-      const groupBaseStats = await api.get(groupBaseStatsRoute, true); // Force refresh
-      console.log('groupBaseStats', groupBaseStats);
+      // call custom rest route; callback method makes the request to LD API for the data
+      // shared data will be available in the document (data payload) and can be accessed by any element listening to the bys:groupSelected event
 
+      // Fetch shared data that both group-stats and group-reporting blocks need
+      const baseUsersStats = await api.get(endpoints.groupBaseUsersStats(groupId), true); // Force refresh
+      const courses = await api.get(endpoints.groupCourses(groupId), true); // Force refresh
+
+      // store globally for blocks to reference
+      window.bysGroupData = {
+        groupId: parseInt(groupId),
+        baseUsersStats: baseUsersStats,
+        courses: courses,
+      };
+
+      // trigger event with all shared data
       $(document).trigger('bys:groupSelected', {
         groupId: parseInt(groupId),
-        stats: groupBaseStats
+        baseUsersStats: baseUsersStats,
+        courses: courses,
       })
     } catch(err) {
-      console.error('Failed to fetch data for group-select', err)
+      console.error('Failed to fetch group data', err)
     }
   });
 });
