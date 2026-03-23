@@ -26,19 +26,35 @@ if (!class_exists('BYS_Groups_Rest_API')) {
         }
 
         /**
+         * Get validated auth header for LD API requests
+         */
+        private function get_validated_auth_header() {
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/auth.php';
+            $auth_header = BYS_Groups_Auth::get_auth_header();
+
+            if (!$auth_header) {
+                return new \WP_REST_Response(array('error' => 'API credentials not configured'), 500);
+            }
+
+            return $auth_header;
+        }
+
+        /**
          * Register REST routes
          */
         public function register_routes() {
 
+            // currentUserGroups
             register_rest_route($this->namespace, '/me/groups', array(
                 'methods'             => 'GET',
                 'callback'            => array($this, 'get_current_user_groups'),
                 'permission_callback' => array($this, 'check_user_permission'),
             ));
 
+            // groupBaseUsersStats
             register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/stats', array(
                 'methods'             => 'GET',
-                'callback'            => array($this, 'get_base_group_users_stats'),
+                'callback'            => array($this, 'get_group_base_users_stats'),
                 'permission_callback' => array($this, 'check_user_permission'),
             ));
 
@@ -124,35 +140,63 @@ if (!class_exists('BYS_Groups_Rest_API')) {
         }
 
 
-        public function get_base_group_users_stats($request) {
+        public function get_group_base_users_stats($request) {
             $group_id = intval($request['group_id']);
 
             if (!$group_id) {
                 return new \WP_REST_Response(array('error' => 'Invalid group ID'), 400);
             }
 
-            // get group members from post meta
-            $group_users_key = 'learndash_group_users_' . $group_id;
-            $member_ids = get_post_meta($group_id, $group_users_key, true);
-            $member_ids = is_array($member_ids) ? $member_ids : array();
-            $total_members = count($member_ids);
+            // Get validated auth header for LD API
+            $auth_result = $this->get_validated_auth_header();
+            if (is_a($auth_result, 'WP_REST_Response')) {
+                return $auth_result; // Return error response
+            }
+            $auth_header = $auth_result;
 
-            // count inactive members
+            // Fetch group users from LD API
+            $ld_api_url = get_home_url() . "/wp-json/ldlms/v2/groups/{$group_id}/users?&_fields=id";
+
+            $response = wp_remote_get($ld_api_url, array(
+                'headers' => array(
+                    'Authorization' => $auth_header,
+                ),
+                'sslverify' => false,
+            ));
+
+            if (is_wp_error($response)) {
+                return new \WP_REST_Response(array('error' => $response->get_error_message()), 500);
+            }
+
+            $status = wp_remote_retrieve_response_code($response);
+            $body = wp_remote_retrieve_body($response);
+
+            if ($status !== 200) {
+                return new \WP_REST_Response(array('error' => 'Failed to fetch users from LearnDash API', 'status' => $status), $status);
+            }
+
+            $group_users = json_decode($body, true);
+            if (!is_array($group_users)) {
+                $group_users = array();
+            }
+
+            $total_members = count($group_users);
             $inactive_members = 0;
-            foreach ($member_ids as $member_id) {
-                $member_id = intval($member_id);
-                $last_login = get_user_meta($member_id, 'last_login', true);
+
+            // Count inactive members by checking last_login user meta
+            foreach ($group_users as $user_data) {
+                $user_id = intval($user_data['id']);
+                $last_login = get_user_meta($user_id, 'last_login', true);
                 if (empty($last_login)) {
                     $inactive_members++;
                 }
             }
 
-            // return member info
+            // Return stats
             return new \WP_REST_Response(array(
-                'group_id'                => $group_id,
-                'total_members'           => $total_members,
-                'member_ids'              => $member_ids,
-                'total_inactive_members'  => $inactive_members,
+                'group_id'               => $group_id,
+                'total_members'          => $total_members,
+                'total_inactive_members' => $inactive_members,
             ), 200);
         }
 
@@ -199,13 +243,12 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 return new \WP_REST_Response(array('error' => 'Invalid group ID'), 400);
             }
 
-            // get group courses using basic auth
-            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/auth.php';
-            $auth_header = BYS_Groups_Auth::get_auth_header();
-
-            if (!$auth_header) {
-                return new \WP_REST_Response(array('error' => 'API credentials not configured'), 500);
+            // Get validated auth header for LD API
+            $auth_result = $this->get_validated_auth_header();
+            if (is_a($auth_result, 'WP_REST_Response')) {
+                return $auth_result; // Return error response
             }
+            $auth_header = $auth_result;
 
             // call to get group courses
             $ld_api_url = get_home_url() . "/wp-json/ldlms/v2/groups/{$group_id}/courses?per_page=100";
