@@ -12,6 +12,16 @@ function getAuthorizationHeader() {
   return null;
 }
 
+// custom API endpoint definitions
+export const endpoints = {
+  currentUserGroups: () => '/wp-json/bys-groups/v1/me/groups',
+  groupBaseUsersStats: (groupId) => `/wp-json/bys-groups/v1/groups/${groupId}/stats`,
+  groupUsers: (groupId) => `/wp-json/bys-groups/v1/groups/${groupId}/users`,
+  groupCourses: (groupId) => `/wp-json/bys-groups/v1/groups/${groupId}/courses`,
+  userCourseProgress: (groupId, userId) => `/wp-json/bys-groups/v1/groups/${groupId}/users/${userId}/courses`,
+  userDetails: (groupId, userId) => `/wp-json/bys-groups/v1/groups/${groupId}/users/${userId}`,
+};
+
 export const api = {
   _cache: new Map(),
   _pending: new Map(),
