@@ -1,1 +1,268 @@
-.wp-block-bys-groups-group-reporting .section__title{align-items:center;display:flex;justify-content:space-between}.wp-block-bys-groups-group-reporting .section__title .filters__toggle{color:var(--wp--preset--color--gray-500);font-size:var(--wp--preset--font-size--small);font-weight:500}.wp-block-bys-groups-group-reporting .filters__box{background-color:var(--wp--preset--color--gray-100);border-radius:1rem;margin-top:var(--wp--preset--spacing--4);padding:var(--wp--preset--spacing--5) var(--wp--preset--spacing--6)}.wp-block-bys-groups-group-reporting .filters__box.hidden{display:none}.wp-block-bys-groups-group-reporting .filters__box .filters__fields{-moz-column-gap:var(--wp--preset--spacing--5);column-gap:var(--wp--preset--spacing--5);display:grid;grid-template-columns:repeat(3,1fr);margin-bottom:var(--wp--preset--spacing--6);row-gap:var(--wp--preset--spacing--3)}.wp-block-bys-groups-group-reporting .filters__box .filters__fields .filters__field{display:flex;flex-direction:column}.wp-block-bys-groups-group-reporting .filters__box .filters__actions{align-items:center;display:flex;gap:var(--wp--preset--spacing--3)}.wp-block-bys-groups-group-reporting .filters__box .filters__actions .filters__reset{background:#fff;color:var(--wp--preset--color--primary)}.wp-block-bys-groups-group-reporting .table__actions{align-items:center;display:flex;font-size:var(--wp--preset--font-size--small);justify-content:space-between;margin-bottom:var(--wp--preset--spacing--4);margin-top:var(--wp--preset--spacing--6)}.wp-block-bys-groups-group-reporting .table__actions__sort label{color:var(--wp--preset--color--gray-500);margin-right:var(--wp--preset--spacing--1)}.wp-block-bys-groups-group-reporting .table__actions__sort select{background:#fff;border:1px solid var(--wp--preset--color--gray-300);border-radius:.25rem;padding:var(--wp--preset--spacing--2)}.wp-block-bys-groups-group-reporting .table__actions__export a{font-weight:500}.wp-block-bys-groups-group-reporting .table__results .table__scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}.wp-block-bys-groups-group-reporting .table__results table{background:#fff;border-collapse:collapse;border-radius:1rem;font-size:var(--wp--preset--font-size--small);text-align:left;width:100%}.wp-block-bys-groups-group-reporting .table__results table thead th{background-color:var(--wp--preset--color--primary);border:none;color:#fff;font-weight:500;padding:var(--wp--preset--spacing--3);vertical-align:bottom;white-space:nowrap}.wp-block-bys-groups-group-reporting .table__results table thead th a,.wp-block-bys-groups-group-reporting .table__results table thead th i{color:#fff}.wp-block-bys-groups-group-reporting .table__results table thead th:first-child{border-top-left-radius:1.5rem}.wp-block-bys-groups-group-reporting .table__results table thead th:last-child{border-top-right-radius:1.5rem}.wp-block-bys-groups-group-reporting .table__results table .course-col-header__inner{display:flex;flex-direction:column;gap:var(--wp--preset--spacing--1)}.wp-block-bys-groups-group-reporting .table__results table .course-col-header--expanded{border-left:2px solid hsla(0,0%,100%,.3)}.wp-block-bys-groups-group-reporting .table__results table .bys-course-toggle{background:none;border:none;color:#fff;cursor:pointer;font-size:inherit;font-weight:600;padding:0;text-align:left}.wp-block-bys-groups-group-reporting .table__results table .bys-course-toggle:hover{opacity:.9;text-decoration:underline}.wp-block-bys-groups-group-reporting .table__results table .bys-dl-link{font-size:var(--wp--preset--font-size--x-small);opacity:.7}.wp-block-bys-groups-group-reporting .table__results table .bys-dl-link:hover{opacity:1}.wp-block-bys-groups-group-reporting .table__results table .bys-dl-link{padding-top:var(--wp--preset--spacing--1)}.wp-block-bys-groups-group-reporting .table__results table .course-sub-col{font-size:var(--wp--preset--font-size--x-small);font-weight:500;opacity:.9}.wp-block-bys-groups-group-reporting .table__results table .course-sub-col--hidden{display:none}.wp-block-bys-groups-group-reporting .table__results table .course-sub-col--progress{min-width:170px}.wp-block-bys-groups-group-reporting .table__results table .course-sub-col--quizzing{min-width:80px}.wp-block-bys-groups-group-reporting .table__results table .course-sub-col--completion,.wp-block-bys-groups-group-reporting .table__results table .course-sub-col--enrolment{min-width:130px}.wp-block-bys-groups-group-reporting .table__results table .course-col--hidden{display:none}.wp-block-bys-groups-group-reporting .table__results table tbody tr:not(:last-of-type) td{border-bottom:1px solid var(--wp--preset--color--gray-200)}.wp-block-bys-groups-group-reporting .table__results table tbody tr.reporting-table__row{cursor:pointer}.wp-block-bys-groups-group-reporting .table__results table tbody tr.reporting-table__row:hover{background:#f8faff}.wp-block-bys-groups-group-reporting .table__results table tbody td{padding:var(--wp--preset--spacing--4) var(--wp--preset--spacing--3);vertical-align:middle}.wp-block-bys-groups-group-reporting .table__results table tbody .status-badge{font-size:var(--wp--preset--font-size--x-small)}.wp-block-bys-groups-group-reporting .table__results table tbody .status-badge--online{color:green}.wp-block-bys-groups-group-reporting .table__results table tbody .status-badge--offline{color:transparent}.wp-block-bys-groups-group-reporting .table__results table tbody .status-badge--never{color:gray}.wp-block-bys-groups-group-reporting .table__results table tbody .completion-badge--completed{color:green}.wp-block-bys-groups-group-reporting .table__results table tbody .completion-badge--partial{color:orange}.wp-block-bys-groups-group-reporting .table__results table tbody .completion-badge--none{color:red}.wp-block-bys-groups-group-reporting .table__results table tbody .course-sub-cell{white-space:nowrap}.wp-block-bys-groups-group-reporting .table__results table tbody .course-sub-cell--completion,.wp-block-bys-groups-group-reporting .table__results table tbody .course-sub-cell--enrolment{color:gray}.wp-block-bys-groups-group-reporting .bys-progress-wrap{background:var(--wp--preset--color--gray-200);border-radius:999px;display:inline-block;height:.5rem;margin-right:6px;overflow:hidden;vertical-align:middle;width:5rem}.wp-block-bys-groups-group-reporting .bys-progress-bar{border-radius:999px;height:100%;transition:width .3s ease}.wp-block-bys-groups-group-reporting .bys-pct{font-size:var(--wp--preset--font-size--x-small);font-weight:600;vertical-align:middle}.wp-block-bys-groups-group-reporting .bys-quiz-icons{align-items:center;display:flex;gap:3px}.wp-block-bys-groups-group-reporting .bys-quiz-icon{cursor:default;line-height:1}.wp-block-bys-groups-group-reporting .bys-quiz-empty{color:var(--wp--preset--color--gray-400)}.wp-block-bys-groups-group-reporting .bys-date-empty{color:var(--wp--preset--color--gray-400);font-style:italic}.wp-block-bys-groups-group-reporting .reporting-table__name-link{color:var(--wp--preset--color--primary);font-weight:500;text-decoration:none}.wp-block-bys-groups-group-reporting .reporting-table__name-link:hover{text-decoration:underline}.wp-block-bys-groups-group-reporting .bys-show-more{background:var(--wp--preset--color--blue-100);border:none;border-bottom-left-radius:1rem;border-bottom-right-radius:1rem;border-top:1px solid var(--wp--preset--color--gray-200);color:var(--wp--preset--color--blue-700);cursor:pointer;display:block;font-size:var(--wp--preset--font-size--small);font-weight:600;padding:var(--wp--preset--spacing--3);text-align:center;width:100%}.wp-block-bys-groups-group-reporting .bys-show-more:hover{background:var(--wp--preset--color--blue-200)}.bys-tooltip{background:#1e293b;border-radius:.4rem;box-shadow:0 4px 12px rgba(0,0,0,.2);color:#fff;font-size:.75rem;padding:.3rem .6rem;pointer-events:none;position:absolute;white-space:nowrap;z-index:9999}.bys-tooltip[aria-hidden=true]{display:none}
+/*!***************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ./node_modules/css-loader/dist/cjs.js??ruleSet[1].rules[4].use[1]!./node_modules/postcss-loader/dist/cjs.js??ruleSet[1].rules[4].use[2]!./node_modules/@wordpress/scripts/node_modules/sass-loader/dist/cjs.js??ruleSet[1].rules[4].use[3]!./src/group-reporting/style.scss ***!
+  \***************************************************************************************************************************************************************************************************************************************************************************************/
+.wp-block-bys-groups-group-reporting .section__title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.wp-block-bys-groups-group-reporting .section__title .filters__toggle {
+  font-size: var(--wp--preset--font-size--small);
+  font-weight: 500;
+  color: var(--wp--preset--color--gray-500);
+}
+.wp-block-bys-groups-group-reporting .filters__box {
+  margin-top: var(--wp--preset--spacing--4);
+  background-color: var(--wp--preset--color--gray-100);
+  padding: var(--wp--preset--spacing--5) var(--wp--preset--spacing--6);
+  border-radius: 1rem;
+}
+.wp-block-bys-groups-group-reporting .filters__box.hidden {
+  display: none;
+}
+.wp-block-bys-groups-group-reporting .filters__box .filters__fields {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  -moz-column-gap: var(--wp--preset--spacing--5);
+       column-gap: var(--wp--preset--spacing--5);
+  row-gap: var(--wp--preset--spacing--3);
+  margin-bottom: var(--wp--preset--spacing--6);
+}
+.wp-block-bys-groups-group-reporting .filters__box .filters__fields .filters__field {
+  display: flex;
+  flex-direction: column;
+}
+.wp-block-bys-groups-group-reporting .filters__box .filters__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--wp--preset--spacing--3);
+}
+.wp-block-bys-groups-group-reporting .filters__box .filters__actions .filters__reset {
+  background: white;
+  color: var(--wp--preset--color--primary);
+}
+.wp-block-bys-groups-group-reporting .table__actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: var(--wp--preset--spacing--6);
+  margin-bottom: var(--wp--preset--spacing--4);
+  font-size: var(--wp--preset--font-size--small);
+}
+.wp-block-bys-groups-group-reporting .table__actions__sort label {
+  color: var(--wp--preset--color--gray-500);
+  margin-right: var(--wp--preset--spacing--1);
+}
+.wp-block-bys-groups-group-reporting .table__actions__sort select {
+  background: white;
+  border: 1px solid var(--wp--preset--color--gray-300);
+  padding: var(--wp--preset--spacing--2);
+  border-radius: 0.25rem;
+}
+.wp-block-bys-groups-group-reporting .table__actions__export a {
+  font-weight: 500;
+}
+.wp-block-bys-groups-group-reporting .table__results .table__scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.wp-block-bys-groups-group-reporting .table__results table {
+  width: 100%;
+  font-size: var(--wp--preset--font-size--small);
+  background: white;
+  border-radius: 1rem;
+  text-align: left;
+  border-collapse: collapse;
+}
+.wp-block-bys-groups-group-reporting .table__results table thead th {
+  background-color: var(--wp--preset--color--primary);
+  color: white;
+  font-weight: 500;
+  padding: var(--wp--preset--spacing--3);
+  border: none;
+  vertical-align: bottom;
+  white-space: nowrap;
+}
+.wp-block-bys-groups-group-reporting .table__results table thead th a, .wp-block-bys-groups-group-reporting .table__results table thead th i {
+  color: white;
+}
+.wp-block-bys-groups-group-reporting .table__results table thead th:first-child {
+  border-top-left-radius: 1.5rem;
+}
+.wp-block-bys-groups-group-reporting .table__results table thead th:last-child {
+  border-top-right-radius: 1.5rem;
+}
+.wp-block-bys-groups-group-reporting .table__results table .course-col-header__inner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wp--preset--spacing--1);
+}
+.wp-block-bys-groups-group-reporting .table__results table .course-col-header--expanded {
+  border-left: 2px solid rgba(255, 255, 255, 0.3);
+}
+.wp-block-bys-groups-group-reporting .table__results table .bys-course-toggle {
+  background: none;
+  border: none;
+  color: white;
+  font-size: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+.wp-block-bys-groups-group-reporting .table__results table .bys-course-toggle:hover {
+  text-decoration: underline;
+  opacity: 0.9;
+}
+.wp-block-bys-groups-group-reporting .table__results table .bys-dl-link {
+  font-size: var(--wp--preset--font-size--x-small);
+  opacity: 0.7;
+}
+.wp-block-bys-groups-group-reporting .table__results table .bys-dl-link:hover {
+  opacity: 1;
+}
+.wp-block-bys-groups-group-reporting .table__results table .bys-dl-link {
+  padding-top: var(--wp--preset--spacing--1);
+}
+.wp-block-bys-groups-group-reporting .table__results table .course-sub-col {
+  font-size: var(--wp--preset--font-size--x-small);
+  font-weight: 500;
+  opacity: 0.9;
+}
+.wp-block-bys-groups-group-reporting .table__results table .course-sub-col--hidden {
+  display: none;
+}
+.wp-block-bys-groups-group-reporting .table__results table .course-sub-col--progress {
+  min-width: 170px;
+}
+.wp-block-bys-groups-group-reporting .table__results table .course-sub-col--quizzing {
+  min-width: 80px;
+}
+.wp-block-bys-groups-group-reporting .table__results table .course-sub-col--enrolment {
+  min-width: 130px;
+}
+.wp-block-bys-groups-group-reporting .table__results table .course-sub-col--completion {
+  min-width: 130px;
+}
+.wp-block-bys-groups-group-reporting .table__results table .course-col--hidden {
+  display: none;
+}
+.wp-block-bys-groups-group-reporting .table__results table tbody tr {
+  border-bottom: 1px solid var(--wp--preset--color--gray-200);
+}
+.wp-block-bys-groups-group-reporting .table__results table tbody tr.reporting-table__row {
+  cursor: pointer;
+}
+.wp-block-bys-groups-group-reporting .table__results table tbody tr.reporting-table__row:hover {
+  background: #f8faff;
+}
+.wp-block-bys-groups-group-reporting .table__results table tbody td {
+  padding: var(--wp--preset--spacing--4) var(--wp--preset--spacing--3);
+  vertical-align: middle;
+}
+.wp-block-bys-groups-group-reporting .table__results table tbody .status-badge {
+  font-size: var(--wp--preset--font-size--x-small);
+}
+.wp-block-bys-groups-group-reporting .table__results table tbody .status-badge--online {
+  color: var(--wp--preset--color--green-500);
+}
+.wp-block-bys-groups-group-reporting .table__results table tbody .status-badge--offline {
+  color: transparent;
+}
+.wp-block-bys-groups-group-reporting .table__results table tbody .status-badge--never {
+  color: var(--wp--preset--color--gray-400);
+}
+.wp-block-bys-groups-group-reporting .table__results table tbody .completion-badge--completed {
+  color: var(--wp--preset--color--green-500);
+}
+.wp-block-bys-groups-group-reporting .table__results table tbody .completion-badge--partial {
+  color: var(--wp--preset--color--orange-500);
+}
+.wp-block-bys-groups-group-reporting .table__results table tbody .completion-badge--none {
+  color: var(--wp--preset--color--red-500);
+}
+.wp-block-bys-groups-group-reporting .table__results table tbody .course-sub-cell {
+  white-space: nowrap;
+}
+.wp-block-bys-groups-group-reporting .table__results table tbody .course-sub-cell--enrolment, .wp-block-bys-groups-group-reporting .table__results table tbody .course-sub-cell--completion {
+  color: gray;
+}
+.wp-block-bys-groups-group-reporting .bys-progress-wrap {
+  display: inline-block;
+  width: 5rem;
+  height: 0.5rem;
+  background: var(--wp--preset--color--gray-200);
+  border-radius: 999px;
+  overflow: hidden;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+.wp-block-bys-groups-group-reporting .bys-progress-bar {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+.wp-block-bys-groups-group-reporting .bys-pct {
+  font-size: var(--wp--preset--font-size--x-small);
+  font-weight: 600;
+  vertical-align: middle;
+}
+.wp-block-bys-groups-group-reporting .bys-quiz-icons {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+.wp-block-bys-groups-group-reporting .bys-quiz-icon {
+  cursor: default;
+  line-height: 1;
+}
+.wp-block-bys-groups-group-reporting .bys-quiz-empty {
+  color: var(--wp--preset--color--gray-400);
+}
+.wp-block-bys-groups-group-reporting .bys-date-empty {
+  color: var(--wp--preset--color--gray-400);
+  font-style: italic;
+}
+.wp-block-bys-groups-group-reporting .reporting-table__name-link {
+  color: var(--wp--preset--color--primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+.wp-block-bys-groups-group-reporting .reporting-table__name-link:hover {
+  text-decoration: underline;
+}
+.wp-block-bys-groups-group-reporting .bys-show-more {
+  display: block;
+  width: 100%;
+  padding: var(--wp--preset--spacing--3);
+  background: var(--wp--preset--color--blue-100);
+  border: none;
+  border-top: 1px solid var(--wp--preset--color--gray-200);
+  color: var(--wp--preset--color--blue-700);
+  font-weight: 600;
+  font-size: var(--wp--preset--font-size--small);
+  cursor: pointer;
+  text-align: center;
+  border-bottom-left-radius: 1rem;
+  border-bottom-right-radius: 1rem;
+}
+.wp-block-bys-groups-group-reporting .bys-show-more:hover {
+  background: var(--wp--preset--color--blue-200);
+}
+.bys-tooltip {
+  position: absolute;
+  z-index: 9999;
+  background: #1e293b;
+  color: white;
+  border-radius: 0.4rem;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.75rem;
+  pointer-events: none;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+.bys-tooltip[aria-hidden=true] {
+  display: none;
+}
+
+/*# sourceMappingURL=style-index.css.map*/

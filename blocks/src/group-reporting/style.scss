@@ -163,9 +163,8 @@
             // ── tbody ─────────────────────────────────────────────────
             tbody {
                 tr {
-                    &:not(:last-of-type) td {
-                        border-bottom: 1px solid var(--wp--preset--color--gray-200);
-                    }
+                    border-bottom: 1px solid var(--wp--preset--color--gray-200);
+                    
                     &.reporting-table__row {
                         cursor: pointer;
                         &:hover { background: #f8faff; }
@@ -180,24 +179,17 @@
                 // Status dot
                 .status-badge {
                     font-size: var(--wp--preset--font-size--x-small);
-                    // &--online  { color: var(--wp--preset--color--green-500); }
-                    &--online  { color: green; }
+                    &--online  { color: var(--wp--preset--color--green-500); }
                     &--offline { color: transparent; }
-                    // &--never   { color: var(--wp--preset--color--gray-400); }
-                    &--never   { color: gray; }
+                    &--never   { color: var(--wp--preset--color--gray-400); }
 
                 }
 
                 // Completion badge (collapsed state)
                 .completion-badge {
-                    // &--completed { color: var(--wp--preset--color--green-500);  }
-                    &--completed { color: green;  }
-
-                    // &--partial   { color: var(--wp--preset--color--orange-500); }
-                    &--partial   { color: orange; }
-
-                    // &--none      { color: var(--wp--preset--color--red-500);    }
-                    &--none      { color: red;    }
+                    &--completed { color: var(--wp--preset--color--green-500);  }
+                    &--partial   { color: var(--wp--preset--color--orange-500); }
+                    &--none      { color: var(--wp--preset--color--red-500);    }
 
                 }
 

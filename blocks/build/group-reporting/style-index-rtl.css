@@ -147,7 +147,7 @@
 .wp-block-bys-groups-group-reporting .table__results table .course-col--hidden {
   display: none;
 }
-.wp-block-bys-groups-group-reporting .table__results table tbody tr:not(:last-of-type) td {
+.wp-block-bys-groups-group-reporting .table__results table tbody tr {
   border-bottom: 1px solid var(--wp--preset--color--gray-200);
 }
 .wp-block-bys-groups-group-reporting .table__results table tbody tr.reporting-table__row {
@@ -164,22 +164,22 @@
   font-size: var(--wp--preset--font-size--x-small);
 }
 .wp-block-bys-groups-group-reporting .table__results table tbody .status-badge--online {
-  color: green;
+  color: var(--wp--preset--color--green-500);
 }
 .wp-block-bys-groups-group-reporting .table__results table tbody .status-badge--offline {
   color: transparent;
 }
 .wp-block-bys-groups-group-reporting .table__results table tbody .status-badge--never {
-  color: gray;
+  color: var(--wp--preset--color--gray-400);
 }
 .wp-block-bys-groups-group-reporting .table__results table tbody .completion-badge--completed {
-  color: green;
+  color: var(--wp--preset--color--green-500);
 }
 .wp-block-bys-groups-group-reporting .table__results table tbody .completion-badge--partial {
-  color: orange;
+  color: var(--wp--preset--color--orange-500);
 }
 .wp-block-bys-groups-group-reporting .table__results table tbody .completion-badge--none {
-  color: red;
+  color: var(--wp--preset--color--red-500);
 }
 .wp-block-bys-groups-group-reporting .table__results table tbody .course-sub-cell {
   white-space: nowrap;
