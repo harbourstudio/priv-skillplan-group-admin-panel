@@ -71,6 +71,13 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'callback'            => array($this, 'get_group_courses'),
                 'permission_callback' => array($this, 'check_user_permission'),
             ));
+
+            // userCourseProgress - fetch user progress for multiple courses
+            register_rest_route($this->namespace, '/users/(?P<user_id>\d+)/course-progress', array(
+                'methods'             => 'GET',
+                'callback'            => array($this, 'get_user_course_progress'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
         }
 
         public function check_user_permission($request) {
@@ -282,6 +289,56 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             }
 
             return new \WP_REST_Response($formatted_courses, 200);
+        }
+
+        /**
+         * Get user course progress for specific courses
+         * Fetches all courses for a user from LD API and filters to requested courses
+         * More efficient than individual per-course requests
+         */
+        public function get_user_course_progress($request) {
+            $user_id = intval($request['user_id']);
+            $course_ids_param = $request->get_param('course_ids'); // comma-separated: 1,2,3
+
+            if (!$user_id || !$course_ids_param) {
+                return new \WP_REST_Response(array('error' => 'Invalid user ID or course_ids'), 400);
+            }
+
+            // Parse course IDs
+            $course_ids = array_map('intval', explode(',', $course_ids_param));
+            $course_ids = array_filter($course_ids);
+
+            if (empty($course_ids)) {
+                return new \WP_REST_Response(array(), 200);
+            }
+
+            // Query user's course progress from WordPress user meta
+            // LearnDash stores progress in _sfwd-course_progress as serialized array
+            // Structure: { course_id => { status, completed, total, ... } }
+
+            $progress_data = get_user_meta($user_id, '_sfwd-course_progress', true);
+            $progress_map = array();
+
+            if (!empty($progress_data) && is_array($progress_data)) {
+                // Build map of course_id => status from the serialized meta
+                foreach ($progress_data as $course_id => $course_progress) {
+                    if (is_array($course_progress) && isset($course_progress['status'])) {
+                        $progress_map[intval($course_id)] = $course_progress['status'];
+                    }
+                }
+            }
+
+            // Return progress for requested courses only
+            $result = array();
+            foreach ($course_ids as $course_id) {
+                $status = $progress_map[$course_id] ?? 'not_started';
+                $result[] = array(
+                    'course_id'       => $course_id,
+                    'progress_status' => $status,
+                );
+            }
+
+            return new \WP_REST_Response($result, 200);
         }
     }
 }

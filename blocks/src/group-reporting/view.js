@@ -1,21 +1,15 @@
-import { api, endpoints } from '../_shared/api-client.js';
+import { api } from '../_shared/api-client.js';
 
 jQuery(document).ready(function($) {
   const $block = $('.wp-block-bys-groups-group-reporting').first();
   const $table = $block.find('.reporting-table');
+  const detailUrl = $table.data('detailUrl') || '/administrator-dashboard/user-progress-detail/';
   const $tooltip = $('.bys-tooltip');
+
   if (!$table.length) return;
 
-  const detailUrl = $table.data('detailUrl') || '/administrator-dashboard/user-progress-detail/';
-
   let expandedIdx = null;
-  let currentGroupId = null;
 
-  /**
-   * ======================================
-   * Interactions
-   * ======================================
-   */
   // Filter panel toggle
   $block.find('.filters__toggle').on('click', function() {
     const $toggle = $(this);
@@ -43,8 +37,9 @@ jQuery(document).ready(function($) {
 
   function resetAllCourses() {
     $table.find('.course-col-header')
-      .removeClass('course-col-header--expanded course-col--hidden')
+      .removeClass('course-col-header--expanded')
       .addClass('course-col-header--collapsed')
+      .removeClass('course-col--hidden')
       .find('.bys-course-toggle')
       .attr('aria-expanded', 'false');
     $table.find('.course-cell--badge').removeClass('course-col--hidden');
@@ -52,14 +47,17 @@ jQuery(document).ready(function($) {
   }
 
   function expandCourse(idx) {
-    $table.find(`.course-col-header[data-course-idx="${idx}"]`)
+    const $header = $table.find(`.course-col-header[data-course-idx="${idx}"]`);
+    $header
       .removeClass('course-col-header--collapsed')
       .addClass('course-col-header--expanded')
       .find('.bys-course-toggle')
       .attr('aria-expanded', 'true');
 
-    $table.find(`.course-sub-col[data-course-idx="${idx}"], .course-sub-cell[data-course-idx="${idx}"]`).removeClass('course-sub-col--hidden');
-    $table.find(`.course-col-header:not([data-course-idx="${idx}"]), .course-cell--badge:not([data-course-idx="${idx}"])`).addClass('course-col--hidden');
+    $table.find(`.course-sub-col[data-course-idx="${idx}"]`).removeClass('course-sub-col--hidden');
+    $table.find(`.course-sub-cell[data-course-idx="${idx}"]`).removeClass('course-sub-col--hidden');
+    $table.find(`.course-col-header:not([data-course-idx="${idx}"])`).addClass('course-col--hidden');
+    $table.find(`.course-cell--badge:not([data-course-idx="${idx}"])`).addClass('course-col--hidden');
   }
 
   // Row click to detail page
@@ -86,51 +84,186 @@ jQuery(document).ready(function($) {
     $tooltip.attr('aria-hidden', 'true').text('');
   });
 
-  /**
-   * ======================================
-   * Render table
-   * ======================================
-   */
+  // Store current group ID for use in detail links
+  let currentGroupId = null;
 
-  // listens for the jQuery event triggered by group-select block
+  // Listen for group selection event
   $(document).on('bys:groupSelected', async function(_, data) {
+    // console.log('bys:groupSelected event received:', data);
     const groupId = data.groupId;
-    const courses = data.courses || [];
     const baseUsersStats = data.baseUsersStats || {};
-
+    const courses = data.courses || [];
     if (!groupId) return;
     currentGroupId = groupId;
-
-    // render table header with courses
-    rebuildTableHeader(courses);
-
-    // render skeleton rows
-    const userIds = baseUsersStats.user_ids || [];
-    const firstTenUserIds = userIds.slice(0, 10);
-    rebuildTableBodyWithSkeletons(courses, firstTenUserIds);
-
-    // fetch user data and course progress in the background
-    await populateTableWithData(groupId, courses, firstTenUserIds);
+    await populateTableFromAPI(groupId, baseUsersStats, courses);
   });
 
-  // render skeleton table rows with loading placeholders
-  function rebuildTableBodyWithSkeletons(courses, userIds) {
-    const $tbody = $table.find('tbody');
-    const rowTemplate = document.getElementById('skeleton-row-template');
-    const courseCellTemplate = document.getElementById('course-cell-template');
+  // Fetch and populate table from custom endpoint
+  async function populateTableFromAPI(groupId, baseUsersStats, courses) {
+    try {
+      // console.log('Fetching users for group:', groupId);
+      const userIds = baseUsersStats.user_ids || [];
+      const firstTenUserIds = userIds.slice(0, 10);
 
+      if (!firstTenUserIds.length) {
+        // console.log('No users in group');
+        rebuildTableHeader(courses);
+        rebuildTableBody(courses, [], {});
+        return;
+      }
+
+      // Fetch user details for the first 10 users
+      const usersUrl = `/wp-json/bys-groups/v1/groups/${groupId}/users?user_ids=${firstTenUserIds.join(',')}`;
+      const usersResponse = await api.get(usersUrl, true); // Force refresh
+
+      if (!usersResponse || !Array.isArray(usersResponse)) {
+        console.error('Invalid users response:', usersResponse);
+        return;
+      }
+
+      // Fetch course progress for each user
+      const userCourseProgress = {};
+      const courseIds = courses.map(c => c.id).join(',');
+
+      if (courseIds) {
+        for (const user of usersResponse) {
+          const progressUrl = `/wp-json/bys-groups/v1/users/${user.id}/course-progress?course_ids=${courseIds}`;
+          try {
+            userCourseProgress[user.id] = await api.get(progressUrl, true);
+          } catch (err) {
+            console.error(`Failed to fetch course progress for user ${user.id}:`, err);
+            userCourseProgress[user.id] = [];
+          }
+        }
+      } else {
+        // No courses, set empty progress for all users
+        usersResponse.forEach(user => {
+          userCourseProgress[user.id] = [];
+        });
+      }
+
+      rebuildTableHeader(courses);
+      rebuildTableBody(courses, usersResponse, userCourseProgress);
+
+    } catch (err) {
+      console.error('Failed to fetch group reporting data:', err);
+    }
+  }
+
+  function rebuildTableHeader(courses) {
+    const $thead = $table.find('thead');
+    $thead.html('');
+
+    const headerRow = document.createElement('tr');
+    headerRow.className = 'reporting-table__head';
+
+    // Add fixed columns
+    const statusTh = document.createElement('th');
+    statusTh.className = 'col-status';
+    headerRow.appendChild(statusTh);
+
+    const nameTh = document.createElement('th');
+    nameTh.className = 'col-name';
+    nameTh.textContent = 'Name';
+    headerRow.appendChild(nameTh);
+
+    const emailTh = document.createElement('th');
+    emailTh.className = 'col-email';
+    emailTh.textContent = 'Email';
+    headerRow.appendChild(emailTh);
+
+    // Add course headers using template
+    const courseHeaderTemplate = document.getElementById('course-header-template');
+    courses.forEach((course, idx) => {
+      const headerContent = courseHeaderTemplate.content.cloneNode(true);
+      const $headers = $(headerContent);
+
+      // Update data-course-idx for all header cells
+      $headers.find('[data-course-idx]').attr('data-course-idx', idx);
+
+      // Update course title and download link
+      // API Note: course.title is an object. Use .rendered for the nice title
+      $headers.find('.bys-course-toggle').html(course.title.rendered).attr('data-course-idx', idx);
+      $headers.find('.bys-dl-link').attr('title', `Download ${escapeHtml(course.title.rendered)}`);
+
+      // Append cloned headers to the row
+      $headers.children().each(function() {
+        headerRow.appendChild(this);
+      });
+    });
+
+    $thead.append(headerRow);
+  }
+
+  function rebuildTableBody(courses, users, userCourseProgress) {
+    const $tbody = $table.find('tbody');
     $tbody.html('');
 
-    userIds.forEach(userId => {
-      // Clone the skeleton row
+    const rowTemplate = document.getElementById('skeleton-row-template');
+    const cellTemplate = document.getElementById('course-cell-template');
+
+    users.forEach(user => {
+      const userProgress = userCourseProgress[user.id] || [];
+
+      // Clone the row template
       const rowContent = rowTemplate.content.cloneNode(true);
       const $row = $(rowContent);
-      $row.find('tr').attr('data-user-id', userId);
 
+      // Set row user ID
+      $row.find('tr').attr('data-user-id', user.id);
+
+      // Update status badge
+      const statusClass = user.has_logged_in ? 'status-badge--online' : 'status-badge--never';
+      $row.find('.status-badge').attr('class', `status-badge ${statusClass}`);
+
+      // Update name and email
+      $row.find('.col-name').html(`
+        <a href="${detailUrl}?group_id=${currentGroupId}&user_id=${user.id}" class="reporting-table__name-link" onclick="event.stopPropagation();">
+          ${escapeHtml(user.display_name)}
+        </a>
+      `);
+      $row.find('.col-email').html(escapeHtml(user.email));
+
+      // Add course cells
       courses.forEach((course, idx) => {
-        const cellsContent = courseCellTemplate.content.cloneNode(true);
-        const $cells = $(cellsContent);
+        const courseData = userProgress.find(cp => cp.course_id === course.id);
+        const progressStatus = courseData?.progress_status || 'not_started';
+
+        // Map API progress_status to CSS class names
+        let status = 'not-started';
+        if (progressStatus === 'completed') {
+          status = 'completed';
+        } else if (progressStatus === 'in_progress') {
+          status = 'in-progress';
+        }
+
+        // Clone cell template
+        const cellContent = cellTemplate.content.cloneNode(true);
+        const $cells = $(cellContent);
+
+        // Set data-course-idx for all cells
         $cells.find('td').attr('data-course-idx', idx);
+
+        // Update badge cell with status class only (no icons or colors in script)
+        $cells.find('.course-cell--badge span').attr('class', `completion-badge completion-badge--${status}`);
+
+        // Update progress cell
+        const percentage = courseData?.percentage || 0;
+        $cells.find('.course-sub-cell--progress').html(`
+          <div class="bys-progress-wrap"><div class="bys-progress-bar" style="width:${percentage}%;"></div></div>
+          <span class="bys-pct">${percentage}%</span>
+        `);
+
+        // Update date cells
+        const enrolledDate = courseData?.enrolled_date || '';
+        const completedDate = courseData?.completed_date || '';
+        const enrolledDateDisplay = enrolledDate ? formatDate(enrolledDate) : 'Not Started';
+        const completedDateDisplay = completedDate ? formatDate(completedDate) : 'Not Completed';
+
+        $cells.find('.course-sub-cell--enrolment').html(`<span class="bys-date">${enrolledDateDisplay}</span>`);
+        $cells.find('.course-sub-cell--completion').html(`<span class="bys-date">${completedDateDisplay}</span>`);
+
+        // Append cells to row
         $row.find('tr').append($cells);
       });
 
@@ -138,71 +271,21 @@ jQuery(document).ready(function($) {
     });
   }
 
-  // Fetch user details and populate user info columns
-  async function populateTableWithData(groupId, courses, userIds) {
+  function formatDate(dateString) {
+    if (!dateString) return '';
     try {
-      const userIdsString = userIds.join(',');
-      const usersUrl = endpoints.groupUsers(groupId, userIdsString);
-      const allUsersResponse = await api.get(usersUrl, true);
-
-      if (!allUsersResponse || !Array.isArray(allUsersResponse)) {
-        console.error('Invalid users response:', allUsersResponse);
-        return;
-      }
-
-      // Update user info columns for each user
-      const $tbody = $table.find('tbody');
-      allUsersResponse.forEach(user => {
-        const $row = $tbody.find(`tr[data-user-id="${user.id}"]`);
-        if (!$row.length) return;
-
-        const statusClass = user.has_logged_in ? 'status-badge--online' : '';
-
-        $row
-          .removeClass('reporting-table__row--loading')
-          .find('.col-status .status-badge').attr('class', `status-badge ${statusClass}`)
-          .end()
-          .find('.col-name').html(`
-            <a href="${detailUrl}?group_id=${currentGroupId}&user_id=${user.id}" class="reporting-table__name-link" onclick="event.stopPropagation();">
-              ${user.display_name}
-            </a>
-          `)
-          .end()
-          .find('.col-email').html(user.email);
-      });
-    } catch (err) {
-      console.error('Failed to fetch group reporting data:', err);
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    } catch (e) {
+      return dateString;
     }
   }
 
-  // Update table header with course columns
-  function rebuildTableHeader(courses) {
-    const $headRow = $table.find('thead tr.reporting-table__head');
-
-    // Remove existing course columns (keep fixed columns: status, name, email)
-    $headRow.find('.course-col-header, .course-sub-col').remove();
-
-    // If no courses, add skeleton
-    if (!courses || courses.length === 0) {
-      const skeletonTemplate = document.getElementById('skeleton-course-header-template');
-      if (skeletonTemplate) {
-        const skeletonContent = skeletonTemplate.content.cloneNode(true);
-        $headRow.append(skeletonContent);
-      }
-    } else {
-      // Clone course header template for each course
-      const courseTemplate = document.getElementById('course-header-template');
-      courses.forEach((course, idx) => {
-        const headerContent = courseTemplate.content.cloneNode(true);
-        const $headers = $(headerContent);
-
-        // Update data-course-idx and course title
-        $headers.find('[data-course-idx]').attr('data-course-idx', idx);
-        $headers.find('.bys-course-toggle').html(course.title.rendered);
-        $headers.find('.bys-dl-link').attr('title', `Download ${course.title.rendered}`);
-
-        $headRow.append($headers);
-      });
+  function escapeHtml(text) {
+    if (!text || typeof text !== 'string') {
+      return '';
     }
+    const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+    return text.replace(/[&<>"']/g, m => map[m]);
   }
 });

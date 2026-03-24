@@ -24,7 +24,7 @@ $detail_url = home_url( '/administrator-dashboard/user-progress-detail/' );
     <div class="section__title">
         <h3>Group Reporting</h3>
         <button class="filters__toggle btn-unstyled" type="button" aria-expanded="false" aria-controls="filters-box">
-            <i class="fa-solid fa-sliders"></i> Filter Participants
+            <i class="fa-regular fa-sliders"></i> Filter Participants
         </button>
     </div>
 
@@ -69,7 +69,7 @@ $detail_url = home_url( '/administrator-dashboard/user-progress-detail/' );
             </select>
         </div>
         <div class="table__actions__export">
-            <a href="#"><i class="fa-solid fa-download"></i> Export Table</a>
+            <a href="#"><i class="fa-regular fa-download"></i> Export Table</a>
         </div>
     </div>
 
@@ -115,7 +115,7 @@ $detail_url = home_url( '/administrator-dashboard/user-progress-detail/' );
                             <!-- course title inserted here -->
                         </button>
                         <a class="bys-dl-link" href="#" title="">
-                            <i class="fa-solid fa-download"></i>
+                            <i class="fa-regular fa-download"></i>
                         </a>
                     </div>
                 </th>

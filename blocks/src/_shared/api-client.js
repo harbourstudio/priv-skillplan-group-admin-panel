@@ -18,6 +18,7 @@ export const endpoints = {
   groupBaseUsersStats: (groupId) => `/wp-json/bys-groups/v1/groups/${groupId}/base-user-stats`,
   groupUsers: (groupId, userIds) => `/wp-json/bys-groups/v1/groups/${groupId}/users?user_ids=${userIds}`,
   groupCourses: (groupId) => `/wp-json/bys-groups/v1/groups/${groupId}/courses`,
+  userCourseProgress: (userId, courseIds) => `/wp-json/bys-groups/v1/users/${userId}/course-progress?course_ids=${courseIds}`,
 };
 
 export const api = {
