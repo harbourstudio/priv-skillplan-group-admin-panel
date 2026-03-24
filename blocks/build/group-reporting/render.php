@@ -150,4 +150,4 @@ $detail_url = home_url( '/administrator-dashboard/user-progress-detail/' );
 
 </div>
 
-<div class="bys-tooltip" role="tooltip" aria-hidden="true"></div>
+<div class="bys-tooltip" role="tooltip"></div>

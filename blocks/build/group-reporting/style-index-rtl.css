@@ -116,12 +116,6 @@
 }
 .wp-block-bys-groups-group-reporting .table__results table .bys-dl-link {
   font-size: var(--wp--preset--font-size--x-small);
-  opacity: 0.7;
-}
-.wp-block-bys-groups-group-reporting .table__results table .bys-dl-link:hover {
-  opacity: 1;
-}
-.wp-block-bys-groups-group-reporting .table__results table .bys-dl-link {
   padding-top: var(--wp--preset--spacing--1);
 }
 .wp-block-bys-groups-group-reporting .table__results table .course-sub-col {
@@ -167,10 +161,10 @@
   color: var(--wp--preset--color--green-500);
 }
 .wp-block-bys-groups-group-reporting .table__results table tbody .status-badge--offline {
-  color: transparent;
+  color: var(--wp--preset--color--gray-300);
 }
 .wp-block-bys-groups-group-reporting .table__results table tbody .status-badge--never {
-  color: var(--wp--preset--color--gray-200);
+  color: transparent;
 }
 .wp-block-bys-groups-group-reporting .table__results table tbody .completion-badge {
   display: inline-flex;
@@ -214,6 +208,7 @@
   margin-left: 6px;
 }
 .wp-block-bys-groups-group-reporting .bys-progress-bar {
+  background-color: var(--wp--preset--color--green-500);
   height: 100%;
   border-radius: 999px;
   transition: width 0.3s ease;
@@ -226,11 +221,28 @@
 .wp-block-bys-groups-group-reporting .bys-quiz-icons {
   display: flex;
   gap: 3px;
-  align-items: center;
+  align-items: flex-end;
 }
 .wp-block-bys-groups-group-reporting .bys-quiz-icon {
-  cursor: default;
+  display: inline-block;
+  width: 8px;
+  height: 20px;
+  border-radius: 2px;
   line-height: 1;
+  background-color: var(--wp--preset--color--gray-300);
+}
+.wp-block-bys-groups-group-reporting .bys-quiz-icon--pass {
+  background-color: var(--wp--preset--color--green-500);
+}
+.wp-block-bys-groups-group-reporting .bys-quiz-icon--fail {
+  background-color: var(--wp--preset--color--red-500);
+  height: 10px;
+  align-self: flex-end;
+}
+.wp-block-bys-groups-group-reporting .bys-quiz-icon--neutral {
+  background-color: var(--wp--preset--color--gray-300);
+  height: 12px;
+  align-self: flex-end;
 }
 .wp-block-bys-groups-group-reporting .bys-quiz-empty {
   color: var(--wp--preset--color--gray-400);
@@ -265,18 +277,22 @@
 .wp-block-bys-groups-group-reporting .bys-show-more:hover {
   background: var(--wp--preset--color--blue-200);
 }
-.bys-tooltip {
-  position: absolute;
+.bys-tooltip-instance {
+  position: fixed;
   z-index: 9999;
-  background: #1e293b;
-  color: white;
-  border-radius: 0.4rem;
-  padding: 0.3rem 0.6rem;
-  font-size: 0.75rem;
-  pointer-events: none;
-  white-space: nowrap;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  background: white;
+  border: solid 1px var(--wp--preset--color--gray-100);
+  border-radius: 0.5rem;
+  font-size: var(--wp--preset--font-size--x-small);
+  padding: var(--wp--preset--spacing--3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
-.bys-tooltip[aria-hidden=true] {
-  display: none;
+.bys-tooltip-instance .bys-tooltip__title {
+  font-weight: 500;
+  margin-bottom: var(--wp--preset--spacing--2);
+}
+.bys-tooltip-instance .bys-tooltip__content {
+  display: flex;
+  gap: var(--wp--preset--spacing--1);
+  align-items: center;
 }

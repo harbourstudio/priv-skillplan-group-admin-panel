@@ -84,12 +84,12 @@ $detail_url = home_url( '/administrator-dashboard/user-progress-detail/' );
                         <th class="col-name">Name</th>
                         <th class="col-email">Email</th>
 
-                        <!-- Course headers will be populated dynamically -->
+                        <!-- Course headers will be populated dynamically via template cloning -->
                     </tr>
                 </thead>
 
                 <tbody>
-                    <!-- Table body populated dynamically -->
+                    <!-- Table body populated dynamically via rows and cells cloning -->
                 </tbody>
 
             </table>
@@ -102,8 +102,8 @@ $detail_url = home_url( '/administrator-dashboard/user-progress-detail/' );
                             <i class="fa-solid fa-circle"></i>
                         </span>
                     </td>
-                    <td class="col-name"><span class="skeleton-text" style="width: 120px;"></span></td>
-                    <td class="col-email"><span class="skeleton-text" style="width: 180px;"></span></td>
+                    <td class="col-name"><span style="width: 120px;"></span></td>
+                    <td class="col-email"><span style="width: 180px;"></span></td>
                 </tr>
             </template>
 
@@ -128,19 +128,19 @@ $detail_url = home_url( '/administrator-dashboard/user-progress-detail/' );
             <!-- Course cell template for cloning -->
             <template id="course-cell-template">
                 <td class="course-cell course-cell--badge">
-                    <span class="skeleton-spinner"></span>
+                    <span></span>
                 </td>
                 <td class="course-cell course-sub-cell course-sub-cell--progress course-sub-col--hidden">
-                    <span class="skeleton-spinner"></span>
+                    <span></span>
                 </td>
                 <td class="course-cell course-sub-cell course-sub-cell--quizzing course-sub-col--hidden">
-                    <span class="skeleton-spinner"></span>
+                    <span></span>
                 </td>
                 <td class="course-cell course-sub-cell course-sub-cell--enrolment course-sub-col--hidden">
-                    <span class="skeleton-text" style="width: 100px;"></span>
+                    <span style="width: 100px;"></span>
                 </td>
                 <td class="course-cell course-sub-cell course-sub-cell--completion course-sub-col--hidden">
-                    <span class="skeleton-text" style="width: 100px;"></span>
+                    <span style="width: 100px;"></span>
                 </td>
             </template>
         </div>
@@ -150,4 +150,4 @@ $detail_url = home_url( '/administrator-dashboard/user-progress-detail/' );
 
 </div>
 
-<div class="bys-tooltip" role="tooltip" aria-hidden="true"></div>
+<div class="bys-tooltip" role="tooltip"></div>

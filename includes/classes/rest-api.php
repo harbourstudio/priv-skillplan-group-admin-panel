@@ -72,10 +72,24 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'permission_callback' => array($this, 'check_user_permission'),
             ));
 
-            // userCourseProgress - fetch user progress for multiple courses
+            // userCourseProgress
             register_rest_route($this->namespace, '/users/(?P<user_id>\d+)/course-progress', array(
                 'methods'             => 'GET',
                 'callback'            => array($this, 'get_user_course_progress'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
+
+            // courseQuizSteps 
+            register_rest_route($this->namespace, '/courses/(?P<course_id>\d+)/quiz-steps', array(
+                'methods'             => 'GET',
+                'callback'            => array($this, 'get_course_quiz_steps'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
+
+            // userQuizAttempts
+            register_rest_route($this->namespace, '/users/(?P<user_id>\d+)/quiz-attempts', array(
+                'methods'             => 'GET',
+                'callback'            => array($this, 'get_user_quiz_attempts'),
                 'permission_callback' => array($this, 'check_user_permission'),
             ));
         }
@@ -180,12 +194,12 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             $total_members = count($group_users);
             $inactive_members = 0;
 
-            // Count inactive members by checking last_login user meta
+            // Count inactive members by checking user meta
             $user_ids = array();
             foreach ($group_users as $user_data) {
                 $user_id = intval($user_data['id']);
                 $user_ids[] = $user_id;
-                $last_login = get_user_meta($user_id, 'last_login', true);
+                $last_login = get_user_meta($user_id, '_ld_notifications_last_login', true);
                 if (empty($last_login)) {
                     $inactive_members++;
                 }
@@ -221,18 +235,40 @@ if (!class_exists('BYS_Groups_Rest_API')) {
 
             // Fetch user data from WordPress
             $users = array();
+            $current_time = current_time('timestamp');
             foreach ($user_ids as $user_id) {
                 $user = get_user_by('ID', $user_id);
                 if ($user) {
-                    // check if user has ever logged in
-                    $last_login = get_user_meta($user_id, 'last_login', true);
-                    $has_logged_in = !empty($last_login);
+                    // Check multiple login meta keys and use the most recent one
+                    $meta_values = array(
+                        '_ld_notifications_last_login' => intval(get_user_meta($user_id, '_ld_notifications_last_login', true) ?: 0),
+                        'learndash-last-login' => intval(get_user_meta($user_id, 'learndash-last-login', true) ?: 0),
+                        'last_login' => intval(get_user_meta($user_id, 'last_login', true) ?: 0),
+                    );
+
+                    // Find the most recent login timestamp (highest value)
+                    $last_login_timestamp = max($meta_values);
+                    $last_login_timestamp = $last_login_timestamp > 0 ? $last_login_timestamp : null;
+
+                    // Calculate status based on last_login
+                    $status = 'never'; // default: never logged in
+                    if ($last_login_timestamp) {
+                        $time_diff = $current_time - $last_login_timestamp;
+                        $hours_ago = $time_diff / 3600;
+                        if ($hours_ago <= 24) {
+                            $status = 'online';
+                        } else {
+                            $status = 'offline';
+                        }
+                    }
 
                     $users[] = array(
-                        'id'             => $user->ID,
-                        'display_name'   => $user->display_name,
-                        'email'          => $user->user_email,
-                        'has_logged_in'  => $has_logged_in,
+                        'id'                  => $user->ID,
+                        'display_name'        => $user->display_name,
+                        'email'               => $user->user_email,
+                        'last_login'          => $last_login_timestamp ? wp_date('c', $last_login_timestamp) : null,
+                        'status'              => $status,
+                        '_debug_meta_values'  => $meta_values, // For debugging - remove after verification
                     );
                 }
             }
@@ -293,7 +329,7 @@ if (!class_exists('BYS_Groups_Rest_API')) {
 
         /**
          * Get user course progress for specific courses
-         * Fetches all courses for a user from LD API and filters to requested courses
+         * Fetches progress, completion, enrollment, and step data from user meta and activity table
          */
         public function get_user_course_progress($request) {
             $user_id = intval($request['user_id']);
@@ -318,19 +354,180 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             if (!empty($progress_data) && is_array($progress_data)) {
                 foreach ($progress_data as $course_id => $course_progress) {
                     if (is_array($course_progress) && isset($course_progress['status'])) {
-                        $progress_map[intval($course_id)] = $course_progress['status'];
+                        $progress_map[intval($course_id)] = array(
+                            'status'    => $course_progress['status'],
+                            'completed' => intval($course_progress['completed'] ?? 0),
+                            'total'     => intval($course_progress['total'] ?? 0),
+                        );
                     }
                 }
             }
 
-            // Return progress for requested courses only
+            // Batch query for completion dates from activity table
+            global $wpdb;
+            $completion_map = array();
+
+            if (!empty($course_ids)) {
+                $placeholders = implode(',', array_fill(0, count($course_ids), '%d'));
+                $query_args = array_merge([$user_id], $course_ids);
+
+                $query = $wpdb->prepare(
+                    "SELECT course_id, activity_completed
+                     FROM {$wpdb->prefix}learndash_user_activity
+                     WHERE user_id = %d AND course_id IN ($placeholders) AND activity_type = 'course' AND activity_status = 1",
+                    ...$query_args
+                );
+
+                $rows = $wpdb->get_results($query);
+                if (!empty($rows)) {
+                    foreach ($rows as $row) {
+                        $completion_map[intval($row->course_id)] = intval($row->activity_completed);
+                    }
+                }
+            }
+
+            // Build result with enriched data
             $result = array();
             foreach ($course_ids as $course_id) {
-                $status = $progress_map[$course_id] ?? 'not_started';
+                $course_progress = $progress_map[$course_id] ?? array('status' => 'not_started', 'completed' => 0, 'total' => 0);
+
+                // Get enrollment date from user meta
+                $enrolled_ts = get_user_meta($user_id, "learndash_course_{$course_id}_enrolled_at", true);
+                $enrolled_at = $enrolled_ts ? wp_date('c', intval($enrolled_ts)) : null;
+
+                // Get completion date from activity table
+                $completed_ts = $completion_map[$course_id] ?? null;
+                $date_completed = $completed_ts ? wp_date('c', intval($completed_ts)) : null;
+
                 $result[] = array(
                     'course_id'       => $course_id,
-                    'progress_status' => $status,
+                    'progress_status' => $course_progress['status'],
+                    'steps_completed' => $course_progress['completed'],
+                    'steps_total'     => $course_progress['total'],
+                    'enrolled_at'     => $enrolled_at,
+                    'date_completed'  => $date_completed,
                 );
+            }
+
+            return new \WP_REST_Response($result, 200);
+        }
+
+        /**
+         * Get quiz steps for a course
+         * Returns first 3 quizzes in a course with caching
+         */
+        public function get_course_quiz_steps($request) {
+            $course_id = intval($request['course_id']);
+
+            if (!$course_id) {
+                return new \WP_REST_Response(array('error' => 'Invalid course ID'), 400);
+            }
+
+            // Check transient cache
+            $cache_key = "bys_quiz_steps_{$course_id}";
+            $cached = get_transient($cache_key);
+            if ($cached !== false) {
+                return new \WP_REST_Response($cached, 200);
+            }
+
+            // Query for quiz steps in this course
+            global $wpdb;
+            $steps = $wpdb->get_results($wpdb->prepare(
+                "SELECT p.ID as step_id, p.post_title as step_title
+                 FROM {$wpdb->posts} p
+                 JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
+                 WHERE pm.meta_key = 'course_id' AND pm.meta_value = %d
+                 AND p.post_type = 'sfwd-quiz' AND p.post_status = 'publish'
+                 ORDER BY p.menu_order ASC
+                 LIMIT 3",
+                $course_id
+            ));
+
+            if (!$steps) {
+                $steps = array();
+            }
+
+            // Convert to array of objects with correct keys
+            $result = array();
+            foreach ($steps as $step) {
+                $result[] = array(
+                    'step_id'    => intval($step->step_id),
+                    'step_title' => $step->step_title,
+                );
+            }
+
+            // Cache for 1 hour
+            set_transient($cache_key, $result, HOUR_IN_SECONDS);
+
+            return new \WP_REST_Response($result, 200);
+        }
+
+        /**
+         * Get quiz attempts for a user in a course
+         * Returns the best attempt (highest percentage) for each quiz with configured pass threshold
+         */
+        public function get_user_quiz_attempts($request) {
+            $user_id = intval($request['user_id']);
+            $course_id = intval($request->get_param('course_id'));
+
+            if (!$user_id || !$course_id) {
+                return new \WP_REST_Response(array('error' => 'Invalid user_id or course_id'), 400);
+            }
+
+            // Query quiz attempts from activity table with points data, ordered by highest percentage first
+            global $wpdb;
+            $attempts = $wpdb->get_results($wpdb->prepare(
+                "SELECT a.activity_id, a.post_id as quiz_id, a.activity_completed as completed,
+                        CAST(m1.activity_meta_value AS UNSIGNED) as percentage,
+                        CAST(m2.activity_meta_value AS UNSIGNED) as points,
+                        CAST(m3.activity_meta_value AS UNSIGNED) as total_points
+                 FROM {$wpdb->prefix}learndash_user_activity a
+                 LEFT JOIN {$wpdb->prefix}learndash_user_activity_meta m1
+                   ON a.activity_id = m1.activity_id AND m1.activity_meta_key = 'percentage'
+                 LEFT JOIN {$wpdb->prefix}learndash_user_activity_meta m2
+                   ON a.activity_id = m2.activity_id AND m2.activity_meta_key = 'points'
+                 LEFT JOIN {$wpdb->prefix}learndash_user_activity_meta m3
+                   ON a.activity_id = m3.activity_id AND m3.activity_meta_key = 'total_points'
+                 WHERE a.user_id = %d AND a.course_id = %d AND a.activity_type = 'quiz'
+                 ORDER BY a.post_id ASC, CAST(m1.activity_meta_value AS UNSIGNED) DESC",
+                $user_id, $course_id
+            ));
+
+            if (!$attempts) {
+                $attempts = array();
+            }
+
+            // Build result array with best attempt per quiz and configured pass threshold
+            $result = array();
+            $seen_quizzes = array();
+
+            foreach ($attempts as $attempt) {
+                $quiz_id = intval($attempt->quiz_id);
+
+                // Skip if we've already recorded the best attempt for this quiz
+                if (isset($seen_quizzes[$quiz_id])) {
+                    continue;
+                }
+
+                $percentage = intval($attempt->percentage ?? 0);
+                $points = intval($attempt->points ?? 0);
+                $total_points = intval($attempt->total_points ?? 0);
+
+                // Get the quiz's configured passing percentage
+                $passing_meta = get_post_meta($quiz_id, '_sfwd-quiz_passingpercentage', true);
+                $passing_percentage = !empty($passing_meta) ? intval($passing_meta) : 80;
+
+                $result[] = array(
+                    'quiz_id'           => $quiz_id,
+                    'percentage'        => $percentage,
+                    'points'            => $points,
+                    'total_points'      => $total_points,
+                    'passing_threshold' => $passing_percentage,
+                    'pass'              => $percentage >= $passing_percentage,
+                    'completed'         => intval($attempt->completed ?? 0),
+                );
+
+                $seen_quizzes[$quiz_id] = true;
             }
 
             return new \WP_REST_Response($result, 200);
