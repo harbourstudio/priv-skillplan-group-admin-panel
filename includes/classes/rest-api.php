@@ -294,7 +294,6 @@ if (!class_exists('BYS_Groups_Rest_API')) {
         /**
          * Get user course progress for specific courses
          * Fetches all courses for a user from LD API and filters to requested courses
-         * More efficient than individual per-course requests
          */
         public function get_user_course_progress($request) {
             $user_id = intval($request['user_id']);
@@ -312,15 +311,11 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 return new \WP_REST_Response(array(), 200);
             }
 
-            // Query user's course progress from WordPress user meta
-            // LearnDash stores progress in _sfwd-course_progress as serialized array
-            // Structure: { course_id => { status, completed, total, ... } }
-
+            // Query user's course progress from user meta
             $progress_data = get_user_meta($user_id, '_sfwd-course_progress', true);
             $progress_map = array();
 
             if (!empty($progress_data) && is_array($progress_data)) {
-                // Build map of course_id => status from the serialized meta
                 foreach ($progress_data as $course_id => $course_progress) {
                     if (is_array($course_progress) && isset($course_progress['status'])) {
                         $progress_map[intval($course_id)] = $course_progress['status'];
