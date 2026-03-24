@@ -17,6 +17,7 @@ export const endpoints = {
   currentUserGroups: () => '/wp-json/bys-groups/v1/me/groups',
   groupBaseUsersStats: (groupId) => `/wp-json/bys-groups/v1/groups/${groupId}/base-user-stats`,
   groupUsers: (groupId, userIds) => `/wp-json/bys-groups/v1/groups/${groupId}/users?user_ids=${userIds}`,
+  groupUserInfo: (groupId, userId ) => `/wp-json/bys-groups/v1/groups/${groupId}/users/${userId}`,
   groupCourses: (groupId) => `/wp-json/bys-groups/v1/groups/${groupId}/courses`,
   userCourseProgress: (userId, courseIds) => `/wp-json/bys-groups/v1/users/${userId}/course-progress?course_ids=${courseIds}`,
   courseQuizSteps: (courseId) => `/wp-json/bys-groups/v1/courses/${courseId}/quiz-steps`,

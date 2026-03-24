@@ -1,12 +1,16 @@
 .wp-block-bys-groups-user-info {
+    background-color: #fff;
+    border: 1px solid var(--wp--preset--color--gray-100);
+    border-radius: .75rem;
+    padding: var(--wp--preset--spacing--5);
 
-    .user-progress__header {
+    .user-info__header {
         display: flex;
         align-items: center;
         gap: var(--wp--preset--spacing--5);
     }
 
-    .user-progress__avatar {
+    .user-info__avatar {
         flex-shrink: 0;
 
         img {
@@ -17,40 +21,27 @@
         }
     }
 
-    .user-progress__name {
+    .user-info__name {
         margin: 0 0 var(--wp--preset--spacing--1);
     }
 
-    .user-progress__email {
-        font-size: var(--wp--preset--font-size--small);
-        color: var(--wp--preset--color--gray-700);
-        margin-right: var(--wp--preset--spacing--3);
-    }
-
-    .user-progress__meta {
+    .user-info__meta {
         display: flex;
         align-items: center;
         flex-wrap: wrap;
         gap: var(--wp--preset--spacing--4);
-    }
+        padding-left: 0 !important;
+        margin: 0;
 
-    .user-progress__meta-item {
-        font-size: var(--wp--preset--font-size--x-small);
-        color: var(--wp--preset--color--gray-600);
-        display: inline-flex;
-        align-items: center;
-        gap: var(--wp--preset--spacing--2);
-
-        i {
-            font-size: 0.65rem;
-        }
-
-        &--active {
-            color: var(--wp--preset--color--green-500);
-            font-weight: 600;
-
-            i {
-                font-size: 0.5rem;
+        &-item {
+            font-size: var(--wp--preset--font-size--x-small);
+            color: var(--wp--preset--color--gray-600);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+    
+            &--active {
+                color: var(--wp--preset--color--green-500);
             }
         }
     }

@@ -1,49 +1,45 @@
 /*!*********************************************************************************************************************************************************************************************************************************************************************************!*\
   !*** css ./node_modules/css-loader/dist/cjs.js??ruleSet[1].rules[4].use[1]!./node_modules/postcss-loader/dist/cjs.js??ruleSet[1].rules[4].use[2]!./node_modules/@wordpress/scripts/node_modules/sass-loader/dist/cjs.js??ruleSet[1].rules[4].use[3]!./src/user-info/style.scss ***!
   \*********************************************************************************************************************************************************************************************************************************************************************************/
-.wp-block-bys-groups-user-info .user-progress__header {
+.wp-block-bys-groups-user-info {
+  background-color: #fff;
+  border: 1px solid var(--wp--preset--color--gray-100);
+  border-radius: 0.75rem;
+  padding: var(--wp--preset--spacing--5);
+}
+.wp-block-bys-groups-user-info .user-info__header {
   display: flex;
   align-items: center;
   gap: var(--wp--preset--spacing--5);
 }
-.wp-block-bys-groups-user-info .user-progress__avatar {
+.wp-block-bys-groups-user-info .user-info__avatar {
   flex-shrink: 0;
 }
-.wp-block-bys-groups-user-info .user-progress__avatar img {
+.wp-block-bys-groups-user-info .user-info__avatar img {
   width: 4.5rem;
   height: 4.5rem;
   border-radius: 9999px;
   -o-object-fit: cover;
      object-fit: cover;
 }
-.wp-block-bys-groups-user-info .user-progress__name {
+.wp-block-bys-groups-user-info .user-info__name {
   margin: 0 0 var(--wp--preset--spacing--1);
 }
-.wp-block-bys-groups-user-info .user-progress__email {
-  font-size: var(--wp--preset--font-size--small);
-  color: var(--wp--preset--color--gray-700);
-  margin-left: var(--wp--preset--spacing--3);
-}
-.wp-block-bys-groups-user-info .user-progress__meta {
+.wp-block-bys-groups-user-info .user-info__meta {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: var(--wp--preset--spacing--4);
+  padding-right: 0 !important;
+  margin: 0;
 }
-.wp-block-bys-groups-user-info .user-progress__meta-item {
+.wp-block-bys-groups-user-info .user-info__meta-item {
   font-size: var(--wp--preset--font-size--x-small);
   color: var(--wp--preset--color--gray-600);
   display: inline-flex;
   align-items: center;
-  gap: var(--wp--preset--spacing--2);
+  gap: 0.25rem;
 }
-.wp-block-bys-groups-user-info .user-progress__meta-item i {
-  font-size: 0.65rem;
-}
-.wp-block-bys-groups-user-info .user-progress__meta-item--active {
+.wp-block-bys-groups-user-info .user-info__meta-item--active {
   color: var(--wp--preset--color--green-500);
-  font-weight: 600;
-}
-.wp-block-bys-groups-user-info .user-progress__meta-item--active i {
-  font-size: 0.5rem;
 }

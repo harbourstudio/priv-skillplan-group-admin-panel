@@ -65,6 +65,13 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'permission_callback' => array($this, 'check_user_permission'),
             ));
 
+            // groupUserInfo
+            register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/users/(?P<user_id>\d+)', array(
+                'methods'             => 'GET',
+                'callback'            => array($this, 'get_group_user_info'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
+
             // groupCourses
             register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/courses', array(
                 'methods'             => 'GET',
@@ -274,6 +281,64 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             }
 
             return new \WP_REST_Response($users, 200);
+        }
+
+        /**
+         * Get detailed information for a single user in a group
+         */
+        public function get_group_user_info($request) {
+            $group_id = intval($request['group_id']);
+            $user_id = intval($request['user_id']);
+
+            if (!$group_id || !$user_id) {
+                return new \WP_REST_Response(array('error' => 'Invalid group ID or user ID'), 400);
+            }
+
+            // Verify user exists and belongs to group
+            $user = get_user_by('ID', $user_id);
+            if (!$user) {
+                return new \WP_REST_Response(array('error' => 'User not found'), 404);
+            }
+
+            // Get user's group enrollment date
+            $group_enrolled_date = get_user_meta($user_id, "learndash_group_{$group_id}_enrolled_at", true);
+
+            // Check multiple login meta keys and use the most recent one
+            $meta_values = array(
+                '_ld_notifications_last_login' => intval(get_user_meta($user_id, '_ld_notifications_last_login', true) ?: 0),
+                'learndash-last-login' => intval(get_user_meta($user_id, 'learndash-last-login', true) ?: 0),
+                'last_login' => intval(get_user_meta($user_id, 'last_login', true) ?: 0),
+            );
+
+            // Find the most recent login timestamp (highest value)
+            $last_login_timestamp = max($meta_values);
+            $last_login_timestamp = $last_login_timestamp > 0 ? $last_login_timestamp : null;
+
+            // Calculate status based on last_login (same logic as reporting block)
+            $current_time = current_time('timestamp');
+            $status = 'never'; // default: never logged in
+            if ($last_login_timestamp) {
+                $time_diff = $current_time - $last_login_timestamp;
+                $hours_ago = $time_diff / 3600;
+                if ($hours_ago <= 24) {
+                    $status = 'online';
+                } else {
+                    $status = 'offline';
+                }
+            }
+
+            $user_data = array(
+                'id'                   => $user->ID,
+                'first_name'           => $user->first_name,
+                'last_name'            => $user->last_name,
+                'display_name'         => $user->display_name,
+                'email'                => $user->user_email,
+                'status'               => $status,
+                'group_enrolled_date'  => $group_enrolled_date ?: null,
+                'last_login'           => $last_login_timestamp,
+            );
+
+            return new \WP_REST_Response($user_data, 200);
         }
 
         public function get_group_courses($request) {

@@ -10,7 +10,8 @@
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   api: () => (/* binding */ api)
+/* harmony export */   api: () => (/* binding */ api),
+/* harmony export */   endpoints: () => (/* binding */ endpoints)
 /* harmony export */ });
 /**
  * Shared API client with in-memory caching and request deduplication.
@@ -25,6 +26,18 @@ function getAuthorizationHeader() {
   }
   return null;
 }
+
+// custom API endpoint definitions
+const endpoints = {
+  currentUserGroups: () => '/wp-json/bys-groups/v1/me/groups',
+  groupBaseUsersStats: groupId => `/wp-json/bys-groups/v1/groups/${groupId}/base-user-stats`,
+  groupUsers: (groupId, userIds) => `/wp-json/bys-groups/v1/groups/${groupId}/users?user_ids=${userIds}`,
+  groupUserInfo: (groupId, userId) => `/wp-json/bys-groups/v1/groups/${groupId}/users/${userId}`,
+  groupCourses: groupId => `/wp-json/bys-groups/v1/groups/${groupId}/courses`,
+  userCourseProgress: (userId, courseIds) => `/wp-json/bys-groups/v1/users/${userId}/course-progress?course_ids=${courseIds}`,
+  courseQuizSteps: courseId => `/wp-json/bys-groups/v1/courses/${courseId}/quiz-steps`,
+  userQuizAttempts: (userId, courseId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-attempts?course_id=${courseId}`
+};
 const api = {
   _cache: new Map(),
   _pending: new Map(),
@@ -166,11 +179,6 @@ var __webpack_exports__ = {};
   \*******************************/
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../_shared/api-client.js */ "./src/_shared/api-client.js");
-/**
- * User Info Block - Frontend View
- * Fetches user data from REST API based on URL parameters
- */
-
 
 jQuery(document).ready(async $ => {
   // Get user_id from URL parameters
@@ -185,10 +193,8 @@ jQuery(document).ready(async $ => {
   // Wait for auth header to be available
   await waitForAuthHeader();
   try {
-    // Fetch user details from custom endpoint
-    const userUrl = `/wp-json/bys-groups/v1/groups/${groupId}/users/${userId}`;
-    const userData = await _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.api.get(userUrl, true);
-
+    // Fetch user details from custom endpoint 
+    const userData = await _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.api.get(_shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.endpoints.groupUserInfo(groupId, userId), true);
     // Display user info
     displayUserInfo(userData);
   } catch (err) {
@@ -207,54 +213,24 @@ jQuery(document).ready(async $ => {
     });
   }
   function displayUserInfo(user) {
-    const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.display_name;
-    const statusClass = user.has_logged_in ? 'active' : 'inactive';
-    const statusText = user.has_logged_in ? 'Active' : 'Inactive';
+    const $block = $('.wp-block-bys-groups-user-info').first(); // only one block instance per page 
+    if (!$block) return;
+    const fullName = [user.first_name, user.last_name].join(' ') || user.display_name;
+    const statusClass = user.status === 'online' ? 'active' : 'inactive';
+    const statusText = user.status === 'online' ? 'Active' : user.status === 'offline' ? 'Offline' : 'Never Logged In';
 
     // Format dates
-    const enrolledDate = user.group_enrolled_date ? formatDate(user.group_enrolled_date) : 'Unknown';
-    const lastActiveDate = user.last_login ? formatUnixTimestamp(user.last_login) : 'Never';
+    const enrolledDate = user.group_enrolled_date ? formatUnixTimestamp(user.group_enrolled_date) : 'Unknown';
+    const lastLoginDate = user.last_login ? formatUnixTimestamp(user.last_login) : 'Never';
 
-    // Build HTML
-    const html = `
-      <div class="user-progress__header">
-        <div class="user-progress__avatar">
-          <img src="https://i.pravatar.cc/80?u=${encodeURIComponent(user.email)}" alt="${escapeHtml(fullName)}" />
-        </div>
-        <div class="user-progress__user-info">
-          <h1 class="user-progress__name">${escapeHtml(fullName)}</h1>
-          <div class="user-progress__meta">
-            <span class="user-progress__email">${escapeHtml(user.email)}</span>
-            <span class="user-progress__meta-item">
-              <i class="fa-solid fa-calendar"></i> Enrolled: ${enrolledDate}
-            </span>
-            <span class="user-progress__meta-item">
-              <i class="fa-solid fa-clock"></i> Last Active: ${lastActiveDate}
-            </span>
-            <span class="user-progress__meta-item user-progress__meta-item--${statusClass}">
-              <i class="fa-solid fa-circle"></i> ${statusText}
-            </span>
-          </div>
-        </div>
-      </div>
-    `;
-
-    // Insert HTML into block
-    const $block = $('.wp-block-bys-groups-user-info');
-    $block.html(html);
-  }
-  function formatDate(dateString) {
-    if (!dateString) return '';
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      });
-    } catch (e) {
-      return dateString;
-    }
+    // Populate with data
+    $block.find('.user-avatar').attr('src', `https://i.pravatar.cc/80?u=${encodeURIComponent(user.email)}`).attr('alt', fullName);
+    $block.find('.user-name').text(fullName);
+    $block.find('.user-email').text(user.email);
+    $block.find('.user-enrolled-date').text(enrolledDate);
+    $block.find('.user-last-active-date').text(lastLoginDate);
+    $block.find('.user-status-item').addClass(`user-info__meta-item--${statusClass}`);
+    $block.find('.user-status-text').text(statusText);
   }
   function formatUnixTimestamp(timestamp) {
     if (!timestamp) return '';
@@ -271,17 +247,6 @@ jQuery(document).ready(async $ => {
     } catch (e) {
       return '';
     }
-  }
-  function escapeHtml(text) {
-    if (!text || typeof text !== 'string') return '';
-    const map = {
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#039;'
-    };
-    return text.replace(/[&<>"']/g, m => map[m]);
   }
 });
 })();

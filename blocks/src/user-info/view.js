@@ -1,9 +1,4 @@
-/**
- * User Info Block - Frontend View
- * Fetches user data from REST API based on URL parameters
- */
-
-import { api } from '../_shared/api-client.js';
+import { endpoints, api } from '../_shared/api-client.js';
 
 jQuery(document).ready(async ($) => {
   // Get user_id from URL parameters
@@ -20,10 +15,8 @@ jQuery(document).ready(async ($) => {
   await waitForAuthHeader();
 
   try {
-    // Fetch user details from custom endpoint
-    const userUrl = `/wp-json/bys-groups/v1/groups/${groupId}/users/${userId}`;
-    const userData = await api.get(userUrl, true);
-
+    // Fetch user details from custom endpoint 
+    const userData = await api.get(endpoints.groupUserInfo(groupId, userId), true);
     // Display user info
     displayUserInfo(userData);
   } catch (err) {
@@ -44,51 +37,28 @@ jQuery(document).ready(async ($) => {
   }
 
   function displayUserInfo(user) {
-    const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.display_name;
-    const statusClass = user.has_logged_in ? 'active' : 'inactive';
-    const statusText = user.has_logged_in ? 'Active' : 'Inactive';
+    const $block = $('.wp-block-bys-groups-user-info').first(); // only one block instance per page 
+    if(!$block) return;
+    
+    const fullName = [user.first_name, user.last_name].join(' ') || user.display_name;
+    const statusClass = user.status === 'online' ? 'active' : 'inactive';
+    const statusText = user.status === 'online' ? 'Active' : user.status === 'offline' ? 'Offline' : 'Never Logged In';
 
     // Format dates
-    const enrolledDate = user.group_enrolled_date ? formatDate(user.group_enrolled_date) : 'Unknown';
-    const lastActiveDate = user.last_login ? formatUnixTimestamp(user.last_login) : 'Never';
+    const enrolledDate = user.group_enrolled_date ? formatUnixTimestamp(user.group_enrolled_date) : 'Unknown';
+    const lastLoginDate = user.last_login ? formatUnixTimestamp(user.last_login) : 'Never';
 
-    // Build HTML
-    const html = `
-      <div class="user-progress__header">
-        <div class="user-progress__avatar">
-          <img src="https://i.pravatar.cc/80?u=${encodeURIComponent(user.email)}" alt="${escapeHtml(fullName)}" />
-        </div>
-        <div class="user-progress__user-info">
-          <h1 class="user-progress__name">${escapeHtml(fullName)}</h1>
-          <div class="user-progress__meta">
-            <span class="user-progress__email">${escapeHtml(user.email)}</span>
-            <span class="user-progress__meta-item">
-              <i class="fa-solid fa-calendar"></i> Enrolled: ${enrolledDate}
-            </span>
-            <span class="user-progress__meta-item">
-              <i class="fa-solid fa-clock"></i> Last Active: ${lastActiveDate}
-            </span>
-            <span class="user-progress__meta-item user-progress__meta-item--${statusClass}">
-              <i class="fa-solid fa-circle"></i> ${statusText}
-            </span>
-          </div>
-        </div>
-      </div>
-    `;
+    // Populate with data
+    $block.find('.user-avatar')
+      .attr('src', `https://i.pravatar.cc/80?u=${encodeURIComponent(user.email)}`)
+      .attr('alt', fullName);
 
-    // Insert HTML into block
-    const $block = $('.wp-block-bys-groups-user-info');
-    $block.html(html);
-  }
-
-  function formatDate(dateString) {
-    if (!dateString) return '';
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-    } catch (e) {
-      return dateString;
-    }
+    $block.find('.user-name').text(fullName);
+    $block.find('.user-email').text(user.email);
+    $block.find('.user-enrolled-date').text(enrolledDate);
+    $block.find('.user-last-active-date').text(lastLoginDate);
+    $block.find('.user-status-item').addClass(`user-info__meta-item--${statusClass}`);
+    $block.find('.user-status-text').text(statusText);
   }
 
   function formatUnixTimestamp(timestamp) {
@@ -104,9 +74,4 @@ jQuery(document).ready(async ($) => {
     }
   }
 
-  function escapeHtml(text) {
-    if (!text || typeof text !== 'string') return '';
-    const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
-    return text.replace(/[&<>"']/g, m => map[m]);
-  }
 });

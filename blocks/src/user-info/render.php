@@ -30,5 +30,24 @@ $auth_header = BYS_Groups_Auth::get_auth_header();
 <?php endif; ?>
 
 <div <?= $wrapper_attributes; ?>>
-    <!-- User info populated by view.js from REST API -->
+    <div class="user-info__header">
+        <div class="user-info__avatar">
+            <img class="user-avatar" src="" alt="" />
+        </div>
+        <div class="user-info__user-info">
+            <h1 class="user-info__name user-name"></h1>
+            <ul class="user-info__meta">
+                <li class="user-info__meta-item user-email"></li>
+                <li class="user-info__meta-item">
+                    <i class="fa-solid fa-calendar"></i> Enrolled: <span class="user-enrolled-date"></span>
+                </li>
+                <li class="user-info__meta-item">
+                    <i class="fa-solid fa-clock"></i> Last Login: <span class="user-last-login-date"></span>
+                </li>
+                <li class="user-info__meta-item user-status-item">
+                    <i class="fa-solid fa-circle"></i> <span class="user-status-text"></span>
+                </li>
+            </ul>
+        </div>
+    </div>
 </div>
