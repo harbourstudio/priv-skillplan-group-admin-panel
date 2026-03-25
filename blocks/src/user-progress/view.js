@@ -64,7 +64,7 @@ jQuery(document).ready(async ($) => {
         $accordionContent.html('<p>Loading...</p>');
 
         try {
-          const lessons = await api.get(endpoints.courseLessonsWithTopics(course.id));
+          const lessons = await api.get(endpoints.courseHierarchialBreakdown(course.id));
 
           // Clear loading state
           $accordionContent.empty();
