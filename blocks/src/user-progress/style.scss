@@ -1,23 +1,15 @@
 .wp-block-bys-groups-user-progress {
-
-    // ─── Main Layout ───────────────────────────────
-    .user-progress__layout {
-        display: grid;
-        grid-template-columns: 1fr 21.25rem;
-        gap: var(--wp--preset--spacing--6);
-        align-items: start;
-
-        @media (max-width: 1024px) {
-            grid-template-columns: 1fr;
-        }
-    }
+    display: grid;
+    grid-template-columns: 1fr 21.25rem;
+    gap: var(--wp--preset--spacing--6);
+    align-items: start;
 
     .user-progress__section-title {
         color: var(--wp--preset--color--gray-500);
         margin: 0 0 var(--wp--preset--spacing--3);
     }
 
-    // ─── Course Accordion (Preline) ────────────────
+    // Course Accordion (Preline)
     .user-progress__courses {
         min-width: 0; // prevent overflow in grid
     }
@@ -127,13 +119,13 @@
         border-radius: 9999px;
     }
 
-    // ─── Accordion Content ─────────────────────────
+    // Accordion Content
     .accordion-content__inner {
         padding: var(--wp--preset--spacing--5) var(--wp--preset--spacing--5) var(--wp--preset--spacing--5);
         border-top: 1px solid var(--wp--preset--color--gray-200);
     }
 
-    // ─── Modules ───────────────────────────────────
+    // Modules
     .module {
         margin-bottom: var(--wp--preset--spacing--4);
 
@@ -174,7 +166,7 @@
         }
     }
 
-    // ─── Lessons Table ─────────────────────────────
+    // Lessons Table
     .lessons-table {
         width: 100%;
         border-collapse: collapse;
@@ -227,7 +219,7 @@
         }
     }
 
-    // ─── Achievements Sidebar ──────────────────────
+    // Achievements Sidebar
     .user-progress__achievements {
         
     }
@@ -320,7 +312,7 @@
         line-height: 1.4;
     }
 
-    // ─── Responsive ────────────────────────────────
+    // Responsive
     @media (max-width: 768px) {
         .user-progress__header {
             flex-direction: column;
@@ -338,5 +330,9 @@
         .accordion-toggle__course-name {
             min-width: auto;
         }
+    }
+    
+    @media (max-width: 1024px) {
+        grid-template-columns: 1fr;
     }
 }

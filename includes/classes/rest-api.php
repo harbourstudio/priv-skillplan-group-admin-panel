@@ -79,17 +79,24 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'permission_callback' => array($this, 'check_user_permission'),
             ));
 
-            // userCourseProgress
+            // groupUserCourseProgress
             register_rest_route($this->namespace, '/users/(?P<user_id>\d+)/course-progress', array(
                 'methods'             => 'GET',
-                'callback'            => array($this, 'get_user_course_progress'),
+                'callback'            => array($this, 'get_group_user_course_progress'),
                 'permission_callback' => array($this, 'check_user_permission'),
             ));
 
-            // courseQuizSteps 
+            // courseQuizSteps (more specific route, register first)
             register_rest_route($this->namespace, '/courses/(?P<course_id>\d+)/quiz-steps', array(
                 'methods'             => 'GET',
                 'callback'            => array($this, 'get_course_quiz_steps'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
+
+            // courseHierarchialBreakdown
+            register_rest_route($this->namespace, '/courses/(?P<course_id>\d+)/steps', array(
+                'methods'             => 'GET',
+                'callback'            => array($this, 'get_course_steps'),
                 'permission_callback' => array($this, 'check_user_permission'),
             ));
 
@@ -100,6 +107,9 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'permission_callback' => array($this, 'check_user_permission'),
             ));
         }
+
+       
+            
 
         public function check_user_permission($request) {
             // check for Authorization header (basic auth)
@@ -356,7 +366,7 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             $auth_header = $auth_result;
 
             // call to get group courses
-            $ld_api_url = get_home_url() . "/wp-json/ldlms/v2/groups/{$group_id}/courses?_field=id,";
+            $ld_api_url = get_home_url() . "/wp-json/ldlms/v2/groups/{$group_id}/courses?_fields=id,title";
 
             $response = wp_remote_get($ld_api_url, array(
                 'headers' => array(
@@ -393,10 +403,75 @@ if (!class_exists('BYS_Groups_Rest_API')) {
         }
 
         /**
+         * Get hierarchal lessons and topics data for a course
+         */
+        public function get_course_steps($request) {
+            $course_id = intval($request['course_id']);
+
+            if (!$course_id) {
+                return new \WP_REST_Response(array('error' => 'Invalid course ID'), 400);
+            }
+
+            // Get validated auth header for LD API
+            $auth_result = $this->get_validated_auth_header();
+            if (is_a($auth_result, 'WP_REST_Response')) {
+                return $auth_result; // Return error response
+            }
+            $auth_header = $auth_result;
+
+            // Fetch steps from LD API
+            $ld_api_url = get_home_url() . "/wp-json/ldlms/v2/sfwd-courses/{$course_id}/steps?_fields=h";
+
+            $response = wp_remote_get($ld_api_url, array(
+                'headers' => array(
+                    'Authorization' => $auth_header,
+                ),
+                'sslverify' => false,
+                'timeout'   => 60, // Increase timeout to 60 seconds for large courses
+            ));
+
+            if (is_wp_error($response)) {
+                return new \WP_REST_Response(array('error' => $response->get_error_message()), 500);
+            }
+
+            $status = wp_remote_retrieve_response_code($response);
+            $body = wp_remote_retrieve_body($response);
+
+            if ($status !== 200) {
+                return new \WP_REST_Response(array('error' => 'Failed to fetch steps from LearnDash API', 'status' => $status), $status);
+            }
+
+            $data = json_decode($body, true);
+
+            // NOTE: this is parsing data based on the type=h (type=hierarchal) structure of that LD endpoint (added to url as _fields=h)
+            $h_lessons = $data['h']['sfwd-lessons'] ?? array();
+            $lessons = array();
+
+            foreach ($h_lessons as $lesson_id => $lesson_data) {
+                $lesson = get_post($lesson_id);
+                $topics_data = $lesson_data['sfwd-topic'] ?? array();
+
+                $lessons[] = array(
+                    'id'     => $lesson_id,
+                    'title'  => $lesson ? $lesson->post_title : 'Undefined',
+                    'topics' => array_map(function ($topic_id) {
+                        $topic = get_post($topic_id);
+                        return array(
+                            'id'    => $topic_id,
+                            'title' => $topic ? $topic->post_title : 'Undefined',
+                        );
+                    }, array_keys($topics_data)),
+                );
+            }
+
+            return new \WP_REST_Response($lessons, 200);
+        }
+
+        /**
          * Get user course progress for specific courses
          * Fetches progress, completion, enrollment, and step data from user meta and activity table
          */
-        public function get_user_course_progress($request) {
+        public function get_group_user_course_progress($request) {
             $user_id = intval($request['user_id']);
             $course_ids_param = $request->get_param('course_ids'); // comma-separated: 1,2,3
 
