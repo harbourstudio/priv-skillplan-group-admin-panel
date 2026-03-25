@@ -52,13 +52,13 @@ $auth_header = BYS_Groups_Auth::get_auth_header();
             </div>
         </template>
 
-        <!-- Template: Lesson (module) section -->
+        <!-- Template: sfwd-lesson (module) section with nested sfwd-topics -->
         <template id="user-progress-lesson-template">
             <div class="module">
                 <div class="module__header">
                     <span class="module__name"></span>
                 </div>
-                <div class="module__lessons">
+                <div class="module__content">
                     <table class="lessons-table">
                         <thead>
                             <tr>
@@ -71,7 +71,7 @@ $auth_header = BYS_Groups_Auth::get_auth_header();
             </div>
         </template>
 
-        <!-- Template: Topic row -->
+        <!-- Template: sfwd-topic row -->
         <template id="user-progress-topic-template">
             <tr>
                 <td class="topic-name"></td>

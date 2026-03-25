@@ -13,10 +13,10 @@ jQuery(document).ready(async ($) => {
   const $block = $('.wp-block-bys-groups-user-progress').first(); // only one block instance per page
   const $coursesList = $block.find('#user-progress-courses-list');
 
-  // Template references
+  // Template references (sfwd-lesson and sfwd-topic templates)
   const courseTemplate = $block.find('#user-progress-course-template')[0];
-  const lessonTemplate = $block.find('#user-progress-lesson-template')[0];
-  const topicTemplate = $block.find('#user-progress-topic-template')[0];
+  const sfwdLessonTemplate = $block.find('#user-progress-lesson-template')[0];
+  const sfwdTopicTemplate = $block.find('#user-progress-topic-template')[0];
 
   try {
     // 1. Fetch group courses
@@ -27,9 +27,14 @@ jQuery(document).ready(async ($) => {
       return;
     }
 
-    // 2. Render course shells (without lessons/topics yet)
+    // Cache data globally so other blocks can access them
+    window.bysGroupsCache = window.bysGroupsCache || {};
+    window.bysGroupsCache.groupId = groupId;
+    window.bysGroupsCache.courses = courses;
+
+    // 2. Render course shells (without structure data yet)
     /**
-     * NOTE: we render course accordions without the full lessons/topics breakdown to avoid making parallel requests to the LD API. Requesting full breakdowns for ALL courses on page load will cause timeout issues. Instead, we fetch the lessons/topics breakdown for a single course when its accordion is clicked, so only one course is being requested at a time.
+     * NOTE: we render course accordions without the full course structure (lessons, topics, quizzes) to avoid making parallel requests to the LD API. Requesting full breakdowns for ALL courses on page load will cause timeout issues. Instead, we fetch the course hierarchy for a single course when its accordion is clicked, so only one course is being requested at a time.
      */
     courses.forEach((course, courseIndex) => {
       const courseNode = courseTemplate.content.cloneNode(true);
@@ -38,7 +43,7 @@ jQuery(document).ready(async ($) => {
 
       // Set course name (use title.rendered to get the nice name)
       const courseTitle = typeof course.title === 'string' ? course.title : course.title?.rendered || 'Untitled';
-      $course.find('.accordion-toggle__course-name').text(courseTitle);
+      $course.find('.accordion-toggle__course-name').html(courseTitle);
 
       // Set unique IDs for accordion functionality
       const courseId = `hs-course-heading-${courseNum}`;
@@ -50,40 +55,50 @@ jQuery(document).ready(async ($) => {
       const $accordionContent = $course.find('.accordion-content__inner');
 
       // Set loading state
-      $accordionContent.html('<p>Click to load lessons...</p>');
+      $accordionContent.html('<p>Click to load course structure...</p>');
 
-      // Attach click handler to fetch lessons on expand
+      // Attach click handler to fetch course structure on expand
       const $toggle = $course.find('.hs-accordion-toggle');
-      let lessonsLoaded = false;
+      let structureLoaded = false;
 
-      // 3. Fetch lessons on-demand on accordion click
+      // 3. CRITICAL: Fetch course structure on-demand on accordion click
       $toggle.on('click', async function() {
-        if (lessonsLoaded) return; // Already loaded
+        if (structureLoaded) return; // Already loaded
 
-        lessonsLoaded = true;
+        structureLoaded = true;
         $accordionContent.html('<p>Loading...</p>');
 
         try {
-          const lessons = await api.get(endpoints.courseHierarchialBreakdown(course.id));
+          const courseData = await api.get(endpoints.courseHierarchialBreakdown(course.id));
+
+          // courseHierarchialBreakdown returns { lessons (sfwd-lessons with nested sfwd-topics), quiz_ids }
+          const modules = courseData.lessons || courseData; // Handle both old and new format
+          const quizIds = courseData.quiz_ids || [];
+
+          // Cache quiz IDs for this course
+          if (quizIds.length > 0) {
+            window.bysGroupsCache.courseQuizzes = window.bysGroupsCache.courseQuizzes || {};
+            window.bysGroupsCache.courseQuizzes[course.id] = quizIds;
+          }
 
           // Clear loading state
           $accordionContent.empty();
 
-          // Render lessons
-          if (Array.isArray(lessons) && lessons.length > 0) {
-            lessons.forEach((lesson) => {
-              const lessonNode = lessonTemplate.content.cloneNode(true);
+          // Render course modules (sfwd-lessons with their sfwd-topics)
+          if (Array.isArray(modules) && modules.length > 0) {
+            modules.forEach((sfwdLesson) => {
+              const lessonNode = sfwdLessonTemplate.content.cloneNode(true);
               const $lesson = $(lessonNode);
-              $lesson.find('.module__name').text(lesson.title);
+              $lesson.find('.module__name').html(sfwdLesson.title);
 
               const $tbody = $lesson.find('tbody');
 
-              // Render topics for this lesson
-              if (Array.isArray(lesson.topics)) {
-                lesson.topics.forEach((topic) => {
-                  const topicNode = topicTemplate.content.cloneNode(true);
+              // Render sfwd-topics for this sfwd-lesson
+              if (Array.isArray(sfwdLesson.topics)) {
+                sfwdLesson.topics.forEach((sfwdTopic) => {
+                  const topicNode = sfwdTopicTemplate.content.cloneNode(true);
                   const $topic = $(topicNode);
-                  $topic.find('.topic-name').text(topic.title);
+                  $topic.find('.topic-name').html(sfwdTopic.title);
                   $tbody.append($topic);
                 });
               }
@@ -91,11 +106,11 @@ jQuery(document).ready(async ($) => {
               $accordionContent.append($lesson);
             });
           } else {
-            $accordionContent.html('<p>No lessons found.</p>');
+            $accordionContent.html('<p>No modules found.</p>');
           }
         } catch (err) {
-          console.error(`[user-progress] Failed to fetch lessons for course ${course.id}:`, err);
-          $accordionContent.html('<p>Failed to load lessons.</p>');
+          console.error(`[user-progress] Failed to fetch course structure for course ${course.id}:`, err);
+          $accordionContent.html('<p>Failed to load course structure.</p>');
         }
       });
 
