@@ -42,82 +42,72 @@
         display: flex;
         justify-content: flex-end;
         align-items: center;
+        gap: var(--wp--preset--spacing--4);
         margin-top: var(--wp--preset--spacing--7);
         margin-bottom: var(--wp--preset--spacing--4);
         font-size: var(--wp--preset--font-size--small);
 
-        .radio-group{
+        label {
             display: flex;
             align-items: center;
-            gap: var(--wp--preset--spacing--4);
-
-            .radio-option{
-                display: flex;
-                align-items: center;
-                gap: var(--wp--preset--spacing--1);
-            }
+            gap: 0.25rem;
+            font-weight: 400;
         }
     }
 
-    .table__results{
+    table{
+        width: 100%;
+        font-size: var(--wp--preset--font-size--small);
+        background: white;
+        border-radius: 1.5rem;
+        text-align: left;
+        border-collapse: collapse;
 
-        table{
-            width: 100%;
-            font-size: var(--wp--preset--font-size--small);
-            background: white;
-            border-radius: 1.5rem;
-            text-align: left;
-            border-collapse: collapse;
-
-            thead{
-
-                th, td{
-                    background-color: var(--wp--preset--color--primary);
+        thead {
+            th, td{
+                background-color: var(--wp--preset--color--primary);
+                color: white;
+                font-weight: 500;
+                padding: var(--wp--preset--spacing--3);
+                border: none;
+                a, i{
                     color: white;
-                    font-weight: 500;
-                    padding: var(--wp--preset--spacing--3);
-                    border: none;
-
-                    a, i{
-                        color: white;
-                    }
-                }
-                
-                tr:first-of-type{
-                    th:first-of-type{
-                        border-top-left-radius: 1.5rem;
-                    }
-                    th:last-of-type{
-                        border-top-right-radius: 1.5rem;
-                    }
                 }
             }
-
-            tbody{
-                tr:not(:last-of-type) td{
-                    border-bottom: 1px solid var(--wp--preset--color--gray-200);
+            
+            tr:first-of-type{
+                th:first-of-type{
+                    border-top-left-radius: 1.5rem;
                 }
-                
-                td{
-                    padding: var(--wp--preset--spacing--3);
+                th:last-of-type{
+                    border-top-right-radius: 1.5rem;
                 }
+            }
+        }
 
-                .status-badge{
-                    border-radius: 0.25rem;
-                    padding: var(--wp--preset--spacing--1) var(--wp--preset--spacing--2);
+        tbody {
+            tr:not(:last-of-type) td{
+                border-bottom: 1px solid var(--wp--preset--color--gray-200);
+            }
+            
+            td{
+                padding: var(--wp--preset--spacing--3);
+            }
+            .status-badge{
+                border-radius: 0.25rem;
+                padding: var(--wp--preset--spacing--1) var(--wp--preset--spacing--2);
 
-                    &--pass{
-                        background-color: var(--wp--preset--color--green-100);
-                        color: var(--wp--preset--color--green-800);
-                    }
-                    &--fail{
-                        background-color: var(--wp--preset--color--red-100);
-                        color: var(--wp--preset--color--red-800);
-                    }
-                    &--ungraded{
-                        background-color: var(--wp--preset--color--orange-100);
-                        color: var(--wp--preset--color--orange-800);
-                    }
+                &--pass{
+                    background-color: var(--wp--preset--color--green-100);
+                    color: var(--wp--preset--color--green-800);
+                }
+                &--fail{
+                    background-color: var(--wp--preset--color--red-100);
+                    color: var(--wp--preset--color--red-800);
+                }
+                &--ungraded{
+                    background-color: var(--wp--preset--color--orange-100);
+                    color: var(--wp--preset--color--orange-800);
                 }
             }
         }
