@@ -1,54 +1,33 @@
-// import { store, getContext } from '@wordpress/interactivity';
+jQuery(document).ready(($) => {
+	const $block = $('.wp-block-bys-groups-user-tabs').first(); // only one instance per page
+	const $tabs = $block.find('.tab-nav__item');
+	const $panels = $block.find('.tab-panel');
 
-// store( 'bys-groups/user-tabs', {
-// 	state: {
-// 		get isUserProgress() {
-// 			return getContext().activeTab === 'user-progress';
-// 		},
-// 		get isQuizDetails() {
-// 			return getContext().activeTab === 'user-quiz-details';
-// 		},
-// 		get isUserActivity() {
-// 			return getContext().activeTab === 'user-activity';
-// 		},
-// 		get hideUserProgress() {
-// 			return getContext().activeTab !== 'user-progress';
-// 		},
-// 		get hideQuizDetails() {
-// 			return getContext().activeTab !== 'user-quiz-details';
-// 		},
-// 		get hideUserActivity() {
-// 			return getContext().activeTab !== 'user-activity';
-// 		},
-// 	},
-// 	actions: {
-// 		setTab( event ) {
-// 			const context = getContext();
-// 			context.activeTab = event.currentTarget.dataset.tab;
-// 		},
-// 	},
-// } );
+	$tabs.on('click', function() {
+		const $clickedTab = $(this);
+		const target = $clickedTab.data('tab');
 
-document.addEventListener( 'DOMContentLoaded', () => {
-	document.querySelectorAll( '.wp-block-bys-groups-user-tabs' ).forEach( ( block ) => {
-		const tabs   = block.querySelectorAll( '.tab-nav__item' );
-		const panels = block.querySelectorAll( '.tab-panel' );
+		// Update tab active states
+		$tabs.each(function() {
+			const $tab = $(this);
+			const isActive = $tab[0] === $clickedTab[0];
+			$tab.toggleClass('tab-nav__item--active', isActive);
+			$tab.attr('aria-selected', isActive ? 'true' : 'false');
+		});
 
-		tabs.forEach( ( tab ) => {
-			tab.addEventListener( 'click', () => {
-				const target = tab.dataset.tab;
+		// Update panel visibility
+		$panels.each(function() {
+			const $panel = $(this);
+			const panelTarget = $panel.attr('id').replace('panel-', '');
+			const isActive = panelTarget === target;
 
-				tabs.forEach( ( t ) => {
-					t.classList.toggle( 'tab-nav__item--active', t === tab );
-					t.setAttribute( 'aria-selected', t === tab ? 'true' : 'false' );
-				} );
+			$panel.toggleClass('tab-panel--hidden', !isActive);
+			isActive ? $panel.removeAttr('hidden') : $panel.attr('hidden', '');
 
-				panels.forEach( ( panel ) => {
-					const isActive = panel.id === `panel-${ target }`;
-					panel.classList.toggle( 'tab-panel--hidden', ! isActive );
-					isActive ? panel.removeAttribute( 'hidden' ) : panel.setAttribute( 'hidden', '' );
-				} );
-			} );
-		} );
-	} );
-} );
+			// Trigger jQuery custom event when tab is activated for lazy-loading blocks
+			if (isActive) {
+				$(window).trigger('bysUserTabActivated', [target]);
+			}
+		});
+	});
+});
