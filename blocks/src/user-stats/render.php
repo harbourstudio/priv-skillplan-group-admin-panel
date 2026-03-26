@@ -28,7 +28,7 @@ $wrapper_attributes = get_block_wrapper_attributes([
             </div>
             <div class="stat__text">
                 <span class="stat__number">
-                    16
+                    n/a
                 </span>
                 <span class="stat__label">
                     Required Courses
@@ -41,7 +41,7 @@ $wrapper_attributes = get_block_wrapper_attributes([
             </div>
             <div class="stat__text">
                 <span class="stat__number">
-                    16
+                    n/a
                 </span>
                 <span class="stat__label">
                     Total Courses
@@ -54,7 +54,7 @@ $wrapper_attributes = get_block_wrapper_attributes([
             </div>
             <div class="stat__text">
                 <span class="stat__number">
-                    16
+                    n/a
                 </span>
                 <span class="stat__label">
                     Logins
@@ -67,7 +67,7 @@ $wrapper_attributes = get_block_wrapper_attributes([
             </div>
             <div class="stat__text">
                 <span class="stat__number">
-                    40h23m
+                    n/a
                 </span>
                 <span class="stat__label">
                     Total Time
@@ -80,7 +80,7 @@ $wrapper_attributes = get_block_wrapper_attributes([
             </div>
             <div class="stat__text">
                 <span class="stat__number">
-                    16
+                    n/a
                 </span>
                 <span class="stat__label">
                     Lessons Completed
@@ -93,7 +93,7 @@ $wrapper_attributes = get_block_wrapper_attributes([
             </div>
             <div class="stat__text">
                 <span class="stat__number">
-                    16
+                    n/a
                 </span>
                 <span class="stat__label">
                     Quizzes Completed

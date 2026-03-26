@@ -1,4 +1,5 @@
 import { api, endpoints } from '../_shared/api-client.js';
+import { LOADING_HTML } from '../_shared/loading.js';
 
 jQuery(document).ready(($) => {
   const $block = $('.wp-block-bys-groups-group-stats').first(); // will only have 1 instance of this block per page
@@ -17,8 +18,8 @@ jQuery(document).ready(($) => {
     $totalInactiveMembers.html(baseUsersStats.total_inactive_members ?? 0);
 
     // show loading state
-    $completedCourses.html('…');
-    $incompleteCourses.html('…');
+    $completedCourses.html(LOADING_HTML);
+    $incompleteCourses.html(LOADING_HTML);
 
     // fetch course completion stats for entire group
     try {

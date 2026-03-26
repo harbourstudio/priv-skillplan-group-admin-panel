@@ -1,4 +1,5 @@
 import { api, endpoints } from '../_shared/api-client.js';
+import { LOADING_HTML } from '../_shared/loading.js';
 
 jQuery(document).ready(($) => {
     const params = new URLSearchParams(window.location.search);
@@ -43,7 +44,8 @@ jQuery(document).ready(($) => {
         if (dataLoaded) return; // Already loaded
 
         dataLoaded = true;
-        $tableBody.html('<tr><td>Loading...</td></tr>');
+        const $loadingRow = jQuery(`<tr><td>${LOADING_HTML}</td></tr>`);
+        $tableBody.html($loadingRow);
 
         try {
         // Fetch quiz progress from custom endpoint

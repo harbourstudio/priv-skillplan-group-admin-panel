@@ -44,6 +44,9 @@ if (!class_exists('BYS_Groups_Core')) {
 
             // Enqueue certificate tracking script on certificate pages
             add_action('wp_enqueue_scripts', array($this, 'enqueue_certificate_tracker'));
+
+            // Enqueue shared block styles
+            add_action('wp_enqueue_scripts', array($this, 'enqueue_shared_block_styles'));
         }
 
         public function enqueue_certificate_tracker() {
@@ -61,6 +64,15 @@ if (!class_exists('BYS_Groups_Core')) {
                 'userId' => get_current_user_id(),
                 'header' => BYS_Groups_Auth::get_auth_header(),
             ));
+        }
+
+        public function enqueue_shared_block_styles() {
+            wp_enqueue_style(
+                'bys-groups-shared',
+                BYS_GROUPS_PLUGIN_URL . 'blocks/src/_shared/loading.css',
+                [],
+                BYS_GROUPS_VERSION
+            );
         }
 
 
