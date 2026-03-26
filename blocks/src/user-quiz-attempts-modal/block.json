@@ -3,7 +3,7 @@
 	"apiVersion": 3,
 	"name": "bys-groups/user-quiz-attempts-modal",
 	"version": "0.2.0",
-	"title": "BYS - User Progress",
+	"title": "BYS - User Quiz Attemps Modal",
 	"category": "custom-blocks",
 	"icon": "welcome-write-blog",
 	"description": "Custom block for Build Your Skills group administrator dashboard.",

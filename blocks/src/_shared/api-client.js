@@ -24,6 +24,7 @@ export const endpoints = {
   courseQuizSteps: (courseId) => `/wp-json/bys-groups/v1/courses/${courseId}/quiz-steps`,
   userQuizAttempts: (userId, courseId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-attempts?course_id=${courseId}`,
   userQuizProgress: (userId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-progress`,
+  userQuizAttemptsDetails: (userId, quizId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-attempts/${quizId}`,
 };
 
 export const api = {
