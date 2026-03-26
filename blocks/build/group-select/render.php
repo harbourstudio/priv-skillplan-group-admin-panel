@@ -19,7 +19,7 @@ $groups = array();
 
 if ($user_id) {
 	// Fetch current user's group via a method of the BYS_Groups_Rest_API class
-	require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/rest-api.php';
+	require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-rest-api.php';
 	$rest_api = new BYS_Groups_Rest_API();
 	$response = $rest_api->get_current_user_groups(null);
 
@@ -31,7 +31,7 @@ if ($user_id) {
 $wrapper_attributes = get_block_wrapper_attributes();
 
 // Get the Authorization header for API requests
-require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/auth.php';
+require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-auth.php';
 $auth_header = BYS_Groups_Auth::get_auth_header();
 ?>
 

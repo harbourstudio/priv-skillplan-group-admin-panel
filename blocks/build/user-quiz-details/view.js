@@ -39,7 +39,8 @@ const endpoints = {
   courseQuizSteps: courseId => `/wp-json/bys-groups/v1/courses/${courseId}/quiz-steps`,
   userQuizAttempts: (userId, courseId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-attempts?course_id=${courseId}`,
   userQuizProgress: userId => `/wp-json/bys-groups/v1/users/${userId}/quiz-progress`,
-  userQuizAttemptsDetails: (userId, quizId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-attempts/${quizId}`
+  userQuizAttemptsDetails: (userId, quizId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-attempts/${quizId}`,
+  userActivity: userId => `/wp-json/bys-groups/v1/users/${userId}/activity`
 };
 const api = {
   _cache: new Map(),
@@ -193,8 +194,30 @@ jQuery(document).ready($ => {
   }
   const $block = $('.wp-block-bys-groups-user-quiz-details').first(); // only one instance of the block
   const $tableBody = $block.find('table').find('tbody');
+  const $table = $block.find('table');
   const tableTemplate = $block.find('#user-quiz-details_template-row')[0];
   let dataLoaded = false;
+
+  // Handle score_sort radio button change
+  const updateColumnVisibility = sortMode => {
+    const isHighest = sortMode === 'highest';
+
+    // Show/hide highest columns
+    $table.find('.col_score_highest, .col_result_highest').toggle(isHighest);
+    $tableBody.find('.cell_score_highest, .cell_result_highest').toggle(isHighest);
+
+    // Show/hide latest columns
+    $table.find('.col_score_latest, .col_result_latest').toggle(!isHighest);
+    $tableBody.find('.cell_score_latest, .cell_result_latest').toggle(!isHighest);
+  };
+
+  // Bind change event to radio buttons
+  $block.find('input[name="score_sort"]').on('change', function () {
+    updateColumnVisibility($(this).val());
+  });
+
+  // Initialize with default 'highest' mode
+  updateColumnVisibility('highest');
 
   // Fetch and render quiz data
   const loadQuizData = async () => {
@@ -229,14 +252,14 @@ jQuery(document).ready($ => {
 
         // Populate attempts count and attach modal trigger
         $row.find('.attemps-count').text(quiz.total_attempts);
-        $row.find('.cell_score_highest').text(formatPercent(quiz.percent_highest));
-        $row.find('.cell_score_latest').text(formatPercent(quiz.percent_latest));
+        $row.find('.cell_score_highest').text(formatScore(quiz.percent_highest, quiz.points_scored_highest, quiz.points_total_highest));
+        $row.find('.cell_score_latest').text(formatScore(quiz.percent_latest, quiz.points_scored_latest, quiz.points_total_latest));
 
         // Render result badges
         const $resultHighest = $row.find('.cell_result_highest .status-badge');
-        renderResultBadge($resultHighest, quiz.pass_highest);
+        renderStatusBadge($resultHighest, quiz.pass_highest);
         const $resultLatest = $row.find('.cell_result_latest .status-badge');
-        renderResultBadge($resultLatest, quiz.pass_latest);
+        renderStatusBadge($resultLatest, quiz.pass_latest);
 
         // Attach click handler to modal trigger (ellipsis button)
         const $button = $row.find('.modal-quiz-attempts__trigger');
@@ -286,11 +309,12 @@ function formatDate(timestamp) {
     return '—';
   }
 }
-function formatPercent(percent) {
+function formatScore(percent, pointsScored, pointsTotal) {
   if (percent === null || percent === undefined) return '—';
-  return percent + '%';
+  if (pointsScored === null || pointsTotal === null) return `${percent}%`;
+  return `${pointsScored}/${pointsTotal} (${percent}%)`;
 }
-function renderResultBadge($badge, pass) {
+function renderStatusBadge($badge, pass) {
   if (pass) {
     $badge.addClass('status-badge--pass').text('Pass');
   } else {

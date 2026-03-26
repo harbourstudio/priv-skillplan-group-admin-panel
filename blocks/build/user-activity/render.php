@@ -15,19 +15,6 @@ foreach ($attrs as $a) {
 }
 
 $wrapper_attributes = get_block_wrapper_attributes();
-
-// ─── Activity Log Data ───
-// TODO: Replace with REST API call to get user activity
-$activities = [
-    [
-        'event'         => 'Earned Certificate',
-        'date'          => 'Sep 3, 2025',
-        'time'          => '3:28:38 PM',
-        'resource'      => 'Math for Electrical',
-        'resource_type' => 'Course',
-        'initiated_by'  => 'System',
-    ],
-];
 ?>
 
 <div <?= $wrapper_attributes; ?>>
@@ -37,20 +24,39 @@ $activities = [
             <div class="filters__fields">
 
                 <div class="filters__field">
-                    <label for="filter-type">Type of Activity</label>
-                    <input type="text" id="filter-type" name="type" placeholder="Type of Activity" />
+                    <label for="filter-activity"><?php esc_html_e('Activity Type', 'bys'); ?></label>
+                    <select id="filter-activity" name="activity">
+                        <option value=""><?php esc_html_e('All Activities', 'bys'); ?></option>
+                        <option value="user_login"><?php esc_html_e('Logged In', 'bys'); ?></option>
+                        <option value="user_logout"><?php esc_html_e('Logged Out', 'bys'); ?></option>
+                        <option value="profile_update"><?php esc_html_e('Updated Profile', 'bys'); ?></option>
+                        <option value="account_settings_update"><?php esc_html_e('Updated Account Settings', 'bys'); ?></option>
+                        <option value="certificate_earned"><?php esc_html_e('Earned a Certificate', 'bys'); ?></option>
+                        <option value="certificate_viewed"><?php esc_html_e('Viewed a Certificate', 'bys'); ?></option>
+                        <option value="lesson_completed"><?php esc_html_e('Completed a Lesson', 'bys'); ?></option>
+                        <option value="topic_completed"><?php esc_html_e('Completed a Topic', 'bys'); ?></option>
+                        <option value="quiz_submitted"><?php esc_html_e('Submitted a Quiz', 'bys'); ?></option>
+                        <option value="course_enrolled"><?php esc_html_e('Enrolled in a Course', 'bys'); ?></option>
+                        <option value="course_unenrolled"><?php esc_html_e('Unenrolled from a Course', 'bys'); ?></option>
+                        <option value="achievement_earned"><?php esc_html_e('Earned an Achievement', 'bys'); ?></option>
+                    </select>
                 </div>
 
                 <div class="filters__field">
-                    <label for="filter-date_range">Date Range</label>
-                    <input type="date" id="filter-date_range" name="date_range" />
+                    <label for="filter-date_from"><?php esc_html_e('From', 'bys'); ?></label>
+                    <input type="date" id="filter-date_from" name="date_from" />
                 </div>
 
                 <div class="filters__field">
-                    <label for="filter-per-page">Items per Page</label>
+                    <label for="filter-date_to"><?php esc_html_e('To', 'bys'); ?></label>
+                    <input type="date" id="filter-date_to" name="date_to" />
+                </div>
+
+                <div class="filters__field">
+                    <label for="filter-per-page"><?php esc_html_e('Items per Page', 'bys'); ?></label>
                     <select id="filter-per-page" name="per_page">
                         <option value="10">10</option>
-                        <option value="20">20</option>
+                        <option value="20" selected>20</option>
                         <option value="50">50</option>
                         <option value="100">100</option>
                     </select>
@@ -59,51 +65,51 @@ $activities = [
             </div>
 
             <div class="filters__actions">
-                <button class="filters__submit" type="submit">Filter</button>
-                <button class="filters__reset" type="reset">Reset</button>
+                <button class="filters__submit" type="submit"><?php esc_html_e('Filter', 'bys'); ?></button>
+                <button class="filters__reset" type="reset"><?php esc_html_e('Reset', 'bys'); ?></button>
             </div>
         </form>
     </div>
 
-    <div class="table__results">
-        <table class="reporting-table">
+    <div class="table-wrapper">
+        <table>
             <thead>
                 <tr class="reporting-table__head-primary">
-                    <th>Event</th>
-                    <th>Timestamp</th>
-                    <th>Resource</th>
-                    <th>Resource Type</th>
-                    <th>Initiated By</th>
+                    <th><?php esc_html_e('Activity', 'bys'); ?></th>
+                    <th><?php esc_html_e('Timestamp', 'bys'); ?></th>
+                    <th><?php esc_html_e('Resource', 'bys'); ?></th>
+                    <th><?php esc_html_e('Resource Type', 'bys'); ?></th>
+                    <th><?php esc_html_e('Initiated By', 'bys'); ?></th>
                     <th></th>
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($activities as $activity) : ?>
-                <tr>
-                    <td><?= esc_html($activity['event']); ?></td>
-                    <td><?= esc_html($activity['date']); ?><br />
-                        <span class="reporting-table__time"><?= esc_html($activity['time']); ?></span>
-                    </td>
-                    <td><?= esc_html($activity['resource']); ?></td>
-                    <td>
-                        <div class="reporting-table__resource-type">
-                            <div class="reporting-table__resource-type__dot"></div> <?= esc_html($activity['resource_type']); ?>
-                        </div>
-                    </td>
-                    <td><?= esc_html($activity['initiated_by']); ?></td>
-                    <td>
-                        <button
-                            type="button"
-                            class="activity-details__trigger btn-unstyled"
-                            data-hs-overlay=""
-                        >
-                            <i class="fa-solid fa-ellipsis"></i>
-                        </button>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
+                <!-- Rows rendered by view.js from REST API -->
             </tbody>
         </table>
     </div>
+
+    <!-- Template for cloning activity rows -->
+    <template id="user-activity__template-row">
+        <tr>
+            <td class="cell-activity">
+                <i class="cell-activity__icon fa-regular"></i>
+                <span class="cell-activity__label"></span>
+            </td>
+
+            <td class="cell-created-at"></td>
+            <td class="cell-object-title"></td>
+            <td class="cell-object-type">
+                <span class="cell-object-type__dot"></span>
+                <span class="cell-object-type__label"></span>
+            </td>
+            <td class="cell-initiated-by"></td>
+            <td>
+                <button type="button" class="activity-details__trigger btn-unstyled">
+                    <i class="fa-solid fa-ellipsis"></i>
+                </button>
+            </td>
+        </tr>
+    </template>
 
 </div>

@@ -38,7 +38,9 @@ const endpoints = {
   groupUserCourseProgress: (userId, courseIds) => `/wp-json/bys-groups/v1/users/${userId}/course-progress?course_ids=${courseIds}`,
   courseQuizSteps: courseId => `/wp-json/bys-groups/v1/courses/${courseId}/quiz-steps`,
   userQuizAttempts: (userId, courseId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-attempts?course_id=${courseId}`,
-  userQuizProgress: userId => `/wp-json/bys-groups/v1/users/${userId}/quiz-progress`
+  userQuizProgress: userId => `/wp-json/bys-groups/v1/users/${userId}/quiz-progress`,
+  userQuizAttemptsDetails: (userId, quizId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-attempts/${quizId}`,
+  userActivity: userId => `/wp-json/bys-groups/v1/users/${userId}/activity`
 };
 const api = {
   _cache: new Map(),
@@ -248,7 +250,7 @@ jQuery(document).ready(async $ => {
           const courseData = await _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.api.get(_shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.endpoints.courseHierarchialBreakdown(course.id));
 
           // courseHierarchialBreakdown returns { lessons (sfwd-lessons with nested sfwd-topics), quiz_ids }
-          const modules = courseData.lessons || courseData;
+          const modules = courseData.lessons || courseData; // Handle both old and new format
           const quizIds = courseData.quiz_ids || [];
 
           // Cache quiz IDs for this course

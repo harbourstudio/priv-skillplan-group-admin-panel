@@ -30,11 +30,17 @@ function getAuthorizationHeader() {
 // custom API endpoint definitions
 const endpoints = {
   currentUserGroups: () => '/wp-json/bys-groups/v1/me/groups',
-  groupBaseUsersStats: groupId => `/wp-json/bys-groups/v1/groups/${groupId}/stats`,
-  groupUsers: groupId => `/wp-json/bys-groups/v1/groups/${groupId}/users`,
+  groupBaseUsersStats: groupId => `/wp-json/bys-groups/v1/groups/${groupId}/base-user-stats`,
+  groupUsers: (groupId, userIds) => `/wp-json/bys-groups/v1/groups/${groupId}/users?user_ids=${userIds}`,
+  groupUserInfo: (groupId, userId) => `/wp-json/bys-groups/v1/groups/${groupId}/users/${userId}`,
   groupCourses: groupId => `/wp-json/bys-groups/v1/groups/${groupId}/courses`,
-  userCourseProgress: (groupId, userId) => `/wp-json/bys-groups/v1/groups/${groupId}/users/${userId}/courses`,
-  userDetails: (groupId, userId) => `/wp-json/bys-groups/v1/groups/${groupId}/users/${userId}`
+  courseHierarchialBreakdown: courseId => `/wp-json/bys-groups/v1/courses/${courseId}/steps`,
+  groupUserCourseProgress: (userId, courseIds) => `/wp-json/bys-groups/v1/users/${userId}/course-progress?course_ids=${courseIds}`,
+  courseQuizSteps: courseId => `/wp-json/bys-groups/v1/courses/${courseId}/quiz-steps`,
+  userQuizAttempts: (userId, courseId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-attempts?course_id=${courseId}`,
+  userQuizProgress: userId => `/wp-json/bys-groups/v1/users/${userId}/quiz-progress`,
+  userQuizAttemptsDetails: (userId, quizId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-attempts/${quizId}`,
+  userActivity: userId => `/wp-json/bys-groups/v1/users/${userId}/activity`
 };
 const api = {
   _cache: new Map(),
@@ -185,10 +191,10 @@ jQuery(document).ready($ => {
   const $button = $block.find('.group-selector__button');
   if (!$select.length || !$button.length) return;
 
-  // When user clicks "Show Group" button, fetch shared data from LearnDash API
-  $button.on('click', async function (e) {
-    e.preventDefault();
-    const groupId = $select.val();
+  /**
+   * fetch group data and trigger bys:groupSelected event
+   */
+  const fetchAndTriggerGroup = async groupId => {
     if (!groupId) return;
     try {
       // call custom rest route; callback method makes the request to LD API for the data
@@ -212,9 +218,22 @@ jQuery(document).ready($ => {
         courses: courses
       });
     } catch (err) {
-      console.error('Failed to fetch group data', err);
+      console.error('[group-select] Failed to fetch group data', err);
     }
+  };
+
+  // when user clicks "Show Group" button, fetch shared data from LearnDash API
+  $button.on('click', async function (e) {
+    e.preventDefault();
+    const groupId = $select.val();
+    await fetchAndTriggerGroup(groupId);
   });
+
+  // auto-trigger for the default-selected group on page load
+  const defaultGroupId = $select.val();
+  if (defaultGroupId) {
+    fetchAndTriggerGroup(defaultGroupId);
+  }
 });
 })();
 
