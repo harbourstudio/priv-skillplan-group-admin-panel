@@ -29,7 +29,7 @@ if (!class_exists('BYS_Groups_Rest_API')) {
          * Get validated auth header for LD API requests
          */
         private function get_validated_auth_header() {
-            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/auth.php';
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-auth.php';
             $auth_header = BYS_Groups_Auth::get_auth_header();
 
             if (!$auth_header) {

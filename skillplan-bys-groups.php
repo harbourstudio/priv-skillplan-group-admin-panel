@@ -25,8 +25,8 @@ define( 'BYS_GROUPS_PLUGIN_URL', plugin_dir_url( __FILE__ ));
 define( 'BYS_GROUPS_PLUGIN_BASENAME', plugin_basename( __FILE__ ));
 
 // File includes
-require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/core.php';
-// require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/activator.php';
+require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-core.php';
+// require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-activator.php';
 
 // // Run on plugin activation
 // register_activation_hook( BYS_GROUPS_PLUGIN_FILE, array('BYS_Groups_Activator', 'activate'));

@@ -18,10 +18,10 @@ if (!class_exists('BYS_Groups_Core')) {
         }
 
         private function includes() {
-            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/auth.php';
-            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/rest-api.php';
-            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/blocks.php';
-            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/admin-settings.php';
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-auth.php';
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-rest-api.php';
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-blocks.php';
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-admin-settings.php';
         }
 
         public function init() {
