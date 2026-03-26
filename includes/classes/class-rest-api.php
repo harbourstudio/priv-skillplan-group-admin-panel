@@ -79,6 +79,13 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'permission_callback' => array($this, 'check_user_permission'),
             ));
 
+            // groupCourseCompletionStats
+            register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/course-completion-stats', array(
+                'methods'             => 'GET',
+                'callback'            => array($this, 'get_group_course_completion_stats'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
+
             // groupUserCourseProgress
             register_rest_route($this->namespace, '/users/(?P<user_id>\d+)/course-progress', array(
                 'methods'             => 'GET',
@@ -418,6 +425,97 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             }
 
             return new \WP_REST_Response($formatted_courses, 200);
+        }
+
+        /**
+         * Get course completion stats for entire group via LD API
+         * Totals completed/incomplete counts across all users
+         */
+        public function get_group_course_completion_stats($request) {
+            $group_id = intval($request['group_id']);
+            $course_ids_param = $request->get_param('course_ids');
+
+            if (!$group_id) {
+                return new \WP_REST_Response(array('error' => 'Invalid group_id'), 400);
+            }
+
+            $auth_result = $this->get_validated_auth_header();
+            if (is_a($auth_result, 'WP_REST_Response')) {
+                return $auth_result;
+            }
+            $auth_header = $auth_result;
+
+            // fetch all user IDs in this group from LD API
+            $ld_users_url = get_home_url() . "/wp-json/ldlms/v2/groups/{$group_id}/users?_fields=id";
+            $response = wp_remote_get($ld_users_url, array(
+                'headers'   => array('Authorization' => $auth_header),
+                'timeout'   => 30,
+                'sslverify' => false,
+            ));
+
+            if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
+                return new \WP_REST_Response(array('error' => 'Failed to fetch group users'), 500);
+            }
+
+            $group_users = json_decode(wp_remote_retrieve_body($response), true);
+            if (!is_array($group_users) || empty($group_users)) {
+                return new \WP_REST_Response(array('total_completed' => 0, 'total_incomplete' => 0), 200);
+            }
+
+            $user_ids = array_map(function($u) { return intval($u['id']); }, $group_users);
+
+            // Resolve course IDs — either from param or fetch from LD API
+            if (!empty($course_ids_param)) {
+                $course_ids = array_filter(array_map('intval', explode(',', $course_ids_param)));
+            } else {
+                $group_courses = $this->get_group_courses_internal($group_id, $auth_header);
+                if (is_a($group_courses, 'WP_REST_Response')) {
+                    return $group_courses;
+                }
+                $course_ids = array_map(function($c) { return intval($c['id']); }, $group_courses);
+            }
+
+            if (empty($course_ids)) {
+                return new \WP_REST_Response(array('total_completed' => 0, 'total_incomplete' => 0), 200);
+            }
+
+            $total_completed = 0;
+            $total_incomplete = 0;
+
+            // For each user × course, fetch progress_status from LD API
+            foreach ($user_ids as $user_id) {
+                foreach ($course_ids as $course_id) {
+                    $ld_url = get_home_url() . "/wp-json/ldlms/v2/users/{$user_id}/course-progress/{$course_id}?_fields=progress_status";
+
+                    $response = wp_remote_get($ld_url, array(
+                        'headers'   => array('Authorization' => $auth_header),
+                        'timeout'   => 30,
+                        'sslverify' => false,
+                    ));
+
+                    if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
+                        continue; // Skip if request fails
+                    }
+
+                    $progress = json_decode(wp_remote_retrieve_body($response), true);
+                    if (!is_array($progress) || empty($progress)) {
+                        $total_incomplete++;
+                        continue;
+                    }
+
+                    $status = $progress['progress_status'] ?? '';
+                    if ($status === 'completed') {
+                        $total_completed++;
+                    } else {
+                        $total_incomplete++;
+                    }
+                }
+            }
+
+            return new \WP_REST_Response(array(
+                'total_completed'  => $total_completed,
+                'total_incomplete' => $total_incomplete,
+            ), 200);
         }
 
         /**

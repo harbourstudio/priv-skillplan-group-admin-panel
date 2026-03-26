@@ -45,16 +45,17 @@ $wrapper_attributes = get_block_wrapper_attributes();
 ?>
 
 <div <?php echo $wrapper_attributes; ?>>
-	<h3><?php echo esc_html('Quick Stats', 'bys'); ?></h3>
+	<h3><?php esc_html_e('Quick Stats', 'bys'); ?></h3>
+	
 	<div class="stats__grid">
-		<?php foreach ( $stats as $stat ) : ?>
+		<?php foreach ($stats as $stat) : ?>
 			<div class="stat__box">
 				<div class="stat__icon">
 					<img src="<?php echo esc_url( BYS_GROUPS_PLUGIN_URL . 'assets/img/' . $stat['icon'] ); ?>" alt="<?php echo esc_attr( $stat['alt'] ); ?>" />
 				</div>
-				<div class="stat__text">
-					<span class="stat__number" data-bys-stat="<?php echo esc_attr( $stat['stat'] ); ?>">0</span>
-					<span class="stat__label"><?php echo esc_html( $stat['label'] ); ?></span>
+				<div class="stat__content">
+					<span class="stat__number" data-bys-stat="<?php echo esc_attr($stat['stat']); ?>"></span>
+					<span class="stat__label"><?php esc_html_e($stat['label']); ?></span>
 				</div>
 			</div>
 		<?php endforeach; ?>

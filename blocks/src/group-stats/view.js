@@ -10,55 +10,27 @@ jQuery(document).ready(($) => {
   const $totalInactiveMembers = $block.find('[data-bys-stat="total_inactive_members"]');
 
   // listen for the custom jquery event triggered by group-select block
-  $(document).on('bys:groupSelected', async (_, {baseUsersStats, courses}) => {
+  $(document).on('bys:groupSelected', async (_, {groupId, baseUsersStats, courses}) => {
 
-    // Update base stats immediately
+    // update base stats immediately
     $totalMembers.html(baseUsersStats.total_members ?? 0);
     $totalInactiveMembers.html(baseUsersStats.total_inactive_members ?? 0);
 
-    // Fetch and calculate course completion stats in background
-    calculateCourseStats(baseUsersStats.user_ids || [], courses || []);
-  });
+    // show loading state
+    $completedCourses.html('…');
+    $incompleteCourses.html('…');
 
-  async function calculateCourseStats(userIds, courses) {
+    // fetch course completion stats for entire group
     try {
-      if (!courses.length || !userIds.length) {
-        $completedCourses.html(0);
-        $incompleteCourses.html(0);
-        return;
-      }
-
-      const courseIds = courses.map(c => c.id).join(',');
-
-      // Fetch progress for all users in parallel through custom wrapper
-      const promises = userIds.map(userId => {
-        const progressUrl = endpoints.userCourseProgress(userId, courseIds);
-        return api.get(progressUrl, false);
-      });
-
-      const allProgressResults = await Promise.all(promises);
-
-      // Count completed and incomplete courses
-      let totalCompleted = 0;
-      let totalIncomplete = 0;
-
-      allProgressResults.forEach(progressArray => {
-        if (!Array.isArray(progressArray)) return;
-        progressArray.forEach(courseProgress => {
-          if (courseProgress.progress_status === 'completed') {
-            totalCompleted++;
-          } else {
-            totalIncomplete++;
-          }
-        });
-      });
-
-      $completedCourses.html(totalCompleted);
-      $incompleteCourses.html(totalIncomplete);
+      const courseIds = (courses || []).map(c => c.id).join(',');
+      const url = endpoints.groupCourseCompletionStats(groupId) + (courseIds ? `?course_ids=${courseIds}` : '');
+      const stats = await api.get(url);
+      $completedCourses.html(stats.total_completed ?? 0);
+      $incompleteCourses.html(stats.total_incomplete ?? 0);
     } catch (err) {
-      console.error('Failed to calculate course stats:', err);
+      console.error('[group-stats] Failed to fetch course completion stats:', err);
       $completedCourses.html(0);
       $incompleteCourses.html(0);
     }
-  }
+  });
 });
