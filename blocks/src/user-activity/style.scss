@@ -31,8 +31,7 @@
         }
     }
 
-    .table__results{
-
+    .table-wrapper{
         margin-top: var(--wp--preset--spacing--7);
 
         table{
@@ -73,7 +72,7 @@
                 }
                 
                 td{
-                    padding: var(--wp--preset--spacing--3);
+                    padding: var(--wp--preset--spacing--3) var(--wp--preset--spacing--4);
                 }
 
                 .reporting-table__time{
@@ -96,4 +95,31 @@
         }
     }
 
+    .cell-activity__icon {
+        margin-right: var(--wp--preset--spacing--2);
+    }
+
+    .cell-object-type__dot {
+        display: inline-block;
+        width: 0.875rem;
+        height: 0.875rem;
+        border-radius: 999px;
+        margin-right: var(--wp--preset--spacing--2);
+
+        &--achievement {
+            background: linear-gradient(315deg, #03C571 0%, #E0FFF1 100%);
+        }
+        &--lesson {
+            background: linear-gradient(315deg, #FC9344 0%, #FEF8EB 100%);
+        }
+        &--quiz {
+            background: linear-gradient(315deg, #8D5D9B 0%, #F4EFF5 100%);;
+        }
+        &--course {
+            background: linear-gradient(315deg, #93D7FE 0%, #DBF2FF 100%);
+        }
+        &--form, &--survey {
+            background: linear-gradient(315deg, #FE4C42 0%, #FFEDEC 100%);
+        }
+    }
 }

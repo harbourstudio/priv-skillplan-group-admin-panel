@@ -1006,12 +1006,15 @@ if (!class_exists('BYS_Groups_Rest_API')) {
 
             $offset = ($page - 1) * $per_page;
             $rows = $wpdb->get_results(
-                "SELECT id, activity, object_id, object_title, object_type, meta, created_at
-                 FROM {$table}
-                 WHERE {$where}
-                 ORDER BY created_at DESC
-                 LIMIT %d OFFSET %d",
-                array($per_page, $offset),
+                $wpdb->prepare(
+                    "SELECT id, activity, initiated_by, object_id, object_title, object_type, meta, created_at
+                     FROM {$table}
+                     WHERE {$where}
+                     ORDER BY created_at DESC
+                     LIMIT %d OFFSET %d",
+                    $per_page,
+                    $offset
+                ),
                 ARRAY_A
             );
 
@@ -1022,11 +1025,12 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                     'id'              => intval($row['id']),
                     'activity'        => $activity_slug,
                     'activity_label'  => $activity_labels[$activity_slug] ?? ucwords(str_replace('_', ' ', $activity_slug)),
+                    'initiated_by'    => $row['initiated_by'] ?? '',
                     'object_id'       => intval($row['object_id']),
                     'object_title'    => $row['object_title'] ?? '',
                     'object_type'     => $row['object_type'] ?? '',
                     'meta'            => !empty($row['meta']) ? json_decode($row['meta'], true) : array(),
-                    'created_at'      => rest_convert_date_to_datetime($row['created_at'])->format('c'),
+                    'created_at'      => mysql_to_rfc3339($row['created_at']),
                 );
             }
 
