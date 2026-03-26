@@ -100,16 +100,20 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'permission_callback' => array($this, 'check_user_permission'),
             ));
 
-            // userQuizAttempts
-            register_rest_route($this->namespace, '/users/(?P<user_id>\d+)/quiz-attempts', array(
+            // userQuizProgress - user's summary of all quizzes in group courses
+            register_rest_route($this->namespace, '/users/(?P<user_id>\d+)/quiz-progress', array(
+                'methods'             => 'GET',
+                'callback'            => array($this, 'get_user_quiz_progress_summary'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
+
+            // userQuizAttempts - detailed attempts for a specific quiz
+            register_rest_route($this->namespace, '/users/(?P<user_id>\d+)/quiz-attempts/(?P<quiz_id>\d+)', array(
                 'methods'             => 'GET',
                 'callback'            => array($this, 'get_user_quiz_attempts'),
                 'permission_callback' => array($this, 'check_user_permission'),
             ));
         }
-
-       
-            
 
         public function check_user_permission($request) {
             // check for Authorization header (basic auth)
@@ -419,8 +423,8 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             }
             $auth_header = $auth_result;
 
-            // Fetch steps from LD API
-            $ld_api_url = get_home_url() . "/wp-json/ldlms/v2/sfwd-courses/{$course_id}/steps?_fields=h";
+            // Fetch steps from LD API with hierarchical and type-list formats
+            $ld_api_url = get_home_url() . "/wp-json/ldlms/v2/sfwd-courses/{$course_id}/steps?_fields=h,t";
 
             $response = wp_remote_get($ld_api_url, array(
                 'headers' => array(
@@ -443,7 +447,7 @@ if (!class_exists('BYS_Groups_Rest_API')) {
 
             $data = json_decode($body, true);
 
-            // NOTE: this is parsing data based on the type=h (type=hierarchal) structure of that LD endpoint (added to url as _fields=h)
+            // Parse hierarchical structure for lessons/topics
             $h_lessons = $data['h']['sfwd-lessons'] ?? array();
             $lessons = array();
 
@@ -464,7 +468,13 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 );
             }
 
-            return new \WP_REST_Response($lessons, 200);
+            // Extract quiz IDs from type-list format (t.sfwd-quiz)
+            $quiz_ids = $data['t']['sfwd-quiz'] ?? array();
+
+            return new \WP_REST_Response(array(
+                'lessons' => $lessons,
+                'quiz_ids' => array_map('intval', $quiz_ids),
+            ), 200);
         }
 
         /**
@@ -606,71 +616,315 @@ if (!class_exists('BYS_Groups_Rest_API')) {
          * Get quiz attempts for a user in a course
          * Returns the best attempt (highest percentage) for each quiz with configured pass threshold
          */
-        public function get_user_quiz_attempts($request) {
+        /**
+         * Get quiz progress summary for all quizzes in group courses
+         * Optional: Pass course_ids to avoid server-side fetch
+         * Format: ?course_ids=1,2,3 (comma-separated course IDs)
+         */
+        public function get_user_quiz_progress_summary($request) {
             $user_id = intval($request['user_id']);
-            $course_id = intval($request->get_param('course_id'));
+            $group_id = intval($request->get_param('group_id'));
+            $course_ids_param = $request->get_param('course_ids');
 
-            if (!$user_id || !$course_id) {
-                return new \WP_REST_Response(array('error' => 'Invalid user_id or course_id'), 400);
+            if (!$user_id || !$group_id) {
+                return new \WP_REST_Response(array('error' => 'user_id and group_id parameters required'), 400);
             }
 
-            // Query quiz attempts from activity table with points data, ordered by highest percentage first
-            global $wpdb;
-            $attempts = $wpdb->get_results($wpdb->prepare(
-                "SELECT a.activity_id, a.post_id as quiz_id, a.activity_completed as completed,
-                        CAST(m1.activity_meta_value AS UNSIGNED) as percentage,
-                        CAST(m2.activity_meta_value AS UNSIGNED) as points,
-                        CAST(m3.activity_meta_value AS UNSIGNED) as total_points
-                 FROM {$wpdb->prefix}learndash_user_activity a
-                 LEFT JOIN {$wpdb->prefix}learndash_user_activity_meta m1
-                   ON a.activity_id = m1.activity_id AND m1.activity_meta_key = 'percentage'
-                 LEFT JOIN {$wpdb->prefix}learndash_user_activity_meta m2
-                   ON a.activity_id = m2.activity_id AND m2.activity_meta_key = 'points'
-                 LEFT JOIN {$wpdb->prefix}learndash_user_activity_meta m3
-                   ON a.activity_id = m3.activity_id AND m3.activity_meta_key = 'total_points'
-                 WHERE a.user_id = %d AND a.course_id = %d AND a.activity_type = 'quiz'
-                 ORDER BY a.post_id ASC, CAST(m1.activity_meta_value AS UNSIGNED) DESC",
-                $user_id, $course_id
-            ));
+            // Get validated auth header for LD API
+            $auth_result = $this->get_validated_auth_header();
+            if (is_a($auth_result, 'WP_REST_Response')) {
+                return $auth_result;
+            }
+            $auth_header = $auth_result;
 
-            if (!$attempts) {
-                $attempts = array();
+            // If course_ids provided, use them directly; otherwise fetch from server
+            if (!empty($course_ids_param)) {
+                $course_ids = array_map('intval', array_filter(explode(',', $course_ids_param)));
+                if (empty($course_ids)) {
+                    return new \WP_REST_Response(array('error' => 'Invalid course_ids parameter'), 400);
+                }
+            } else {
+                // Fetch group courses via internal call
+                $group_courses = $this->get_group_courses_internal($group_id, $auth_header);
+                if (is_a($group_courses, 'WP_REST_Response')) {
+                    return $group_courses;
+                }
+
+                if (empty($group_courses)) {
+                    return new \WP_REST_Response(array(), 200);
+                }
+
+                $course_ids = array_map(function($course) { return intval($course['id']); }, $group_courses);
             }
 
-            // Build result array with best attempt per quiz and configured pass threshold
-            $result = array();
-            $seen_quizzes = array();
+            // Build course ID -> title map for later lookup (fetch titles if needed)
+            $course_map = array();
 
-            foreach ($attempts as $attempt) {
-                $quiz_id = intval($attempt->quiz_id);
+            // If course_ids were provided, we still need titles from LD API
+            if (!empty($course_ids_param)) {
+                // Fetch course titles from LD API
+                $ld_api_url = get_home_url() . "/wp-json/ldlms/v2/groups/{$group_id}/courses?_fields=id,title";
+                $response = wp_remote_get($ld_api_url, array(
+                    'headers' => array('Authorization' => $auth_header),
+                    'timeout'   => 30,
+                    'sslverify' => false,
+                ));
 
-                // Skip if we've already recorded the best attempt for this quiz
-                if (isset($seen_quizzes[$quiz_id])) {
+                if (!is_wp_error($response) && wp_remote_retrieve_response_code($response) === 200) {
+                    $courses = json_decode(wp_remote_retrieve_body($response), true);
+                    if (is_array($courses)) {
+                        foreach ($courses as $course) {
+                            $title = $course['title'];
+                            if (is_array($title) && isset($title['rendered'])) {
+                                $title = $title['rendered'];
+                            }
+                            $course_map[intval($course['id'])] = $title;
+                        }
+                    }
+                }
+            } else {
+                // Build map from already-fetched courses
+                foreach ($group_courses as $course) {
+                    $course_map[$course['id']] = $course['title'];
+                }
+            }
+
+            // Collect all quiz IDs from all courses
+            $all_quiz_ids = array();
+            $quiz_course_map = array(); // quiz_id -> course_id (for parent course reference)
+
+            foreach ($course_ids as $course_id) {
+
+                // Fetch course steps to get quiz IDs
+                $ld_api_url = get_home_url() . "/wp-json/ldlms/v2/sfwd-courses/{$course_id}/steps?_fields=h,t";
+
+                $response = wp_remote_get($ld_api_url, array(
+                    'headers' => array(
+                        'Authorization' => $auth_header,
+                    ),
+                    'timeout'   => 60,
+                    'sslverify' => false,
+                ));
+
+                if (is_wp_error($response)) {
+                    error_log('[BYS Groups] Course steps fetch failed for course ' . $course_id . ': ' . $response->get_error_message());
                     continue;
                 }
 
-                $percentage = intval($attempt->percentage ?? 0);
-                $points = intval($attempt->points ?? 0);
-                $total_points = intval($attempt->total_points ?? 0);
+                $status = wp_remote_retrieve_response_code($response);
+                if ($status !== 200) {
+                    error_log('[BYS Groups] Course steps API returned status ' . $status . ' for course ' . $course_id);
+                    continue;
+                }
 
-                // Get the quiz's configured passing percentage
-                $passing_meta = get_post_meta($quiz_id, '_sfwd-quiz_passingpercentage', true);
-                $passing_percentage = !empty($passing_meta) ? intval($passing_meta) : 80;
+                $body = wp_remote_retrieve_body($response);
+                $steps_data = json_decode($body, true);
 
-                $result[] = array(
-                    'quiz_id'           => $quiz_id,
-                    'percentage'        => $percentage,
-                    'points'            => $points,
-                    'total_points'      => $total_points,
-                    'passing_threshold' => $passing_percentage,
-                    'pass'              => $percentage >= $passing_percentage,
-                    'completed'         => intval($attempt->completed ?? 0),
-                );
-
-                $seen_quizzes[$quiz_id] = true;
+                // Extract quiz IDs from type-list format (t.sfwd-quiz)
+                $quiz_ids = $steps_data['t']['sfwd-quiz'] ?? array();
+                foreach ($quiz_ids as $quiz_id) {
+                    $quiz_id = intval($quiz_id);
+                    if ($quiz_id > 0) {
+                        $all_quiz_ids[$quiz_id] = true;
+                        // Map quiz to course (for parent course reference)
+                        if (!isset($quiz_course_map[$quiz_id])) {
+                            $quiz_course_map[$quiz_id] = $course_id;
+                        }
+                    }
+                }
             }
 
+            if (empty($all_quiz_ids)) {
+                return new \WP_REST_Response(array(), 200);
+            }
+
+            // Fetch quiz attempts for each quiz ID
+            $result = array();
+            foreach (array_keys($all_quiz_ids) as $quiz_id) {
+                // Call LD API: /ldlms/v2/users/{user_id}/quiz-progress?quiz={quiz_id}
+                $ld_api_url = get_home_url() . "/wp-json/ldlms/v2/users/{$user_id}/quiz-progress?quiz={$quiz_id}";
+
+                $response = wp_remote_get($ld_api_url, array(
+                    'headers' => array(
+                        'Authorization' => $auth_header,
+                    ),
+                    'timeout'   => 60,
+                    'sslverify' => false,
+                ));
+
+                if (is_wp_error($response)) {
+                    error_log('[BYS Groups] Quiz progress fetch failed for quiz ' . $quiz_id . ': ' . $response->get_error_message());
+                    continue;
+                }
+
+                $status = wp_remote_retrieve_response_code($response);
+                if ($status !== 200) {
+                    error_log('[BYS Groups] Quiz progress API returned status ' . $status . ' for quiz ' . $quiz_id);
+                    continue;
+                }
+
+                $body = wp_remote_retrieve_body($response);
+                $attempts = json_decode($body, true);
+
+                if (!is_array($attempts) || empty($attempts)) {
+                    continue;
+                }
+
+                // Get quiz title
+                $quiz = get_post($quiz_id);
+                $title = $quiz ? $quiz->post_title : 'Quiz #' . $quiz_id;
+
+                // Get parent course ID and title
+                $parent_course_id = $quiz_course_map[$quiz_id] ?? 0;
+                $parent_course_title = $course_map[$parent_course_id] ?? 'Course #' . $parent_course_id;
+
+                // Sort by completed timestamp descending to get latest
+                usort($attempts, function ($a, $b) {
+                    $ts_a = strtotime($a['completed'] ?? 0);
+                    $ts_b = strtotime($b['completed'] ?? 0);
+                    return $ts_b - $ts_a;
+                });
+
+                $latest_attempt = $attempts[0];
+
+                // Find highest percentage
+                $highest_attempt = $attempts[0];
+                foreach ($attempts as $attempt) {
+                    $percentage = floatval($attempt['percentage'] ?? 0);
+                    if ($percentage > floatval($highest_attempt['percentage'] ?? 0)) {
+                        $highest_attempt = $attempt;
+                    }
+                }
+
+                $result[] = array(
+                    'id'                      => $quiz_id,
+                    'quiz_id'                 => $quiz_id,
+                    'title'                   => $title,
+                    'parent_course_id'        => $parent_course_id,
+                    'parent_course_title'     => $parent_course_title,
+                    'total_attempts'          => count($attempts),
+                    'percent_highest'         => floatval($highest_attempt['percentage'] ?? 0),
+                    'percent_latest'          => floatval($latest_attempt['percentage'] ?? 0),
+                    'pass_highest'            => (bool)($highest_attempt['pass'] ?? false),
+                    'pass_latest'             => (bool)($latest_attempt['pass'] ?? false),
+                    'latest_timestamp'        => $latest_attempt['completed'] ?? null,
+                );
+            }
+
+            // Sort by latest_timestamp descending (most recent first)
+            usort($result, function ($a, $b) {
+                $ts_a = strtotime($a['latest_timestamp'] ?? 0);
+                $ts_b = strtotime($b['latest_timestamp'] ?? 0);
+                return $ts_b - $ts_a;
+            });
+
             return new \WP_REST_Response($result, 200);
+        }
+
+        /**
+         * Get all attempts for a specific quiz
+         */
+        public function get_user_quiz_attempts($request) {
+            $user_id = intval($request['user_id']);
+            $quiz_id = intval($request['quiz_id']);
+
+            if (!$user_id || !$quiz_id) {
+                return new \WP_REST_Response(array('error' => 'user_id and quiz_id parameters required'), 400);
+            }
+
+            // Get validated auth header for LD API
+            $auth_result = $this->get_validated_auth_header();
+            if (is_a($auth_result, 'WP_REST_Response')) {
+                return $auth_result;
+            }
+            $auth_header = $auth_result;
+
+            // Call LD API: /ldlms/v2/users/{user_id}/quiz-progress?quiz={quiz_id}
+            $ld_api_url = get_home_url() . "/wp-json/ldlms/v2/users/{$user_id}/quiz-progress?quiz={$quiz_id}";
+
+            $response = wp_remote_get($ld_api_url, array(
+                'headers' => array(
+                    'Authorization' => $auth_header,
+                ),
+                'timeout'   => 60,
+                'sslverify' => false,
+            ));
+
+            if (is_wp_error($response)) {
+                return new \WP_REST_Response(array('error' => $response->get_error_message()), 500);
+            }
+
+            $status = wp_remote_retrieve_response_code($response);
+            if ($status !== 200) {
+                return new \WP_REST_Response(array('error' => 'Failed to fetch quiz attempts from LearnDash API', 'status' => $status), $status);
+            }
+
+            $body = wp_remote_retrieve_body($response);
+            $attempts = json_decode($body, true);
+
+            if (!is_array($attempts)) {
+                $attempts = array();
+            }
+
+            // Sort by completed timestamp descending (most recent first)
+            usort($attempts, function ($a, $b) {
+                $ts_a = strtotime($a['completed'] ?? 0);
+                $ts_b = strtotime($b['completed'] ?? 0);
+                return $ts_b - $ts_a;
+            });
+
+            return new \WP_REST_Response($attempts, 200);
+        }
+
+        /**
+         * Internal helper to fetch group courses (reusable by other endpoints)
+         * Returns array of course objects with id and title
+         */
+        private function get_group_courses_internal($group_id, $auth_header) {
+            // Fetch group users from LD API
+            $ld_api_url = get_home_url() . "/wp-json/ldlms/v2/groups/{$group_id}/courses?_fields=id,title";
+
+            $response = wp_remote_get($ld_api_url, array(
+                'headers' => array(
+                    'Authorization' => $auth_header,
+                ),
+                'timeout'   => 30,
+                'sslverify' => false,
+            ));
+
+            if (is_wp_error($response)) {
+                return new \WP_REST_Response(array('error' => $response->get_error_message()), 500);
+            }
+
+            $status = wp_remote_retrieve_response_code($response);
+            $body = wp_remote_retrieve_body($response);
+
+            if ($status !== 200) {
+                return new \WP_REST_Response(array('error' => 'Failed to fetch courses from LearnDash API', 'status' => $status), $status);
+            }
+
+            $courses = json_decode($body, true);
+            if (!is_array($courses)) {
+                $courses = array();
+            }
+
+            // Ensure each course has both id and title
+            $result = array();
+            foreach ($courses as $course) {
+                if (isset($course['id'])) {
+                    $course_title = $course['title'];
+                    if (is_array($course_title) && isset($course_title['rendered'])) {
+                        $course_title = $course_title['rendered'];
+                    }
+
+                    $result[] = array(
+                        'id'    => intval($course['id']),
+                        'title' => $course_title,
+                    );
+                }
+            }
+
+            return $result;
         }
     }
 }
