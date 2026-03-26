@@ -24,11 +24,17 @@ if (!class_exists('BYS_Groups_Activity_Logger')) {
         private function register_hooks() {
             // WIP: add add_action() calls
             
+            // LOGIN EVENT
             add_action('wp_login', [$this, 'on_user_login'], 10, 2);
+            
             // // Capture user ID BEFORE logout fires (priority 1 = runs first)
             // add_action('wp_logout', [$this, 'capture_user_before_logout'], 1);
             // // Log logout AFTER user is captured (priority 100 = runs last)
             // // add_action('wp_logout', [$this, 'on_user_logout'], 100);
+            
+            // MY PROFILE FORM UPDATE (GF form#16) 
+            add_action('gform_after_submission_16', [$this, 'on_profile_form_submitted'], 10, 2);
+
         }
 
 
@@ -92,5 +98,27 @@ if (!class_exists('BYS_Groups_Activity_Logger')) {
         //         object_type:  null // not applicable
         //     );
         // }
+
+        public function on_profile_form_submitted($entry, $form) {
+            $user_id = isset($entry['created_by']) ? intval($entry['created_by']) : get_current_user_id();
+            
+            if (!$user_id) {
+                return;
+            }
+            
+            $this->log_activity(
+                user_id:      $user_id,
+                activity:     'profile_updated',
+                initiated_by: 'self',
+                object_id:    intval($form['id']), // use form ID
+                object_title: 'Gravity Form: ' .$form['title'], // use form title
+                object_type:  'form',
+                meta:         [
+                    'entry_id' => intval($entry['id']),
+                    'form_id'  => intval($form['id']),
+                ]
+            );
+        }
+
     }
 }
