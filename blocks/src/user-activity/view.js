@@ -5,6 +5,7 @@
 
 import { api, endpoints } from '../_shared/api-client.js';
 import { LOADING_COMPONENT } from '../_shared/loading.js';
+import { formatDate, formatTime } from '../_shared/helpers.js';
 
 jQuery(document).ready(($) => {
   const params = new URLSearchParams(window.location.search);
@@ -30,25 +31,6 @@ jQuery(document).ready(($) => {
 
   let currentPage = 1;
   let currentFilters = {};
-
-  /**
-   * Format datetime string to readable format
-   */
-  const formatDate = (isoString) => {
-    const date = new Date(isoString);
-    const dateStr = date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-    const timeStr = date.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
-    });
-    return `${dateStr}\n${timeStr}`;
-  };
 
   /**
    * Load activity data from API
@@ -84,7 +66,9 @@ jQuery(document).ready(($) => {
         $row.find('.cell-activity__icon').addClass(icon);
         $row.find('.cell-activity__label').text(item.activity_label);
 
-        $row.find('.cell-created-at').text(formatDate(item.created_at));
+        $row.find('.cell-created-at__date').text(formatDate(item.created_at));
+        $row.find('.cell-created-at__time').text(formatTime(item.created_at));
+        
         $row.find('.cell-object-title').html(item.object_title || '—');
         
         const objectType = item.object_type || '—';

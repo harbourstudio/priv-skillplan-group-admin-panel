@@ -1,5 +1,5 @@
 import { api, endpoints } from '../_shared/api-client.js';
-import { formatScore, formatDate } from '../_shared/helpers.js';
+import { formatScore, formatDate, formatTime } from '../_shared/helpers.js';
 
 jQuery(document).ready(($) => {
   const $block = $('.wp-block-bys-groups-user-quiz-attempts-modal').first();

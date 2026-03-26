@@ -19,13 +19,42 @@ export function formatDate(timestamp) {
 
   try {
     return new Date(timestamp).toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+    });
+  } catch {
+    return '—';
+  }
+}
+
+export function formatTime(timestamp) {
+  if (!timestamp) return '—';
+
+  try {
+    return new Date(timestamp).toLocaleString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+    });
+  } catch {
+    return '—';
+  }
+}
+
+export function formatDateTime(timestamp) {
+  if (!timestamp) return '—';
+
+  try {
+    return new Date(timestamp).toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
     });
   } catch {
     return '—';

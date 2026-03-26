@@ -97,7 +97,11 @@ $wrapper_attributes = get_block_wrapper_attributes();
                 <span class="cell-activity__label"></span>
             </td>
 
-            <td class="cell-created-at"></td>
+            <td class="cell-created-at">
+                <span class="cell-created-at__date"></span>
+                <span class="cell-created-at__time"></span>
+            </td>
+            
             <td class="cell-object-title"></td>
             <td class="cell-object-type">
                 <span class="cell-object-type__dot"></span>

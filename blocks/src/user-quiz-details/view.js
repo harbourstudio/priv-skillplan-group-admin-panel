@@ -1,6 +1,6 @@
 import { api, endpoints } from '../_shared/api-client.js';
 import { LOADING_COMPONENT } from '../_shared/loading.js';
-import { formatScore, formatDate } from '../_shared/helpers.js';
+import { formatScore, formatDate, formatTime } from '../_shared/helpers.js';
 
 jQuery(document).ready(($) => {
     const params = new URLSearchParams(window.location.search);
