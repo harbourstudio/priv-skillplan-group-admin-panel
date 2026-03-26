@@ -33,7 +33,10 @@ if (!class_exists('BYS_Groups_Activity_Logger')) {
             // // add_action('wp_logout', [$this, 'on_user_logout'], 100);
             
             // MY PROFILE FORM UPDATE (GF form#16) 
-            add_action('gform_after_submission_16', [$this, 'on_profile_form_submitted'], 10, 2);
+            add_action('gform_after_submission_16', [$this, 'on_profile_update'], 10, 2);
+
+            // ACCOUNT SETTINGS FORM UPDATE (GF form#15)
+            add_action('gform_after_submission_15', [$this, 'on_account_settings_update'], 10, 2);
 
         }
 
@@ -99,7 +102,7 @@ if (!class_exists('BYS_Groups_Activity_Logger')) {
         //     );
         // }
 
-        public function on_profile_form_submitted($entry, $form) {
+        public function on_profile_update($entry, $form){
             $user_id = isset($entry['created_by']) ? intval($entry['created_by']) : get_current_user_id();
             
             if (!$user_id) {
@@ -108,7 +111,7 @@ if (!class_exists('BYS_Groups_Activity_Logger')) {
             
             $this->log_activity(
                 user_id:      $user_id,
-                activity:     'profile_updated',
+                activity:     'profile_update',
                 initiated_by: 'self',
                 object_id:    intval($form['id']), // use form ID
                 object_title: 'Gravity Form: ' .$form['title'], // use form title
@@ -120,5 +123,25 @@ if (!class_exists('BYS_Groups_Activity_Logger')) {
             );
         }
 
+        public function on_account_settings_update($entry, $form) {
+            $user_id = isset($entry['created_by']) ? intval($entry['created_by']) : get_current_user_id();
+            
+            if (!$user_id) {
+                return;
+            }
+            
+            $this->log_activity(
+                user_id:      $user_id,
+                activity:     'account_settings_update',
+                initiated_by: 'self',
+                object_id:    intval($form['id']), // use form ID
+                object_title: 'Gravity Form: ' .$form['title'], // use form title
+                object_type:  'form',
+                meta:         [
+                    'entry_id' => intval($entry['id']),
+                    'form_id'  => intval($form['id']),
+                ]
+            );
+        }
     }
 }
