@@ -23,6 +23,8 @@ if (!class_exists('BYS_Groups_Core')) {
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-rest-api.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-blocks.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-admin-settings.php';
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-activity-logger.php';
+
         }
 
         public function init() {
@@ -39,6 +41,7 @@ if (!class_exists('BYS_Groups_Core')) {
             new BYS_Groups_Admin_Settings();
             new BYS_Groups_Rest_API();
             new BYS_Groups_Blocks();
+            new BYS_Groups_Activity_Logger();
         }
 
 

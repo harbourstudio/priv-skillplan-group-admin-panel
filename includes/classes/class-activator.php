@@ -19,14 +19,14 @@ if (!class_exists('BYS_Groups_Activator')) {
             global $wpdb;
             $charset_collate = $wpdb->get_charset_collate();
 
-            $sql = "CREATE TABLE {$wpdb->prefix}bys_groups_user_activity (
+            $sql = "CREATE TABLE {$wpdb->prefix}" . BYS_GROUPS_USER_ACTIVITY_TABLE . " (
                 id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
                 user_id      BIGINT UNSIGNED NOT NULL,
                 activity     VARCHAR(64)     NOT NULL,
+                initiated_by VARCHAR(64)     NOT NULL,
                 object_id    BIGINT UNSIGNED DEFAULT 0,
                 object_title VARCHAR(255)    DEFAULT NULL,
                 object_type  VARCHAR(64)     DEFAULT NULL,
-                initiated_by VARCHAR(64)     NOT NULL,
                 meta         LONGTEXT        DEFAULT NULL,
                 created_at   DATETIME        NOT NULL,
                 PRIMARY KEY  (id),
