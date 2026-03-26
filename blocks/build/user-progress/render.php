@@ -17,7 +17,7 @@ foreach ($attrs as $a) {
 $wrapper_attributes = get_block_wrapper_attributes();
 
 // Get validated auth header for client-side API requests
-require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/auth.php';
+require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-auth.php';
 $auth_header = BYS_Groups_Auth::get_auth_header();
 
 ?>

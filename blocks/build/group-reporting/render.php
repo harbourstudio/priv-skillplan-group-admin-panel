@@ -31,10 +31,49 @@ $detail_url = home_url( '/administrator-dashboard/user-progress-detail/' );
     <div id="filters-box" class="filters__box hidden" aria-hidden="true">
         <form class="filters__form" method="get">
             <div class="filters__fields">
-                <div class="filters__field"><label for="filter-course">Course</label><input type="text" id="filter-course" name="course" placeholder="Search course…" /></div>
+                <div class="filters__field filters__field--multiselect" id="filters__field--course">
+                    <label>Course</label>
+                    <div class="bys-multiselect" id="bys-multiselect-course" aria-haspopup="listbox" aria-expanded="false">
+                        <div class="bys-multiselect__control">
+                            <div class="bys-multiselect__pills" id="bys-multiselect-course-pills">
+                                <span class="bys-multiselect__placeholder">All courses</span>
+                            </div>
+                            <button class="bys-multiselect__toggle btn-unstyled" type="button" aria-label="Toggle course selector">
+                                <i class="fa-regular fa-chevron-down"></i>
+                            </button>
+                        </div>
+                        <div class="bys-multiselect__dropdown hidden" role="listbox" aria-multiselectable="true" id="bys-multiselect-course-dropdown">
+                            <div class="bys-multiselect__search-wrap">
+                                <input class="bys-multiselect__search" type="text" placeholder="Search courses…" aria-label="Search courses" autocomplete="off" />
+                            </div>
+                            <ul class="bys-multiselect__list" role="group"></ul>
+                            <div class="bys-multiselect__empty hidden">No courses found</div>
+                        </div>
+                    </div>
+                </div>
                 <div class="filters__field"><label for="filter-enrolment-date">Enrolment Date</label><input type="date" id="filter-enrolment-date" name="enrolment_date" /></div>
                 <div class="filters__field"><label for="filter-completion-date">Completion Date</label><input type="date" id="filter-completion-date" name="completion_date" /></div>
-                <div class="filters__field"><label for="filter-users">Users</label><input type="text" id="filter-users" name="users" placeholder="Search user…" /></div>
+                <div class="filters__field filters__field--multiselect" id="filters__field--users">
+                    <label>Users</label>
+                    <div class="bys-multiselect" id="bys-multiselect-users" aria-haspopup="listbox" aria-expanded="false">
+                        <div class="bys-multiselect__control">
+                            <div class="bys-multiselect__pills" id="bys-multiselect-users-pills">
+                                <span class="bys-multiselect__placeholder">All users</span>
+                            </div>
+                            <button class="bys-multiselect__toggle btn-unstyled" type="button" aria-label="Toggle user selector">
+                                <i class="fa-regular fa-chevron-down"></i>
+                            </button>
+                        </div>
+                        <div class="bys-multiselect__dropdown hidden" role="listbox" aria-multiselectable="true" id="bys-multiselect-users-dropdown">
+                            <div class="bys-multiselect__search-wrap">
+                                <input class="bys-multiselect__search" type="text" placeholder="Search users…" aria-label="Search users" autocomplete="off" />
+                            </div>
+                            <ul class="bys-multiselect__list" role="group"></ul>
+                            <div class="bys-multiselect__empty hidden">No users found</div>
+                            <div class="bys-multiselect__loading hidden">Loading users…</div>
+                        </div>
+                    </div>
+                </div>
                 <div class="filters__field">
                     <label for="filter-status">Status</label>
                     <select id="filter-status" name="status">

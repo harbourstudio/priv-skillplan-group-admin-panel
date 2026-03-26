@@ -34,12 +34,14 @@ const endpoints = {
   groupUsers: (groupId, userIds) => `/wp-json/bys-groups/v1/groups/${groupId}/users?user_ids=${userIds}`,
   groupUserInfo: (groupId, userId) => `/wp-json/bys-groups/v1/groups/${groupId}/users/${userId}`,
   groupCourses: groupId => `/wp-json/bys-groups/v1/groups/${groupId}/courses`,
+  groupCourseCompletionStats: groupId => `/wp-json/bys-groups/v1/groups/${groupId}/course-completion-stats`,
   courseHierarchialBreakdown: courseId => `/wp-json/bys-groups/v1/courses/${courseId}/steps`,
   groupUserCourseProgress: (userId, courseIds) => `/wp-json/bys-groups/v1/users/${userId}/course-progress?course_ids=${courseIds}`,
   courseQuizSteps: courseId => `/wp-json/bys-groups/v1/courses/${courseId}/quiz-steps`,
   userQuizAttempts: (userId, courseId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-attempts?course_id=${courseId}`,
   userQuizProgress: userId => `/wp-json/bys-groups/v1/users/${userId}/quiz-progress`,
-  userQuizAttemptsDetails: (userId, quizId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-attempts/${quizId}`
+  userQuizAttemptsDetails: (userId, quizId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-attempts/${quizId}`,
+  userActivity: userId => `/wp-json/bys-groups/v1/users/${userId}/activity`
 };
 const api = {
   _cache: new Map(),
@@ -109,6 +111,76 @@ const api = {
     this._cache.clear();
   }
 };
+
+/***/ },
+
+/***/ "./src/_shared/helpers.js"
+/*!********************************!*\
+  !*** ./src/_shared/helpers.js ***!
+  \********************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   formatDate: () => (/* binding */ formatDate),
+/* harmony export */   formatDateTime: () => (/* binding */ formatDateTime),
+/* harmony export */   formatScore: () => (/* binding */ formatScore),
+/* harmony export */   formatTime: () => (/* binding */ formatTime)
+/* harmony export */ });
+/**
+ * Shared block functions
+ *
+ * Usage:
+ *   import { formatScore, formatDate } from '../_shared/helpers.js';
+ *
+ */
+
+function formatScore(percent, pointsScored, pointsTotal) {
+  if (percent === null || percent === undefined) return '—';
+  if (pointsScored === null || pointsTotal === null) return `${percent}%`;
+  return `${pointsScored}/${pointsTotal} (${percent}%)`;
+}
+function formatDate(timestamp) {
+  if (!timestamp) return '—';
+  try {
+    return new Date(timestamp).toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  } catch {
+    return '—';
+  }
+}
+function formatTime(timestamp) {
+  if (!timestamp) return '—';
+  try {
+    return new Date(timestamp).toLocaleString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    });
+  } catch {
+    return '—';
+  }
+}
+function formatDateTime(timestamp) {
+  if (!timestamp) return '—';
+  try {
+    return new Date(timestamp).toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    });
+  } catch {
+    return '—';
+  }
+}
 
 /***/ }
 
@@ -182,6 +254,8 @@ var __webpack_exports__ = {};
   \**********************************************/
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../_shared/api-client.js */ "./src/_shared/api-client.js");
+/* harmony import */ var _shared_helpers_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../_shared/helpers.js */ "./src/_shared/helpers.js");
+
 
 jQuery(document).ready($ => {
   const $block = $('.wp-block-bys-groups-user-quiz-attempts-modal').first();
@@ -207,8 +281,8 @@ jQuery(document).ready($ => {
           const rowNode = rowTemplate.content.cloneNode(true);
           const $row = $(rowNode);
           $row.find('.cell_attempt_index').text(index + 1);
-          $row.find('.cell_attempt_date').text(formatDate(attempt.completed));
-          $row.find('.cell_attempt_score').text(formatScore(attempt.percentage, attempt.points_scored, attempt.points_total));
+          $row.find('.cell_attempt_date').text((0,_shared_helpers_js__WEBPACK_IMPORTED_MODULE_1__.formatDate)(attempt.completed));
+          $row.find('.cell_attempt_score').text((0,_shared_helpers_js__WEBPACK_IMPORTED_MODULE_1__.formatScore)(attempt.percentage, attempt.points_scored, attempt.points_total));
           const $statusBadge = $row.find('.status-badge');
           if (attempt.pass) {
             $statusBadge.addClass('status-badge--pass').text('Pass');
@@ -242,27 +316,6 @@ jQuery(document).ready($ => {
     $('html').css('overflow', 'unset');
   });
 });
-function formatDate(timestamp) {
-  if (!timestamp) return '—';
-  try {
-    return new Date(timestamp).toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false
-    });
-  } catch {
-    return '—';
-  }
-}
-function formatScore(percent, pointsScored, pointsTotal) {
-  if (percent === null || percent === undefined) return '—';
-  if (pointsScored === null || pointsTotal === null) return `${percent}%`;
-  return `${pointsScored}/${pointsTotal} (${percent}%)`;
-}
 })();
 
 /******/ })()

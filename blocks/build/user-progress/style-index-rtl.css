@@ -8,8 +8,8 @@
   align-items: start;
 }
 .wp-block-bys-groups-user-progress .user-progress__section-title {
-  color: var(--wp--preset--color--gray-500);
-  margin: 0 0 var(--wp--preset--spacing--3);
+  color: var(--wp--preset--color--gray-500) !important;
+  margin: 0 0 var(--wp--preset--spacing--3) !important;
 }
 .wp-block-bys-groups-user-progress .user-progress__courses {
   min-width: 0;

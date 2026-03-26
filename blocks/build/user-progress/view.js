@@ -34,11 +34,14 @@ const endpoints = {
   groupUsers: (groupId, userIds) => `/wp-json/bys-groups/v1/groups/${groupId}/users?user_ids=${userIds}`,
   groupUserInfo: (groupId, userId) => `/wp-json/bys-groups/v1/groups/${groupId}/users/${userId}`,
   groupCourses: groupId => `/wp-json/bys-groups/v1/groups/${groupId}/courses`,
+  groupCourseCompletionStats: groupId => `/wp-json/bys-groups/v1/groups/${groupId}/course-completion-stats`,
   courseHierarchialBreakdown: courseId => `/wp-json/bys-groups/v1/courses/${courseId}/steps`,
   groupUserCourseProgress: (userId, courseIds) => `/wp-json/bys-groups/v1/users/${userId}/course-progress?course_ids=${courseIds}`,
   courseQuizSteps: courseId => `/wp-json/bys-groups/v1/courses/${courseId}/quiz-steps`,
   userQuizAttempts: (userId, courseId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-attempts?course_id=${courseId}`,
-  userQuizProgress: userId => `/wp-json/bys-groups/v1/users/${userId}/quiz-progress`
+  userQuizProgress: userId => `/wp-json/bys-groups/v1/users/${userId}/quiz-progress`,
+  userQuizAttemptsDetails: (userId, quizId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-attempts/${quizId}`,
+  userActivity: userId => `/wp-json/bys-groups/v1/users/${userId}/activity`
 };
 const api = {
   _cache: new Map(),
@@ -108,6 +111,36 @@ const api = {
     this._cache.clear();
   }
 };
+
+/***/ },
+
+/***/ "./src/_shared/loading.js"
+/*!********************************!*\
+  !*** ./src/_shared/loading.js ***!
+  \********************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   LOADING_COMPONENT: () => (/* binding */ LOADING_COMPONENT)
+/* harmony export */ });
+/**
+ * Shared loading state component
+ *
+ * Usage:
+ *   import { LOADING_COMPONENT } from '../_shared/loading.js';
+ * 
+ */
+const LOADING_COMPONENT = `
+    <div class="bys-groups-loading-wrapper" role="status" aria-live="polite" aria-label="Loading">
+        <div class="bys-groups-loading" aria-hidden="true">
+            <span class="bys-groups-loading__dot"></span>
+            <span class="bys-groups-loading__dot"></span>
+            <span class="bys-groups-loading__dot"></span>
+        </div>
+        <span class="bys-sr-only">Loading</span>
+    </div>
+`;
 
 /***/ }
 
@@ -181,6 +214,8 @@ var __webpack_exports__ = {};
   \***********************************/
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../_shared/api-client.js */ "./src/_shared/api-client.js");
+/* harmony import */ var _shared_loading_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../_shared/loading.js */ "./src/_shared/loading.js");
+
 
 jQuery(document).ready(async $ => {
   const params = new URLSearchParams(window.location.search);
@@ -243,12 +278,12 @@ jQuery(document).ready(async $ => {
         if (structureLoaded) return; // Already loaded
 
         structureLoaded = true;
-        $accordionContent.html('<p>Loading...</p>');
+        $accordionContent.html(_shared_loading_js__WEBPACK_IMPORTED_MODULE_1__.LOADING_COMPONENT);
         try {
           const courseData = await _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.api.get(_shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.endpoints.courseHierarchialBreakdown(course.id));
 
           // courseHierarchialBreakdown returns { lessons (sfwd-lessons with nested sfwd-topics), quiz_ids }
-          const modules = courseData.lessons || courseData;
+          const modules = courseData.lessons || courseData; // Handle both old and new format
           const quizIds = courseData.quiz_ids || [];
 
           // Cache quiz IDs for this course
