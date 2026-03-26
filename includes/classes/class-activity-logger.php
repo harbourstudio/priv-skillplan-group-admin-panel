@@ -1,53 +1,30 @@
 <?php
 /**
  * Activity Logger Class
- * 
- * Listens to various hooks to capture user activities (WordPress, LearnDash, GamiPress, and Gravity Forms)
- * Extracts relevant event data and logs each activity to the custom database table for fetching and display by the user-activity block
- *  
+ *
  * @package BYS_Groups
  * @since 1.0.0
  */
 
-
 if (!defined('ABSPATH')) exit;
 
 if (!class_exists('BYS_Groups_Activity_Logger')) {
-
     class BYS_Groups_Activity_Logger {
         public function __construct() {
             $this->register_hooks();
         }
-        
-        private $current_user_before_logout = null;
 
         private function register_hooks() {
-            // WIP: add add_action() calls
-            
-            // LOGIN EVENT
             add_action('wp_login', [$this, 'on_user_login'], 10, 2);
-            
-            // // Capture user ID BEFORE logout fires (priority 1 = runs first)
-            // add_action('wp_logout', [$this, 'capture_user_before_logout'], 1);
-            // // Log logout AFTER user is captured (priority 100 = runs last)
-            // // add_action('wp_logout', [$this, 'on_user_logout'], 100);
-            
-            // MY PROFILE FORM UPDATE (GF form#16) 
             add_action('gform_after_submission_16', [$this, 'on_profile_update'], 10, 2);
-
-            // ACCOUNT SETTINGS FORM UPDATE (GF form#15)
             add_action('gform_after_submission_15', [$this, 'on_account_settings_update'], 10, 2);
-
             add_action('learndash_course_completed', [$this, 'on_certificate_earned'], 10, 1);
-
-
         }
 
 
         private function log_activity($user_id, $activity, $initiated_by, $object_id, $object_title, $object_type, $meta = []) {
-
             global $wpdb;
-            
+
             $wpdb->insert(
                 $wpdb->prefix . BYS_GROUPS_USER_ACTIVITY_TABLE,
                 [
@@ -67,17 +44,6 @@ if (!class_exists('BYS_Groups_Activity_Logger')) {
         }
 
 
-        /**
-         * ============================
-         * HELPER METHODS
-         * ============================
-         */
-
-         /**
-         * Fetch data from LD API
-         * 
-         * To be used by any callback methods callign LD API 
-         */
         private function fetch_from_learndash_api($endpoint) {
             $auth_header = BYS_Groups_Auth::get_auth_header();
             if (!$auth_header) {
@@ -107,14 +73,14 @@ if (!class_exists('BYS_Groups_Activity_Logger')) {
             }
 
             $body = wp_remote_retrieve_body($response);
-            
-            // Try to find JSON in the response (strip out any PHP warnings/output)
+
+            // Extract JSON from response (may contain PHP warnings/output)
             if (preg_match('/\[.*\]/s', $body, $matches)) {
                 $body = $matches[0];
             } elseif (preg_match('/\{.*\}/s', $body, $matches)) {
                 $body = $matches[0];
             }
-            
+
             $decoded = json_decode($body, true);
             if ($decoded === null) {
                 error_log('Activity Logger: JSON decode failed - ' . json_last_error_msg());
@@ -124,12 +90,6 @@ if (!class_exists('BYS_Groups_Activity_Logger')) {
 
             return $decoded;
         }
-
-        /**
-         * ============================
-         * Hook Callback Methods
-         * ============================
-         */
 
         public function on_user_login($user_login, $user) {
             $this->log_activity(
@@ -243,5 +203,7 @@ if (!class_exists('BYS_Groups_Activity_Logger')) {
                 ]
             );
         }
+
+
     }
 }

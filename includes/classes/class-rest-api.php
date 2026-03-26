@@ -113,6 +113,20 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'callback'            => array($this, 'get_user_quiz_attempts'),
                 'permission_callback' => array($this, 'check_user_permission'),
             ));
+
+            // userActivity - activity log for a user
+            register_rest_route($this->namespace, '/users/(?P<user_id>\d+)/activity', array(
+                'methods'             => 'GET',
+                'callback'            => array($this, 'get_user_activity'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
+
+            // logCertificateView - log when user views a certificate
+            register_rest_route($this->namespace, '/users/(?P<user_id>\d+)/log-certificate-view', array(
+                'methods'             => 'POST',
+                'callback'            => array($this, 'log_certificate_view'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
         }
 
         public function check_user_permission($request) {
@@ -940,6 +954,170 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             }
 
             return $result;
+        }
+
+        /**
+         * Get user activity log with pagination and filtering
+         */
+        public function get_user_activity($request) {
+            global $wpdb;
+
+            $user_id = intval($request['user_id']);
+            if (!$user_id) {
+                return new \WP_REST_Response(array('error' => 'Invalid user ID'), 400);
+            }
+
+            $activity_filter = sanitize_text_field($request->get_param('activity') ?? '');
+            $date_from = sanitize_text_field($request->get_param('date_from') ?? '');
+            $date_to = sanitize_text_field($request->get_param('date_to') ?? '');
+            $per_page = min(intval($request->get_param('per_page') ?? 20), 100);
+            $page = max(intval($request->get_param('page') ?? 1), 1);
+
+            if ($per_page < 1) $per_page = 20;
+
+            $activity_labels = array(
+                'user_login'              => 'Logged In',
+                'profile_update'          => 'Updated Profile',
+                'account_settings_update' => 'Updated Account Settings',
+                'certificate_earned'      => 'Earned a Certificate',
+                'certificate_viewed'      => 'Viewed a Certificate',
+            );
+
+            $where_clauses = array(
+                $wpdb->prepare("user_id = %d", $user_id)
+            );
+
+            if (!empty($activity_filter)) {
+                $where_clauses[] = $wpdb->prepare("activity = %s", $activity_filter);
+            }
+
+            if (!empty($date_from)) {
+                $where_clauses[] = $wpdb->prepare("DATE(created_at) >= %s", $date_from);
+            }
+
+            if (!empty($date_to)) {
+                $where_clauses[] = $wpdb->prepare("DATE(created_at) <= %s", $date_to);
+            }
+
+            $where = implode(" AND ", $where_clauses);
+            $table = $wpdb->prefix . BYS_GROUPS_USER_ACTIVITY_TABLE;
+
+            $total = intval($wpdb->get_var("SELECT COUNT(*) FROM {$table} WHERE {$where}"));
+
+            $offset = ($page - 1) * $per_page;
+            $rows = $wpdb->get_results(
+                "SELECT id, activity, object_id, object_title, object_type, meta, created_at
+                 FROM {$table}
+                 WHERE {$where}
+                 ORDER BY created_at DESC
+                 LIMIT %d OFFSET %d",
+                array($per_page, $offset),
+                ARRAY_A
+            );
+
+            $items = array();
+            foreach ($rows as $row) {
+                $activity_slug = $row['activity'];
+                $items[] = array(
+                    'id'              => intval($row['id']),
+                    'activity'        => $activity_slug,
+                    'activity_label'  => $activity_labels[$activity_slug] ?? ucwords(str_replace('_', ' ', $activity_slug)),
+                    'object_id'       => intval($row['object_id']),
+                    'object_title'    => $row['object_title'] ?? '',
+                    'object_type'     => $row['object_type'] ?? '',
+                    'meta'            => !empty($row['meta']) ? json_decode($row['meta'], true) : array(),
+                    'created_at'      => rest_convert_date_to_datetime($row['created_at'])->format('c'),
+                );
+            }
+
+            $pages = $per_page > 0 ? ceil($total / $per_page) : 0;
+
+            return new \WP_REST_Response(array(
+                'total' => $total,
+                'pages' => $pages,
+                'items' => $items,
+            ), 200);
+        }
+
+        /**
+         * Log certificate view event via REST API
+         *
+         * Called by certificate-link-tracker.js when user clicks a certificate link
+         */
+        public function log_certificate_view($request) {
+            global $wpdb;
+
+            $user_id = intval($request['user_id']);
+            $course_id = intval($request->get_param('course_id') ?? 0);
+
+            if (!$user_id || !$course_id) {
+                return new \WP_REST_Response(array('error' => 'Invalid user_id or course_id'), 400);
+            }
+
+            $user = get_user_by('ID', $user_id);
+            if (!$user) {
+                return new \WP_REST_Response(array('error' => 'User not found'), 404);
+            }
+
+            // Prevent duplicate logs within 12 hours
+            $cache_key = "cert_viewed_{$user_id}_{$course_id}";
+            // if (get_transient($cache_key)) {
+            //     return new \WP_REST_Response(array('message' => 'Already logged within 12 hours'), 200);
+            // }
+
+            $course_title = get_the_title($course_id);
+            $table = $wpdb->prefix . BYS_GROUPS_USER_ACTIVITY_TABLE;
+
+            // Fetch certificate details from LD API
+            $cert_id = null;
+            $awarded_cert_url = null;
+            $auth_header = $this->get_validated_auth_header();
+            if ($auth_header && !is_wp_error($auth_header)) {
+                $ld_api_url = get_home_url() . "/wp-json/ldlms/v2/users/{$user_id}/courses?include={$course_id}";
+                $response = wp_remote_get($ld_api_url, array(
+                    'headers' => array('Authorization' => $auth_header),
+                    'timeout' => 30,
+                    'sslverify' => false,
+                ));
+
+                if (!is_wp_error($response) && wp_remote_retrieve_response_code($response) === 200) {
+                    $body = wp_remote_retrieve_body($response);
+                    if (preg_match('/\[.*\]/s', $body, $matches)) {
+                        $body = $matches[0];
+                    } elseif (preg_match('/\{.*\}/s', $body, $matches)) {
+                        $body = $matches[0];
+                    }
+                    $data = json_decode($body, true);
+                    if (is_array($data) && !empty($data)) {
+                        $course = $data[0];
+                        $cert_id = intval($course['certificate'] ?? 0);
+                        $awarded_cert_url = $course['awarded_certificate_url'] ?? null;
+                    }
+                }
+            }
+
+            $wpdb->insert(
+                $table,
+                array(
+                    'user_id'      => $user_id,
+                    'activity'     => 'certificate_viewed',
+                    'initiated_by' => 'self',
+                    'object_id'    => $course_id,
+                    'object_title' => $course_title ?: null,
+                    'object_type'  => 'course',
+                    'meta'         => json_encode(array(
+                        'viewed_at'              => current_time('mysql'),
+                        'certificate_id'        => $cert_id,
+                        'awarded_certificate_url' => $awarded_cert_url,
+                    )),
+                    'created_at'   => current_time('mysql'),
+                ),
+                array('%d', '%s', '%s', '%d', '%s', '%s', '%s', '%s')
+            );
+
+            set_transient($cache_key, true, 12 * HOUR_IN_SECONDS);
+
+            return new \WP_REST_Response(array('message' => 'Certificate view logged'), 200);
         }
     }
 }

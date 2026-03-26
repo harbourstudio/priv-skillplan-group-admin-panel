@@ -24,7 +24,6 @@ if (!class_exists('BYS_Groups_Core')) {
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-blocks.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-admin-settings.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-activity-logger.php';
-
         }
 
         public function init() {
@@ -42,6 +41,26 @@ if (!class_exists('BYS_Groups_Core')) {
             new BYS_Groups_Rest_API();
             new BYS_Groups_Blocks();
             new BYS_Groups_Activity_Logger();
+
+            // Enqueue certificate tracking script on certificate pages
+            add_action('wp_enqueue_scripts', array($this, 'enqueue_certificate_tracker'));
+        }
+
+        public function enqueue_certificate_tracker() {
+            // Enqueue link tracker on all pages (to intercept certificate link clicks)
+            wp_enqueue_script(
+                'bys-certificate-link-tracker',
+                BYS_GROUPS_PLUGIN_URL . 'assets/js/certificate-link-tracker.js',
+                array('jquery'),
+                BYS_GROUPS_VERSION,
+                true
+            );
+
+            // Localize user ID and auth header for JS access
+            wp_localize_script('bys-certificate-link-tracker', 'bysGroupsAuth', array(
+                'userId' => get_current_user_id(),
+                'header' => BYS_Groups_Auth::get_auth_header(),
+            ));
         }
 
 
