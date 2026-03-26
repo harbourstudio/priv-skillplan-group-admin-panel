@@ -8,11 +8,10 @@ jQuery(document).ready(($) => {
   const $button = $block.find('.group-selector__button');
   if (!$select.length || !$button.length) return;
 
-  // When user clicks "Show Group" button, fetch shared data from LearnDash API
-  $button.on('click', async function(e) {
-    e.preventDefault();
-
-    const groupId = $select.val();
+  /**
+   * fetch group data and trigger bys:groupSelected event
+   */
+  const fetchAndTriggerGroup = async (groupId) => {
     if (!groupId) return;
 
     try {
@@ -37,7 +36,20 @@ jQuery(document).ready(($) => {
         courses: courses,
       })
     } catch(err) {
-      console.error('Failed to fetch group data', err)
+      console.error('[group-select] Failed to fetch group data', err)
     }
+  };
+
+  // when user clicks "Show Group" button, fetch shared data from LearnDash API
+  $button.on('click', async function(e) {
+    e.preventDefault();
+    const groupId = $select.val();
+    await fetchAndTriggerGroup(groupId);
   });
+
+  // auto-trigger for the default-selected group on page load
+  const defaultGroupId = $select.val();
+  if (defaultGroupId) {
+    fetchAndTriggerGroup(defaultGroupId);
+  }
 });
