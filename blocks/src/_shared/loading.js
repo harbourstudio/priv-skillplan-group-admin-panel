@@ -2,10 +2,10 @@
  * Shared loading state component
  *
  * Usage:
- *   import { LOADING_HTML } from '../_shared/loading.js';
+ *   import { LOADING_COMPONENT } from '../_shared/loading.js';
  * 
  */
-export const LOADING_HTML = `
+export const LOADING_COMPONENT = `
     <div class="bys-groups-loading-wrapper" role="status" aria-live="polite" aria-label="Loading">
         <div class="bys-groups-loading" aria-hidden="true">
             <span class="bys-groups-loading__dot"></span>

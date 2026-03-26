@@ -4,7 +4,7 @@
  */
 
 import { api, endpoints } from '../_shared/api-client.js';
-import { LOADING_HTML } from '../_shared/loading.js';
+import { LOADING_COMPONENT } from '../_shared/loading.js';
 
 jQuery(document).ready(($) => {
   const params = new URLSearchParams(window.location.search);
@@ -54,7 +54,7 @@ jQuery(document).ready(($) => {
    * Load activity data from API
    */
   const loadActivity = async (page = 1) => {
-    const $loadingRow = jQuery(`<tr><td>${LOADING_HTML}</td></tr>`);
+    const $loadingRow = jQuery(`<tr><td>${LOADING_COMPONENT}</td></tr>`);
     $tbody.html($loadingRow);
     currentPage = page;
 

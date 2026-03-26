@@ -1,5 +1,5 @@
 import { api, endpoints } from '../_shared/api-client.js';
-import { LOADING_HTML } from '../_shared/loading.js';
+import { LOADING_COMPONENT } from '../_shared/loading.js';
 
 jQuery(document).ready(function($) {
   const $block = $('.wp-block-bys-groups-group-reporting').first();
@@ -426,7 +426,7 @@ jQuery(document).ready(function($) {
         `);
 
         // Update quizzing cell — render as loading placeholder, fetch on toggle click
-        $cells.find('.course-sub-cell--quizzing').html(LOADING_HTML);
+        $cells.find('.course-sub-cell--quizzing').html(LOADING_COMPONENT);
 
         // Update date cells
         const enrolledAt = courseData?.enrolled_at || '';

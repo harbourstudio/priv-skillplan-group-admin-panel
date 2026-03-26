@@ -11,20 +11,20 @@
     border-width: 0;
 }
 
-/* Three-dot loading animation using primary color */
+/* Three-dot loading animation */
 .bys-groups-loading {
     display: inline-flex;
     align-items: center;
-    gap: 0.25em;
+    gap: 0.25rem;
     margin: auto;
 }
 
 .bys-groups-loading__dot {
     display: inline-block;
-    width: 0.5em;
-    height: 0.5em;
+    width: 0.75rem;
+    height: 0.75rem;
     border-radius: 50%;
-    background-color: var(--wp--preset--color--primary);
+    background-color: var(--wp--preset--color--gray-500);
     opacity: 0.4;
     animation: bys-loading-pulse 1.4s ease-in-out infinite;
 }

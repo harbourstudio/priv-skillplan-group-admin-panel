@@ -1,5 +1,5 @@
 import { api, endpoints } from '../_shared/api-client.js';
-import { LOADING_HTML } from '../_shared/loading.js';
+import { LOADING_COMPONENT } from '../_shared/loading.js';
 
 jQuery(document).ready(async ($) => {
   const params = new URLSearchParams(window.location.search);
@@ -67,7 +67,7 @@ jQuery(document).ready(async ($) => {
         if (structureLoaded) return; // Already loaded
 
         structureLoaded = true;
-        $accordionContent.html(LOADING_HTML);
+        $accordionContent.html(LOADING_COMPONENT);
 
         try {
           const courseData = await api.get(endpoints.courseHierarchialBreakdown(course.id));
