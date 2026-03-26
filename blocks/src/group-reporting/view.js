@@ -1,5 +1,4 @@
 import { api, endpoints } from '../_shared/api-client.js';
-import { LOADING_COMPONENT } from '../_shared/loading.js';
 
 jQuery(document).ready(function($) {
   const $block = $('.wp-block-bys-groups-group-reporting').first();
@@ -303,7 +302,10 @@ jQuery(document).ready(function($) {
 
       // Update course title and download link
       // API Note: course.title is an object. Use .rendered for the nice title
-      $headers.find('.bys-course-toggle').html(course.title.rendered).attr('data-course-idx', idx);
+      const requiredBadge = course.required
+        ? ' <span class="bys-required-badge" aria-label="Required" title="Required">*</span>'
+        : '';
+      $headers.find('.bys-course-toggle').html(course.title.rendered + requiredBadge).attr('data-course-idx', idx);
       $headers.find('.bys-dl-link').attr('title', `Download ${escapeHtml(course.title.rendered)}`);
 
       // Append cloned headers to the row
@@ -426,7 +428,7 @@ jQuery(document).ready(function($) {
         `);
 
         // Update quizzing cell — render as loading placeholder, fetch on toggle click
-        $cells.find('.course-sub-cell--quizzing').html(LOADING_COMPONENT);
+        $cells.find('.course-sub-cell--quizzing').html('<span class="bys-quiz-loading">—</span>');
 
         // Update date cells
         const enrolledAt = courseData?.enrolled_at || '';

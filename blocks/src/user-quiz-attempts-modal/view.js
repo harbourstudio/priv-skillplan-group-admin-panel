@@ -1,4 +1,5 @@
 import { api, endpoints } from '../_shared/api-client.js';
+import { formatScore, formatDate } from '../_shared/helpers.js';
 
 jQuery(document).ready(($) => {
   const $block = $('.wp-block-bys-groups-user-quiz-attempts-modal').first();
@@ -68,28 +69,3 @@ jQuery(document).ready(($) => {
     $('html').css('overflow', 'unset');
   });
 });
-
-function formatDate(timestamp) {
-  if (!timestamp) return '—';
-  try {
-    return new Date(timestamp).toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false
-    });
-  } catch {
-    return '—';
-  }
-}
-
-function formatScore(percent, pointsScored, pointsTotal) {
-  if (percent === null || percent === undefined) return '—';
-
-  if (pointsScored === null || pointsTotal === null) return `${percent}%`;
-  
-  return `${pointsScored}/${pointsTotal} (${percent}%)`;
-}
