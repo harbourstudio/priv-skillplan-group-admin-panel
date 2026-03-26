@@ -8,6 +8,9 @@ jQuery(document).ready(function($) {
   if (!$table.length) return;
 
   let expandedIdx = null;
+  let usersInView = []; // current page of users (usersResponse)
+  let coursesInView = []; // current courses (from bys:groupSelected)
+  let courseQuizLoadedIdx = new Set(); // tracks which course-idx quiz data has been loaded
 
   // Filter panel toggle
   $block.find('.filters__toggle').on('click', function() {
@@ -29,6 +32,10 @@ jQuery(document).ready(function($) {
     if (opening) {
       expandCourse(idx);
       expandedIdx = idx;
+      // Defer quiz data fetch to click, only if not already loaded
+      if (!courseQuizLoadedIdx.has(idx)) {
+        loadQuizDataForCourse(idx);
+      }
     } else {
       expandedIdx = null;
     }
@@ -119,8 +126,49 @@ jQuery(document).ready(function($) {
     $('.bys-tooltip-instance').remove();
   }
 
-  // Quiz icon tooltips — hover (desktop) and click (mobile/tablet)
-  $table.on('mouseenter', '.bys-quiz-icon[data-tip]', function() {
+  // Quiz icon tooltips — lazy-fetch points on first hover, then show tooltip
+  $table.on('mouseenter', '.bys-quiz-icon[data-quiz-id]:not([data-tip-loaded])', async function() {
+    const $icon = $(this);
+    const quizId = parseInt($icon.data('quizId'));
+    const userId = parseInt($icon.data('userId'));
+
+    // Skip if not attempted (no user/quiz data)
+    if (!userId || !quizId) {
+      createAndShowTooltip($icon);
+      return;
+    }
+
+    // Fetch detailed attempts to get points fraction
+    try {
+      const attempts = await api.get(endpoints.userQuizAttemptsDetails(userId, quizId));
+      if (!Array.isArray(attempts) || attempts.length === 0) {
+        $icon.attr('data-tip-loaded', '1');
+        createAndShowTooltip($icon);
+        return;
+      }
+
+      // Find highest attempt
+      const highest = attempts.reduce((best, a) =>
+        parseFloat(a.percentage || 0) >= parseFloat(best.percentage || 0) ? a : best, attempts[0]);
+
+      // Build points fraction
+      const pointsFraction = (highest.points_scored != null && highest.points_total != null)
+        ? `${highest.points_scored}/${highest.points_total}`
+        : 'N/A';
+
+      // Update tooltip with actual points
+      const tip = `${$icon.data('quizTitle')}|${pointsFraction}|${$icon.data('percent')}%`;
+      $icon.attr('data-tip', escapeHtml(tip)).attr('data-tip-loaded', '1');
+      createAndShowTooltip($icon);
+    } catch (err) {
+      console.error(`[group-reporting] Failed to fetch quiz attempts for user ${userId}, quiz ${quizId}:`, err);
+      $icon.attr('data-tip-loaded', '1');
+      createAndShowTooltip($icon);
+    }
+  });
+
+  // Show tooltip for already-loaded icons (not attempted, or already fetched)
+  $table.on('mouseenter', '.bys-quiz-icon[data-tip-loaded]', function() {
     createAndShowTooltip($(this));
   });
 
@@ -187,24 +235,12 @@ jQuery(document).ready(function($) {
         return;
       }
 
-      // Scaffold table body with user rows (empty course cells)
-      rebuildTableBody(courses, usersResponse, {}, {}, {});
+      // Store state for toggle handler to access
+      usersInView = usersResponse;
+      coursesInView = courses;
+      courseQuizLoadedIdx.clear();
 
-      // Fetch quiz steps and course progress in parallel (background)
-      // Fetch quiz steps for all courses (cached per course)
-      const courseQuizMap = {};
-      if (courses.length > 0) {
-        try {
-          await Promise.all(courses.map(async (course) => {
-            const steps = await api.get(endpoints.courseQuizSteps(course.id));
-            courseQuizMap[course.id] = steps || [];
-          }));
-        } catch (err) {
-          console.error('Failed to fetch quiz steps:', err);
-        }
-      }
-
-      // Fetch course progress for each user
+      // Fetch course progress for each user (quiz fetch is deferred to toggle click)
       const userCourseProgress = {};
       const courseIds = courses.map(c => c.id).join(',');
 
@@ -225,23 +261,8 @@ jQuery(document).ready(function($) {
         });
       }
 
-      // Fetch quiz attempts for each user × course
-      const userQuizAttempts = {};
-      for (const user of usersResponse) {
-        userQuizAttempts[user.id] = {};
-        for (const course of courses) {
-          try {
-            const attempts = await api.get(endpoints.userQuizAttempts(user.id, course.id), true); // Force refresh
-            userQuizAttempts[user.id][course.id] = attempts || [];
-          } catch (err) {
-            console.error(`Failed to fetch quiz attempts for user ${user.id}, course ${course.id}:`, err);
-            userQuizAttempts[user.id][course.id] = [];
-          }
-        }
-      }
-
       rebuildTableHeader(courses);
-      rebuildTableBody(courses, usersResponse, userCourseProgress, courseQuizMap, userQuizAttempts);
+      rebuildTableBody(courses, usersResponse, userCourseProgress);
 
     } catch (err) {
       console.error('Failed to fetch group reporting data:', err);
@@ -293,38 +314,37 @@ jQuery(document).ready(function($) {
     $thead.append(headerRow);
   }
 
-  function buildQuizBars(quizData, attempts) {
+  function buildQuizBars(quizData, userId, userQuizProgress) {
     // quizData is an array of { step_id, step_title }
+    // userQuizProgress is { [quizId]: { id, percent_highest, pass_highest, total_attempts, ... } }
     if (!quizData || quizData.length === 0) {
       return '<span class="bys-quiz-empty">—</span>';
     }
 
     const barsMaxHeight = 24; // 24px represents 100%
-    const bars = quizData.map((quiz, i) => {
+    const bars = quizData.map((quiz) => {
       const quizId = quiz.step_id;
       const quizTitle = quiz.step_title;
-      const quizAttempts = (attempts || []).filter(a => a.quiz_id === quizId);
+      const summary = userQuizProgress[quizId];
 
-      if (!quizAttempts.length) {
+      // Not attempted
+      if (!summary || summary.total_attempts === 0) {
         const tip = `${quizTitle}|Not attempted`;
-        return `<span class="bys-quiz-icon bys-quiz-icon--neutral" data-tip="${escapeHtml(tip)}"></span>`;
+        return `<span class="bys-quiz-icon bys-quiz-icon--neutral" data-tip="${escapeHtml(tip)}" data-quiz-id="${quizId}" data-quiz-title="${escapeHtml(quizTitle)}"></span>`;
       }
 
-      const latest = quizAttempts[quizAttempts.length - 1];
-      const cls = latest.pass ? 'bys-quiz-icon--pass' : 'bys-quiz-icon--fail';
+      // Attempted — bar represents highest attempt
+      const cls = summary.pass_highest ? 'bys-quiz-icon--pass' : 'bys-quiz-icon--fail';
+      const barHeight = barsMaxHeight * (summary.percent_highest * 0.01);
+      // Tooltip initially shows "Loading..." for points; actual points fetched on hover via userQuizAttemptsDetails
+      const tip = `${quizTitle}|Loading...|${Math.round(summary.percent_highest)}%`;
 
-      // Format: "Quiz Title|points_earned/total_points|percentage%"
-      const pointsFraction = latest.total_points > 0 ? `${latest.points}/${latest.total_points}` : 'N/A';
-      const percentage = `${Math.round(latest.percentage)}%`;
-      const tip = `${quizTitle}|${pointsFraction}|${percentage}`;
-      const barRelativeHeight = barsMaxHeight*(latest.percentage * 0.01); // calculate height of this quiz bar relative to 100% (24px)
-
-      return `<span class="bys-quiz-icon ${cls}" data-tip="${escapeHtml(tip)}" style="height: ${barRelativeHeight}px"></span>`;
+      return `<span class="bys-quiz-icon ${cls}" data-tip="${escapeHtml(tip)}" data-quiz-id="${quizId}" data-user-id="${userId}" data-quiz-title="${escapeHtml(quizTitle)}" data-percent="${Math.round(summary.percent_highest)}" style="height: ${barHeight}px"></span>`;
     });
     return `<div class="bys-quiz-icons">${bars.join('')}</div>`;
   }
 
-  function rebuildTableBody(courses, users, userCourseProgress, courseQuizMap, userQuizAttempts) {
+  function rebuildTableBody(courses, users, userCourseProgress) {
     const $tbody = $table.find('tbody');
     $tbody.html('');
 
@@ -404,10 +424,8 @@ jQuery(document).ready(function($) {
           <span class="bys-percent bys-percent--${percentageClass}">${percentage}%</span>
         `);
 
-        // Update quizzing cell
-        const quizData = courseQuizMap[course.id] || [];
-        const attemptsForCourse = (userQuizAttempts[user.id] || {})[course.id] || [];
-        $cells.find('.course-sub-cell--quizzing').html(buildQuizBars(quizData, attemptsForCourse));
+        // Update quizzing cell — render as loading placeholder, fetch on toggle click
+        $cells.find('.course-sub-cell--quizzing').html('<span class="bys-quiz-loading">—</span>');
 
         // Update date cells
         const enrolledAt = courseData?.enrolled_at || '';
@@ -423,6 +441,47 @@ jQuery(document).ready(function($) {
       });
 
       $tbody.append($row);
+    });
+  }
+
+  /**
+   * Lazy-load quiz data for a course on toggle click
+   * Fetches courseQuizSteps and userQuizProgress for visible users, scoped to this course
+   */
+  async function loadQuizDataForCourse(courseIdx) {
+    const course = coursesInView[courseIdx];
+    if (!course) return;
+
+    courseQuizLoadedIdx.add(courseIdx); // Mark as loading to prevent double-fetch
+
+    let quizSteps = [];
+    try {
+      quizSteps = await api.get(endpoints.courseQuizSteps(course.id)) || [];
+    } catch (err) {
+      console.error(`[group-reporting] Failed to fetch quiz steps for course ${course.id}:`, err);
+    }
+
+    // Fetch quiz progress for each visible user, scoped to this course
+    const userQuizProgressMap = {};
+    for (const user of usersInView) {
+      try {
+        const url = endpoints.userQuizProgress(user.id) + `?group_id=${currentGroupId}&course_ids=${course.id}`;
+        const quizzes = await api.get(url);
+        userQuizProgressMap[user.id] = {};
+        if (Array.isArray(quizzes)) {
+          quizzes.forEach(q => { userQuizProgressMap[user.id][q.id] = q; });
+        }
+      } catch (err) {
+        console.error(`[group-reporting] Failed to fetch quiz progress for user ${user.id}:`, err);
+        userQuizProgressMap[user.id] = {};
+      }
+    }
+
+    // Populate quizzing cells in-place for this course column
+    $table.find(`.course-sub-cell--quizzing[data-course-idx="${courseIdx}"]`).each(function() {
+      const userId = $(this).closest('tr').data('userId');
+      const userQuizProgress = userQuizProgressMap[userId] || {};
+      $(this).html(buildQuizBars(quizSteps, userId, userQuizProgress));
     });
   }
 
