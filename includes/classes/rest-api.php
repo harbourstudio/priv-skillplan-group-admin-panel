@@ -741,7 +741,6 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             // Fetch quiz attempts for each quiz ID
             $result = array();
             foreach (array_keys($all_quiz_ids) as $quiz_id) {
-                // Call LD API: /ldlms/v2/users/{user_id}/quiz-progress?quiz={quiz_id}
                 $ld_api_url = get_home_url() . "/wp-json/ldlms/v2/users/{$user_id}/quiz-progress?quiz={$quiz_id}";
 
                 $response = wp_remote_get($ld_api_url, array(
@@ -805,6 +804,10 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                     'total_attempts'          => count($attempts),
                     'percent_highest'         => floatval($highest_attempt['percentage'] ?? 0),
                     'percent_latest'          => floatval($latest_attempt['percentage'] ?? 0),
+                    'points_scored_highest'   => floatval($highest_attempt['points_scored'] ?? 0),
+                    'points_total_highest'    => floatval($highest_attempt['points_total'] ?? 0),
+                    'points_scored_latest'    => floatval($latest_attempt['points_scored'] ?? 0),
+                    'points_total_latest'     => floatval($latest_attempt['points_total'] ?? 0),
                     'pass_highest'            => (bool)($highest_attempt['pass'] ?? false),
                     'pass_latest'             => (bool)($latest_attempt['pass'] ?? false),
                     'latest_timestamp'        => $latest_attempt['completed'] ?? null,
@@ -839,7 +842,6 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             }
             $auth_header = $auth_result;
 
-            // Call LD API: /ldlms/v2/users/{user_id}/quiz-progress?quiz={quiz_id}
             $ld_api_url = get_home_url() . "/wp-json/ldlms/v2/users/{$user_id}/quiz-progress?quiz={$quiz_id}";
 
             $response = wp_remote_get($ld_api_url, array(
@@ -866,14 +868,27 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 $attempts = array();
             }
 
+            // Normalize attempt data to include score breakdown
+            $normalized = array();
+            foreach ($attempts as $attempt) {
+                $normalized[] = array(
+                    'id'              => $attempt['id'] ?? null,
+                    'completed'       => $attempt['completed'] ?? null,
+                    'percentage'      => floatval($attempt['percentage'] ?? 0),
+                    'pass'            => (bool)($attempt['pass'] ?? false),
+                    'points_scored'   => floatval($attempt['points_scored'] ?? 0),
+                    'points_total'    => floatval($attempt['points_total'] ?? 0),
+                );
+            }
+
             // Sort by completed timestamp descending (most recent first)
-            usort($attempts, function ($a, $b) {
+            usort($normalized, function ($a, $b) {
                 $ts_a = strtotime($a['completed'] ?? 0);
                 $ts_b = strtotime($b['completed'] ?? 0);
                 return $ts_b - $ts_a;
             });
 
-            return new \WP_REST_Response($attempts, 200);
+            return new \WP_REST_Response($normalized, 200);
         }
 
         /**

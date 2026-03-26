@@ -63,12 +63,20 @@
         text-align: left;
         border-collapse: collapse;
 
+        // Hide 'latest' columns by default (shown when 'latest' sort is selected)
+        .col_score_latest,
+        .col_result_latest,
+        .cell_score_latest,
+        .cell_result_latest {
+            display: none;
+        }
+
         thead {
             th, td{
                 background-color: var(--wp--preset--color--primary);
                 color: white;
                 font-weight: 500;
-                padding: var(--wp--preset--spacing--3);
+                padding: var(--wp--preset--spacing--3) var(--wp--preset--spacing--4);
                 border: none;
                 a, i{
                     color: white;
@@ -91,23 +99,24 @@
             }
             
             td{
-                padding: var(--wp--preset--spacing--3);
+                padding: var(--wp--preset--spacing--3) var(--wp--preset--spacing--4);
             }
+
             .status-badge{
                 border-radius: 0.25rem;
                 padding: var(--wp--preset--spacing--1) var(--wp--preset--spacing--2);
 
                 &--pass{
                     background-color: var(--wp--preset--color--green-100);
-                    color: var(--wp--preset--color--green-800);
+                    color: var(--wp--preset--color--green-700);
                 }
                 &--fail{
                     background-color: var(--wp--preset--color--red-100);
-                    color: var(--wp--preset--color--red-800);
+                    color: var(--wp--preset--color--red-700);
                 }
                 &--ungraded{
                     background-color: var(--wp--preset--color--orange-100);
-                    color: var(--wp--preset--color--orange-800);
+                    color: var(--wp--preset--color--orange-700);
                 }
             }
         }
