@@ -18,6 +18,7 @@ if (!class_exists('BYS_Groups_Core')) {
         }
 
         private function includes() {
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-activator.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-auth.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-rest-api.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-blocks.php';
@@ -29,7 +30,10 @@ if (!class_exists('BYS_Groups_Core')) {
             if (!$this->is_learndash_active()) {
                 add_action( 'admin_notices', array( $this, 'missing_ld_notice' ) );
                 return;
-            } 
+            }
+
+            // Run Activator class with the create_tables() method. Safety net that ensures the cusotm tables exist on every load
+            BYS_Groups_Activator::activate();
 
             // Initialize classes
             new BYS_Groups_Admin_Settings();
