@@ -18,12 +18,22 @@ if (!class_exists('BYS_Groups_Activity_Logger')) {
         public function __construct() {
             $this->register_hooks();
         }
+        
+        private $current_user_before_logout = null;
 
         private function register_hooks() {
-            // WIP: add add_action() calls 
+            // WIP: add add_action() calls
+            
+            add_action('wp_login', [$this, 'on_user_login'], 10, 2);
+            // // Capture user ID BEFORE logout fires (priority 1 = runs first)
+            // add_action('wp_logout', [$this, 'capture_user_before_logout'], 1);
+            // // Log logout AFTER user is captured (priority 100 = runs last)
+            // // add_action('wp_logout', [$this, 'on_user_logout'], 100);
         }
 
+
         private function log_activity($user_id, $activity, $initiated_by, $object_id, $object_title, $object_type, $meta = []) {
+
             global $wpdb;
             
             $wpdb->insert(
@@ -33,23 +43,54 @@ if (!class_exists('BYS_Groups_Activity_Logger')) {
                     'activity'     => sanitize_text_field($activity),
                     'initiated_by' => sanitize_text_field($initiated_by),
                     'object_id'    => intval($object_id),
-                    'object_title' => sanitize_text_field($object_title),
-                    'object_type'  => sanitize_text_field($object_type),
-                    'meta'         => json_encode($meta),
+                    'object_title' => !empty($object_title) ? sanitize_text_field($object_title) : null,
+                    'object_type'  => !empty($object_type) ? sanitize_text_field($object_type) : null,
+                    'meta'         => !empty($meta) ? json_encode($meta) : null,
                     'created_at'   => current_time('mysql'),
                 ],
                 [
-                    '%d', '%s', '%d', '%s', '%s', '%s', '%s', '%s'  // Format specifiers
+                    '%d', '%s', '%s', '%d', '%s', '%s', '%s', '%s'
                 ]
             );
         }
 
+
         /**
          * ============================
-         * Hook Callbacks
+         * Hook Callback Methods
          * ============================
          */
-        
 
+        public function on_user_login($user_login, $user) {
+            $this->log_activity(
+                user_id:      $user->ID,
+                activity:     'user_login',
+                initiated_by: 'self',
+                object_id:    0, // not applicable
+                object_title: null, // not applicable
+                object_type:  null // not applicable
+            );
+        }
+
+        // public function capture_user_before_logout() {
+        //     $this->current_user_before_logout = get_current_user_id();
+        // }
+        
+        // public function on_user_logout() {
+        //     $user_id = $this->current_user_before_logout;
+            
+        //     if (!$user_id) {
+        //         return;
+        //     }
+            
+        //     $this->log_activity(
+        //         user_id:      $user_id,
+        //         activity:     'user_logout',
+        //         initiated_by: 'self',
+        //         object_id:    0, // not applicable
+        //         object_title: null, // not applicable
+        //         object_type:  null // not applicable
+        //     );
+        // }
     }
 }
