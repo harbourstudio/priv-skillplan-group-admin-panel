@@ -1,3 +1,8 @@
+@keyframes bys-shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
 .wp-block-bys-groups-group-stats {
 
     .stats__grid{
@@ -32,6 +37,17 @@
         .stat__number{
             color: var(--wp--preset--color--dark);
             font-size: var(--wp--preset--font-size--x-large);
+
+            &--loading {
+                display: inline-block;
+                width: 2.5rem;
+                height: 1em;
+                border-radius: 4px;
+                vertical-align: middle;
+                background: linear-gradient(90deg, #e8e8e8 25%, #f2f2f2 50%, #e8e8e8 75%);
+                background-size: 200% 100%;
+                animation: bys-shimmer 1.4s infinite linear;
+            }
         }
     }
 	

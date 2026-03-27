@@ -9,14 +9,20 @@ jQuery(document).ready(($) => {
   const $incompleteCourses = $block.find('[data-bys-stat="incomplete_courses"]');
   const $totalInactiveMembers = $block.find('[data-bys-stat="total_inactive_members"]');
 
+  // Show loading state immediately — stats are empty until a group loads
+  $block.find('.stat__number').addClass('stat__number--loading').html('');
+
   // listen for the custom jquery event triggered by group-select block
   $(document).on('bys:groupSelected', async (_, {baseUsersStats, courses}) => {
 
-    // Update base stats immediately
-    $totalMembers.html(baseUsersStats.total_members ?? 0);
-    $totalInactiveMembers.html(baseUsersStats.total_inactive_members ?? 0);
+    // Show loading state on all numbers while data resolves
+    $block.find('.stat__number').addClass('stat__number--loading').html('');
 
-    // Fetch and calculate course completion stats in background
+    // Base stats are already available — resolve immediately
+    $totalMembers.removeClass('stat__number--loading').html(baseUsersStats.total_members ?? 0);
+    $totalInactiveMembers.removeClass('stat__number--loading').html(baseUsersStats.total_inactive_members ?? 0);
+
+    // Calculated stats need an async fetch
     calculateCourseStats(baseUsersStats.user_ids || [], courses || []);
   });
 
@@ -32,7 +38,7 @@ jQuery(document).ready(($) => {
 
       // Fetch progress for all users in parallel through custom wrapper
       const promises = userIds.map(userId => {
-        const progressUrl = endpoints.userCourseProgress(userId, courseIds);
+        const progressUrl = endpoints.groupUserCourseProgress(userId, courseIds);
         return api.get(progressUrl, false);
       });
 
@@ -53,12 +59,12 @@ jQuery(document).ready(($) => {
         });
       });
 
-      $completedCourses.html(totalCompleted);
-      $incompleteCourses.html(totalIncomplete);
+      $completedCourses.removeClass('stat__number--loading').html(totalCompleted);
+      $incompleteCourses.removeClass('stat__number--loading').html(totalIncomplete);
     } catch (err) {
       console.error('Failed to calculate course stats:', err);
-      $completedCourses.html(0);
-      $incompleteCourses.html(0);
+      $completedCourses.removeClass('stat__number--loading').html(0);
+      $incompleteCourses.removeClass('stat__number--loading').html(0);
     }
   }
 });

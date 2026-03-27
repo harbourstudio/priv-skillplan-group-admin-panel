@@ -8,11 +8,35 @@ jQuery(document).ready(function($) {
   if (!$table.length) return;
 
   let expandedIdx = null;
-  let usersInView = []; // current page of users (usersResponse)
-  let coursesInView = []; // current courses (from bys:groupSelected)
-  let courseQuizLoadedIdx = new Set(); // tracks which course-idx quiz data has been loaded
+  let usersInView = [];         // current page of users
+  let coursesInView = [];       // current courses (from bys:groupSelected)
+  let userCourseProgressAll = {}; // promoted to module scope: { [userId]: [...progress] }
+  let courseQuizLoadedIdx = new Set();
+  let courseQuizStepsCache    = {}; // { [courseId]: [...steps] }
+  let userQuizProgressCache   = {}; // { [courseId]: { [userId]: { [quizId]: quizData } } }
+  let loadedOffset = 0;             // how many users have been loaded into the table
+  let currentSort  = 'name_asc';
+  const PAGE_SIZE  = 10;
+  let sortedUsers  = [];            // sorted order after an explicit sort; empty = use lazy-load order
+  let displayedCount = 0;           // how many of sortedUsers are currently rendered
 
-  // Filter panel toggle
+  // ── Filter state ────────────────────────────────────────────────────────────
+  let selectedCourseIds   = []; // course multiselect state
+  let selectedUserIds     = []; // user multiselect state
+  let allGroupUserIds     = []; // full list of user IDs for current group (from baseUsersStats)
+  let allGroupUsers       = []; // full fetched user objects for the filter list (lazy-loaded)
+  let allGroupUsersLoaded = false; // whether the full user list has been fetched
+
+  let activeFilters = {         // current applied filter values
+    courseIds:      [],         // array of course IDs (empty = all)
+    userIds:        [],         // array of user IDs (empty = all)
+    courseStatus:   '',         // course-level: completed | in_progress | inactive
+    userStatus:     '',         // user-level: online | offline | never
+    enrolmentDate:  '',
+    completionDate: '',
+  };
+
+  // ── Filter panel toggle ──────────────────────────────────────────────────────
   $block.find('.filters__toggle').on('click', function() {
     const $toggle = $(this);
     const $box = $block.find('#filters-box');
@@ -20,9 +44,13 @@ jQuery(document).ready(function($) {
     $toggle.attr('aria-expanded', !isOpen);
     $box.attr('aria-hidden', isOpen);
     $box.toggleClass('hidden', isOpen);
+    if (!isOpen) {
+      populateCourseMultiselect();
+      populateUserMultiselect(); // lazy-fetches full user list if needed
+    }
   });
 
-  // Course column expand/collapse
+  // ── Course column expand/collapse ────────────────────────────────────────────
   $table.on('click', '.bys-course-toggle', function(e) {
     e.stopPropagation();
     const idx = parseInt($(this).data('courseIdx'), 10);
@@ -32,7 +60,6 @@ jQuery(document).ready(function($) {
     if (opening) {
       expandCourse(idx);
       expandedIdx = idx;
-      // Defer quiz data fetch to click, only if not already loaded
       if (!courseQuizLoadedIdx.has(idx)) {
         loadQuizDataForCourse(idx);
       }
@@ -50,6 +77,9 @@ jQuery(document).ready(function($) {
       .attr('aria-expanded', 'false');
     $table.find('.course-cell--badge').removeClass('course-col--hidden');
     $table.find('.course-sub-col, .course-sub-cell').addClass('course-sub-col--hidden');
+
+    // Re-apply course column filter after reset
+    applyColumnFilter();
   }
 
   function expandCourse(idx) {
@@ -66,7 +96,7 @@ jQuery(document).ready(function($) {
     $table.find(`.course-cell--badge:not([data-course-idx="${idx}"])`).addClass('course-col--hidden');
   }
 
-  // Row click to detail page
+  // ── Row click to detail page ─────────────────────────────────────────────────
   $table.on('click', '.reporting-table__row', function(e) {
     if ($(e.target).closest('.bys-course-toggle').length) return;
     if ($(e.target).closest('a').length) return;
@@ -75,20 +105,17 @@ jQuery(document).ready(function($) {
     if (userId) window.location.href = detailUrl + '?user_id=' + userId + '&group_id=' + currentGroupId;
   });
 
-  // Create tooltip instance on demand
+  // ── Tooltips ─────────────────────────────────────────────────────────────────
   function createAndShowTooltip($trigger) {
     const tipData = $trigger.data('tip');
     if (!tipData) return;
 
-    // Remove any existing tooltip
     $('.bys-tooltip-instance').remove();
 
-    // Parse tooltip data (format: "Quiz Title|points_earned/points_total|percentage")
     let quizTitle = tipData;
     let pointsFraction = '';
     let percentage = '';
 
-    // If it contains pipe separators, parse the full format
     if (tipData.includes('|')) {
       const parts = tipData.split('|');
       quizTitle = parts[0] || '';
@@ -96,7 +123,6 @@ jQuery(document).ready(function($) {
       percentage = parts[2] || '';
     }
 
-    // Create tooltip with structured content
     const $tip = $('<div class="bys-tooltip-instance" role="tooltip"></div>');
 
     if (pointsFraction || percentage) {
@@ -113,7 +139,6 @@ jQuery(document).ready(function($) {
 
     $tip.appendTo('body');
 
-    // Position absolutely below the trigger element
     const triggerRect = $trigger[0].getBoundingClientRect();
     $tip.css({
       position: 'fixed',
@@ -126,19 +151,16 @@ jQuery(document).ready(function($) {
     $('.bys-tooltip-instance').remove();
   }
 
-  // Quiz icon tooltips — lazy-fetch points on first hover, then show tooltip
   $table.on('mouseenter', '.bys-quiz-icon[data-quiz-id]:not([data-tip-loaded])', async function() {
     const $icon = $(this);
     const quizId = parseInt($icon.data('quizId'));
     const userId = parseInt($icon.data('userId'));
 
-    // Skip if not attempted (no user/quiz data)
     if (!userId || !quizId) {
       createAndShowTooltip($icon);
       return;
     }
 
-    // Fetch detailed attempts to get points fraction
     try {
       const attempts = await api.get(endpoints.userQuizAttemptsDetails(userId, quizId));
       if (!Array.isArray(attempts) || attempts.length === 0) {
@@ -147,16 +169,13 @@ jQuery(document).ready(function($) {
         return;
       }
 
-      // Find highest attempt
       const highest = attempts.reduce((best, a) =>
         parseFloat(a.percentage || 0) >= parseFloat(best.percentage || 0) ? a : best, attempts[0]);
 
-      // Build points fraction
       const pointsFraction = (highest.points_scored != null && highest.points_total != null)
         ? `${highest.points_scored}/${highest.points_total}`
         : 'N/A';
 
-      // Update tooltip with actual points
       const tip = `${$icon.data('quizTitle')}|${pointsFraction}|${$icon.data('percent')}%`;
       $icon.attr('data-tip', escapeHtml(tip)).attr('data-tip-loaded', '1');
       createAndShowTooltip($icon);
@@ -167,7 +186,6 @@ jQuery(document).ready(function($) {
     }
   });
 
-  // Show tooltip for already-loaded icons (not attempted, or already fetched)
   $table.on('mouseenter', '.bys-quiz-icon[data-tip-loaded]', function() {
     createAndShowTooltip($(this));
   });
@@ -176,7 +194,6 @@ jQuery(document).ready(function($) {
     destroyTooltip();
   });
 
-  // Status badge tooltips — hover (desktop) and click (mobile/tablet)
   $table.on('mouseenter', '.status-badge__icon[data-tip]', function() {
     createAndShowTooltip($(this));
   });
@@ -185,87 +202,274 @@ jQuery(document).ready(function($) {
     destroyTooltip();
   });
 
-  // Touch/click support for mobile/tablet (quiz icons and status badges)
   $table.on('click', '[data-tip]', function(e) {
     e.stopPropagation();
     createAndShowTooltip($(this));
   });
 
-  // Hide tooltip when clicking elsewhere
   $(document).on('click', function() {
     destroyTooltip();
   });
 
-  // Store current group ID for use in detail links
+  // ── Group selection ───────────────────────────────────────────────────────────
   let currentGroupId = null;
 
-  // Listen for group selection event
   $(document).on('bys:groupSelected', async function(_, data) {
-    // console.log('bys:groupSelected event received:', data);
     const groupId = data.groupId;
     const baseUsersStats = data.baseUsersStats || {};
     const courses = data.courses || [];
     if (!groupId) return;
     currentGroupId = groupId;
+
+    // Reset filter state on group change
+    selectedCourseIds = [];
+    selectedUserIds   = [];
+    allGroupUserIds   = data.baseUsersStats?.user_ids || [];
+    allGroupUsers     = [];
+    allGroupUsersLoaded = false;
+    activeFilters = { courseIds: [], userIds: [], courseStatus: '', userStatus: '', enrolmentDate: '', completionDate: '' };
+    userCourseProgressAll = {};
+    courseQuizStepsCache  = {};
+    userQuizProgressCache = {};
+    loadedOffset  = 0;
+    currentSort   = 'name_asc';
+    sortedUsers   = [];
+    displayedCount = 0;
+    $block.find('#sort-select').val('name_asc');
+    resetFilterFormUI();
+
     await populateTableFromAPI(groupId, baseUsersStats, courses);
   });
 
-  // Fetch and populate table from custom endpoint
+  // ── Table population ──────────────────────────────────────────────────────────
   async function populateTableFromAPI(groupId, baseUsersStats, courses) {
     try {
-      // console.log('Fetching users for group:', groupId);
       const userIds = baseUsersStats.user_ids || [];
       const firstTenUserIds = userIds.slice(0, 10);
 
-      // Build table header immediately (we have courses data)
       rebuildTableHeader(courses);
+      showSkeletonRows(firstTenUserIds.length || PAGE_SIZE);
 
       if (!firstTenUserIds.length) {
-        // console.log('No users in group');
-        rebuildTableBody(courses, [], {}, {}, {});
+        rebuildTableBody(courses, [], {});
         return;
       }
 
-      // Fetch user details for the first 10 users
       const usersUrl = `/wp-json/bys-groups/v1/groups/${groupId}/users?user_ids=${firstTenUserIds.join(',')}`;
-      const usersResponse = await api.get(usersUrl, true); // Force refresh
+      const usersResponse = await api.get(usersUrl, true);
 
       if (!usersResponse || !Array.isArray(usersResponse)) {
         console.error('Invalid users response:', usersResponse);
         return;
       }
 
-      // Store state for toggle handler to access
       usersInView = usersResponse;
       coursesInView = courses;
       courseQuizLoadedIdx.clear();
 
-      // Fetch course progress for each user (quiz fetch is deferred to toggle click)
-      const userCourseProgress = {};
       const courseIds = courses.map(c => c.id).join(',');
 
       if (courseIds) {
         for (const user of usersResponse) {
           const progressUrl = `/wp-json/bys-groups/v1/users/${user.id}/course-progress?course_ids=${courseIds}`;
           try {
-            userCourseProgress[user.id] = await api.get(progressUrl, true);
+            userCourseProgressAll[user.id] = await api.get(progressUrl, true);
           } catch (err) {
             console.error(`Failed to fetch course progress for user ${user.id}:`, err);
-            userCourseProgress[user.id] = [];
+            userCourseProgressAll[user.id] = [];
           }
         }
       } else {
-        // No courses, set empty progress for all users
         usersResponse.forEach(user => {
-          userCourseProgress[user.id] = [];
+          userCourseProgressAll[user.id] = [];
         });
       }
 
       rebuildTableHeader(courses);
-      rebuildTableBody(courses, usersResponse, userCourseProgress);
+      rebuildTableBody(courses, usersResponse, userCourseProgressAll);
+      loadedOffset = firstTenUserIds.length;
+      updateShowMoreButton();
 
     } catch (err) {
       console.error('Failed to fetch group reporting data:', err);
+    }
+  }
+
+  // ── Filter application ────────────────────────────────────────────────────────
+
+  /**
+   * Apply all active filters to the current table state.
+   * Course filter → show/hide columns (no re-render).
+   * All other filters → show/hide rows.
+   */
+  function applyFilters() {
+    applyColumnFilter();
+    applyRowFilters();
+  }
+
+  /**
+   * Show/hide course columns based on activeFilters.courseIds.
+   * Works by toggling course-col--hidden on matching [data-course-idx] elements.
+   */
+  function applyColumnFilter() {
+    const filtered = activeFilters.courseIds.length > 0;
+
+    coursesInView.forEach((course, idx) => {
+      const visible = !filtered || activeFilters.courseIds.includes(course.id);
+
+      // Sub-columns only matter if this course is the expanded one — leave their
+      // own hidden state alone; just hide the whole group if column is filtered out.
+      if (!visible) {
+        $table.find(`[data-course-idx="${idx}"]`).addClass('course-col--hidden');
+      } else if (expandedIdx !== idx) {
+        // Visible but not expanded: clear course-col--hidden from everything for
+        // this course (the toggle button inside the header also receives it when
+        // hidden), then keep sub-cols hidden via their own class.
+        $table.find(`[data-course-idx="${idx}"]`).removeClass('course-col--hidden');
+        $table.find(`.course-sub-col[data-course-idx="${idx}"]`).addClass('course-sub-col--hidden');
+        $table.find(`.course-sub-cell[data-course-idx="${idx}"]`).addClass('course-sub-col--hidden');
+      }
+    });
+  }
+
+  /**
+   * Show/hide rows based on user search, status, enrolment date, completion date.
+   * All filtering is against in-memory data — no re-fetch.
+   */
+  function applyRowFilters() {
+    const { userIds, courseStatus, userStatus, enrolmentDate, completionDate } = activeFilters;
+
+    $table.find('tbody tr.reporting-table__row').each(function() {
+      const userId = parseInt($(this).data('userId'), 10);
+      const user = usersInView.find(u => u.id === userId);
+      if (!user) return;
+
+      let visible = true;
+
+      // User multiselect filter — exact ID match
+      if (userIds.length > 0) {
+        visible = userIds.includes(userId);
+      }
+
+      // User status filter (online / offline / never) — user-level, no course required
+      if (visible && userStatus) {
+        visible = (user.status || 'never') === userStatus;
+      }
+
+      // Course status filter (completed / in_progress / inactive) — requires single course selection
+      if (visible && courseStatus) {
+        const userProgress = userCourseProgressAll[userId] || [];
+        const coursesToCheck = activeFilters.courseIds.length > 0
+          ? userProgress.filter(p => activeFilters.courseIds.includes(p.course_id))
+          : userProgress;
+        const progressStatus = courseStatus === 'inactive' ? 'not_started' : courseStatus;
+        visible = coursesToCheck.some(p => (p.progress_status || 'not_started') === progressStatus);
+      }
+
+      // Enrolment date filter — requires single course selection
+      if (visible && enrolmentDate) {
+        const filterDate = new Date(enrolmentDate);
+        const userProgress = userCourseProgressAll[userId] || [];
+        const coursesToCheck = activeFilters.courseIds.length > 0
+          ? userProgress.filter(p => activeFilters.courseIds.includes(p.course_id))
+          : userProgress;
+        visible = coursesToCheck.some(p => p.enrolled_at && new Date(p.enrolled_at) >= filterDate);
+      }
+
+      // Completion date filter — requires single course selection
+      if (visible && completionDate) {
+        const filterDate = new Date(completionDate);
+        const userProgress = userCourseProgressAll[userId] || [];
+        const coursesToCheck = activeFilters.courseIds.length > 0
+          ? userProgress.filter(p => activeFilters.courseIds.includes(p.course_id))
+          : userProgress;
+        visible = coursesToCheck.some(p => p.date_completed && new Date(p.date_completed) >= filterDate);
+      }
+
+      $(this).toggleClass('reporting-table__row--filtered', !visible);
+      $(this).css('display', visible ? '' : 'none');
+    });
+  }
+
+  // ── Course-dependent field enable/disable ────────────────────────────────────
+  function updateCourseDepFieldState() {
+    const singleCourse = selectedCourseIds.length === 1;
+    const $depFields = $block.find('.filters__field--course-dep');
+    $depFields.toggleClass('is-disabled', !singleCourse);
+    $depFields.find('select, input[type="date"]').prop('disabled', !singleCourse);
+
+    if (!singleCourse) {
+      $block.find('#filter-status').val('').addClass('is-placeholder');
+      $block.find('#filter-enrolment-date').val('').addClass('is-placeholder');
+      $block.find('#filter-completion-date').val('').addClass('is-placeholder');
+    }
+  }
+
+  // ── Filter form submit ────────────────────────────────────────────────────────
+  $block.find('.filters__form').on('submit', async function(e) {
+    e.preventDefault();
+
+    const singleCourse = selectedCourseIds.length === 1;
+
+    activeFilters.courseIds      = selectedCourseIds.slice();
+    activeFilters.userIds        = selectedUserIds.slice();
+    activeFilters.courseStatus   = singleCourse ? $block.find('#filter-status').val() : '';
+    activeFilters.userStatus     = $block.find('#filter-user-status').val();
+    activeFilters.enrolmentDate  = singleCourse ? $block.find('#filter-enrolment-date').val() : '';
+    activeFilters.completionDate = singleCourse ? $block.find('#filter-completion-date').val() : '';
+
+    closeMultiselect($block.find('#bys-multiselect-course'));
+    closeMultiselect($block.find('#bys-multiselect-users'));
+
+    // Row filters may match users not yet loaded — drain remaining pages first
+    const hasRowFilter = activeFilters.userIds.length > 0 ||
+      activeFilters.courseStatus || activeFilters.userStatus ||
+      activeFilters.enrolmentDate || activeFilters.completionDate;
+
+    if (hasRowFilter && loadedOffset < allGroupUserIds.length) {
+      const $btn = $block.find('.filters__submit');
+      $btn.prop('disabled', true).text('Loading…');
+      await loadAllRemainingUsers();
+      $btn.prop('disabled', false).text('Filter');
+    }
+
+    applyFilters();
+  });
+
+  // ── Filter reset ──────────────────────────────────────────────────────────────
+  $block.find('.filters__reset').on('click', function() {
+    selectedCourseIds = [];
+    selectedUserIds   = [];
+    activeFilters = { courseIds: [], userIds: [], courseStatus: '', userStatus: '', enrolmentDate: '', completionDate: '' };
+
+    resetFilterFormUI();
+    updateCourseDepFieldState();
+    closeMultiselect($block.find('#bys-multiselect-course'));
+    closeMultiselect($block.find('#bys-multiselect-users'));
+    populateCourseMultiselect();
+    populateUserMultiselect();
+
+    // Restore all rows and columns
+    $table.find('tbody tr').css('display', '').removeClass('reporting-table__row--filtered');
+    $table.find('[data-course-idx]').removeClass('course-col--hidden');
+    $table.find('.course-sub-col, .course-sub-cell').addClass('course-sub-col--hidden');
+    expandedIdx = null;
+  });
+
+  function resetFilterFormUI() {
+    $block.find('#filter-status').val('').addClass('is-placeholder');
+    $block.find('#filter-user-status').val('').addClass('is-placeholder');
+    $block.find('#filter-enrolment-date').val('').addClass('is-placeholder');
+    $block.find('#filter-completion-date').val('').addClass('is-placeholder');
+  }
+
+  // ── Table builders ────────────────────────────────────────────────────────────
+  function showSkeletonRows(count) {
+    const $tbody = $table.find('tbody');
+    $tbody.html('');
+    const rowTemplate = document.getElementById('skeleton-row-template');
+    for (let i = 0; i < count; i++) {
+      $tbody.append(rowTemplate.content.cloneNode(true));
     }
   }
 
@@ -276,7 +480,6 @@ jQuery(document).ready(function($) {
     const headerRow = document.createElement('tr');
     headerRow.className = 'reporting-table__head';
 
-    // Add fixed columns
     const statusTh = document.createElement('th');
     statusTh.className = 'col-status';
     headerRow.appendChild(statusTh);
@@ -291,24 +494,20 @@ jQuery(document).ready(function($) {
     emailTh.textContent = 'Email';
     headerRow.appendChild(emailTh);
 
-    // Add course headers using template
     const courseHeaderTemplate = document.getElementById('course-header-template');
     courses.forEach((course, idx) => {
       const headerContent = courseHeaderTemplate.content.cloneNode(true);
       const $headers = $(headerContent);
 
-      // Update data-course-idx for all header cells
       $headers.find('[data-course-idx]').attr('data-course-idx', idx);
 
-      // Update course title and download link
-      // API Note: course.title is an object. Use .rendered for the nice title
+      const courseTitle = course.shortname || course.title?.rendered || course.title || '';
       const requiredBadge = course.required
         ? ' <span class="bys-required-badge" aria-label="Required" title="Required">*</span>'
         : '';
-      $headers.find('.bys-course-toggle').html(course.title.rendered + requiredBadge).attr('data-course-idx', idx);
-      $headers.find('.bys-dl-link').attr('title', `Download ${escapeHtml(course.title.rendered)}`);
+      $headers.find('.bys-course-toggle').html(escapeHtml(courseTitle) + requiredBadge).attr('data-course-idx', idx);
+      $headers.find('.bys-dl-link').attr('title', `Download ${escapeHtml(courseTitle)}`);
 
-      // Append cloned headers to the row
       $headers.children().each(function() {
         headerRow.appendChild(this);
       });
@@ -318,28 +517,23 @@ jQuery(document).ready(function($) {
   }
 
   function buildQuizBars(quizData, userId, userQuizProgress) {
-    // quizData is an array of { step_id, step_title }
-    // userQuizProgress is { [quizId]: { id, percent_highest, pass_highest, total_attempts, ... } }
     if (!quizData || quizData.length === 0) {
       return '<span class="bys-quiz-empty">—</span>';
     }
 
-    const barsMaxHeight = 24; // 24px represents 100%
+    const barsMaxHeight = 24;
     const bars = quizData.map((quiz) => {
       const quizId = quiz.step_id;
       const quizTitle = quiz.step_title;
       const summary = userQuizProgress[quizId];
 
-      // Not attempted
       if (!summary || summary.total_attempts === 0) {
         const tip = `${quizTitle}|Not attempted`;
         return `<span class="bys-quiz-icon bys-quiz-icon--neutral" data-tip="${escapeHtml(tip)}" data-quiz-id="${quizId}" data-quiz-title="${escapeHtml(quizTitle)}"></span>`;
       }
 
-      // Attempted — bar represents highest attempt
       const cls = summary.pass_highest ? 'bys-quiz-icon--pass' : 'bys-quiz-icon--fail';
       const barHeight = barsMaxHeight * (summary.percent_highest * 0.01);
-      // Tooltip initially shows "Loading..." for points; actual points fetched on hover via userQuizAttemptsDetails
       const tip = `${quizTitle}|Loading...|${Math.round(summary.percent_highest)}%`;
 
       return `<span class="bys-quiz-icon ${cls}" data-tip="${escapeHtml(tip)}" data-quiz-id="${quizId}" data-user-id="${userId}" data-quiz-title="${escapeHtml(quizTitle)}" data-percent="${Math.round(summary.percent_highest)}" style="height: ${barHeight}px"></span>`;
@@ -348,8 +542,12 @@ jQuery(document).ready(function($) {
   }
 
   function rebuildTableBody(courses, users, userCourseProgress) {
+    $table.find('tbody').html('');
+    appendTableRows(courses, users, userCourseProgress);
+  }
+
+  function appendTableRows(courses, users, userCourseProgress) {
     const $tbody = $table.find('tbody');
-    $tbody.html('');
 
     const rowTemplate = document.getElementById('skeleton-row-template');
     const cellTemplate = document.getElementById('course-cell-template');
@@ -357,18 +555,14 @@ jQuery(document).ready(function($) {
     users.forEach(user => {
       const userProgress = userCourseProgress[user.id] || [];
 
-      // Clone the row template
       const rowContent = rowTemplate.content.cloneNode(true);
       const $row = $(rowContent);
 
-      // Set row user ID
-      $row.find('tr').attr('data-user-id', user.id);
+      $row.find('tr').attr('data-user-id', user.id).removeClass('reporting-table__row--loading');
 
-      // Update status badge (status is calculated in PHP based on last_login)
-      const userStatus = user.status || 'never'; // 'online', 'offline', or 'never'
+      const userStatus = user.status || 'never';
       const statusClass = `status-badge--${userStatus}`;
 
-      // Build tooltip with last login info
       let statusBadge = `<i class="fa-solid fa-circle"></i>`;
       if (user.last_login) {
         const readableDateTime = formatDate(user.last_login);
@@ -379,67 +573,45 @@ jQuery(document).ready(function($) {
 
       $row.find('.status-badge').attr('class', `status-badge ${statusClass}`).html(statusBadge);
 
-      // Update name and email
+      const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.display_name || '';
       $row.find('.col-name').html(`
         <a href="${detailUrl}?group_id=${currentGroupId}&user_id=${user.id}" class="reporting-table__name-link" onclick="event.stopPropagation();">
-          ${escapeHtml(user.display_name)}
+          ${escapeHtml(fullName)}
         </a>
       `);
       $row.find('.col-email').html(escapeHtml(user.email));
 
-      // Add course cells
       courses.forEach((course, idx) => {
         const courseData = userProgress.find(cp => cp.course_id === course.id);
         const progressStatus = courseData?.progress_status || 'not_started';
 
-        // Map API progress_status to CSS class names
         let status = 'not-started';
-        if (progressStatus === 'completed') {
-          status = 'completed';
-        } else if (progressStatus === 'in_progress') {
-          status = 'in-progress';
-        }
+        if (progressStatus === 'completed') status = 'completed';
+        else if (progressStatus === 'in_progress') status = 'in-progress';
 
-        // Clone cell template
         const cellContent = cellTemplate.content.cloneNode(true);
         const $cells = $(cellContent);
 
-        // Set data-course-idx for all cells
         $cells.find('td').attr('data-course-idx', idx);
-
-        // Update badge cell with status class only (no icons or colors in script)
         $cells.find('.course-cell--badge span').attr('class', `completion-badge completion-badge--${status}`);
 
-        // Update progress cell
         const stepsCompleted = courseData?.steps_completed || 0;
         const stepsTotal = courseData?.steps_total || 0;
         const percentage = stepsTotal > 0 ? Math.round((stepsCompleted / stepsTotal) * 100) : 0;
-        let percentageClass = '';
-        if (percentage === 100) {
-          percentageClass = 'complete';
-        } else if (percentage === 0 ) {
-          percentageClass = 'not-started';
-        } else {
-          percentageClass = 'in-progress';
-        }
+        let percentageClass = percentage === 100 ? 'complete' : percentage === 0 ? 'not-started' : 'in-progress';
+
         $cells.find('.course-sub-cell--progress').html(`
           <div class="bys-progress-wrap"><div class="bys-progress-bar" style="width:${percentage}%;"></div></div>
           <span class="bys-percent bys-percent--${percentageClass}">${percentage}%</span>
         `);
 
-        // Update quizzing cell — render as loading placeholder, fetch on toggle click
         $cells.find('.course-sub-cell--quizzing').html('<span class="bys-quiz-loading">—</span>');
 
-        // Update date cells
         const enrolledAt = courseData?.enrolled_at || '';
         const dateCompleted = courseData?.date_completed || '';
-        const enrolledDateDisplay = enrolledAt ? formatDate(enrolledAt) : 'Not started';
-        const completedDateDisplay = dateCompleted ? formatDate(dateCompleted) : 'Not completed';
+        $cells.find('.course-sub-cell--enrolment').html(`<span class="bys-date">${enrolledAt ? formatDate(enrolledAt) : 'Not started'}</span>`);
+        $cells.find('.course-sub-cell--completion').html(`<span class="bys-date">${dateCompleted ? formatDate(dateCompleted) : 'Not completed'}</span>`);
 
-        $cells.find('.course-sub-cell--enrolment').html(`<span class="bys-date">${enrolledDateDisplay}</span>`);
-        $cells.find('.course-sub-cell--completion').html(`<span class="bys-date">${completedDateDisplay}</span>`);
-
-        // Append cells to row
         $row.find('tr').append($cells);
       });
 
@@ -447,24 +619,27 @@ jQuery(document).ready(function($) {
     });
   }
 
-  /**
-   * Lazy-load quiz data for a course on toggle click
-   * Fetches courseQuizSteps and userQuizProgress for visible users, scoped to this course
-   */
+  // ── Quiz data lazy loader ─────────────────────────────────────────────────────
   async function loadQuizDataForCourse(courseIdx) {
     const course = coursesInView[courseIdx];
     if (!course) return;
 
-    courseQuizLoadedIdx.add(courseIdx); // Mark as loading to prevent double-fetch
+    courseQuizLoadedIdx.add(courseIdx);
 
     let quizSteps = [];
-    try {
-      quizSteps = await api.get(endpoints.courseQuizSteps(course.id)) || [];
-    } catch (err) {
-      console.error(`[group-reporting] Failed to fetch quiz steps for course ${course.id}:`, err);
+    if (courseQuizStepsCache[course.id]) {
+      quizSteps = courseQuizStepsCache[course.id];
+    } else {
+      try {
+        quizSteps = await api.get(endpoints.courseQuizSteps(course.id)) || [];
+        courseQuizStepsCache[course.id] = quizSteps;
+      } catch (err) {
+        console.error(`[group-reporting] Failed to fetch quiz steps for course ${course.id}:`, err);
+      }
     }
 
-    // Fetch quiz progress for each visible user, scoped to this course
+    if (!userQuizProgressCache[course.id]) userQuizProgressCache[course.id] = {};
+
     const userQuizProgressMap = {};
     for (const user of usersInView) {
       try {
@@ -474,13 +649,14 @@ jQuery(document).ready(function($) {
         if (Array.isArray(quizzes)) {
           quizzes.forEach(q => { userQuizProgressMap[user.id][q.id] = q; });
         }
+        userQuizProgressCache[course.id][user.id] = userQuizProgressMap[user.id];
       } catch (err) {
         console.error(`[group-reporting] Failed to fetch quiz progress for user ${user.id}:`, err);
         userQuizProgressMap[user.id] = {};
+        userQuizProgressCache[course.id][user.id] = {};
       }
     }
 
-    // Populate quizzing cells in-place for this course column
     $table.find(`.course-sub-cell--quizzing[data-course-idx="${courseIdx}"]`).each(function() {
       const userId = $(this).closest('tr').data('userId');
       const userQuizProgress = userQuizProgressMap[userId] || {};
@@ -488,21 +664,502 @@ jQuery(document).ready(function($) {
     });
   }
 
+  // ── Show More / lazy load ─────────────────────────────────────────────────────
+
+  function updateShowMoreButton() {
+    const $btn = $block.find('.bys-show-more');
+    const hasMore = sortedUsers.length > 0
+      ? displayedCount < sortedUsers.length
+      : loadedOffset < allGroupUserIds.length;
+    $btn.toggleClass('hidden', !hasMore);
+  }
+
+  $block.on('click', '.bys-show-more', function() {
+    loadMoreUsers();
+  });
+
+  /**
+   * Core: fetch a specific batch of user IDs, get their progress, append rows.
+   * Returns the array of newly loaded users (or empty array on failure).
+   */
+  async function fetchAndAppendUsers(nextIds) {
+    const usersUrl = `/wp-json/bys-groups/v1/groups/${currentGroupId}/users?user_ids=${nextIds.join(',')}`;
+    const newUsers = await api.get(usersUrl, true);
+    if (!newUsers || !Array.isArray(newUsers)) return [];
+
+    const courseIds = coursesInView.map(c => c.id).join(',');
+    if (courseIds) {
+      for (const user of newUsers) {
+        const progressUrl = `/wp-json/bys-groups/v1/users/${user.id}/course-progress?course_ids=${courseIds}`;
+        try {
+          userCourseProgressAll[user.id] = await api.get(progressUrl, true);
+        } catch (err) {
+          console.error(`Failed to fetch course progress for user ${user.id}:`, err);
+          userCourseProgressAll[user.id] = [];
+        }
+      }
+    } else {
+      newUsers.forEach(u => { userCourseProgressAll[u.id] = []; });
+    }
+
+    usersInView = usersInView.concat(newUsers);
+    loadedOffset += newUsers.length;
+    appendTableRows(coursesInView, newUsers, userCourseProgressAll);
+
+    if (expandedIdx !== null && courseQuizLoadedIdx.has(expandedIdx)) {
+      await loadQuizDataForNewUsers(expandedIdx, newUsers);
+    }
+
+    return newUsers;
+  }
+
+  async function loadMoreUsers() {
+    const $btn = $block.find('.bys-show-more');
+
+    // Post-sort: data already in memory — just render the next page
+    if (sortedUsers.length > 0 && displayedCount < sortedUsers.length) {
+      const nextPage = sortedUsers.slice(displayedCount, displayedCount + PAGE_SIZE);
+      displayedCount += nextPage.length;
+      appendTableRows(coursesInView, nextPage, userCourseProgressAll);
+      if (expandedIdx !== null && courseQuizLoadedIdx.has(expandedIdx)) {
+        await loadQuizDataForNewUsers(expandedIdx, nextPage);
+      }
+      applyFilters();
+      updateShowMoreButton();
+      return;
+    }
+
+    const nextIds = allGroupUserIds.slice(loadedOffset, loadedOffset + PAGE_SIZE);
+    if (!nextIds.length) { $btn.addClass('hidden'); return; }
+
+    $btn.prop('disabled', true).text('Loading…');
+    try {
+      await fetchAndAppendUsers(nextIds);
+      applyFilters();
+      updateShowMoreButton();
+    } catch (err) {
+      console.error('[group-reporting] Failed to load more users:', err);
+    } finally {
+      $btn.prop('disabled', false).text('Show More Results');
+    }
+  }
+
+  /**
+   * Load all users not yet fetched, in PAGE_SIZE batches.
+   * Used when a filter is submitted that may match users beyond the current page.
+   */
+  async function loadAllRemainingUsers() {
+    while (loadedOffset < allGroupUserIds.length) {
+      const nextIds = allGroupUserIds.slice(loadedOffset, loadedOffset + PAGE_SIZE);
+      if (!nextIds.length) break;
+      try {
+        await fetchAndAppendUsers(nextIds);
+      } catch (err) {
+        console.error('[group-reporting] Failed to load remaining users for filter:', err);
+        break;
+      }
+    }
+    updateShowMoreButton();
+  }
+
+  async function loadQuizDataForNewUsers(courseIdx, newUsers) {
+    const course = coursesInView[courseIdx];
+    if (!course) return;
+
+    const quizSteps = courseQuizStepsCache[course.id] || [];
+    if (!quizSteps.length) return;
+
+    for (const user of newUsers) {
+      try {
+        const url = endpoints.userQuizProgress(user.id) + `?group_id=${currentGroupId}&course_ids=${course.id}`;
+        const quizzes = await api.get(url);
+        const userQuizProgress = {};
+        if (Array.isArray(quizzes)) {
+          quizzes.forEach(q => { userQuizProgress[q.id] = q; });
+        }
+        $table.find(`tr[data-user-id="${user.id}"] .course-sub-cell--quizzing[data-course-idx="${courseIdx}"]`)
+          .html(buildQuizBars(quizSteps, user.id, userQuizProgress));
+      } catch (err) {
+        console.error(`[group-reporting] Failed to fetch quiz progress for new user ${user.id}:`, err);
+      }
+    }
+  }
+
+  // ── Sort ──────────────────────────────────────────────────────────────────────
+
+  $block.on('change', '#sort-select', async function() {
+    currentSort = $(this).val();
+    const $select = $(this);
+
+    if (loadedOffset < allGroupUserIds.length) {
+      $select.prop('disabled', true);
+      await loadAllRemainingUsers();
+      $select.prop('disabled', false);
+    }
+
+    sortAndRebuildTable();
+  });
+
+  function getUserSortDate(user) {
+    const userProgress = userCourseProgressAll[user.id] || [];
+    const coursesToCheck = activeFilters.courseIds.length > 0
+      ? userProgress.filter(p => activeFilters.courseIds.includes(p.course_id))
+      : userProgress;
+    const dates = coursesToCheck
+      .map(p => p.enrolled_at ? new Date(p.enrolled_at).getTime() : 0)
+      .filter(d => d > 0);
+    return dates.length ? Math.max(...dates) : 0;
+  }
+
+  function sortAndRebuildTable() {
+    sortedUsers = [...usersInView];
+
+    switch (currentSort) {
+      case 'name_asc':
+        sortedUsers.sort((a, b) => {
+          const na = ([a.first_name, a.last_name].filter(Boolean).join(' ') || a.display_name || '').toLowerCase();
+          const nb = ([b.first_name, b.last_name].filter(Boolean).join(' ') || b.display_name || '').toLowerCase();
+          return na.localeCompare(nb);
+        });
+        break;
+      case 'name_desc':
+        sortedUsers.sort((a, b) => {
+          const na = ([a.first_name, a.last_name].filter(Boolean).join(' ') || a.display_name || '').toLowerCase();
+          const nb = ([b.first_name, b.last_name].filter(Boolean).join(' ') || b.display_name || '').toLowerCase();
+          return nb.localeCompare(na);
+        });
+        break;
+      case 'date_asc':
+        sortedUsers.sort((a, b) => getUserSortDate(a) - getUserSortDate(b));
+        break;
+      case 'date_desc':
+      default:
+        sortedUsers.sort((a, b) => getUserSortDate(b) - getUserSortDate(a));
+        break;
+    }
+
+    displayedCount = Math.min(PAGE_SIZE, sortedUsers.length);
+    const wasExpanded = expandedIdx;
+    rebuildTableBody(coursesInView, sortedUsers.slice(0, displayedCount), userCourseProgressAll);
+
+    // Restore expanded course state and quiz data from cache
+    if (wasExpanded !== null) {
+      expandCourse(wasExpanded);
+      applyColumnFilter();
+      const course = coursesInView[wasExpanded];
+      if (course && courseQuizLoadedIdx.has(wasExpanded) && userQuizProgressCache[course.id]) {
+        const quizSteps = courseQuizStepsCache[course.id] || [];
+        $table.find(`.course-sub-cell--quizzing[data-course-idx="${wasExpanded}"]`).each(function() {
+          const userId = $(this).closest('tr').data('userId');
+          const userQuizProgress = userQuizProgressCache[course.id][userId] || {};
+          $(this).html(buildQuizBars(quizSteps, userId, userQuizProgress));
+        });
+      }
+    }
+
+    updateShowMoreButton();
+    applyFilters();
+  }
+
+  // ── Course Multiselect ────────────────────────────────────────────────────────
+
+  function populateCourseMultiselect() {
+    const $ms = $block.find('#bys-multiselect-course');
+    const $list = $ms.find('.bys-multiselect__list');
+    $list.html('');
+
+    if (!coursesInView.length) {
+      $ms.find('.bys-multiselect__empty').removeClass('hidden');
+      return;
+    }
+    $ms.find('.bys-multiselect__empty').addClass('hidden');
+
+    coursesInView.forEach(course => {
+      const id = course.id;
+      const title = course.title?.rendered || course.title || '';
+      const isChecked = selectedCourseIds.includes(id);
+      const requiredMark = course.required
+        ? ' <span class="bys-required-badge" aria-hidden="true">*</span>'
+        : '';
+      $list.append(`
+        <li class="bys-multiselect__option" role="option" aria-selected="${isChecked}" data-course-id="${id}">
+          <label>
+            <input type="checkbox" value="${id}" ${isChecked ? 'checked' : ''} />
+            <span>${escapeHtml(title)}${requiredMark}</span>
+          </label>
+        </li>
+      `);
+    });
+
+    syncPills($ms);
+  }
+
+  function syncPills($ms) {
+    const $pills = $ms.find('.bys-multiselect__pills');
+    $pills.html('');
+
+    if (!selectedCourseIds.length) {
+      $pills.html('<span class="bys-multiselect__placeholder">All courses</span>');
+      return;
+    }
+
+    selectedCourseIds.forEach(id => {
+      const course = coursesInView.find(c => c.id === id);
+      if (!course) return;
+      const title = course.title?.rendered || course.title || '';
+      $pills.append(`
+        <span class="bys-multiselect__pill" data-course-id="${id}">
+          ${escapeHtml(title)}
+          <button class="bys-multiselect__pill-remove btn-unstyled" type="button" aria-label="Remove ${escapeHtml(title)}" data-course-id="${id}">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </span>
+      `);
+    });
+  }
+
+  // Open/close toggle
+  $block.on('click', '#bys-multiselect-course .bys-multiselect__toggle', function(e) {
+    e.stopPropagation();
+    toggleMultiselect($block.find('#bys-multiselect-course'));
+  });
+
+  $block.on('click', '#bys-multiselect-course .bys-multiselect__control', function(e) {
+    if ($(e.target).closest('.bys-multiselect__pill-remove').length) return;
+    toggleMultiselect($block.find('#bys-multiselect-course'));
+  });
+
+  function toggleMultiselect($ms) {
+    const isOpen = $ms.attr('aria-expanded') === 'true';
+    $ms.attr('aria-expanded', isOpen ? 'false' : 'true');
+    $ms.find('.bys-multiselect__dropdown').toggleClass('hidden', isOpen);
+    if (!isOpen) $ms.find('.bys-multiselect__search').val('').trigger('input').focus();
+  }
+
+  function closeMultiselect($ms) {
+    $ms.attr('aria-expanded', 'false');
+    $ms.find('.bys-multiselect__dropdown').addClass('hidden');
+  }
+
+  $(document).on('click', function(e) {
+    if (!$(e.target).closest('#bys-multiselect-course').length) {
+      closeMultiselect($block.find('#bys-multiselect-course'));
+    }
+    if (!$(e.target).closest('#bys-multiselect-users').length) {
+      closeMultiselect($block.find('#bys-multiselect-users'));
+    }
+  });
+
+  // Checkbox toggle — courses
+  $block.on('change', '#bys-multiselect-course-dropdown input[type="checkbox"]', function() {
+    const id = parseInt($(this).val(), 10);
+    if ($(this).is(':checked')) {
+      if (!selectedCourseIds.includes(id)) selectedCourseIds.push(id);
+      $(this).closest('li').attr('aria-selected', 'true');
+    } else {
+      selectedCourseIds = selectedCourseIds.filter(x => x !== id);
+      $(this).closest('li').attr('aria-selected', 'false');
+    }
+    syncPills($block.find('#bys-multiselect-course'));
+    updateCourseDepFieldState();
+  });
+
+  // Pill remove
+  $block.on('click', '.bys-multiselect__pill-remove', function(e) {
+    e.stopPropagation();
+    const id = parseInt($(this).data('courseId'), 10);
+    selectedCourseIds = selectedCourseIds.filter(x => x !== id);
+    $block.find(`#bys-multiselect-course-dropdown input[value="${id}"]`).prop('checked', false)
+      .closest('li').attr('aria-selected', 'false');
+    syncPills($block.find('#bys-multiselect-course'));
+    updateCourseDepFieldState();
+  });
+
+  // Search within course dropdown
+  $block.on('input', '#bys-multiselect-course .bys-multiselect__search', function() {
+    const q = $(this).val().toLowerCase().trim();
+    const $options = $block.find('#bys-multiselect-course-dropdown .bys-multiselect__option');
+    let visibleCount = 0;
+    $options.each(function() {
+      const label = $(this).find('span').first().text().toLowerCase();
+      const match = !q || label.includes(q);
+      $(this).toggleClass('hidden', !match);
+      if (match) visibleCount++;
+    });
+    $block.find('#bys-multiselect-course .bys-multiselect__empty').toggleClass('hidden', visibleCount > 0);
+  });
+
+  // ── User Multiselect ──────────────────────────────────────────────────────────
+
+  /**
+   * Lazy-fetch all group users on first open, then populate the list.
+   * Uses the same /groups/{id}/users endpoint but passes all user IDs at once.
+   * Result is cached in allGroupUsers for the life of the group selection.
+   */
+  async function populateUserMultiselect() {
+    const $ms = $block.find('#bys-multiselect-users');
+    const $list = $ms.find('.bys-multiselect__list');
+    const $loading = $ms.find('.bys-multiselect__loading');
+    const $empty = $ms.find('.bys-multiselect__empty');
+
+    if (!allGroupUserIds.length) {
+      $list.html('');
+      $empty.removeClass('hidden');
+      return;
+    }
+
+    // If already loaded, just re-render (selection state may have changed)
+    if (allGroupUsersLoaded) {
+      renderUserOptions($ms, $list, $empty);
+      return;
+    }
+
+    // Show loading state while fetching
+    $list.html('');
+    $empty.addClass('hidden');
+    $loading.removeClass('hidden');
+
+    try {
+      const url = `/wp-json/bys-groups/v1/groups/${currentGroupId}/users?user_ids=${allGroupUserIds.join(',')}`;
+      const response = await api.get(url, true);
+      allGroupUsers = Array.isArray(response) ? response : [];
+      // Sort alphabetically by display_name
+      allGroupUsers.sort((a, b) => (a.display_name || '').localeCompare(b.display_name || ''));
+      allGroupUsersLoaded = true;
+    } catch (err) {
+      console.error('[group-reporting] Failed to fetch all group users for filter:', err);
+      allGroupUsers = [];
+      allGroupUsersLoaded = true;
+    }
+
+    $loading.addClass('hidden');
+    renderUserOptions($ms, $list, $empty);
+  }
+
+  function renderUserOptions($ms, $list, $empty) {
+    $list.html('');
+
+    if (!allGroupUsers.length) {
+      $empty.removeClass('hidden');
+      syncUserPills($ms);
+      return;
+    }
+    $empty.addClass('hidden');
+
+    allGroupUsers.forEach(user => {
+      const id = user.id;
+      const email = user.email || '';
+      const isChecked = selectedUserIds.includes(id);
+      $list.append(`
+        <li class="bys-multiselect__option" role="option" aria-selected="${isChecked}" data-user-id="${id}">
+          <label>
+            <input type="checkbox" value="${id}" ${isChecked ? 'checked' : ''} />
+            <span class="bys-multiselect__user-email">${escapeHtml(email)}</span>
+          </label>
+        </li>
+      `);
+    });
+
+    syncUserPills($ms);
+  }
+
+  function syncUserPills($ms) {
+    const $pills = $ms.find('.bys-multiselect__pills');
+    $pills.html('');
+
+    if (!selectedUserIds.length) {
+      $pills.html('<span class="bys-multiselect__placeholder">All users</span>');
+      return;
+    }
+
+    selectedUserIds.forEach(id => {
+      const user = allGroupUsers.find(u => u.id === id);
+      if (!user) return;
+      const email = user.email || '';
+      $pills.append(`
+        <span class="bys-multiselect__pill" data-user-id="${id}">
+          ${escapeHtml(email)}
+          <button class="bys-multiselect__pill-remove btn-unstyled" type="button" aria-label="Remove ${escapeHtml(email)}" data-user-id="${id}">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </span>
+      `);
+    });
+  }
+
+  // Open/close — users
+  $block.on('click', '#bys-multiselect-users .bys-multiselect__toggle', function(e) {
+    e.stopPropagation();
+    toggleMultiselect($block.find('#bys-multiselect-users'));
+  });
+
+  $block.on('click', '#bys-multiselect-users .bys-multiselect__control', function(e) {
+    if ($(e.target).closest('.bys-multiselect__pill-remove').length) return;
+    toggleMultiselect($block.find('#bys-multiselect-users'));
+  });
+
+  // Checkbox toggle — users
+  $block.on('change', '#bys-multiselect-users-dropdown input[type="checkbox"]', function() {
+    const id = parseInt($(this).val(), 10);
+    if ($(this).is(':checked')) {
+      if (!selectedUserIds.includes(id)) selectedUserIds.push(id);
+      $(this).closest('li').attr('aria-selected', 'true');
+    } else {
+      selectedUserIds = selectedUserIds.filter(x => x !== id);
+      $(this).closest('li').attr('aria-selected', 'false');
+    }
+    syncUserPills($block.find('#bys-multiselect-users'));
+  });
+
+  // Pill remove — users
+  $block.on('click', '#bys-multiselect-users .bys-multiselect__pill-remove', function(e) {
+    e.stopPropagation();
+    const id = parseInt($(this).data('userId'), 10);
+    selectedUserIds = selectedUserIds.filter(x => x !== id);
+    $block.find(`#bys-multiselect-users-dropdown input[value="${id}"]`).prop('checked', false)
+      .closest('li').attr('aria-selected', 'false');
+    syncUserPills($block.find('#bys-multiselect-users'));
+  });
+
+  // Search within users dropdown
+  $block.on('input', '#bys-multiselect-users .bys-multiselect__search', function() {
+    const q = $(this).val().toLowerCase().trim();
+    const $options = $block.find('#bys-multiselect-users-dropdown .bys-multiselect__option');
+    let visibleCount = 0;
+    $options.each(function() {
+      const email = $(this).find('.bys-multiselect__user-email').text().toLowerCase();
+      const match = !q || email.includes(q);
+      $(this).toggleClass('hidden', !match);
+      if (match) visibleCount++;
+    });
+    $block.find('#bys-multiselect-users .bys-multiselect__empty').toggleClass('hidden', visibleCount > 0);
+  });
+
+  // ── Placeholder class for native select/date ─────────────────────────────────
+  $block.on('change', '#filter-status, #filter-user-status', function() {
+    $(this).toggleClass('is-placeholder', !$(this).val());
+  });
+
+  $block.on('change', '#filter-enrolment-date, #filter-completion-date', function() {
+    $(this).toggleClass('is-placeholder', !$(this).val());
+  });
+
+  // ── Utilities ─────────────────────────────────────────────────────────────────
   function formatDate(dateString) {
     if (!dateString) return '';
     try {
       const date = new Date(dateString);
-      const dateFormat = date.toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-      return dateFormat;
+      return date.toLocaleString('en-US', {
+        year: 'numeric', month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+      });
     } catch (e) {
       return dateString;
     }
   }
 
   function escapeHtml(text) {
-    if (!text || typeof text !== 'string') {
-      return '';
-    }
+    if (!text || typeof text !== 'string') return '';
     const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
     return text.replace(/[&<>"']/g, m => map[m]);
   }
