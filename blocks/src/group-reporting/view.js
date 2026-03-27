@@ -333,59 +333,61 @@ jQuery(document).ready(function($) {
   }
 
   /**
+   * Pure predicate: returns true if a user object passes all active row filters.
+   * Works against in-memory data — no DOM access.
+   */
+  function userPassesRowFilter(user) {
+    const { userIds, courseStatus, userStatus, enrolmentDate, completionDate } = activeFilters;
+    let visible = true;
+
+    if (userIds.length > 0) {
+      visible = userIds.includes(user.id);
+    }
+
+    if (visible && userStatus) {
+      visible = (user.status || 'never') === userStatus;
+    }
+
+    if (visible && courseStatus) {
+      const userProgress = userCourseProgressAll[user.id] || [];
+      const coursesToCheck = activeFilters.courseIds.length > 0
+        ? userProgress.filter(p => activeFilters.courseIds.includes(p.course_id))
+        : userProgress;
+      const progressStatus = courseStatus === 'inactive' ? 'not_started' : courseStatus;
+      visible = coursesToCheck.some(p => (p.progress_status || 'not_started') === progressStatus);
+    }
+
+    if (visible && enrolmentDate) {
+      const filterDate = new Date(enrolmentDate);
+      const userProgress = userCourseProgressAll[user.id] || [];
+      const coursesToCheck = activeFilters.courseIds.length > 0
+        ? userProgress.filter(p => activeFilters.courseIds.includes(p.course_id))
+        : userProgress;
+      visible = coursesToCheck.some(p => p.enrolled_at && new Date(p.enrolled_at) >= filterDate);
+    }
+
+    if (visible && completionDate) {
+      const filterDate = new Date(completionDate);
+      const userProgress = userCourseProgressAll[user.id] || [];
+      const coursesToCheck = activeFilters.courseIds.length > 0
+        ? userProgress.filter(p => activeFilters.courseIds.includes(p.course_id))
+        : userProgress;
+      visible = coursesToCheck.some(p => p.date_completed && new Date(p.date_completed) >= filterDate);
+    }
+
+    return visible;
+  }
+
+  /**
    * Show/hide rows based on user search, status, enrolment date, completion date.
    * All filtering is against in-memory data — no re-fetch.
    */
   function applyRowFilters() {
-    const { userIds, courseStatus, userStatus, enrolmentDate, completionDate } = activeFilters;
-
     $table.find('tbody tr.reporting-table__row').each(function() {
       const userId = parseInt($(this).data('userId'), 10);
       const user = usersInView.find(u => u.id === userId);
       if (!user) return;
-
-      let visible = true;
-
-      // User multiselect filter — exact ID match
-      if (userIds.length > 0) {
-        visible = userIds.includes(userId);
-      }
-
-      // User status filter (online / offline / never) — user-level, no course required
-      if (visible && userStatus) {
-        visible = (user.status || 'never') === userStatus;
-      }
-
-      // Course status filter (completed / in_progress / inactive) — requires single course selection
-      if (visible && courseStatus) {
-        const userProgress = userCourseProgressAll[userId] || [];
-        const coursesToCheck = activeFilters.courseIds.length > 0
-          ? userProgress.filter(p => activeFilters.courseIds.includes(p.course_id))
-          : userProgress;
-        const progressStatus = courseStatus === 'inactive' ? 'not_started' : courseStatus;
-        visible = coursesToCheck.some(p => (p.progress_status || 'not_started') === progressStatus);
-      }
-
-      // Enrolment date filter — requires single course selection
-      if (visible && enrolmentDate) {
-        const filterDate = new Date(enrolmentDate);
-        const userProgress = userCourseProgressAll[userId] || [];
-        const coursesToCheck = activeFilters.courseIds.length > 0
-          ? userProgress.filter(p => activeFilters.courseIds.includes(p.course_id))
-          : userProgress;
-        visible = coursesToCheck.some(p => p.enrolled_at && new Date(p.enrolled_at) >= filterDate);
-      }
-
-      // Completion date filter — requires single course selection
-      if (visible && completionDate) {
-        const filterDate = new Date(completionDate);
-        const userProgress = userCourseProgressAll[userId] || [];
-        const coursesToCheck = activeFilters.courseIds.length > 0
-          ? userProgress.filter(p => activeFilters.courseIds.includes(p.course_id))
-          : userProgress;
-        visible = coursesToCheck.some(p => p.date_completed && new Date(p.date_completed) >= filterDate);
-      }
-
+      const visible = userPassesRowFilter(user);
       $(this).toggleClass('reporting-table__row--filtered', !visible);
       $(this).css('display', visible ? '' : 'none');
     });
@@ -506,7 +508,7 @@ jQuery(document).ready(function($) {
         ? ' <span class="bys-required-badge" aria-label="Required" title="Required">*</span>'
         : '';
       $headers.find('.bys-course-toggle').html(escapeHtml(courseTitle) + requiredBadge).attr('data-course-idx', idx);
-      $headers.find('.bys-dl-link').attr('title', `Download ${escapeHtml(courseTitle)}`);
+      $headers.find('.bys-dl-link').attr('title', `Download ${escapeHtml(courseTitle)}`).attr('data-course-idx', idx);
 
       $headers.children().each(function() {
         headerRow.appendChild(this);
@@ -1143,6 +1145,144 @@ jQuery(document).ready(function($) {
   $block.on('change', '#filter-enrolment-date, #filter-completion-date', function() {
     $(this).toggleClass('is-placeholder', !$(this).val());
   });
+
+  // ── Export ────────────────────────────────────────────────────────────────────
+
+  $block.on('click', '.table__actions__export a', async function(e) {
+    e.preventDefault();
+    if (!currentGroupId) return;
+
+    const $link = $(this);
+    $link.addClass('is-loading').text('Exporting…');
+
+    try {
+      await exportTableToCsv();
+    } finally {
+      $link.removeClass('is-loading').html('<i class="fa-regular fa-download"></i> Export Table');
+    }
+  });
+
+  $table.on('click', '.bys-dl-link', async function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!currentGroupId) return;
+
+    const courseIdx = parseInt($(this).data('courseIdx'), 10);
+    const course = coursesInView[courseIdx];
+    if (!course) return;
+
+    const $link = $(this);
+    $link.addClass('is-loading').html('<i class="fa-regular fa-spinner fa-spin"></i>');
+
+    try {
+      await exportCourseToCsv(course);
+    } finally {
+      $link.removeClass('is-loading').html('<i class="fa-regular fa-download"></i>');
+    }
+  });
+
+  /**
+   * Shared: get the filtered, ordered user list for any export.
+   * Loads all remaining users first if they haven't been fetched yet.
+   */
+  async function getExportUsers() {
+    if (loadedOffset < allGroupUserIds.length) {
+      await loadAllRemainingUsers();
+    }
+    const ordered = sortedUsers.length > 0 ? [...sortedUsers] : [...usersInView];
+    return ordered.filter(user => userPassesRowFilter(user));
+  }
+
+  /**
+   * Shared: serialize a 2-D array of strings to a UTF-8 CSV blob and trigger download.
+   */
+  function downloadCsv(rows, filename) {
+    const csv = rows.map(row =>
+      row.map(cell => {
+        const str = String(cell ?? '');
+        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+          return '"' + str.replace(/"/g, '""') + '"';
+        }
+        return str;
+      }).join(',')
+    ).join('\n');
+
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function courseProgressCells(courseData) {
+    const progressLabel = { completed: 'Completed', in_progress: 'In Progress', not_started: 'Not Started' };
+    const progressStatus = courseData?.progress_status || 'not_started';
+    const stepsCompleted = courseData?.steps_completed || 0;
+    const stepsTotal = courseData?.steps_total || 0;
+    const percentage = stepsTotal > 0 ? Math.round((stepsCompleted / stepsTotal) * 100) : 0;
+    return [
+      progressLabel[progressStatus] || progressStatus,
+      `${percentage}%`,
+      courseData?.enrolled_at ? formatDate(courseData.enrolled_at) : '',
+      courseData?.date_completed ? formatDate(courseData.date_completed) : '',
+    ];
+  }
+
+  async function exportTableToCsv() {
+    const filteredUsers = await getExportUsers();
+
+    // Determine which courses to include (respect active course column filter)
+    const coursesToExport = activeFilters.courseIds.length > 0
+      ? coursesInView.filter(c => activeFilters.courseIds.includes(c.id))
+      : [...coursesInView];
+
+    const statusLabel = { online: 'Online', offline: 'Offline', never: 'Never Logged In' };
+
+    const headers = ['Status', 'Name', 'Email'];
+    coursesToExport.forEach(course => {
+      const title = course.shortname || course.title?.rendered || course.title || '';
+      const req = course.required ? ' (Required)' : '';
+      headers.push(`${title}${req} - Course Status`, `${title}${req} - Progress`, `${title}${req} - Enrolled`, `${title}${req} - Completed`);
+    });
+
+    const rows = [headers];
+    filteredUsers.forEach(user => {
+      const userProgress = userCourseProgressAll[user.id] || [];
+      const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.display_name || '';
+      const row = [statusLabel[user.status] || 'Never Logged In', fullName, user.email || ''];
+      coursesToExport.forEach(course => {
+        row.push(...courseProgressCells(userProgress.find(cp => cp.course_id === course.id)));
+      });
+      rows.push(row);
+    });
+
+    const today = new Date().toISOString().split('T')[0];
+    downloadCsv(rows, `group-report-${currentGroupId}-${today}.csv`);
+  }
+
+  async function exportCourseToCsv(course) {
+    const filteredUsers = await getExportUsers();
+
+    const title = course.shortname || course.title?.rendered || course.title || '';
+    const req = course.required ? ' (Required)' : '';
+
+    const headers = ['Name', 'Email', `${title}${req} - Course Status`, `${title}${req} - Progress`, `${title}${req} - Enrolled`, `${title}${req} - Completed`];
+
+    const rows = [headers];
+    filteredUsers.forEach(user => {
+      const userProgress = userCourseProgressAll[user.id] || [];
+      const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.display_name || '';
+      rows.push([fullName, user.email || '', ...courseProgressCells(userProgress.find(cp => cp.course_id === course.id))]);
+    });
+
+    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const today = new Date().toISOString().split('T')[0];
+    downloadCsv(rows, `course-report-${slug}-${today}.csv`);
+  }
 
   // ── Utilities ─────────────────────────────────────────────────────────────────
   function formatDate(dateString) {
