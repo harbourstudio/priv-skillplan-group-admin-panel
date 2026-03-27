@@ -207,31 +207,40 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             }
             $auth_header = $auth_result;
 
-            // Fetch group users from LD API
-            $ld_api_url = get_home_url() . "/wp-json/ldlms/v2/groups/{$group_id}/users?&_fields=id";
+            // Fetch all group users from LD API (paginated — LD defaults to 10 per page)
+            $group_users = array();
+            $page        = 1;
+            $per_page    = 100;
 
-            $response = wp_remote_get($ld_api_url, array(
-                'headers' => array(
-                    'Authorization' => $auth_header,
-                ),
-                'sslverify' => false,
-            ));
+            do {
+                $ld_api_url = get_home_url() . "/wp-json/ldlms/v2/groups/{$group_id}/users?_fields=id&per_page={$per_page}&page={$page}";
 
-            if (is_wp_error($response)) {
-                return new \WP_REST_Response(array('error' => $response->get_error_message()), 500);
-            }
+                $response = wp_remote_get($ld_api_url, array(
+                    'headers' => array(
+                        'Authorization' => $auth_header,
+                    ),
+                    'sslverify' => false,
+                ));
 
-            $status = wp_remote_retrieve_response_code($response);
-            $body = wp_remote_retrieve_body($response);
+                if (is_wp_error($response)) {
+                    return new \WP_REST_Response(array('error' => $response->get_error_message()), 500);
+                }
 
-            if ($status !== 200) {
-                return new \WP_REST_Response(array('error' => 'Failed to fetch users from LearnDash API', 'status' => $status), $status);
-            }
+                $status = wp_remote_retrieve_response_code($response);
+                $body   = wp_remote_retrieve_body($response);
 
-            $group_users = json_decode($body, true);
-            if (!is_array($group_users)) {
-                $group_users = array();
-            }
+                if ($status !== 200) {
+                    return new \WP_REST_Response(array('error' => 'Failed to fetch users from LearnDash API', 'status' => $status), $status);
+                }
+
+                $page_users = json_decode($body, true);
+                if (!is_array($page_users) || empty($page_users)) {
+                    break;
+                }
+
+                $group_users = array_merge($group_users, $page_users);
+                $page++;
+            } while (count($page_users) === $per_page);
 
             $total_members = count($group_users);
             $inactive_members = 0;
@@ -305,12 +314,13 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                     }
 
                     $users[] = array(
-                        'id'                  => $user->ID,
-                        'display_name'        => $user->display_name,
-                        'email'               => $user->user_email,
-                        'last_login'          => $last_login_timestamp ? wp_date('c', $last_login_timestamp) : null,
-                        'status'              => $status,
-                        '_debug_meta_values'  => $meta_values, // For debugging - remove after verification
+                        'id'           => $user->ID,
+                        'first_name'   => get_user_meta($user_id, 'first_name', true) ?: '',
+                        'last_name'    => get_user_meta($user_id, 'last_name', true) ?: '',
+                        'display_name' => $user->display_name,
+                        'email'        => $user->user_email,
+                        'last_login'   => $last_login_timestamp ? wp_date('c', $last_login_timestamp) : null,
+                        'status'       => $status,
                     );
                 }
             }
@@ -413,13 +423,16 @@ if (!class_exists('BYS_Groups_Rest_API')) {
 
             $courses = json_decode($body, true);
 
-            // extract just id and title from each course
+            // extract id, title, and shortname (custom meta) from each course
             $formatted_courses = array();
             if (is_array($courses)) {
                 foreach ($courses as $course) {
+                    $course_id = $course['id'] ?? null;
+                    $shortname = $course_id ? get_post_meta($course_id, 'shortname', true) : '';
                     $formatted_courses[] = array(
-                        'id'    => $course['id'] ?? null,
-                        'title' => $course['title'] ?? 'Untitled',
+                        'id'        => $course_id,
+                        'title'     => $course['title'] ?? 'Untitled',
+                        'shortname' => $shortname ?: null,
                     );
                 }
             }

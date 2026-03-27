@@ -54,8 +54,8 @@ $wrapper_attributes = get_block_wrapper_attributes();
 					<img src="<?php echo esc_url( BYS_GROUPS_PLUGIN_URL . 'assets/img/' . $stat['icon'] ); ?>" alt="<?php echo esc_attr( $stat['alt'] ); ?>" />
 				</div>
 				<div class="stat__content">
-					<span class="stat__number" data-bys-stat="<?php echo esc_attr($stat['stat']); ?>"></span>
-					<span class="stat__label"><?php esc_html_e($stat['label']); ?></span>
+					<span class="stat__number stat__number--loading" data-bys-stat="<?php echo esc_attr( $stat['stat'] ); ?>"></span>
+					<span class="stat__label"><?php echo esc_html( $stat['label'] ); ?></span>
 				</div>
 			</div>
 		<?php endforeach; ?>

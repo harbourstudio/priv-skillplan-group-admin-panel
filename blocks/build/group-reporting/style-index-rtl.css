@@ -1,6 +1,14 @@
 /*!***************************************************************************************************************************************************************************************************************************************************************************************!*\
   !*** css ./node_modules/css-loader/dist/cjs.js??ruleSet[1].rules[4].use[1]!./node_modules/postcss-loader/dist/cjs.js??ruleSet[1].rules[4].use[2]!./node_modules/@wordpress/scripts/node_modules/sass-loader/dist/cjs.js??ruleSet[1].rules[4].use[3]!./src/group-reporting/style.scss ***!
   \***************************************************************************************************************************************************************************************************************************************************************************************/
+@keyframes bys-shimmer {
+  0% {
+    background-position: -100% 0;
+  }
+  100% {
+    background-position: 300% 0;
+  }
+}
 .wp-block-bys-groups-group-reporting .section__title {
   display: flex;
   justify-content: space-between;
@@ -31,6 +39,48 @@
 .wp-block-bys-groups-group-reporting .filters__box .filters__fields .filters__field {
   display: flex;
   flex-direction: column;
+}
+.wp-block-bys-groups-group-reporting .filters__box .filters__fields .filters__field label {
+  font-size: var(--wp--preset--font-size--x-small);
+  font-weight: 500;
+  color: var(--wp--preset--color--gray-600);
+  margin-bottom: 4px;
+}
+.wp-block-bys-groups-group-reporting .filters__box .filters__fields .filters__field select,
+.wp-block-bys-groups-group-reporting .filters__box .filters__fields .filters__field input[type=date] {
+  min-height: 3rem;
+  background: white;
+  border: 1px solid var(--wp--preset--color--gray-300);
+  border-radius: 0.375rem;
+  padding: var(--wp--preset--spacing--1) var(--wp--preset--spacing--3);
+  font-size: var(--wp--preset--font-size--small);
+  color: var(--wp--preset--color--dark);
+  -webkit-appearance: auto;
+     -moz-appearance: auto;
+          appearance: auto;
+}
+.wp-block-bys-groups-group-reporting .filters__box .filters__fields .filters__field select:focus,
+.wp-block-bys-groups-group-reporting .filters__box .filters__fields .filters__field input[type=date]:focus {
+  border-color: var(--wp--preset--color--primary);
+  outline: none;
+}
+.wp-block-bys-groups-group-reporting .filters__box .filters__fields .filters__field select:disabled,
+.wp-block-bys-groups-group-reporting .filters__box .filters__fields .filters__field input[type=date]:disabled {
+  background: var(--wp--preset--color--gray-100);
+  cursor: not-allowed;
+}
+.wp-block-bys-groups-group-reporting .filters__box .filters__fields .filters__field select.is-placeholder,
+.wp-block-bys-groups-group-reporting .filters__box .filters__fields .filters__field input[type=date].is-placeholder {
+  color: var(--wp--preset--color--gray-400);
+}
+.wp-block-bys-groups-group-reporting .filters__box .filters__fields .filters__field__hint {
+  display: none;
+  font-size: var(--wp--preset--font-size--x-small);
+  color: var(--wp--preset--color--gray-400);
+  margin-top: 4px;
+}
+.wp-block-bys-groups-group-reporting .filters__box .filters__fields .filters__field--course-dep.is-disabled .wp-block-bys-groups-group-reporting .filters__box .filters__fields .filters__field--course-dep__hint {
+  display: block;
 }
 .wp-block-bys-groups-group-reporting .filters__box .filters__actions {
   display: flex;
@@ -199,12 +249,13 @@
 .wp-block-bys-groups-group-reporting .table__results .table__scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  clip-path: inset(0 round 1rem);
 }
 .wp-block-bys-groups-group-reporting .table__results table {
-  width: 100%;
+  width: auto;
+  min-width: 100%;
   font-size: var(--wp--preset--font-size--x-small);
   background: white;
-  border-radius: 1rem;
   text-align: right;
   border-collapse: collapse;
 }
@@ -220,11 +271,21 @@
 .wp-block-bys-groups-group-reporting .table__results table thead th a, .wp-block-bys-groups-group-reporting .table__results table thead th i {
   color: white;
 }
-.wp-block-bys-groups-group-reporting .table__results table thead th:first-child {
-  border-top-right-radius: 1.5rem;
+.wp-block-bys-groups-group-reporting .table__results table thead th.col-name, .wp-block-bys-groups-group-reporting .table__results table thead th.col-email {
+  min-width: 212px;
 }
-.wp-block-bys-groups-group-reporting .table__results table thead th:last-child {
-  border-top-left-radius: 1.5rem;
+.wp-block-bys-groups-group-reporting .table__results table thead th.col-status {
+  min-width: 32px;
+}
+.wp-block-bys-groups-group-reporting .table__results table thead th.course-col-header {
+  min-width: 92px;
+}
+.wp-block-bys-groups-group-reporting .table__results table td.col-name,
+.wp-block-bys-groups-group-reporting .table__results table td.col-email {
+  min-width: 212px;
+}
+.wp-block-bys-groups-group-reporting .table__results table td.col-status {
+  min-width: 32px;
 }
 .wp-block-bys-groups-group-reporting .table__results table .course-col-header__inner {
   display: flex;
@@ -283,6 +344,14 @@
 }
 .wp-block-bys-groups-group-reporting .table__results table tbody tr.reporting-table__row:hover {
   background: #f8faff;
+}
+.wp-block-bys-groups-group-reporting .table__results table tbody tr.reporting-table__row--loading td span {
+  display: inline-block;
+  height: 0.85em;
+  border-radius: 4px;
+  background: linear-gradient(-90deg, #e8e8e8 25%, #f2f2f2 50%, #e8e8e8 75%);
+  background-size: 200% 100%;
+  animation: bys-shimmer 1.4s infinite linear;
 }
 .wp-block-bys-groups-group-reporting .table__results table tbody td {
   padding: var(--wp--preset--spacing--3);

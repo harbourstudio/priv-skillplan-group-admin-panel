@@ -32,7 +32,7 @@ $detail_url = home_url( '/administrator-dashboard/user-progress-detail/' );
         <form class="filters__form" method="get">
             <div class="filters__fields">
                 <div class="filters__field filters__field--multiselect" id="filters__field--course">
-                    <label>Course</label>
+                    <label>Courses</label>
                     <div class="bys-multiselect" id="bys-multiselect-course" aria-haspopup="listbox" aria-expanded="false">
                         <div class="bys-multiselect__control">
                             <div class="bys-multiselect__pills" id="bys-multiselect-course-pills">
@@ -51,8 +51,16 @@ $detail_url = home_url( '/administrator-dashboard/user-progress-detail/' );
                         </div>
                     </div>
                 </div>
-                <div class="filters__field"><label for="filter-enrolment-date">Enrolment Date</label><input type="date" id="filter-enrolment-date" name="enrolment_date" /></div>
-                <div class="filters__field"><label for="filter-completion-date">Completion Date</label><input type="date" id="filter-completion-date" name="completion_date" /></div>
+                <div class="filters__field filters__field--course-dep" id="filters__field--enrolment-date">
+                    <label for="filter-enrolment-date">Enrolment Date</label>
+                    <input type="date" id="filter-enrolment-date" name="enrolment_date" disabled />
+                    <span class="filters__field__hint">Select one course to enable</span>
+                </div>
+                <div class="filters__field filters__field--course-dep" id="filters__field--completion-date">
+                    <label for="filter-completion-date">Completion Date</label>
+                    <input type="date" id="filter-completion-date" name="completion_date" disabled />
+                    <span class="filters__field__hint">Select one course to enable</span>
+                </div>
                 <div class="filters__field filters__field--multiselect" id="filters__field--users">
                     <label>Users</label>
                     <div class="bys-multiselect" id="bys-multiselect-users" aria-haspopup="listbox" aria-expanded="false">
@@ -74,21 +82,32 @@ $detail_url = home_url( '/administrator-dashboard/user-progress-detail/' );
                         </div>
                     </div>
                 </div>
-                <div class="filters__field">
-                    <label for="filter-status">Status</label>
-                    <select id="filter-status" name="status">
-                        <option value="">All Statuses</option><option value="active">Active</option>
-                        <option value="completed">Completed</option><option value="inactive">Inactive</option>
+                <div class="filters__field filters__field--course-dep" id="filters__field--status">
+                    <label for="filter-status">Course Status</label>
+                    <select id="filter-status" name="status" disabled>
+                        <option value="">All Statuses</option>
+                        <option value="completed">Completed</option>
                         <option value="in_progress">In Progress</option>
+                        <option value="inactive">Not Started</option>
+                    </select>
+                    <span class="filters__field__hint">Select one course to enable</span>
+                </div>
+                <div class="filters__field" id="filters__field--user-status">
+                    <label for="filter-user-status">User Status</label>
+                    <select id="filter-user-status" name="user_status" class="is-placeholder">
+                        <option value="">All Statuses</option>
+                        <option value="online">Online</option>
+                        <option value="offline">Offline</option>
+                        <option value="never">Never Logged In</option>
                     </select>
                 </div>
-                <div class="filters__field">
+                <!-- <div class="filters__field">
                     <label for="filter-per-page">Items per Page</label>
                     <select id="filter-per-page" name="per_page">
                         <option value="10">10</option><option value="20">20</option>
                         <option value="50">50</option><option value="100">100</option>
                     </select>
-                </div>
+                </div> -->
             </div>
             <div class="filters__actions">
                 <button class="filters__submit btn" type="submit">Filter</button>
@@ -101,10 +120,10 @@ $detail_url = home_url( '/administrator-dashboard/user-progress-detail/' );
         <div class="table__actions__sort">
             <label for="sort-select">Sort by</label>
             <select class="table__actions__sort__select" name="sort" id="sort-select">
-                <option value="date_desc">Date Enrolled (Descending)</option>
-                <option value="date_asc">Date Enrolled (Ascending)</option>
                 <option value="name_asc">Name (A–Z)</option>
                 <option value="name_desc">Name (Z–A)</option>
+                <option value="date_desc">Date Enrolled (Descending)</option>
+                <option value="date_asc">Date Enrolled (Ascending)</option>
             </select>
         </div>
         <div class="table__actions__export">
@@ -119,7 +138,7 @@ $detail_url = home_url( '/administrator-dashboard/user-progress-detail/' );
                 <thead>
                     <tr class="reporting-table__head">
                         <!-- Fixed columns -->
-                        <th class="col-status"></th>
+                        <th class="col-status" aria-label="System Status"></th>
                         <th class="col-name">Name</th>
                         <th class="col-email">Email</th>
 
@@ -184,7 +203,7 @@ $detail_url = home_url( '/administrator-dashboard/user-progress-detail/' );
             </template>
         </div>
 
-        <button class="bys-show-more btn-unstyled" type="button">Show More Results</button>
+        <button class="bys-show-more btn-unstyled hidden" type="button">Show More Results</button>
     </div>
 
 </div>

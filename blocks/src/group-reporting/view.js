@@ -12,6 +12,13 @@ jQuery(document).ready(function($) {
   let coursesInView = [];       // current courses (from bys:groupSelected)
   let userCourseProgressAll = {}; // promoted to module scope: { [userId]: [...progress] }
   let courseQuizLoadedIdx = new Set();
+  let courseQuizStepsCache    = {}; // { [courseId]: [...steps] }
+  let userQuizProgressCache   = {}; // { [courseId]: { [userId]: { [quizId]: quizData } } }
+  let loadedOffset = 0;             // how many users have been loaded into the table
+  let currentSort  = 'name_asc';
+  const PAGE_SIZE  = 10;
+  let sortedUsers  = [];            // sorted order after an explicit sort; empty = use lazy-load order
+  let displayedCount = 0;           // how many of sortedUsers are currently rendered
 
   // ── Filter state ────────────────────────────────────────────────────────────
   let selectedCourseIds   = []; // course multiselect state
@@ -23,7 +30,8 @@ jQuery(document).ready(function($) {
   let activeFilters = {         // current applied filter values
     courseIds:      [],         // array of course IDs (empty = all)
     userIds:        [],         // array of user IDs (empty = all)
-    status:         '',
+    courseStatus:   '',         // course-level: completed | in_progress | inactive
+    userStatus:     '',         // user-level: online | offline | never
     enrolmentDate:  '',
     completionDate: '',
   };
@@ -219,7 +227,15 @@ jQuery(document).ready(function($) {
     allGroupUserIds   = data.baseUsersStats?.user_ids || [];
     allGroupUsers     = [];
     allGroupUsersLoaded = false;
-    activeFilters = { courseIds: [], userIds: [], status: '', enrolmentDate: '', completionDate: '' };
+    activeFilters = { courseIds: [], userIds: [], courseStatus: '', userStatus: '', enrolmentDate: '', completionDate: '' };
+    userCourseProgressAll = {};
+    courseQuizStepsCache  = {};
+    userQuizProgressCache = {};
+    loadedOffset  = 0;
+    currentSort   = 'name_asc';
+    sortedUsers   = [];
+    displayedCount = 0;
+    $block.find('#sort-select').val('name_asc');
     resetFilterFormUI();
 
     await populateTableFromAPI(groupId, baseUsersStats, courses);
@@ -232,6 +248,7 @@ jQuery(document).ready(function($) {
       const firstTenUserIds = userIds.slice(0, 10);
 
       rebuildTableHeader(courses);
+      showSkeletonRows(firstTenUserIds.length || PAGE_SIZE);
 
       if (!firstTenUserIds.length) {
         rebuildTableBody(courses, [], {});
@@ -270,6 +287,8 @@ jQuery(document).ready(function($) {
 
       rebuildTableHeader(courses);
       rebuildTableBody(courses, usersResponse, userCourseProgressAll);
+      loadedOffset = firstTenUserIds.length;
+      updateShowMoreButton();
 
     } catch (err) {
       console.error('Failed to fetch group reporting data:', err);
@@ -298,22 +317,65 @@ jQuery(document).ready(function($) {
     coursesInView.forEach((course, idx) => {
       const visible = !filtered || activeFilters.courseIds.includes(course.id);
 
-      // Badge column (always present per course)
-      $table.find(`.course-col-header[data-course-idx="${idx}"]`).toggleClass('course-col--hidden', !visible);
-      $table.find(`.course-cell--badge[data-course-idx="${idx}"]`).toggleClass('course-col--hidden', !visible);
-
       // Sub-columns only matter if this course is the expanded one — leave their
       // own hidden state alone; just hide the whole group if column is filtered out.
       if (!visible) {
         $table.find(`[data-course-idx="${idx}"]`).addClass('course-col--hidden');
       } else if (expandedIdx !== idx) {
-        // Visible but not expanded: ensure sub-cols stay hidden (their normal state)
-        $table.find(`.course-sub-col[data-course-idx="${idx}"]`).addClass('course-sub-col--hidden').removeClass('course-col--hidden');
-        $table.find(`.course-sub-cell[data-course-idx="${idx}"]`).addClass('course-sub-col--hidden').removeClass('course-col--hidden');
-        $table.find(`.course-col-header[data-course-idx="${idx}"]`).removeClass('course-col--hidden');
-        $table.find(`.course-cell--badge[data-course-idx="${idx}"]`).removeClass('course-col--hidden');
+        // Visible but not expanded: clear course-col--hidden from everything for
+        // this course (the toggle button inside the header also receives it when
+        // hidden), then keep sub-cols hidden via their own class.
+        $table.find(`[data-course-idx="${idx}"]`).removeClass('course-col--hidden');
+        $table.find(`.course-sub-col[data-course-idx="${idx}"]`).addClass('course-sub-col--hidden');
+        $table.find(`.course-sub-cell[data-course-idx="${idx}"]`).addClass('course-sub-col--hidden');
       }
     });
+  }
+
+  /**
+   * Pure predicate: returns true if a user object passes all active row filters.
+   * Works against in-memory data — no DOM access.
+   */
+  function userPassesRowFilter(user) {
+    const { userIds, courseStatus, userStatus, enrolmentDate, completionDate } = activeFilters;
+    let visible = true;
+
+    if (userIds.length > 0) {
+      visible = userIds.includes(user.id);
+    }
+
+    if (visible && userStatus) {
+      visible = (user.status || 'never') === userStatus;
+    }
+
+    if (visible && courseStatus) {
+      const userProgress = userCourseProgressAll[user.id] || [];
+      const coursesToCheck = activeFilters.courseIds.length > 0
+        ? userProgress.filter(p => activeFilters.courseIds.includes(p.course_id))
+        : userProgress;
+      const progressStatus = courseStatus === 'inactive' ? 'not_started' : courseStatus;
+      visible = coursesToCheck.some(p => (p.progress_status || 'not_started') === progressStatus);
+    }
+
+    if (visible && enrolmentDate) {
+      const filterDate = new Date(enrolmentDate);
+      const userProgress = userCourseProgressAll[user.id] || [];
+      const coursesToCheck = activeFilters.courseIds.length > 0
+        ? userProgress.filter(p => activeFilters.courseIds.includes(p.course_id))
+        : userProgress;
+      visible = coursesToCheck.some(p => p.enrolled_at && new Date(p.enrolled_at) >= filterDate);
+    }
+
+    if (visible && completionDate) {
+      const filterDate = new Date(completionDate);
+      const userProgress = userCourseProgressAll[user.id] || [];
+      const coursesToCheck = activeFilters.courseIds.length > 0
+        ? userProgress.filter(p => activeFilters.courseIds.includes(p.course_id))
+        : userProgress;
+      visible = coursesToCheck.some(p => p.date_completed && new Date(p.date_completed) >= filterDate);
+    }
+
+    return visible;
   }
 
   /**
@@ -321,77 +383,58 @@ jQuery(document).ready(function($) {
    * All filtering is against in-memory data — no re-fetch.
    */
   function applyRowFilters() {
-    const { userIds, status, enrolmentDate, completionDate } = activeFilters;
-
     $table.find('tbody tr.reporting-table__row').each(function() {
       const userId = parseInt($(this).data('userId'), 10);
       const user = usersInView.find(u => u.id === userId);
       if (!user) return;
-
-      let visible = true;
-
-      // User multiselect filter — exact ID match
-      if (userIds.length > 0) {
-        visible = userIds.includes(userId);
-      }
-
-      // Status filter
-      if (visible && status) {
-        const userStatus = user.status || 'never';
-        // Map filter option values to the status values on the user object
-        // status options: 'active' (online), 'inactive' (offline/never), 'completed', 'in_progress'
-        if (status === 'active') {
-          visible = userStatus === 'online';
-        } else if (status === 'inactive') {
-          visible = userStatus === 'offline' || userStatus === 'never';
-        } else if (status === 'completed' || status === 'in_progress') {
-          // Course-level statuses: user is visible if ANY of the filtered courses match
-          const userProgress = userCourseProgressAll[userId] || [];
-          const coursesToCheck = activeFilters.courseIds.length > 0
-            ? userProgress.filter(p => activeFilters.courseIds.includes(p.course_id))
-            : userProgress;
-          const progressStatus = status === 'completed' ? 'completed' : 'in_progress';
-          visible = coursesToCheck.some(p => p.progress_status === progressStatus);
-        }
-      }
-
-      // Enrolment date filter — user visible if ANY course has enrolled_at on/after the date
-      if (visible && enrolmentDate) {
-        const filterDate = new Date(enrolmentDate);
-        const userProgress = userCourseProgressAll[userId] || [];
-        const coursesToCheck = activeFilters.courseIds.length > 0
-          ? userProgress.filter(p => activeFilters.courseIds.includes(p.course_id))
-          : userProgress;
-        visible = coursesToCheck.some(p => p.enrolled_at && new Date(p.enrolled_at) >= filterDate);
-      }
-
-      // Completion date filter — user visible if ANY course completed on/after the date
-      if (visible && completionDate) {
-        const filterDate = new Date(completionDate);
-        const userProgress = userCourseProgressAll[userId] || [];
-        const coursesToCheck = activeFilters.courseIds.length > 0
-          ? userProgress.filter(p => activeFilters.courseIds.includes(p.course_id))
-          : userProgress;
-        visible = coursesToCheck.some(p => p.date_completed && new Date(p.date_completed) >= filterDate);
-      }
-
+      const visible = userPassesRowFilter(user);
       $(this).toggleClass('reporting-table__row--filtered', !visible);
       $(this).css('display', visible ? '' : 'none');
     });
   }
 
+  // ── Course-dependent field enable/disable ────────────────────────────────────
+  function updateCourseDepFieldState() {
+    const singleCourse = selectedCourseIds.length === 1;
+    const $depFields = $block.find('.filters__field--course-dep');
+    $depFields.toggleClass('is-disabled', !singleCourse);
+    $depFields.find('select, input[type="date"]').prop('disabled', !singleCourse);
+
+    if (!singleCourse) {
+      $block.find('#filter-status').val('').addClass('is-placeholder');
+      $block.find('#filter-enrolment-date').val('').addClass('is-placeholder');
+      $block.find('#filter-completion-date').val('').addClass('is-placeholder');
+    }
+  }
+
   // ── Filter form submit ────────────────────────────────────────────────────────
-  $block.find('.filters__form').on('submit', function(e) {
+  $block.find('.filters__form').on('submit', async function(e) {
     e.preventDefault();
+
+    const singleCourse = selectedCourseIds.length === 1;
 
     activeFilters.courseIds      = selectedCourseIds.slice();
     activeFilters.userIds        = selectedUserIds.slice();
-    activeFilters.status         = $block.find('#filter-status').val();
-    activeFilters.enrolmentDate  = $block.find('#filter-enrolment-date').val();
-    activeFilters.completionDate = $block.find('#filter-completion-date').val();
+    activeFilters.courseStatus   = singleCourse ? $block.find('#filter-status').val() : '';
+    activeFilters.userStatus     = $block.find('#filter-user-status').val();
+    activeFilters.enrolmentDate  = singleCourse ? $block.find('#filter-enrolment-date').val() : '';
+    activeFilters.completionDate = singleCourse ? $block.find('#filter-completion-date').val() : '';
 
     closeMultiselect($block.find('#bys-multiselect-course'));
     closeMultiselect($block.find('#bys-multiselect-users'));
+
+    // Row filters may match users not yet loaded — drain remaining pages first
+    const hasRowFilter = activeFilters.userIds.length > 0 ||
+      activeFilters.courseStatus || activeFilters.userStatus ||
+      activeFilters.enrolmentDate || activeFilters.completionDate;
+
+    if (hasRowFilter && loadedOffset < allGroupUserIds.length) {
+      const $btn = $block.find('.filters__submit');
+      $btn.prop('disabled', true).text('Loading…');
+      await loadAllRemainingUsers();
+      $btn.prop('disabled', false).text('Filter');
+    }
+
     applyFilters();
   });
 
@@ -399,9 +442,10 @@ jQuery(document).ready(function($) {
   $block.find('.filters__reset').on('click', function() {
     selectedCourseIds = [];
     selectedUserIds   = [];
-    activeFilters = { courseIds: [], userIds: [], status: '', enrolmentDate: '', completionDate: '' };
+    activeFilters = { courseIds: [], userIds: [], courseStatus: '', userStatus: '', enrolmentDate: '', completionDate: '' };
 
     resetFilterFormUI();
+    updateCourseDepFieldState();
     closeMultiselect($block.find('#bys-multiselect-course'));
     closeMultiselect($block.find('#bys-multiselect-users'));
     populateCourseMultiselect();
@@ -415,12 +459,22 @@ jQuery(document).ready(function($) {
   });
 
   function resetFilterFormUI() {
-    $block.find('#filter-status').val('');
-    $block.find('#filter-enrolment-date').val('');
-    $block.find('#filter-completion-date').val('');
+    $block.find('#filter-status').val('').addClass('is-placeholder');
+    $block.find('#filter-user-status').val('').addClass('is-placeholder');
+    $block.find('#filter-enrolment-date').val('').addClass('is-placeholder');
+    $block.find('#filter-completion-date').val('').addClass('is-placeholder');
   }
 
   // ── Table builders ────────────────────────────────────────────────────────────
+  function showSkeletonRows(count) {
+    const $tbody = $table.find('tbody');
+    $tbody.html('');
+    const rowTemplate = document.getElementById('skeleton-row-template');
+    for (let i = 0; i < count; i++) {
+      $tbody.append(rowTemplate.content.cloneNode(true));
+    }
+  }
+
   function rebuildTableHeader(courses) {
     const $thead = $table.find('thead');
     $thead.html('');
@@ -449,12 +503,12 @@ jQuery(document).ready(function($) {
 
       $headers.find('[data-course-idx]').attr('data-course-idx', idx);
 
-      const courseTitle = course.title?.rendered || course.title || '';
+      const courseTitle = course.shortname || course.title?.rendered || course.title || '';
       const requiredBadge = course.required
         ? ' <span class="bys-required-badge" aria-label="Required" title="Required">*</span>'
         : '';
       $headers.find('.bys-course-toggle').html(escapeHtml(courseTitle) + requiredBadge).attr('data-course-idx', idx);
-      $headers.find('.bys-dl-link').attr('title', `Download ${escapeHtml(courseTitle)}`);
+      $headers.find('.bys-dl-link').attr('title', `Download ${escapeHtml(courseTitle)}`).attr('data-course-idx', idx);
 
       $headers.children().each(function() {
         headerRow.appendChild(this);
@@ -490,8 +544,12 @@ jQuery(document).ready(function($) {
   }
 
   function rebuildTableBody(courses, users, userCourseProgress) {
+    $table.find('tbody').html('');
+    appendTableRows(courses, users, userCourseProgress);
+  }
+
+  function appendTableRows(courses, users, userCourseProgress) {
     const $tbody = $table.find('tbody');
-    $tbody.html('');
 
     const rowTemplate = document.getElementById('skeleton-row-template');
     const cellTemplate = document.getElementById('course-cell-template');
@@ -502,7 +560,7 @@ jQuery(document).ready(function($) {
       const rowContent = rowTemplate.content.cloneNode(true);
       const $row = $(rowContent);
 
-      $row.find('tr').attr('data-user-id', user.id);
+      $row.find('tr').attr('data-user-id', user.id).removeClass('reporting-table__row--loading');
 
       const userStatus = user.status || 'never';
       const statusClass = `status-badge--${userStatus}`;
@@ -517,9 +575,10 @@ jQuery(document).ready(function($) {
 
       $row.find('.status-badge').attr('class', `status-badge ${statusClass}`).html(statusBadge);
 
+      const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.display_name || '';
       $row.find('.col-name').html(`
         <a href="${detailUrl}?group_id=${currentGroupId}&user_id=${user.id}" class="reporting-table__name-link" onclick="event.stopPropagation();">
-          ${escapeHtml(user.display_name)}
+          ${escapeHtml(fullName)}
         </a>
       `);
       $row.find('.col-email').html(escapeHtml(user.email));
@@ -570,11 +629,18 @@ jQuery(document).ready(function($) {
     courseQuizLoadedIdx.add(courseIdx);
 
     let quizSteps = [];
-    try {
-      quizSteps = await api.get(endpoints.courseQuizSteps(course.id)) || [];
-    } catch (err) {
-      console.error(`[group-reporting] Failed to fetch quiz steps for course ${course.id}:`, err);
+    if (courseQuizStepsCache[course.id]) {
+      quizSteps = courseQuizStepsCache[course.id];
+    } else {
+      try {
+        quizSteps = await api.get(endpoints.courseQuizSteps(course.id)) || [];
+        courseQuizStepsCache[course.id] = quizSteps;
+      } catch (err) {
+        console.error(`[group-reporting] Failed to fetch quiz steps for course ${course.id}:`, err);
+      }
     }
+
+    if (!userQuizProgressCache[course.id]) userQuizProgressCache[course.id] = {};
 
     const userQuizProgressMap = {};
     for (const user of usersInView) {
@@ -585,9 +651,11 @@ jQuery(document).ready(function($) {
         if (Array.isArray(quizzes)) {
           quizzes.forEach(q => { userQuizProgressMap[user.id][q.id] = q; });
         }
+        userQuizProgressCache[course.id][user.id] = userQuizProgressMap[user.id];
       } catch (err) {
         console.error(`[group-reporting] Failed to fetch quiz progress for user ${user.id}:`, err);
         userQuizProgressMap[user.id] = {};
+        userQuizProgressCache[course.id][user.id] = {};
       }
     }
 
@@ -596,6 +664,203 @@ jQuery(document).ready(function($) {
       const userQuizProgress = userQuizProgressMap[userId] || {};
       $(this).html(buildQuizBars(quizSteps, userId, userQuizProgress));
     });
+  }
+
+  // ── Show More / lazy load ─────────────────────────────────────────────────────
+
+  function updateShowMoreButton() {
+    const $btn = $block.find('.bys-show-more');
+    const hasMore = sortedUsers.length > 0
+      ? displayedCount < sortedUsers.length
+      : loadedOffset < allGroupUserIds.length;
+    $btn.toggleClass('hidden', !hasMore);
+  }
+
+  $block.on('click', '.bys-show-more', function() {
+    loadMoreUsers();
+  });
+
+  /**
+   * Core: fetch a specific batch of user IDs, get their progress, append rows.
+   * Returns the array of newly loaded users (or empty array on failure).
+   */
+  async function fetchAndAppendUsers(nextIds) {
+    const usersUrl = `/wp-json/bys-groups/v1/groups/${currentGroupId}/users?user_ids=${nextIds.join(',')}`;
+    const newUsers = await api.get(usersUrl, true);
+    if (!newUsers || !Array.isArray(newUsers)) return [];
+
+    const courseIds = coursesInView.map(c => c.id).join(',');
+    if (courseIds) {
+      for (const user of newUsers) {
+        const progressUrl = `/wp-json/bys-groups/v1/users/${user.id}/course-progress?course_ids=${courseIds}`;
+        try {
+          userCourseProgressAll[user.id] = await api.get(progressUrl, true);
+        } catch (err) {
+          console.error(`Failed to fetch course progress for user ${user.id}:`, err);
+          userCourseProgressAll[user.id] = [];
+        }
+      }
+    } else {
+      newUsers.forEach(u => { userCourseProgressAll[u.id] = []; });
+    }
+
+    usersInView = usersInView.concat(newUsers);
+    loadedOffset += newUsers.length;
+    appendTableRows(coursesInView, newUsers, userCourseProgressAll);
+
+    if (expandedIdx !== null && courseQuizLoadedIdx.has(expandedIdx)) {
+      await loadQuizDataForNewUsers(expandedIdx, newUsers);
+    }
+
+    return newUsers;
+  }
+
+  async function loadMoreUsers() {
+    const $btn = $block.find('.bys-show-more');
+
+    // Post-sort: data already in memory — just render the next page
+    if (sortedUsers.length > 0 && displayedCount < sortedUsers.length) {
+      const nextPage = sortedUsers.slice(displayedCount, displayedCount + PAGE_SIZE);
+      displayedCount += nextPage.length;
+      appendTableRows(coursesInView, nextPage, userCourseProgressAll);
+      if (expandedIdx !== null && courseQuizLoadedIdx.has(expandedIdx)) {
+        await loadQuizDataForNewUsers(expandedIdx, nextPage);
+      }
+      applyFilters();
+      updateShowMoreButton();
+      return;
+    }
+
+    const nextIds = allGroupUserIds.slice(loadedOffset, loadedOffset + PAGE_SIZE);
+    if (!nextIds.length) { $btn.addClass('hidden'); return; }
+
+    $btn.prop('disabled', true).text('Loading…');
+    try {
+      await fetchAndAppendUsers(nextIds);
+      applyFilters();
+      updateShowMoreButton();
+    } catch (err) {
+      console.error('[group-reporting] Failed to load more users:', err);
+    } finally {
+      $btn.prop('disabled', false).text('Show More Results');
+    }
+  }
+
+  /**
+   * Load all users not yet fetched, in PAGE_SIZE batches.
+   * Used when a filter is submitted that may match users beyond the current page.
+   */
+  async function loadAllRemainingUsers() {
+    while (loadedOffset < allGroupUserIds.length) {
+      const nextIds = allGroupUserIds.slice(loadedOffset, loadedOffset + PAGE_SIZE);
+      if (!nextIds.length) break;
+      try {
+        await fetchAndAppendUsers(nextIds);
+      } catch (err) {
+        console.error('[group-reporting] Failed to load remaining users for filter:', err);
+        break;
+      }
+    }
+    updateShowMoreButton();
+  }
+
+  async function loadQuizDataForNewUsers(courseIdx, newUsers) {
+    const course = coursesInView[courseIdx];
+    if (!course) return;
+
+    const quizSteps = courseQuizStepsCache[course.id] || [];
+    if (!quizSteps.length) return;
+
+    for (const user of newUsers) {
+      try {
+        const url = endpoints.userQuizProgress(user.id) + `?group_id=${currentGroupId}&course_ids=${course.id}`;
+        const quizzes = await api.get(url);
+        const userQuizProgress = {};
+        if (Array.isArray(quizzes)) {
+          quizzes.forEach(q => { userQuizProgress[q.id] = q; });
+        }
+        $table.find(`tr[data-user-id="${user.id}"] .course-sub-cell--quizzing[data-course-idx="${courseIdx}"]`)
+          .html(buildQuizBars(quizSteps, user.id, userQuizProgress));
+      } catch (err) {
+        console.error(`[group-reporting] Failed to fetch quiz progress for new user ${user.id}:`, err);
+      }
+    }
+  }
+
+  // ── Sort ──────────────────────────────────────────────────────────────────────
+
+  $block.on('change', '#sort-select', async function() {
+    currentSort = $(this).val();
+    const $select = $(this);
+
+    if (loadedOffset < allGroupUserIds.length) {
+      $select.prop('disabled', true);
+      await loadAllRemainingUsers();
+      $select.prop('disabled', false);
+    }
+
+    sortAndRebuildTable();
+  });
+
+  function getUserSortDate(user) {
+    const userProgress = userCourseProgressAll[user.id] || [];
+    const coursesToCheck = activeFilters.courseIds.length > 0
+      ? userProgress.filter(p => activeFilters.courseIds.includes(p.course_id))
+      : userProgress;
+    const dates = coursesToCheck
+      .map(p => p.enrolled_at ? new Date(p.enrolled_at).getTime() : 0)
+      .filter(d => d > 0);
+    return dates.length ? Math.max(...dates) : 0;
+  }
+
+  function sortAndRebuildTable() {
+    sortedUsers = [...usersInView];
+
+    switch (currentSort) {
+      case 'name_asc':
+        sortedUsers.sort((a, b) => {
+          const na = ([a.first_name, a.last_name].filter(Boolean).join(' ') || a.display_name || '').toLowerCase();
+          const nb = ([b.first_name, b.last_name].filter(Boolean).join(' ') || b.display_name || '').toLowerCase();
+          return na.localeCompare(nb);
+        });
+        break;
+      case 'name_desc':
+        sortedUsers.sort((a, b) => {
+          const na = ([a.first_name, a.last_name].filter(Boolean).join(' ') || a.display_name || '').toLowerCase();
+          const nb = ([b.first_name, b.last_name].filter(Boolean).join(' ') || b.display_name || '').toLowerCase();
+          return nb.localeCompare(na);
+        });
+        break;
+      case 'date_asc':
+        sortedUsers.sort((a, b) => getUserSortDate(a) - getUserSortDate(b));
+        break;
+      case 'date_desc':
+      default:
+        sortedUsers.sort((a, b) => getUserSortDate(b) - getUserSortDate(a));
+        break;
+    }
+
+    displayedCount = Math.min(PAGE_SIZE, sortedUsers.length);
+    const wasExpanded = expandedIdx;
+    rebuildTableBody(coursesInView, sortedUsers.slice(0, displayedCount), userCourseProgressAll);
+
+    // Restore expanded course state and quiz data from cache
+    if (wasExpanded !== null) {
+      expandCourse(wasExpanded);
+      applyColumnFilter();
+      const course = coursesInView[wasExpanded];
+      if (course && courseQuizLoadedIdx.has(wasExpanded) && userQuizProgressCache[course.id]) {
+        const quizSteps = courseQuizStepsCache[course.id] || [];
+        $table.find(`.course-sub-cell--quizzing[data-course-idx="${wasExpanded}"]`).each(function() {
+          const userId = $(this).closest('tr').data('userId');
+          const userQuizProgress = userQuizProgressCache[course.id][userId] || {};
+          $(this).html(buildQuizBars(quizSteps, userId, userQuizProgress));
+        });
+      }
+    }
+
+    updateShowMoreButton();
+    applyFilters();
   }
 
   // ── Course Multiselect ────────────────────────────────────────────────────────
@@ -698,6 +963,7 @@ jQuery(document).ready(function($) {
       $(this).closest('li').attr('aria-selected', 'false');
     }
     syncPills($block.find('#bys-multiselect-course'));
+    updateCourseDepFieldState();
   });
 
   // Pill remove
@@ -708,6 +974,7 @@ jQuery(document).ready(function($) {
     $block.find(`#bys-multiselect-course-dropdown input[value="${id}"]`).prop('checked', false)
       .closest('li').attr('aria-selected', 'false');
     syncPills($block.find('#bys-multiselect-course'));
+    updateCourseDepFieldState();
   });
 
   // Search within course dropdown
@@ -869,6 +1136,153 @@ jQuery(document).ready(function($) {
     });
     $block.find('#bys-multiselect-users .bys-multiselect__empty').toggleClass('hidden', visibleCount > 0);
   });
+
+  // ── Placeholder class for native select/date ─────────────────────────────────
+  $block.on('change', '#filter-status, #filter-user-status', function() {
+    $(this).toggleClass('is-placeholder', !$(this).val());
+  });
+
+  $block.on('change', '#filter-enrolment-date, #filter-completion-date', function() {
+    $(this).toggleClass('is-placeholder', !$(this).val());
+  });
+
+  // ── Export ────────────────────────────────────────────────────────────────────
+
+  $block.on('click', '.table__actions__export a', async function(e) {
+    e.preventDefault();
+    if (!currentGroupId) return;
+
+    const $link = $(this);
+    $link.addClass('is-loading').text('Exporting…');
+
+    try {
+      await exportTableToCsv();
+    } finally {
+      $link.removeClass('is-loading').html('<i class="fa-regular fa-download"></i> Export Table');
+    }
+  });
+
+  $table.on('click', '.bys-dl-link', async function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!currentGroupId) return;
+
+    const courseIdx = parseInt($(this).data('courseIdx'), 10);
+    const course = coursesInView[courseIdx];
+    if (!course) return;
+
+    const $link = $(this);
+    $link.addClass('is-loading').html('<i class="fa-regular fa-spinner fa-spin"></i>');
+
+    try {
+      await exportCourseToCsv(course);
+    } finally {
+      $link.removeClass('is-loading').html('<i class="fa-regular fa-download"></i>');
+    }
+  });
+
+  /**
+   * Shared: get the filtered, ordered user list for any export.
+   * Loads all remaining users first if they haven't been fetched yet.
+   */
+  async function getExportUsers() {
+    if (loadedOffset < allGroupUserIds.length) {
+      await loadAllRemainingUsers();
+    }
+    const ordered = sortedUsers.length > 0 ? [...sortedUsers] : [...usersInView];
+    return ordered.filter(user => userPassesRowFilter(user));
+  }
+
+  /**
+   * Shared: serialize a 2-D array of strings to a UTF-8 CSV blob and trigger download.
+   */
+  function downloadCsv(rows, filename) {
+    const csv = rows.map(row =>
+      row.map(cell => {
+        const str = String(cell ?? '');
+        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+          return '"' + str.replace(/"/g, '""') + '"';
+        }
+        return str;
+      }).join(',')
+    ).join('\n');
+
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function courseProgressCells(courseData) {
+    const progressLabel = { completed: 'Completed', in_progress: 'In Progress', not_started: 'Not Started' };
+    const progressStatus = courseData?.progress_status || 'not_started';
+    const stepsCompleted = courseData?.steps_completed || 0;
+    const stepsTotal = courseData?.steps_total || 0;
+    const percentage = stepsTotal > 0 ? Math.round((stepsCompleted / stepsTotal) * 100) : 0;
+    return [
+      progressLabel[progressStatus] || progressStatus,
+      `${percentage}%`,
+      courseData?.enrolled_at ? formatDate(courseData.enrolled_at) : '',
+      courseData?.date_completed ? formatDate(courseData.date_completed) : '',
+    ];
+  }
+
+  async function exportTableToCsv() {
+    const filteredUsers = await getExportUsers();
+
+    // Determine which courses to include (respect active course column filter)
+    const coursesToExport = activeFilters.courseIds.length > 0
+      ? coursesInView.filter(c => activeFilters.courseIds.includes(c.id))
+      : [...coursesInView];
+
+    const statusLabel = { online: 'Online', offline: 'Offline', never: 'Never Logged In' };
+
+    const headers = ['Status', 'Name', 'Email'];
+    coursesToExport.forEach(course => {
+      const title = course.shortname || course.title?.rendered || course.title || '';
+      const req = course.required ? ' (Required)' : '';
+      headers.push(`${title}${req} - Course Status`, `${title}${req} - Progress`, `${title}${req} - Enrolled`, `${title}${req} - Completed`);
+    });
+
+    const rows = [headers];
+    filteredUsers.forEach(user => {
+      const userProgress = userCourseProgressAll[user.id] || [];
+      const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.display_name || '';
+      const row = [statusLabel[user.status] || 'Never Logged In', fullName, user.email || ''];
+      coursesToExport.forEach(course => {
+        row.push(...courseProgressCells(userProgress.find(cp => cp.course_id === course.id)));
+      });
+      rows.push(row);
+    });
+
+    const today = new Date().toISOString().split('T')[0];
+    downloadCsv(rows, `group-report-${currentGroupId}-${today}.csv`);
+  }
+
+  async function exportCourseToCsv(course) {
+    const filteredUsers = await getExportUsers();
+
+    const title = course.shortname || course.title?.rendered || course.title || '';
+    const req = course.required ? ' (Required)' : '';
+
+    const headers = ['Name', 'Email', `${title}${req} - Course Status`, `${title}${req} - Progress`, `${title}${req} - Enrolled`, `${title}${req} - Completed`];
+
+    const rows = [headers];
+    filteredUsers.forEach(user => {
+      const userProgress = userCourseProgressAll[user.id] || [];
+      const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.display_name || '';
+      rows.push([fullName, user.email || '', ...courseProgressCells(userProgress.find(cp => cp.course_id === course.id))]);
+    });
+
+    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const today = new Date().toISOString().split('T')[0];
+    downloadCsv(rows, `course-report-${slug}-${today}.csv`);
+  }
 
   // ── Utilities ─────────────────────────────────────────────────────────────────
   function formatDate(dateString) {
