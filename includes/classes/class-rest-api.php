@@ -121,6 +121,13 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'permission_callback' => array($this, 'check_user_permission'),
             ));
 
+            // userCourseStepsProgress - all steps progress for a user in a course (lessons, topics, quizzes)
+            register_rest_route($this->namespace, '/users/(?P<user_id>\d+)/course-progress-steps/(?P<course_id>\d+)', array(
+                'methods'             => 'GET',
+                'callback'            => array($this, 'get_user_course_steps_progress'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
+
             // userActivity - activity log for a user
             register_rest_route($this->namespace, '/users/(?P<user_id>\d+)/activity', array(
                 'methods'             => 'GET',
@@ -673,14 +680,16 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 // Get completion date from activity table
                 $completed_ts = $completion_map[$course_id] ?? null;
                 $date_completed = $completed_ts ? wp_date('c', intval($completed_ts)) : null;
+                $date_completed_gmt = $completed_ts ? gmdate('Y-m-d H:i:s', intval($completed_ts)) : null;
 
                 $result[] = array(
-                    'course_id'       => $course_id,
-                    'progress_status' => $course_progress['status'],
-                    'steps_completed' => $course_progress['completed'],
-                    'steps_total'     => $course_progress['total'],
-                    'enrolled_at'     => $enrolled_at,
-                    'date_completed'  => $date_completed,
+                    'course_id'           => $course_id,
+                    'progress_status'     => $course_progress['status'],
+                    'steps_completed'     => $course_progress['completed'],
+                    'steps_total'         => $course_progress['total'],
+                    'enrolled_at'         => $enrolled_at,
+                    'date_completed'      => $date_completed,
+                    'date_completed_gmt'  => $date_completed_gmt,
                 );
             }
 
@@ -1078,6 +1087,12 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 return new \WP_REST_Response(array('error' => 'Invalid user ID'), 400);
             }
 
+            // Check if course_id is provided - if so, return last activity for that course only
+            $course_id = intval($request->get_param('course_id') ?? 0);
+            if ($course_id) {
+                return $this->get_user_course_last_activity($user_id, $course_id);
+            }
+
             $activity_filter = sanitize_text_field($request->get_param('activity') ?? '');
             $date_from = sanitize_text_field($request->get_param('date_from') ?? '');
             $date_to = sanitize_text_field($request->get_param('date_to') ?? '');
@@ -1092,6 +1107,11 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'account_settings_update' => 'Updated Account Settings',
                 'certificate_earned'      => 'Earned a Certificate',
                 'certificate_viewed'      => 'Viewed a Certificate',
+                'lesson_completed'        => 'Completed a Lesson',
+                'topic_completed'         => 'Completed a Topic',
+                'quiz_submitted'          => 'Submitted a Quiz',
+                'course_enrolled'         => 'Enrolled in a Course',
+                'course_unenrolled'       => 'Unenrolled from a Course',
             );
 
             $where_clauses = array(
@@ -1233,6 +1253,103 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             set_transient($cache_key, true, 12 * HOUR_IN_SECONDS);
 
             return new \WP_REST_Response(array('message' => 'Certificate view logged'), 200);
+        }
+
+        /**
+         * Get last activity timestamp for user in a specific course
+         * Uses LearnDash native function learndash_get_user_activity()
+         */
+        private function get_user_course_last_activity($user_id, $course_id) {
+            try {
+                // Use LearnDash native function to get last activity
+                if (function_exists('learndash_get_user_activity')) {
+                    $activity = learndash_get_user_activity(array(
+                        'user_id'   => intval($user_id),
+                        'course_id' => intval($course_id)
+                    ));
+
+                    if ($activity && isset($activity->activity_updated)) {
+                        // activity_updated is a MySQL GMT timestamp string
+                        $last_activity_gmt = $activity->activity_updated;
+
+                        return new \WP_REST_Response(array(
+                            'last_activity_gmt' => $last_activity_gmt
+                        ), 200);
+                    }
+                } else {
+                    error_log('[BYS Groups] learndash_get_user_activity function not found');
+                }
+            } catch (\Exception $e) {
+                error_log('[BYS Groups] Error getting user last activity: ' . $e->getMessage());
+                return new \WP_REST_Response(array('error' => $e->getMessage()), 500);
+            }
+
+            return new \WP_REST_Response(array('last_activity_gmt' => null), 200);
+        }
+
+        /**
+         * Get all steps progress for a user in a course
+         * Fetches lessons, topics, and quizzes with their completion status
+         * Handles pagination to get all steps (not just first 10)
+         */
+        public function get_user_course_steps_progress($request) {
+            $user_id = intval($request['user_id']);
+            $course_id = intval($request['course_id']);
+
+            if (!$user_id || !$course_id) {
+                return new \WP_REST_Response(array('error' => 'Invalid user_id or course_id'), 400);
+            }
+
+            // Get validated auth header for LD API
+            $auth_result = $this->get_validated_auth_header();
+            if (is_a($auth_result, 'WP_REST_Response')) {
+                return $auth_result;
+            }
+            $auth_header = $auth_result;
+
+            // Fetch all steps progress for user in course using LD API endpoint
+            // The LD API paginates by default, so we need to fetch all pages
+            $all_steps = array();
+            $page = 1;
+            $per_page = 100; // Request max per page to minimize API calls
+
+            while (true) {
+                $ld_api_url = get_home_url() . "/wp-json/ldlms/v2/users/{$user_id}/course-progress/{$course_id}/steps?per_page={$per_page}&page={$page}";
+
+                $response = wp_remote_get($ld_api_url, array(
+                    'headers' => array('Authorization' => $auth_header),
+                    'timeout' => 30,
+                    'sslverify' => false,
+                ));
+
+                if (is_wp_error($response)) {
+                    return new \WP_REST_Response(array('error' => $response->get_error_message()), 500);
+                }
+
+                $status = wp_remote_retrieve_response_code($response);
+                $body = wp_remote_retrieve_body($response);
+
+                if ($status !== 200) {
+                    return new \WP_REST_Response(array('error' => 'Failed to fetch course steps progress from LearnDash API', 'status' => $status), $status);
+                }
+
+                $data = json_decode($body, true);
+
+                if (!is_array($data) || empty($data)) {
+                    break; // No more pages
+                }
+
+                $all_steps = array_merge($all_steps, $data);
+
+                // Check if there are more pages
+                if (count($data) < $per_page) {
+                    break; // Last page
+                }
+
+                $page++;
+            }
+
+            return new \WP_REST_Response($all_steps, 200);
         }
     }
 }

@@ -38,13 +38,25 @@ $auth_header = BYS_Groups_Auth::get_auth_header();
 
         <!-- Template: Course accordion item -->
         <template id="user-progress-course-template">
-            <div class="hs-accordion">
+            <div class="hs-accordion" data-course-id="">
                 <button class="hs-accordion-toggle btn-unstyled" aria-expanded="false">
-                    <span class="accordion-toggle__icon">
-                        <i class="fa-solid fa-plus hs-accordion-active:hidden block"></i>
-                        <i class="fa-solid fa-minus hs-accordion-active:block hidden"></i>
-                    </span>
-                    <span class="accordion-toggle__course-name"></span>
+                    <div class="accordion-toggle__left-wrapper">
+                        <span class="accordion-toggle__icon">
+                            <i class="fa-solid fa-plus hs-accordion-active:hidden block"></i>
+                            <i class="fa-solid fa-minus hs-accordion-active:block hidden"></i>
+                        </span>
+                        <span class="accordion-toggle__course-name"></span>
+                    </div>
+                    <div class="accordion-toggle__right-wrapper">
+                        <span class="accordion-toggle__date"></span>
+                        <span class="accordion-toggle__completion">
+                            <span class="completion-badge"></span>
+                        </span>
+                        <span class="accordion-toggle__progress">
+                            <span class="course-steps-completed">0</span>/<span class="course-steps-total">0</span>
+                            <?php esc_html_e('Lessons', 'bys'); ?>
+                        </span>
+                    </div>
                 </button>
                 <div class="hs-accordion-content hidden w-full overflow-hidden transition-[height] duration-300" role="region">
                     <div class="accordion-content__inner"></div>
@@ -54,15 +66,22 @@ $auth_header = BYS_Groups_Auth::get_auth_header();
 
         <!-- Template: sfwd-lesson (module) section with nested sfwd-topics -->
         <template id="user-progress-lesson-template">
-            <div class="module">
-                <div class="module__header">
-                    <span class="module__name"></span>
+            <div class="lesson">
+                <div class="lesson__header">
+                    <span class="lesson__name"></span>
+                    <span class="lesson__completion">
+                        <span class="completion-badge"></span>
+                    </span>
                 </div>
-                <div class="module__content">
-                    <table class="lessons-table">
+                <div class="lesson__content">
+                    <table>
                         <thead>
                             <tr>
-                                <th>Lesson</th>
+                                <th><?php esc_html_e('Lesson', 'bys'); ?></th>
+                                <th><?php esc_html_e('Status', 'bys'); ?></th>
+                                <th><?php esc_html_e('Visits', 'bys'); ?></th>
+                                <th><?php esc_html_e('Time Spent', 'bys'); ?></th>
+                                <th><?php esc_html_e('Last Accessed', 'bys'); ?></th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -75,13 +94,19 @@ $auth_header = BYS_Groups_Auth::get_auth_header();
         <template id="user-progress-topic-template">
             <tr>
                 <td class="topic-name"></td>
+                <td class="topic-completion">
+                    <span class="completion-badge"></span>
+                </td>
+                <td class="topic-visits"></td>
+                <td class="topic-timespent"></td>
+                <td class="topic-last-accessed"></td>
             </tr>
         </template>
 
     </div>
 
-    <div class="user-progress__achievements">
+    <div class="user-progress-achievements">
         <h6 class="user-progress__section-title">Achievements</h6>
-        <div class="achievements__list"></div>
+        <div class="user-progress-achievements__list"></div>
     </div>
 </div>
