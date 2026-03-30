@@ -14,91 +14,63 @@ foreach ($attrs as $a) {
     }
 }
 
+$stats = [
+	[
+		'icon' => 'fire.svg',
+		'alt'  => 'required courses',
+		'stat' => 'required_courses',
+		'label' => 'Required Courses',
+	],
+	[
+		'icon' => 'check-seal.svg',
+		'alt'  => 'total courses',
+		'stat' => 'total_courses',
+		'label' => 'Total Courses',
+	],
+	[
+		'icon' => 'fire.svg',
+		'alt'  => 'logins',
+		'stat' => 'total_logins',
+		'label' => 'Logins',
+	],
+    [
+        'icon' => 'fire.svg',
+        'alt'  => 'total time',
+        'stat' => 'total_time',
+        'label' => 'Total Time',
+    ],
+	[
+		'icon' => 'fire.svg',
+		'alt'  => 'total topics completed',
+		'stat' => 'total_topics_completed',
+		'label' => 'Lessons Completed',
+	],
+    [
+		'icon' => 'fire.svg',
+		'alt'  => 'total quizzes completed',
+		'stat' => 'total_quizzes_completed',
+		'label' => 'Quizzes Completed',
+	],
+];
+
 $wrapper_attributes = get_block_wrapper_attributes([
     // 'data-priority' => esc_attr($priority),
 ]);
 ?>
 
 <div <?= $wrapper_attributes; ?>>
-    <h3>Quick Stats</h3>
+    <h3><?php esc_html_e('Quick Stats', 'bys'); ?></h3>
     <div class="stats__grid">
-        <div class="stat__box">
-            <div class="stat__icon">
-                <img src="<?= esc_url(BYS_GROUPS_PLUGIN_URL . 'assets/img/fire.svg'); ?>" alt="fire" />
-            </div>
-            <div class="stat__text">
-                <span class="stat__number">
-                    n/a
-                </span>
-                <span class="stat__label">
-                    Required Courses
-                </span>
-            </div>
-        </div>
-        <div class="stat__box">
-            <div class="stat__icon">
-                <img src="<?= esc_url(BYS_GROUPS_PLUGIN_URL . 'assets/img/check-seal.svg'); ?>" alt="fire" />
-            </div>
-            <div class="stat__text">
-                <span class="stat__number">
-                    n/a
-                </span>
-                <span class="stat__label">
-                    Total Courses
-                </span>
-            </div>
-        </div>
-        <div class="stat__box">
-            <div class="stat__icon">
-                <img src="<?= esc_url(BYS_GROUPS_PLUGIN_URL . 'assets/img/fire.svg'); ?>" alt="fire" />
-            </div>
-            <div class="stat__text">
-                <span class="stat__number">
-                    n/a
-                </span>
-                <span class="stat__label">
-                    Logins
-                </span>
-            </div>
-        </div>
-        <div class="stat__box">
-            <div class="stat__icon">
-                <img src="<?= esc_url(BYS_GROUPS_PLUGIN_URL . 'assets/img/fire.svg'); ?>" alt="fire" />
-            </div>
-            <div class="stat__text">
-                <span class="stat__number">
-                    n/a
-                </span>
-                <span class="stat__label">
-                    Total Time
-                </span>
-            </div>
-        </div>
-        <div class="stat__box">
-            <div class="stat__icon">
-                <img src="<?= esc_url(BYS_GROUPS_PLUGIN_URL . 'assets/img/fire.svg'); ?>" alt="fire" />
-            </div>
-            <div class="stat__text">
-                <span class="stat__number">
-                    n/a
-                </span>
-                <span class="stat__label">
-                    Lessons Completed
-                </span>
-            </div>
-        </div>
-        <div class="stat__box">
-            <div class="stat__icon">
-                <img src="<?= esc_url(BYS_GROUPS_PLUGIN_URL . 'assets/img/fire.svg'); ?>" alt="fire" />
-            </div>
-            <div class="stat__text">
-                <span class="stat__number">
-                    n/a
-                </span>
-                <span class="stat__label">
-                    Quizzes Completed
-                </span>
-            </div>
-        </div>
-    </div>
+        <?php foreach ($stats as $stat) : ?>
+			<div class="stat__box">
+				<div class="stat__icon">
+					<img src="<?php echo esc_url( BYS_GROUPS_PLUGIN_URL . 'assets/img/' . $stat['icon'] ); ?>" alt="<?php echo esc_attr( $stat['alt'] ); ?>" />
+				</div>
+				<div class="stat__content">
+					<span class="stat__number stat__number--loading" data-bys-stat="<?php echo esc_attr( $stat['stat'] ); ?>"></span>
+					<span class="stat__label"><?php esc_html_e( $stat['label'] ); ?></span>
+				</div>
+			</div>
+		<?php endforeach; ?>
+	</div>
 </div>
