@@ -1,0 +1,55 @@
+/**
+ * Shared tooltip styles for all blocks
+ * Used with tooltip.js utility
+ */
+
+.bys-groups-tooltip {
+  background: white;
+  color: var(--wp--preset--color--gray-700);
+  padding: var(--wp--preset--spacing--3);
+  border-radius: 0.5rem;
+  border: 1px solid var(--wp--preset--color--gray-100);
+  box-shadow: 0 2px 8px 0 rgba(99, 99, 150, 0.15);
+  font-size: var(--wp--preset--font-size--x-small);
+  word-wrap: break-word;
+  max-width: 20rem;
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  animation: bys-tooltip-fade-in 0.15s ease-out;
+  
+  &__title {
+    font-weight: 600;
+    margin-bottom: var(--wp--preset--spacing--1);
+  }
+  
+  &__content {
+    font-size: var(--wp--preset--font-size--x-small);
+    opacity: 0.9;
+  }
+  
+  &__fraction,
+  &__percentage {
+    margin: 0;
+  }
+  
+  &__fraction {
+    font-weight: 600;
+  }
+  
+  &__percentage {
+    font-size: var(--wp--preset--font-size--x-small);
+    opacity: 0.8;
+  }
+}
+
+@keyframes bys-tooltip-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

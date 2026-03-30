@@ -32,6 +32,9 @@ if (!class_exists('BYS_Groups_Blocks')) {
         private function init() {
             // Run block registration
             add_action('init', array($this, 'bys_groups_register_blocks'));
+
+            // Enqueue shared block styles
+            add_action('wp_enqueue_scripts', array($this, 'enqueue_shared_block_components_styles'));
         }
 
         /**
@@ -46,6 +49,27 @@ if (!class_exists('BYS_Groups_Blocks')) {
                     register_block_type($block_path);
                 }
             }
+        }
+
+        /**
+         * Enqueue shared block component styles
+         */
+        public function enqueue_shared_block_components_styles() {
+            // Loading component styles
+            wp_enqueue_style(
+                'bys-groups-loading',
+                BYS_GROUPS_PLUGIN_URL . 'blocks/src/_shared/loading.css',
+                [],
+                BYS_GROUPS_VERSION
+            );
+
+            // Tooltip component styles
+            wp_enqueue_style(
+                'bys-groups-tooltip',
+                BYS_GROUPS_PLUGIN_URL . 'blocks/src/_shared/tooltip.css',
+                [],
+                BYS_GROUPS_VERSION
+            );
         }
     }
 }
