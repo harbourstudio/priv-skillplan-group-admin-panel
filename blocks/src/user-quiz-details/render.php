@@ -47,10 +47,9 @@ $auth_header = BYS_Groups_Auth::get_auth_header();
                     <label for="filter-status"><?php esc_html_e('Status', 'bys'); ?></label>
                     <select id="filter-status" name="status">
                         <option value=""><?php esc_html_e('All Statuses', 'bys'); ?></option>
-                        <option value="active"><?php esc_html_e('Active', 'bys'); ?></option>
-                        <option value="completed"><?php esc_html_e('Completed', 'bys'); ?></option>
-                        <option value="inactive"><?php esc_html_e('Inactive', 'bys'); ?></option>
-                        <option value="in_progress"><?php esc_html_e('In Progress', 'bys'); ?></option>
+                        <option value="pass"><?php esc_html_e('Passed', 'bys'); ?></option>
+                        <option value="fail"><?php esc_html_e('Failed', 'bys'); ?></option>
+                        <option value="ungraded"><?php esc_html_e('Ungraded', 'bys'); ?></option>
                     </select>
                 </div>
 

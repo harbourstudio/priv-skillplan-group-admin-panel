@@ -44,6 +44,7 @@ $wrapper_attributes = get_block_wrapper_attributes();
                             <th class="col_attempt_date"><?php esc_html_e('Submitted', 'bys'); ?></th>
                             <th class="col_attempt_score"><?php esc_html_e('Score', 'bys'); ?></th>
                             <th class="col_attempt_status"><?php esc_html_e('Status', 'bys'); ?></th>
+                            <th class="col_attempt_details"></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -61,6 +62,13 @@ $wrapper_attributes = get_block_wrapper_attributes();
             <td class="cell_attempt_date"></td>
             <td class="cell_attempt_score"></td>
             <td><span class="status-badge"></span></td>
+            <td class="cell_attempt_details">
+                <a
+                    class="cell_attempt_details"
+                >
+                    <i class="fa-solid fa-ellipsis"></i>
+                </a>
+            </td>
         </tr>
     </template>
 

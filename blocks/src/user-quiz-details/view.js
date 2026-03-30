@@ -17,8 +17,10 @@ jQuery(document).ready(($) => {
     const $tableBody = $block.find('table').find('tbody');
     const $table = $block.find('table');
     const tableTemplate = $block.find('#user-quiz-details_template-row')[0];
+    const $filterForm = $block.find('.filters__form');
 
     let dataLoaded = false;
+    let allQuizzes = []; // Store original unfiltered data
 
     // Handle score_sort radio button change
     const updateColumnVisibility = (sortMode) => {
@@ -61,8 +63,72 @@ jQuery(document).ready(($) => {
             return;
         }
 
-        // Clear the tbody and render table rows
+        // Store original data for filtering
+        allQuizzes = quizzes;
+
+        // Render quizzes
+        renderQuizzes(quizzes);
+
+        // Bind filter form submit
+        $filterForm.on('submit', function(e) {
+          e.preventDefault();
+          applyFilters();
+        });
+
+        // Bind filter reset
+        $filterForm.find('.filters__reset').on('click', function() {
+          $filterForm[0].reset();
+          renderQuizzes(allQuizzes);
+        });
+        } catch (err) {
+            console.error('[user-quiz-details] Failed to fetch quiz progress:', err);
+            $tableBody.html('<tr><td>Failed to load quiz data.</td></tr>');
+        }
+    };
+
+    // Apply filters to quiz data
+    const applyFilters = () => {
+      const keyword = $filterForm.find('#filter-keyword').val().toLowerCase();
+      const status = $filterForm.find('#filter-status').val();
+      const dateRange = $filterForm.find('#filter-date_range').val();
+
+      const filtered = allQuizzes.filter((quiz) => {
+        // Keyword filter: search quiz title OR course title
+        if (keyword) {
+          const matchesKeyword =
+            quiz.title.toLowerCase().includes(keyword) ||
+            quiz.parent_course_title.toLowerCase().includes(keyword);
+          if (!matchesKeyword) return false;
+        }
+
+        // Status filter
+        if (status) {
+          if (status === 'pass' && !quiz.pass_latest) return false;
+          if (status === 'fail' && quiz.pass_latest) return false;
+          if (status === 'ungraded' && quiz.pass_latest !== null) return false;
+        }
+
+        // Date range filter
+        if (dateRange) {
+          const selectedDate = new Date(dateRange).getTime();
+          const quizDate = new Date(quiz.latest_timestamp).getTime();
+          if (quizDate < selectedDate) return false;
+        }
+
+        return true;
+      });
+
+      renderQuizzes(filtered);
+    };
+
+    // Render quiz rows to table
+    const renderQuizzes = (quizzes) => {
         $tableBody.empty();
+
+        if (quizzes.length === 0) {
+          $tableBody.html('<tr><td colspan="9">No quizzes match your filters.</td></tr>');
+          return;
+        }
 
         quizzes.forEach((quiz) => {
             const rowNode = tableTemplate.content.cloneNode(true);
@@ -118,10 +184,6 @@ jQuery(document).ready(($) => {
         $tableBody.on('mouseleave', '[data-tooltip]', function () {
           destroyTooltip();
         });
-        } catch (err) {
-            console.error('[user-quiz-details] Failed to fetch quiz progress:', err);
-            $tableBody.html('<tr><td>Failed to load quiz data.</td></tr>');
-        }
     };
 
     // CRITICAL: Listen for jQuery tab activation event from user-tabs block
