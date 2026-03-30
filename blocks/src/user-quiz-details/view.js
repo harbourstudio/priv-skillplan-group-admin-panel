@@ -1,6 +1,7 @@
 import { api, endpoints } from '../_shared/api-client.js';
-import { LOADING_COMPONENT } from '../_shared/loading.js';
-import { formatScore, formatDate, formatTime } from '../_shared/helpers.js';
+import { LOADING } from '../_shared/loading.js';
+import { formatScore, formatDate, formatTime, formatDateTime } from '../_shared/helpers.js';
+import { createTooltip, destroyTooltip } from '../_shared/tooltip.js';
 
 jQuery(document).ready(($) => {
     const params = new URLSearchParams(window.location.search);
@@ -45,8 +46,8 @@ jQuery(document).ready(($) => {
         if (dataLoaded) return; // Already loaded
 
         dataLoaded = true;
-        const $loadingRow = jQuery(`<tr><td>${LOADING_COMPONENT}</td></tr>`);
-        $tableBody.html($loadingRow);
+        const loadingCells = Array(6).fill(`<td>${LOADING}</td>`).join('');
+        $tableBody.html(`<tr>${loadingCells}</tr>`);
 
         try {
         // Fetch quiz progress from custom endpoint
@@ -56,7 +57,7 @@ jQuery(document).ready(($) => {
         const quizzes = await api.get(url);
 
         if (!Array.isArray(quizzes) || quizzes.length === 0) {
-            $tableBody.html('<tr><td>No quiz attempts found.</td></tr>');
+            $tableBody.html('<tr><td colspan="6">No quiz attempts found.</td></tr>');
             return;
         }
 
@@ -72,7 +73,8 @@ jQuery(document).ready(($) => {
 
             // Populate cells
             $row.find('.cell_quiz_title').html(quiz.title);
-            $row.find('.cell_last_activity').text(formatDate(quiz.latest_timestamp));
+            const $lastActivity = $row.find('.cell_last_activity');
+            $lastActivity.text(formatDate(quiz.latest_timestamp)).attr('data-tooltip', quiz.latest_timestamp_gmt ? formatDateTime(quiz.latest_timestamp_gmt) : '—');
             $row.find('.cell_parent_course').html(quiz.parent_course_title);
 
             // Populate attempts count and attach modal trigger
@@ -107,6 +109,14 @@ jQuery(document).ready(($) => {
             });
 
             $tableBody.append($row);
+        });
+
+        // Initialize tooltips on last activity cells
+        $tableBody.on('mouseenter', '[data-tooltip]', function () {
+          createTooltip($(this), $(this).attr('data-tooltip'));
+        });
+        $tableBody.on('mouseleave', '[data-tooltip]', function () {
+          destroyTooltip();
         });
         } catch (err) {
             console.error('[user-quiz-details] Failed to fetch quiz progress:', err);

@@ -1,5 +1,6 @@
 import { api, endpoints } from '../_shared/api-client.js';
-import { formatScore, formatDate, formatTime } from '../_shared/helpers.js';
+import { formatScore, formatDate, formatTime, formatDateTime } from '../_shared/helpers.js';
+import { createTooltip, destroyTooltip } from '../_shared/tooltip.js';
 
 jQuery(document).ready(($) => {
   const $block = $('.wp-block-bys-groups-user-quiz-attempts-modal').first();
@@ -31,7 +32,8 @@ jQuery(document).ready(($) => {
           const $row = $(rowNode);
 
           $row.find('.cell_attempt_index').text(index + 1);
-          $row.find('.cell_attempt_date').text(formatDate(attempt.completed));
+          const $attemptDate = $row.find('.cell_attempt_date');
+          $attemptDate.text(formatDate(attempt.completed)).attr('data-tooltip', attempt.completed_gmt ? formatDateTime(attempt.completed_gmt) : '—');
           $row.find('.cell_attempt_score').text(formatScore(attempt.percentage, attempt.points_scored, attempt.points_total));
 
           const $statusBadge = $row.find('.status-badge');
@@ -42,6 +44,14 @@ jQuery(document).ready(($) => {
           }
 
           $modalTbody.append($row);
+        });
+
+        // Initialize tooltips on attempt date cells
+        $modalTbody.on('mouseenter', '[data-tooltip]', function () {
+          createTooltip($(this), $(this).attr('data-tooltip'));
+        });
+        $modalTbody.on('mouseleave', '[data-tooltip]', function () {
+          destroyTooltip();
         });
       } else {
         $modalTbody.html('<tr><td>No attempts found.</td></tr>');

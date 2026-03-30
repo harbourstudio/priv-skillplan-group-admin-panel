@@ -41,7 +41,9 @@ const endpoints = {
   userQuizAttempts: (userId, courseId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-attempts?course_id=${courseId}`,
   userQuizProgress: userId => `/wp-json/bys-groups/v1/users/${userId}/quiz-progress`,
   userQuizAttemptsDetails: (userId, quizId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-attempts/${quizId}`,
-  userActivity: userId => `/wp-json/bys-groups/v1/users/${userId}/activity`
+  userActivity: userId => `/wp-json/bys-groups/v1/users/${userId}/activity`,
+  userLessonProgress: (userId, lessonId) => `/wp-json/bys-groups/v1/users/${userId}/lessons/${lessonId}`,
+  userTopicProgress: (userId, topicId) => `/wp-json/bys-groups/v1/users/${userId}/topics/${topicId}`
 };
 const api = {
   _cache: new Map(),
@@ -192,25 +194,94 @@ function formatDateTime(timestamp) {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   LOADING_COMPONENT: () => (/* binding */ LOADING_COMPONENT)
+/* harmony export */   LOADING: () => (/* binding */ LOADING)
 /* harmony export */ });
 /**
  * Shared loading state component
  *
  * Usage:
- *   import { LOADING_COMPONENT } from '../_shared/loading.js';
+ *   import { LOADING } from '../_shared/loading.js';
  * 
  */
-const LOADING_COMPONENT = `
-    <div class="bys-groups-loading-wrapper" role="status" aria-live="polite" aria-label="Loading">
-        <div class="bys-groups-loading" aria-hidden="true">
-            <span class="bys-groups-loading__dot"></span>
-            <span class="bys-groups-loading__dot"></span>
-            <span class="bys-groups-loading__dot"></span>
-        </div>
-        <span class="bys-sr-only">Loading</span>
+const LOADING = `
+    <div class="bys-groups-loading" role="status" aria-live="polite" aria-label="Loading">
+        <span></span>
     </div>
 `;
+
+/***/ },
+
+/***/ "./src/_shared/tooltip.js"
+/*!********************************!*\
+  !*** ./src/_shared/tooltip.js ***!
+  \********************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   createTooltip: () => (/* binding */ createTooltip),
+/* harmony export */   destroyTooltip: () => (/* binding */ destroyTooltip)
+/* harmony export */ });
+/**
+ * Shared tooltip utility
+ *
+ * Usage in block scripts:
+ *   import { createTooltip, destroyTooltip } from '../_shared/tooltip.js';
+ *
+ *   jQuery(document).ready(($) => {
+ *     // Show tooltip on hover
+ *     $container.on('mouseenter', '[data-tooltip]', function () {
+ *       createTooltip($(this), $(this).attr('data-tooltip'));
+ *     });
+ *
+ *     // Hide tooltip on leave
+ *     $container.on('mouseleave', '[data-tooltip]', function () {
+ *       destroyTooltip();
+ *     });
+ *   });
+ */
+
+function createTooltip($trigger, content) {
+  destroyTooltip();
+  if (!content) return;
+  const $tip = jQuery('<div class="bys-groups-tooltip" role="tooltip"></div>');
+
+  // Render based on content type
+  if (typeof content === 'string') {
+    $tip.text(content);
+  } else if (typeof content === 'object') {
+    const {
+      title,
+      body
+    } = content;
+    let html = '';
+    if (title) html += `<div class="bys-groups-tooltip__title">${escapeHtml(title)}</div>`;
+    if (body) html += `<div class="bys-groups-tooltip__content">${escapeHtml(body)}</div>`;
+    if (html) $tip.html(html);
+  }
+  $tip.appendTo('body');
+
+  // Position below trigger
+  const triggerRect = $trigger[0].getBoundingClientRect();
+  $tip.css({
+    position: 'fixed',
+    top: triggerRect.top + triggerRect.height + 4 + 'px',
+    left: triggerRect.left + 'px'
+  });
+}
+function destroyTooltip() {
+  jQuery('.bys-groups-tooltip').remove();
+}
+function escapeHtml(text) {
+  const map = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  };
+  return String(text).replace(/[&<>"']/g, m => map[m]);
+}
 
 /***/ }
 
@@ -286,6 +357,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../_shared/api-client.js */ "./src/_shared/api-client.js");
 /* harmony import */ var _shared_loading_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../_shared/loading.js */ "./src/_shared/loading.js");
 /* harmony import */ var _shared_helpers_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../_shared/helpers.js */ "./src/_shared/helpers.js");
+/* harmony import */ var _shared_tooltip_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../_shared/tooltip.js */ "./src/_shared/tooltip.js");
+
 
 
 
@@ -329,8 +402,8 @@ jQuery(document).ready($ => {
     if (dataLoaded) return; // Already loaded
 
     dataLoaded = true;
-    const $loadingRow = jQuery(`<tr><td>${_shared_loading_js__WEBPACK_IMPORTED_MODULE_1__.LOADING_COMPONENT}</td></tr>`);
-    $tableBody.html($loadingRow);
+    const loadingCells = Array(6).fill(`<td>${_shared_loading_js__WEBPACK_IMPORTED_MODULE_1__.LOADING}</td>`).join('');
+    $tableBody.html(`<tr>${loadingCells}</tr>`);
     try {
       // Fetch quiz progress from custom endpoint
       // Pass course IDs from cache to avoid redundant server-side fetch
@@ -338,7 +411,7 @@ jQuery(document).ready($ => {
       const url = _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.endpoints.userQuizProgress(userId) + `?group_id=${groupId}` + (courseIds ? `&course_ids=${courseIds}` : '');
       const quizzes = await _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.api.get(url);
       if (!Array.isArray(quizzes) || quizzes.length === 0) {
-        $tableBody.html('<tr><td>No quiz attempts found.</td></tr>');
+        $tableBody.html('<tr><td colspan="6">No quiz attempts found.</td></tr>');
         return;
       }
 
@@ -353,7 +426,8 @@ jQuery(document).ready($ => {
 
         // Populate cells
         $row.find('.cell_quiz_title').html(quiz.title);
-        $row.find('.cell_last_activity').text((0,_shared_helpers_js__WEBPACK_IMPORTED_MODULE_2__.formatDate)(quiz.latest_timestamp));
+        const $lastActivity = $row.find('.cell_last_activity');
+        $lastActivity.text((0,_shared_helpers_js__WEBPACK_IMPORTED_MODULE_2__.formatDate)(quiz.latest_timestamp)).attr('data-tooltip', quiz.latest_timestamp_gmt ? (0,_shared_helpers_js__WEBPACK_IMPORTED_MODULE_2__.formatDateTime)(quiz.latest_timestamp_gmt) : '—');
         $row.find('.cell_parent_course').html(quiz.parent_course_title);
 
         // Populate attempts count and attach modal trigger
@@ -385,6 +459,14 @@ jQuery(document).ready($ => {
           }]);
         });
         $tableBody.append($row);
+      });
+
+      // Initialize tooltips on last activity cells
+      $tableBody.on('mouseenter', '[data-tooltip]', function () {
+        (0,_shared_tooltip_js__WEBPACK_IMPORTED_MODULE_3__.createTooltip)($(this), $(this).attr('data-tooltip'));
+      });
+      $tableBody.on('mouseleave', '[data-tooltip]', function () {
+        (0,_shared_tooltip_js__WEBPACK_IMPORTED_MODULE_3__.destroyTooltip)();
       });
     } catch (err) {
       console.error('[user-quiz-details] Failed to fetch quiz progress:', err);

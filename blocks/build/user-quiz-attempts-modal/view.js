@@ -41,7 +41,9 @@ const endpoints = {
   userQuizAttempts: (userId, courseId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-attempts?course_id=${courseId}`,
   userQuizProgress: userId => `/wp-json/bys-groups/v1/users/${userId}/quiz-progress`,
   userQuizAttemptsDetails: (userId, quizId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-attempts/${quizId}`,
-  userActivity: userId => `/wp-json/bys-groups/v1/users/${userId}/activity`
+  userActivity: userId => `/wp-json/bys-groups/v1/users/${userId}/activity`,
+  userLessonProgress: (userId, lessonId) => `/wp-json/bys-groups/v1/users/${userId}/lessons/${lessonId}`,
+  userTopicProgress: (userId, topicId) => `/wp-json/bys-groups/v1/users/${userId}/topics/${topicId}`
 };
 const api = {
   _cache: new Map(),
@@ -182,6 +184,80 @@ function formatDateTime(timestamp) {
   }
 }
 
+/***/ },
+
+/***/ "./src/_shared/tooltip.js"
+/*!********************************!*\
+  !*** ./src/_shared/tooltip.js ***!
+  \********************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   createTooltip: () => (/* binding */ createTooltip),
+/* harmony export */   destroyTooltip: () => (/* binding */ destroyTooltip)
+/* harmony export */ });
+/**
+ * Shared tooltip utility
+ *
+ * Usage in block scripts:
+ *   import { createTooltip, destroyTooltip } from '../_shared/tooltip.js';
+ *
+ *   jQuery(document).ready(($) => {
+ *     // Show tooltip on hover
+ *     $container.on('mouseenter', '[data-tooltip]', function () {
+ *       createTooltip($(this), $(this).attr('data-tooltip'));
+ *     });
+ *
+ *     // Hide tooltip on leave
+ *     $container.on('mouseleave', '[data-tooltip]', function () {
+ *       destroyTooltip();
+ *     });
+ *   });
+ */
+
+function createTooltip($trigger, content) {
+  destroyTooltip();
+  if (!content) return;
+  const $tip = jQuery('<div class="bys-groups-tooltip" role="tooltip"></div>');
+
+  // Render based on content type
+  if (typeof content === 'string') {
+    $tip.text(content);
+  } else if (typeof content === 'object') {
+    const {
+      title,
+      body
+    } = content;
+    let html = '';
+    if (title) html += `<div class="bys-groups-tooltip__title">${escapeHtml(title)}</div>`;
+    if (body) html += `<div class="bys-groups-tooltip__content">${escapeHtml(body)}</div>`;
+    if (html) $tip.html(html);
+  }
+  $tip.appendTo('body');
+
+  // Position below trigger
+  const triggerRect = $trigger[0].getBoundingClientRect();
+  $tip.css({
+    position: 'fixed',
+    top: triggerRect.top + triggerRect.height + 4 + 'px',
+    left: triggerRect.left + 'px'
+  });
+}
+function destroyTooltip() {
+  jQuery('.bys-groups-tooltip').remove();
+}
+function escapeHtml(text) {
+  const map = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  };
+  return String(text).replace(/[&<>"']/g, m => map[m]);
+}
+
 /***/ }
 
 /******/ 	});
@@ -255,6 +331,8 @@ var __webpack_exports__ = {};
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../_shared/api-client.js */ "./src/_shared/api-client.js");
 /* harmony import */ var _shared_helpers_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../_shared/helpers.js */ "./src/_shared/helpers.js");
+/* harmony import */ var _shared_tooltip_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../_shared/tooltip.js */ "./src/_shared/tooltip.js");
+
 
 
 jQuery(document).ready($ => {
@@ -281,7 +359,8 @@ jQuery(document).ready($ => {
           const rowNode = rowTemplate.content.cloneNode(true);
           const $row = $(rowNode);
           $row.find('.cell_attempt_index').text(index + 1);
-          $row.find('.cell_attempt_date').text((0,_shared_helpers_js__WEBPACK_IMPORTED_MODULE_1__.formatDate)(attempt.completed));
+          const $attemptDate = $row.find('.cell_attempt_date');
+          $attemptDate.text((0,_shared_helpers_js__WEBPACK_IMPORTED_MODULE_1__.formatDate)(attempt.completed)).attr('data-tooltip', attempt.completed_gmt ? (0,_shared_helpers_js__WEBPACK_IMPORTED_MODULE_1__.formatDateTime)(attempt.completed_gmt) : '—');
           $row.find('.cell_attempt_score').text((0,_shared_helpers_js__WEBPACK_IMPORTED_MODULE_1__.formatScore)(attempt.percentage, attempt.points_scored, attempt.points_total));
           const $statusBadge = $row.find('.status-badge');
           if (attempt.pass) {
@@ -290,6 +369,14 @@ jQuery(document).ready($ => {
             $statusBadge.addClass('status-badge--fail').text('Fail');
           }
           $modalTbody.append($row);
+        });
+
+        // Initialize tooltips on attempt date cells
+        $modalTbody.on('mouseenter', '[data-tooltip]', function () {
+          (0,_shared_tooltip_js__WEBPACK_IMPORTED_MODULE_2__.createTooltip)($(this), $(this).attr('data-tooltip'));
+        });
+        $modalTbody.on('mouseleave', '[data-tooltip]', function () {
+          (0,_shared_tooltip_js__WEBPACK_IMPORTED_MODULE_2__.destroyTooltip)();
         });
       } else {
         $modalTbody.html('<tr><td>No attempts found.</td></tr>');
