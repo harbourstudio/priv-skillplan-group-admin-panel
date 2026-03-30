@@ -1243,11 +1243,11 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 return new \WP_REST_Response(array('error' => 'User not found'), 404);
             }
 
-            // Prevent duplicate logs within 12 hours
-            $cache_key = "cert_viewed_{$user_id}_{$course_id}";
-            // if (get_transient($cache_key)) {
-            //     return new \WP_REST_Response(array('message' => 'Already logged within 12 hours'), 200);
-            // }
+            // Prevent duplicate logs within 30 minutes
+            $cache_key = "bys_cert_viewed_{$user_id}_{$course_id}";
+            if (get_transient($cache_key)) {
+                return new \WP_REST_Response(array('message' => 'Certificate view already logged within 30 minutes'), 200);
+            }
 
             $course_title = get_the_title($course_id);
             $table = $wpdb->prefix . BYS_GROUPS_USER_ACTIVITY_TABLE;
@@ -1299,7 +1299,7 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 array('%d', '%s', '%s', '%d', '%s', '%s', '%s', '%s')
             );
 
-            set_transient($cache_key, true, 12 * HOUR_IN_SECONDS);
+            set_transient($cache_key, true, 30 * MINUTE_IN_SECONDS);
 
             return new \WP_REST_Response(array('message' => 'Certificate view logged'), 200);
         }
