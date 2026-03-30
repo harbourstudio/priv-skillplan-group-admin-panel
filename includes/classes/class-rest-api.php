@@ -1077,6 +1077,39 @@ if (!class_exists('BYS_Groups_Rest_API')) {
         }
 
         /**
+         * Get last accessed timestamp for a lesson or topic
+         *
+         * Queries LearnDash user activity to find when the user last accessed the given object
+         * Returns RFC3339 formatted timestamp or null if never accessed
+         */
+        private function get_last_accessed_timestamp($user_id, $post_id, $object_type) {
+            // Map object_type to LearnDash activity_type
+            $activity_type = ($object_type === 'topic') ? 'topic' : 'lesson';
+
+            // Query LearnDash activity
+            $activity = learndash_get_user_activity([
+                'user_id'       => $user_id,
+                'post_id'       => $post_id,
+                'activity_type' => $activity_type,
+            ]);
+
+            if (!$activity) {
+                return null;
+            }
+
+            // Use activity_updated if available (most recent activity update)
+            // Fall back to activity_completed or activity_started
+            $timestamp = $activity->activity_updated ?: $activity->activity_completed ?: $activity->activity_started;
+
+            if ($timestamp <= 0) {
+                return null;
+            }
+
+            // Convert Unix timestamp to RFC3339 format
+            return mysql_to_rfc3339(date('Y-m-d H:i:s', $timestamp));
+        }
+
+        /**
          * Get user activity log with pagination and filtering
          */
         public function get_user_activity($request) {
@@ -1107,11 +1140,15 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'account_settings_update' => 'Updated Account Settings',
                 'certificate_earned'      => 'Earned a Certificate',
                 'certificate_viewed'      => 'Viewed a Certificate',
-                'lesson_completed'        => 'Completed a Lesson',
-                'topic_completed'         => 'Completed a Topic',
+                'lesson_completed'        => 'Completed a Module',
+                'topic_completed'         => 'Completed a Lesson',
                 'quiz_submitted'          => 'Submitted a Quiz',
+                'quiz_completed'          => 'Completed a Quiz',
                 'course_enrolled'         => 'Enrolled in a Course',
                 'course_unenrolled'       => 'Unenrolled from a Course',
+                'lesson_visited'          => 'Visited a Module',
+                'topic_visited'           => 'Visited a Lesson',
+                'quiz_attempted'          => 'Attempted a Quiz',
             );
 
             $where_clauses = array(
@@ -1152,15 +1189,27 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             $items = array();
             foreach ($rows as $row) {
                 $activity_slug = $row['activity'];
+                $object_type = $row['object_type'] ?? '';
+                $object_id = intval($row['object_id']);
+                $meta = !empty($row['meta']) ? json_decode($row['meta'], true) : array();
+
+                // Enrich lesson/topic entries with last_accessed timestamp from LearnDash
+                if (in_array($object_type, ['lesson', 'topic']) && $object_id > 0) {
+                    $last_accessed = $this->get_last_accessed_timestamp($user_id, $object_id, $object_type);
+                    if ($last_accessed) {
+                        $meta['last_accessed'] = $last_accessed;
+                    }
+                }
+
                 $items[] = array(
                     'id'              => intval($row['id']),
                     'activity'        => $activity_slug,
                     'activity_label'  => $activity_labels[$activity_slug] ?? ucwords(str_replace('_', ' ', $activity_slug)),
                     'initiated_by'    => $row['initiated_by'] ?? '',
-                    'object_id'       => intval($row['object_id']),
+                    'object_id'       => $object_id,
                     'object_title'    => $row['object_title'] ?? '',
-                    'object_type'     => $row['object_type'] ?? '',
-                    'meta'            => !empty($row['meta']) ? json_decode($row['meta'], true) : array(),
+                    'object_type'     => $object_type,
+                    'meta'            => $meta,
                     'created_at'      => mysql_to_rfc3339($row['created_at']),
                 );
             }

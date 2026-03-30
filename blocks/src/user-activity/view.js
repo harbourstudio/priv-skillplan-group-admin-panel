@@ -1,10 +1,5 @@
-/**
- * User Activity Block - Frontend View
- * Fetches user activity from REST API and renders in a table
- */
-
 import { api, endpoints } from '../_shared/api-client.js';
-import { LOADING_COMPONENT } from '../_shared/loading.js';
+import { LOADING } from '../_shared/loading.js';
 import { formatDate, formatTime } from '../_shared/helpers.js';
 
 jQuery(document).ready(($) => {
@@ -19,7 +14,7 @@ jQuery(document).ready(($) => {
   const $tbody = $block.find('table tbody');
   const $form = $block.find('.filters__form');
   const $resetBtn = $block.find('.filters__reset');
-  const rowTemplate = $block.find('#user-activity__template-row')[0];
+  const rowTemplate = $block.find('#user-activity-template-row')[0];
 
   const iconMap = {
     'Logged In': 'fa-user',
@@ -27,6 +22,23 @@ jQuery(document).ready(($) => {
     'Updated Account Settings': 'fa-user',
     'Earned a Certificate': 'fa-certificate',
     'Viewed a Certificate': 'fa-eye',
+    'Completed a Module': 'fa-check-circle',
+    'Completed a Lesson': 'fa-check-circle',
+    'Submitted a Quiz': 'fa-check-circle',
+    'Completed a Quiz': 'fa-check-circle',
+    'Attempted a Quiz': 'fa-pencil',
+    'Enrolled in a Course': 'fa-graduation-cap',
+    'Unenrolled from a Course': 'fa-graduation-cap',
+    'Visited a Module': 'fa-eye',
+    'Visited a Lesson': 'fa-eye',
+  };
+
+  // Map object types to frontend labels (sfwd-lesson=Module, sfwd-topic=Lesson)
+  const objectTypeLabels = {
+    'lesson': 'Module',
+    'topic': 'Lesson',
+    'quiz': 'Quiz',
+    'course': 'Course',
   };
 
   let currentPage = 1;
@@ -36,7 +48,7 @@ jQuery(document).ready(($) => {
    * Load activity data from API
    */
   const loadActivity = async (page = 1) => {
-    const $loadingRow = jQuery(`<tr><td>${LOADING_COMPONENT}</td></tr>`);
+    const $loadingRow = jQuery(`<tr><td>${LOADING}</td></tr>`);
     $tbody.html($loadingRow);
     currentPage = page;
 
@@ -70,9 +82,10 @@ jQuery(document).ready(($) => {
         $row.find('.cell-created-at__time').text(formatTime(item.created_at));
         
         $row.find('.cell-object-title').html(item.object_title || '—');
-        
+
         const objectType = item.object_type || '—';
-        $row.find('.cell-object-type .cell-object-type__label').text(objectType.charAt(0).toUpperCase() + objectType.slice(1));
+        const objectTypeLabel = objectTypeLabels[objectType] || objectType.charAt(0).toUpperCase() + objectType.slice(1);
+        $row.find('.cell-object-type .cell-object-type__label').text(objectTypeLabel);
         $row.find('.cell-object-type .cell-object-type__dot').addClass(`cell-object-type__dot--${objectType}`);
         
         const initiatedBy = item.initiated_by || '—';
@@ -111,13 +124,11 @@ jQuery(document).ready(($) => {
 
   /**
    * Listen for tab activation event from user-tabs block
+   * Only fetch activity data when the user-activity tab is activated
    */
   jQuery(window).on('bysUserTabActivated', function (_event, tabName) {
     if (tabName === 'user-activity') {
       loadActivity(1);
     }
   });
-
-  // Load on page load (fallback in case tab is pre-activated)
-  loadActivity(1);
 });

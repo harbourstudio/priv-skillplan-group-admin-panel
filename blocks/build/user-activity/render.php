@@ -15,6 +15,74 @@ foreach ($attrs as $a) {
 }
 
 $wrapper_attributes = get_block_wrapper_attributes();
+
+$filter_options = [
+    [
+        "value" => "",
+        "label" => "All Activities"
+    ],
+    [
+        "value" => "user_login",
+        "label" => "Logged In"
+    ],
+    [
+        "value" => "user_logout",
+        "label" => "Logged Out"
+    ],
+    [
+        "value" => "profile_updated",
+        "label" => "Updated Profile"
+    ],
+    [
+        "value" => "account_settings_update",
+        "label" => "Updated Account Settings"
+    ],
+    [
+        "value" => "certificate_earned",
+        "label" => "Earned a Certificate"
+    ],
+    [
+        "value" => "certificate_viewed",
+        "label" => "Viewed a Certificate"
+    ],
+    [
+        "value" => "lesson_completed",
+        "label" => "Completed a Lesson"
+    ],
+    [
+        "value" => "topic_completed",
+        "label" => "Completed a Topic"
+    ],
+    [
+        "value" => "quiz_submitted",
+        "label" => "Submitted a Quiz"
+    ],
+    [
+        "value" => "quiz_completed",
+        "label" => "Completed a Quiz"
+    ],
+    [
+        "value" => "course_enrolled",
+        "label" => "Enrolled in a Course"
+    ],
+    [
+        "value" => "course_unenrolled",
+        "label" => "Unenrolled from a Course"
+    ],
+    [
+        "value" => "lesson_visited",
+        "label" => "Visited a Lesson"
+    ],
+    [
+        "value" => "topic_visited",
+        "label" => "Visited a Topic"
+    ],
+    [
+        "value" => "achievement_earned",
+        "label" => "Earned an Achievement"
+    ],
+
+]
 ?>
 
 <div <?= $wrapper_attributes; ?>>
@@ -26,19 +94,13 @@ $wrapper_attributes = get_block_wrapper_attributes();
                 <div class="filters__field">
                     <label for="filter-activity"><?php esc_html_e('Activity Type', 'bys'); ?></label>
                     <select id="filter-activity" name="activity">
-                        <option value=""><?php esc_html_e('All Activities', 'bys'); ?></option>
-                        <option value="user_login"><?php esc_html_e('Logged In', 'bys'); ?></option>
-                        <option value="user_logout"><?php esc_html_e('Logged Out', 'bys'); ?></option>
-                        <option value="profile_update"><?php esc_html_e('Updated Profile', 'bys'); ?></option>
-                        <option value="account_settings_update"><?php esc_html_e('Updated Account Settings', 'bys'); ?></option>
-                        <option value="certificate_earned"><?php esc_html_e('Earned a Certificate', 'bys'); ?></option>
-                        <option value="certificate_viewed"><?php esc_html_e('Viewed a Certificate', 'bys'); ?></option>
-                        <option value="lesson_completed"><?php esc_html_e('Completed a Lesson', 'bys'); ?></option>
-                        <option value="topic_completed"><?php esc_html_e('Completed a Topic', 'bys'); ?></option>
-                        <option value="quiz_submitted"><?php esc_html_e('Submitted a Quiz', 'bys'); ?></option>
-                        <option value="course_enrolled"><?php esc_html_e('Enrolled in a Course', 'bys'); ?></option>
-                        <option value="course_unenrolled"><?php esc_html_e('Unenrolled from a Course', 'bys'); ?></option>
-                        <option value="achievement_earned"><?php esc_html_e('Earned an Achievement', 'bys'); ?></option>
+                        <?php foreach ($filter_options as $option) : ?>
+                            <option
+                                value="<?php echo esc_attr($option['value']); ?>"
+                            >
+                                <?php echo esc_html_e($option['label']); ?>
+                            </option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
 
@@ -74,7 +136,7 @@ $wrapper_attributes = get_block_wrapper_attributes();
     <div class="table-wrapper">
         <table>
             <thead>
-                <tr class="reporting-table__head-primary">
+                <tr>
                     <th><?php esc_html_e('Activity', 'bys'); ?></th>
                     <th><?php esc_html_e('Timestamp', 'bys'); ?></th>
                     <th><?php esc_html_e('Resource', 'bys'); ?></th>
@@ -90,7 +152,7 @@ $wrapper_attributes = get_block_wrapper_attributes();
     </div>
 
     <!-- Template for cloning activity rows -->
-    <template id="user-activity__template-row">
+    <template id="user-activity-template-row">
         <tr>
             <td class="cell-activity">
                 <i class="cell-activity__icon fa-regular"></i>
@@ -109,7 +171,7 @@ $wrapper_attributes = get_block_wrapper_attributes();
             </td>
             <td class="cell-initiated-by"></td>
             <td>
-                <button type="button" class="activity-details__trigger btn-unstyled">
+                <button type="button" class="cell-initiated-by__trigger btn-unstyled">
                     <i class="fa-solid fa-ellipsis"></i>
                 </button>
             </td>
