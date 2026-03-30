@@ -455,6 +455,12 @@ if (!class_exists('BYS_Groups_Activity_Logger')) {
             $post_id = intval($post->ID);
             $post_type = $post->post_type;
 
+            // Check transient to prevent duplicate logs
+            $transient_key = 'bys_page_view_' . $user_id . '_' . $post_id;
+            if (get_transient($transient_key)) {
+                return; // Already logged a visit for this within transient window
+            }
+
             // Determine activity type and object type based on post type
             if ($post_type === 'sfwd-lessons') {
                 $activity_type = 'lesson';
@@ -517,6 +523,9 @@ if (!class_exists('BYS_Groups_Activity_Logger')) {
                 object_type:  $object_type,
                 meta:         $meta
             );
+
+            // Set transient for 30 mins
+            set_transient($transient_key, true, 30 * MINUTE_IN_SECONDS);
         }
     }
 }
