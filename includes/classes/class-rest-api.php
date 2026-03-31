@@ -257,7 +257,7 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             foreach ($group_users as $user_data) {
                 $user_id = intval($user_data['id']);
                 $user_ids[] = $user_id;
-                $last_login = get_user_meta($user_id, '_ld_notifications_last_login', true);
+                $last_login = get_user_meta($user_id, 'learndash_last_login', true);
                 if (empty($last_login)) {
                     $inactive_members++;
                 }
@@ -1126,7 +1126,16 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 return $this->get_user_course_last_activity($user_id, $course_id);
             }
 
-            $activity_filter = sanitize_text_field($request->get_param('activity') ?? '');
+            // Handle multiple activity filters (activity[]=val1&activity[]=val2)
+            $activity_filters = $request->get_param('activity');
+            if (is_string($activity_filters)) {
+                $activity_filters = array($activity_filters);
+            } elseif (!is_array($activity_filters)) {
+                $activity_filters = array();
+            }
+            $activity_filters = array_map('sanitize_text_field', $activity_filters);
+            $activity_filters = array_filter($activity_filters); // Remove empty values
+
             $date_from = sanitize_text_field($request->get_param('date_from') ?? '');
             $date_to = sanitize_text_field($request->get_param('date_to') ?? '');
             $per_page = min(intval($request->get_param('per_page') ?? 20), 100);
@@ -1134,29 +1143,13 @@ if (!class_exists('BYS_Groups_Rest_API')) {
 
             if ($per_page < 1) $per_page = 20;
 
-            $activity_labels = array(
-                'user_login'              => 'Logged In',
-                'profile_update'          => 'Updated Profile',
-                'account_settings_update' => 'Updated Account Settings',
-                'certificate_earned'      => 'Earned a Certificate',
-                'certificate_viewed'      => 'Viewed a Certificate',
-                'lesson_completed'        => 'Completed a Module',
-                'topic_completed'         => 'Completed a Lesson',
-                'quiz_submitted'          => 'Submitted a Quiz',
-                'quiz_completed'          => 'Completed a Quiz',
-                'course_enrolled'         => 'Enrolled in a Course',
-                'course_unenrolled'       => 'Unenrolled from a Course',
-                'lesson_visited'          => 'Visited a Module',
-                'topic_visited'           => 'Visited a Lesson',
-                'quiz_attempted'          => 'Attempted a Quiz',
-            );
-
             $where_clauses = array(
                 $wpdb->prepare("user_id = %d", $user_id)
             );
 
-            if (!empty($activity_filter)) {
-                $where_clauses[] = $wpdb->prepare("activity = %s", $activity_filter);
+            if (!empty($activity_filters)) {
+                $placeholders = implode(',', array_fill(0, count($activity_filters), '%s'));
+                $where_clauses[] = $wpdb->prepare("activity IN ({$placeholders})", ...$activity_filters);
             }
 
             if (!empty($date_from)) {
@@ -1204,7 +1197,6 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 $items[] = array(
                     'id'              => intval($row['id']),
                     'activity'        => $activity_slug,
-                    'activity_label'  => $activity_labels[$activity_slug] ?? ucwords(str_replace('_', ' ', $activity_slug)),
                     'initiated_by'    => $row['initiated_by'] ?? '',
                     'object_id'       => $object_id,
                     'object_title'    => $row['object_title'] ?? '',
