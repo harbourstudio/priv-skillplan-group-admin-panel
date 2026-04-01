@@ -353,4 +353,89 @@
             }
         }
     }
+
+    /*
+    * =================================
+    * User activity modal
+    * =================================
+    */
+    .user-activity-modal {
+        // user-activity-modal backdrop
+        .user-activity-modal-backdrop-container {
+            background-color: #000;
+            opacity: 0.3;
+            position: absolute;
+            inset: 0;
+            z-index: 10;
+            cursor: pointer;
+            pointer-events: auto;
+        }
+
+        &.hs-overlay {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            position: fixed;
+            z-index: 1000;
+            overflow-y: auto;
+            padding: var(--wp--preset--spacing--3);
+
+            &:not(.hidden) {
+                display: flex;
+            }
+        }
+
+        &__inner {
+            display: flex;
+            flex-direction: column;
+            background: white;
+            border-radius: 1rem;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
+            max-width: 48rem;
+            width: 100%;
+            position: relative;
+            z-index: 20;
+            max-height: 80vh;
+            overflow: hidden;
+        }
+
+        &__header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--wp--preset--spacing--4);
+            border-bottom: 1px solid var(--wp--preset--color--gray-200);
+            background-color: var(--wp--preset--color--primary);
+            color: white;
+
+            * {
+                color: white;
+                margin-bottom: 0 !important;
+            }
+        }
+
+        &__body {
+            overflow-y: auto;
+            flex: 1;
+            padding: var(--wp--preset--spacing--4);
+
+            .activity-details {
+                display: block;
+                background-color: var(--wp--preset--color--gray-100);
+                border: 1px solid var(--wp--preset--color--gray-300);
+                border-radius: 0.4rem;
+                padding: var(--wp--preset--spacing--3);
+                font-size: var(--wp--preset--font-size--x-small);
+                white-space: pre-wrap;
+                word-break: break-word;
+                font-family: monospace;
+                max-height: 400px;
+                overflow-y: auto;
+            }
+        }
+    }
 }

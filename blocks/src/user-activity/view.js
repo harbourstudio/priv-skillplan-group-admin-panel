@@ -161,6 +161,10 @@ jQuery(document).ready(($) => {
         const initiatedBy = item.initiated_by || '—';
         $row.find('.cell-initiated-by').text(initiatedBy.charAt(0).toUpperCase() + initiatedBy.slice(1));
 
+        // Store full metadata as data attribute for modal access
+        $row.data('meta', item.meta || {});
+        $row.data('activity-label', label);
+
         $tbody.append($row);
 
       });
@@ -169,6 +173,68 @@ jQuery(document).ready(($) => {
       $tbody.html('<tr><td>Failed to load activity.</td></tr>');
     }
   };
+
+  /**
+   * Handle activity details trigger click
+   * Opens modal with metadata for selected activity
+   */
+  const openActivityModal = (activityData) => {
+    const $modal = $block.find('#user-activity-modal');
+
+    // Set modal title
+    $modal.find('.title').text(activityData.activity_label || activityData.activity);
+    $modal.find('.subtitle').text(activityData.object_title || '—');
+
+    // Display metadata as formatted JSON
+    const metaDisplay = activityData.meta && Object.keys(activityData.meta).length > 0
+      ? JSON.stringify(activityData.meta, null, 2)
+      : 'No metadata available';
+
+    $modal.find('.activity-details').text(metaDisplay);
+
+    // Open modal - prevent layout shift by compensating for scrollbar
+    $modal.removeClass('hidden').addClass('open');
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    $('html').css({
+      'overflow': 'hidden',
+      'padding-right': scrollbarWidth + 'px'
+    });
+  };
+
+  /**
+   * Click handler for cell-details__trigger buttons
+   */
+  $block.on('click', '.cell-details__trigger', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const $row = $(this).closest('tr');
+    const activityData = {
+      activity: $row.data('activity') || '',
+      activity_label: $row.find('.cell-activity__label').text(),
+      object_title: $row.find('.cell-object-title').text(),
+      created_at: $row.find('.cell-created-at__date').text(),
+      object_type: $row.find('.cell-object-type__label').text(),
+      initiated_by: $row.find('.cell-initiated-by').text(),
+      // Store full activity data from the original API response
+      meta: $row.data('meta') || {}
+    };
+
+    openActivityModal(activityData);
+  });
+
+  /**
+   * Close modal handlers
+   */
+  const $modal = $block.find('#user-activity-modal');
+  $modal.find('[data-hs-overlay]').on('click', function(e) {
+    e.stopPropagation();
+    $modal.addClass('hidden').removeClass('open');
+    $('html').css({
+      'overflow': 'unset',
+      'padding-right': '0px'
+    });
+  });
 
   /**
    * Activity multiselect toggle - click anywhere on the control

@@ -1143,6 +1143,7 @@ if (!class_exists('BYS_Groups_Rest_API')) {
 
             if ($per_page < 1) $per_page = 20;
 
+            // Fetch custom table activities
             $where_clauses = array(
                 $wpdb->prepare("user_id = %d", $user_id)
             );
@@ -1163,19 +1164,10 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             $where = implode(" AND ", $where_clauses);
             $table = $wpdb->prefix . BYS_GROUPS_USER_ACTIVITY_TABLE;
 
-            $total = intval($wpdb->get_var("SELECT COUNT(*) FROM {$table} WHERE {$where}"));
-
-            $offset = ($page - 1) * $per_page;
             $rows = $wpdb->get_results(
-                $wpdb->prepare(
-                    "SELECT id, activity, initiated_by, object_id, object_title, object_type, meta, created_at
-                     FROM {$table}
-                     WHERE {$where}
-                     ORDER BY created_at DESC
-                     LIMIT %d OFFSET %d",
-                    $per_page,
-                    $offset
-                ),
+                "SELECT id, activity, initiated_by, object_id, object_title, object_type, meta, created_at
+                 FROM {$table}
+                 WHERE {$where}",
                 ARRAY_A
             );
 
@@ -1202,8 +1194,32 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                     'object_title'    => $row['object_title'] ?? '',
                     'object_type'     => $object_type,
                     'meta'            => $meta,
-                    'created_at'      => mysql_to_rfc3339($row['created_at']),
+                    'created_at'      => $row['created_at'],
                 );
+            }
+
+            // Fetch and transform GamiPress achievement logs if no activity filter or achievement_earned is in filters
+            $should_fetch_gamipress = empty($activity_filters) || in_array('achievement_earned', $activity_filters);
+            if ($should_fetch_gamipress) {
+                $gamipress_items = $this->get_gamipress_achievements($user_id, $date_from, $date_to);
+                if ($gamipress_items) {
+                    $items = array_merge($items, $gamipress_items);
+                }
+            }
+
+            // Sort by created_at descending
+            usort($items, function ($a, $b) {
+                return strtotime($b['created_at']) - strtotime($a['created_at']);
+            });
+
+            // Apply pagination to merged results
+            $total = count($items);
+            $offset = ($page - 1) * $per_page;
+            $paginated_items = array_slice($items, $offset, $per_page);
+
+            // Convert created_at to RFC3339 format for API response
+            foreach ($paginated_items as &$item) {
+                $item['created_at'] = mysql_to_rfc3339($item['created_at']);
             }
 
             $pages = $per_page > 0 ? ceil($total / $per_page) : 0;
@@ -1211,7 +1227,7 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             return new \WP_REST_Response(array(
                 'total' => $total,
                 'pages' => $pages,
-                'items' => $items,
+                'items' => $paginated_items,
             ), 200);
         }
 
@@ -1294,6 +1310,149 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             set_transient($cache_key, true, 30 * MINUTE_IN_SECONDS);
 
             return new \WP_REST_Response(array('message' => 'Certificate view logged'), 200);
+        }
+
+        /**
+         * Fetch GamiPress achievement logs and transform to activity log format
+         *
+         * @param int $user_id User ID
+         * @param string $date_from Optional start date (YYYY-MM-DD format)
+         * @param string $date_to Optional end date (YYYY-MM-DD format)
+         * @return array Transformed GamiPress achievement items
+         */
+        private function get_gamipress_achievements($user_id, $date_from = '', $date_to = '') {
+            $user_id = intval($user_id);
+            if (!$user_id) {
+                return array();
+            }
+
+            $items = array();
+
+            // Fetch achievements from gamipress-user-earnings endpoint (has post_id and title)
+            $base_url = get_home_url() . '/wp-json/wp/v2/gamipress-user-earnings';
+            $args = array(
+                'user_id' => $user_id,
+                'per_page' => 100,
+                'orderby' => 'date',
+                'order'   => 'desc'
+            );
+
+            $url = add_query_arg($args, $base_url);
+
+            $auth_header = BYS_Groups_Auth::get_auth_header();
+            $request_args = array(
+                'timeout'   => 10,
+                'sslverify' => false,
+            );
+
+            if ($auth_header) {
+                $request_args['headers'] = array('Authorization' => $auth_header);
+            }
+
+            $response = wp_remote_get($url, $request_args);
+
+            if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
+                return array();
+            }
+
+            $body = wp_remote_retrieve_body($response);
+            $earnings = json_decode($body, true);
+
+            if (!is_array($earnings)) {
+                return array();
+            }
+
+            // Now fetch the logs to get trigger_type (which determines initiated_by)
+            $logs_base_url = get_home_url() . '/wp-json/wp/v2/gamipress-logs';
+            $logs_args = array(
+                'user_id' => $user_id,
+                'type'    => 'achievement_award',
+                'per_page' => 100,
+                'orderby' => 'date',
+                'order'   => 'desc'
+            );
+
+            $logs_url = add_query_arg($logs_args, $logs_base_url);
+
+            $logs_response = wp_remote_get($logs_url, $request_args);
+
+            $logs_by_date = array();
+            if (!is_wp_error($logs_response) && wp_remote_retrieve_response_code($logs_response) === 200) {
+                $logs_body = wp_remote_retrieve_body($logs_response);
+                $logs = json_decode($logs_body, true);
+                if (is_array($logs)) {
+                    // Index logs by date for quick lookup
+                    foreach ($logs as $log) {
+                        $logs_by_date[$log['date']] = $log;
+                    }
+                }
+            }
+
+            foreach ($earnings as $earning) {
+                // Only include badge post_type
+                if (($earning['post_type'] ?? '') !== 'badge') {
+                    continue;
+                }
+
+                // Parse earning date
+                $earning_date = $earning['date'] ?? null;
+                if (!$earning_date) {
+                    continue;
+                }
+
+                // Filter by date range if provided
+                if ($date_from && strtotime($earning_date) < strtotime($date_from)) {
+                    continue;
+                }
+                if ($date_to && strtotime($earning_date) > strtotime($date_to . ' 23:59:59')) {
+                    continue;
+                }
+
+                // Get trigger_type from matching log entry
+                $trigger_type = 'gamipress_earned_achievement'; // default
+                if (isset($logs_by_date[$earning_date])) {
+                    $trigger_type = $logs_by_date[$earning_date]['trigger_type'] ?? 'gamipress_earned_achievement';
+                }
+
+                // Only include these specific trigger_type
+                if ($trigger_type !== 'gamipress_award_achievement' && $trigger_type !== 'gamipress_earned_achievement') {
+                    continue;
+                }
+
+                // Determine initiated_by based on trigger type
+                $initiated_by = ($trigger_type === 'gamipress_award_achievement') ? 'admin' : 'system';
+
+                // Extract achievement details from earning
+                $achievement_id = intval($earning['post_id'] ?? 0);
+                $achievement_title = $earning['title'] ?? 'Achievement Earned';
+
+                // Build metadata
+                $meta = array(
+                    'gamipress_earning' => array(
+                        'earning_id'   => $earning['id'] ?? null,
+                        'title'        => $earning['title'] ?? null,
+                        'post_type'    => $earning['post_type'] ?? null,
+                        'points'       => $earning['points'] ?? null,
+                        'points_type'  => $earning['points_type'] ?? null,
+                        'date'         => $earning['date'] ?? null,
+                    ),
+                );
+
+                $mysql_date = date('Y-m-d H:i:s', strtotime($earning_date));
+
+                $items[] = array(
+                    'id'              => 0, // GamiPress items don't have ID in custom table (handled by REST API)
+                    'activity'        => 'achievement_earned',
+                    'initiated_by'    => $initiated_by,
+                    'object_id'       => $achievement_id,
+                    'object_title'    => $achievement_title,
+                    'object_type'     => 'achievement',
+                    'meta'            => $meta,
+                    'created_at'      => $mysql_date,
+                );
+            }
+
+            return $items;
         }
 
         /**

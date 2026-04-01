@@ -16,72 +16,79 @@ foreach ($attrs as $a) {
 
 $wrapper_attributes = get_block_wrapper_attributes();
 
-$filter_options = [
+$activity_type_filter_options = [
     [
         "value" => "",
         "label" => "All Activities"
     ],
     [
         "value" => "user_login",
-        "label" => "Logged In"
+        "label" => "Logged in"
     ],
     [
         "value" => "user_logout",
-        "label" => "Logged Out"
+        "label" => "Logged out"
     ],
     [
         "value" => "profile_update",
-        "label" => "Updated Profile"
+        "label" => "Updated profile"
     ],
     [
         "value" => "account_settings_update",
-        "label" => "Updated Account Settings"
+        "label" => "Updated account settings"
     ],
     [
         "value" => "certificate_earned",
-        "label" => "Earned Certificate"
+        "label" => "Earned certificate"
     ],
     [
         "value" => "certificate_viewed",
-        "label" => "Viewed Certificate"
+        "label" => "Viewed certificate"
     ],
     [
         "value" => "lesson_completed",
-        "label" => "Completed Lesson"
+        "label" => "Completed module"
     ],
     [
         "value" => "topic_completed",
-        "label" => "Completed Topic"
+        "label" => "Completed lesson"
     ],
     [
         "value" => "quiz_submitted",
-        "label" => "Submitted Quiz"
+        "label" => "Submitted quiz"
     ],
     [
         "value" => "quiz_completed",
-        "label" => "Completed Quiz"
+        "label" => "Completed quiz"
     ],
     [
         "value" => "course_enrolled",
-        "label" => "Enrolled in Course"
+        "label" => "Enrolled"
     ],
     [
         "value" => "course_unenrolled",
-        "label" => "Unenrolled from Course"
+        "label" => "Unenrolled"
     ],
     [
         "value" => "lesson_visited",
-        "label" => "Visited Lesson"
+        "label" => "Visited module"
     ],
     [
         "value" => "topic_visited",
-        "label" => "Visited Topic"
+        "label" => "Visited lesson"
     ],
     [
         "value" => "achievement_earned",
-        "label" => "Earned an Achievement"
+        "label" => "Earned achievement"
     ],
-
+    [
+        "value" => "user_logout",
+        "label" => "Logged out"
+    ],
+    [
+        "value" => "quiz_started",
+        "label" => "Started a quiz"
+    ],
 ]
 ?>
 
@@ -89,8 +96,8 @@ $filter_options = [
 // Map activities to their display properties (label and icon)
 $activity_icon_map = [
     'user_login'              => 'fa-user',
-    'user_logout'             => 'fa-user',
-    'profile_update'         => 'fa-user',
+    'user_logout'             => 'fa-lock',
+    'profile_update'          => 'fa-user',
     'account_settings_update' => 'fa-user',
     'certificate_earned'      => 'fa-certificate',
     'certificate_viewed'      => 'fa-eye',
@@ -98,16 +105,17 @@ $activity_icon_map = [
     'topic_completed'         => 'fa-check-circle',
     'quiz_submitted'          => 'fa-check-circle',
     'quiz_completed'          => 'fa-check-circle',
-    'course_enrolled'         => 'fa-graduation-cap',
-    'course_unenrolled'       => 'fa-graduation-cap',
+    'quiz_started'            => 'fa-pencil-alt',
+    'course_enrolled'         => 'fa-check-circle',
+    'course_unenrolled'       => 'fa-xmark-circle',
     'lesson_visited'          => 'fa-eye',
     'topic_visited'           => 'fa-eye',
-    'achievement_earned'      => 'fa-star',
+    'achievement_earned'      => 'fa-award',
 ];
 
 // Build activity config from filter options + icons
 $activity_map = [];
-foreach ($filter_options as $option) {
+foreach ($activity_type_filter_options as $option) {
     if (!empty($option['value'])) {
         $activity_map[$option['value']] = [
             'label' => $option['label'],
@@ -141,7 +149,7 @@ foreach ($filter_options as $option) {
                         </div>
                         <div class="bys-multiselect__dropdown hidden" role="listbox" aria-multiselectable="true" id="bys-multiselect-activity-dropdown">
                             <ul class="bys-multiselect__list" role="group">
-                                <?php foreach ($filter_options as $option) : ?>
+                                <?php foreach ($activity_type_filter_options as $option) : ?>
                                     <?php if (!empty($option['value'])) : ?>
                                         <li class="bys-multiselect__option" role="option">
                                             <label>
@@ -188,6 +196,74 @@ foreach ($filter_options as $option) {
                         <div>
                             <label for="filter-date-to"><?php esc_html_e('To', 'bys'); ?></label>
                             <input type="date" id="filter-date-to" name="date_to" />
+                        </div>
+                    </div>
+                </div>
+
+                 <!-- Resource Type Multiselect -->
+                <div class="filters__field filters__field--multiselect">
+                    <label><?php esc_html_e('Resource Type', 'bys'); ?></label>
+                    <div class="bys-multiselect" id="bys-multiselect-resource-type" aria-haspopup="listbox" aria-expanded="false">
+                        <div class="bys-multiselect__control">
+                            <div class="bys-multiselect__pills" id="bys-multiselect-resource-type-pills">
+                                <span class="bys-multiselect__placeholder"><?php esc_html_e('All Resource Type', 'bys'); ?></span>
+                            </div>
+                            <button class="bys-multiselect__toggle btn-unstyled" type="button" aria-label="Toggle resource type selector">
+                                <i class="fa-regular fa-chevron-down"></i>
+                            </button>
+                        </div>
+                        <div class="bys-multiselect__dropdown hidden" role="listbox" aria-multiselectable="true" id="bys-multiselect-resource-type-dropdown">
+                            <ul class="bys-multiselect__list" role="group">
+                                <?php foreach ($activity_type_filter_options as $option) : ?>
+                                    <?php if (!empty($option['value'])) : ?>
+                                        <li class="bys-multiselect__option" role="option">
+                                            <label>
+                                                <input
+                                                    type="checkbox"
+                                                    name="resource-type[]"
+                                                    value="<?php echo esc_attr($option['value']); ?>"
+                                                    class="bys-multiselect__checkbox"
+                                                />
+                                                <span><?php echo esc_html($option['label']); ?></span>
+                                            </label>
+                                        </li>
+                                    <?php endif; ?>
+                                <?php endforeach; ?>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                 <!-- Resource Multiselect -->
+                <div class="filters__field filters__field--multiselect">
+                    <label><?php esc_html_e('Resource', 'bys'); ?></label>
+                    <div class="bys-multiselect" id="bys-multiselect-resource" aria-haspopup="listbox" aria-expanded="false">
+                        <div class="bys-multiselect__control">
+                            <div class="bys-multiselect__pills" id="bys-multiselect-resource-pills">
+                                <span class="bys-multiselect__placeholder"><?php esc_html_e('All Resources', 'bys'); ?></span>
+                            </div>
+                            <button class="bys-multiselect__toggle btn-unstyled" type="button" aria-label="Toggle resource selector">
+                                <i class="fa-regular fa-chevron-down"></i>
+                            </button>
+                        </div>
+                        <div class="bys-multiselect__dropdown hidden" role="listbox" aria-multiselectable="true" id="bys-multiselect-resource-dropdown">
+                            <ul class="bys-multiselect__list" role="group">
+                                <?php foreach ($activity_type_filter_options as $option) : ?>
+                                    <?php if (!empty($option['value'])) : ?>
+                                        <li class="bys-multiselect__option" role="option">
+                                            <label>
+                                                <input
+                                                    type="checkbox"
+                                                    name="resource[]"
+                                                    value="<?php echo esc_attr($option['value']); ?>"
+                                                    class="bys-multiselect__checkbox"
+                                                />
+                                                <span><?php echo esc_html($option['label']); ?></span>
+                                            </label>
+                                        </li>
+                                    <?php endif; ?>
+                                <?php endforeach; ?>
+                            </ul>
                         </div>
                     </div>
                 </div>
@@ -238,11 +314,34 @@ foreach ($filter_options as $option) {
             </td>
             <td class="cell-initiated-by"></td>
             <td>
-                <button type="button" class="cell-initiated-by__trigger btn-unstyled">
+                <button type="button" class="cell-details__trigger btn-unstyled">
                     <i class="fa-solid fa-ellipsis"></i>
                 </button>
             </td>
         </tr>
     </template>
 
+    <div
+        id="user-activity-modal"
+        class="user-activity-modal hs-overlay hidden"
+        role="dialog"
+        tabindex="-1"
+        aria-labelledby="user-activity-modal-label"
+        data-hs-overlay-backdrop-container="#user-activity-modal-backdrop"
+    >
+        <!-- Backdrop container (Preline will render backdrop here) -->
+        <div id="user-activity-modal-backdrop" class="user-activity-modal-backdrop-container" data-hs-overlay="#user-activity-modal"></div>
+
+        <div class="user-activity-modal__inner">
+            <div class="user-activity-modal__header">
+                <h4 class="title"></h4>
+                <span class="subtitle"></span>
+            </div>
+
+            <div class="user-activity-modal__body">
+                <code class="activity-details">
+                </code>
+            </div>
+        </div>
+    </div>
 </div>
