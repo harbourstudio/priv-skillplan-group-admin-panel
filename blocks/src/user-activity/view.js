@@ -31,6 +31,8 @@ jQuery(document).ready(($) => {
   let currentPage = 1;
   let currentFilters = {};
   let selectedActivities = []; // Track selected activity values
+  let totalPages = 0; // Track total pages from API response
+  let isLoadingMore = false; // Prevent duplicate requests
 
   /**
    * Sync activity pills display from selectedActivities array
@@ -78,6 +80,37 @@ jQuery(document).ready(($) => {
   };
 
   /**
+   * Validate and constrain date inputs
+   * - filter-date-from cannot be after filter-date-to
+   * - filter-date-to cannot be before filter-date-from
+   */
+  const validateDateRange = () => {
+    const $dateFrom = $block.find('#filter-date-from');
+    const $dateTo = $block.find('#filter-date-to');
+    const dateFrom = $dateFrom.val();
+    const dateTo = $dateTo.val();
+
+    // Set native min/max constraints
+    if (dateFrom) {
+      $dateTo.attr('min', dateFrom);
+    } else {
+      $dateTo.removeAttr('min');
+    }
+
+    if (dateTo) {
+      $dateFrom.attr('max', dateTo);
+    } else {
+      $dateFrom.removeAttr('max');
+    }
+
+    // Fallback: if values violate constraint, auto-correct
+    if (dateFrom && dateTo && dateFrom > dateTo) {
+      // User set from after to — reset from to match to
+      $dateFrom.val(dateTo);
+    }
+  };
+
+  /**
    * Update the date range button text based on selected dates
    */
   const updateDateRangeText = () => {
@@ -97,11 +130,55 @@ jQuery(document).ready(($) => {
 
 
   /**
-   * Load activity data from API
+   * Render activity rows from items array
    */
-  const loadActivity = async (page = 1) => {
-    const $loadingRow = jQuery(`<tr><td>${LOADING}</td></tr>`);
-    $tbody.html($loadingRow);
+  const renderActivityRows = (items) => {
+    items.forEach((item) => {
+      const $row = $(rowTemplate.content.cloneNode(true)).find('tr');
+
+      // Get activity config (label and icon) based on activity type
+      const config = activityConfig[item.activity] || {};
+      const label = config.label || item.activity_label || '—';
+      const icon = config.icon || '';
+
+      $row.attr('data-activity', item.activity);
+      $row.find('.cell-activity__icon').addClass(icon);
+      $row.find('.cell-activity__label').text(label);
+
+      $row.find('.cell-created-at__date').text(formatDate(item.created_at));
+      $row.find('.cell-created-at__time').text(formatTime(item.created_at));
+
+      $row.find('.cell-object-title').html(item.object_title || '—');
+
+      const objectType = item.object_type || '—';
+      const objectTypeLabel = objectTypeLabels[objectType] || objectType.charAt(0).toUpperCase() + objectType.slice(1);
+      $row.find('.cell-object-type .cell-object-type__label').text(objectTypeLabel);
+      $row.find('.cell-object-type .cell-object-type__dot').addClass(`cell-object-type__dot--${objectType}`);
+
+      const initiatedBy = item.initiated_by || '—';
+      $row.find('.cell-initiated-by').text(initiatedBy.charAt(0).toUpperCase() + initiatedBy.slice(1));
+
+      // Store full metadata as data attribute for modal access
+      $row.data('meta', item.meta || {});
+      $row.data('activity-label', label);
+
+      $tbody.append($row);
+    });
+  };
+
+  /**
+   * Load activity data from API (replace mode) or append (show more mode)
+   */
+  const loadActivity = async (page = 1, append = false) => {
+    if (isLoadingMore) return; // Prevent duplicate requests
+    isLoadingMore = true;
+
+    // Show loading state only on initial load
+    if (!append) {
+      const loadingCells = Array(6).fill(`<td>${LOADING}</td>`).join('');
+      $tbody.html(`<tr>${loadingCells}</tr>`);
+    }
+
     currentPage = page;
 
     try {
@@ -129,48 +206,40 @@ jQuery(document).ready(($) => {
       const url = `${endpoints.userActivity(userId)}?${queryParams.toString()}`;
       const result = await api.get(url);
 
-      $tbody.empty();
+      totalPages = result.pages || 0;
 
-      if (!result.items || result.items.length === 0) {
-        $tbody.html('<tr><td>No activity found.</td></tr>');
-        return;
+      // Clear table on initial load, append on show more
+      if (!append) {
+        $tbody.empty();
+
+        if (!result.items || result.items.length === 0) {
+          $tbody.html('<tr><td>No activity found.</td></tr>');
+          updateShowMoreButton();
+          return;
+        }
       }
 
-      result.items.forEach((item) => {
-        const $row = $(rowTemplate.content.cloneNode(true)).find('tr');
-
-        // Get activity config (label and icon) based on activity type
-        const config = activityConfig[item.activity] || {};
-        const label = config.label || item.activity_label || '—';
-        const icon = config.icon || '';
-
-        $row.attr('data-activity', item.activity);
-        $row.find('.cell-activity__icon').addClass(icon);
-        $row.find('.cell-activity__label').text(label);
-
-        $row.find('.cell-created-at__date').text(formatDate(item.created_at));
-        $row.find('.cell-created-at__time').text(formatTime(item.created_at));
-
-        $row.find('.cell-object-title').html(item.object_title || '—');
-
-        const objectType = item.object_type || '—';
-        const objectTypeLabel = objectTypeLabels[objectType] || objectType.charAt(0).toUpperCase() + objectType.slice(1);
-        $row.find('.cell-object-type .cell-object-type__label').text(objectTypeLabel);
-        $row.find('.cell-object-type .cell-object-type__dot').addClass(`cell-object-type__dot--${objectType}`);
-
-        const initiatedBy = item.initiated_by || '—';
-        $row.find('.cell-initiated-by').text(initiatedBy.charAt(0).toUpperCase() + initiatedBy.slice(1));
-
-        // Store full metadata as data attribute for modal access
-        $row.data('meta', item.meta || {});
-        $row.data('activity-label', label);
-
-        $tbody.append($row);
-
-      });
+      renderActivityRows(result.items || []);
+      updateShowMoreButton();
     } catch (err) {
       console.error('[user-activity] Failed to fetch activity:', err);
-      $tbody.html('<tr><td>Failed to load activity.</td></tr>');
+      if (!append) {
+        $tbody.html('<tr><td>Failed to load activity.</td></tr>');
+      }
+    } finally {
+      isLoadingMore = false;
+    }
+  };
+
+  /**
+   * Update show more button visibility and state
+   */
+  const updateShowMoreButton = () => {
+    const $showMore = $block.find('.bys-show-more');
+    if (currentPage >= totalPages) {
+      $showMore.addClass('hidden');
+    } else {
+      $showMore.removeClass('hidden');
     }
   };
 
@@ -289,9 +358,10 @@ jQuery(document).ready(($) => {
   });
 
   /**
-   * Handle date input changes
+   * Handle date input changes with validation
    */
   $block.on('change', '#filter-date-from, #filter-date-to', function () {
+    validateDateRange();
     updateDateRangeText();
   });
 
@@ -316,6 +386,14 @@ jQuery(document).ready(($) => {
   });
 
   /**
+   * Handle show more button click
+   */
+  $block.on('click', '.bys-show-more', function (e) {
+    e.preventDefault();
+    loadActivity(currentPage + 1, true);
+  });
+
+  /**
    * Handle filter form submission
    */
   $form.on('submit', function (e) {
@@ -334,18 +412,22 @@ jQuery(document).ready(($) => {
   $resetBtn.on('click', function () {
     currentFilters = {};
     selectedActivities = [];
+    currentPage = 1;
+    totalPages = 0;
     $form[0].reset();
     $block.find('#bys-multiselect-activity-dropdown .bys-multiselect__checkbox').prop('checked', false);
     $block.find('#bys-multiselect-activity .bys-multiselect__option').removeAttr('aria-selected');
     syncActivityPills();
+    validateDateRange();
     updateDateRangeText();
     loadActivity(1);
   });
 
   /**
-   * Initialize pills and date range text on page load
+   * Initialize pills, date range text, and date validation on page load
    */
   syncActivityPills();
+  validateDateRange();
   updateDateRangeText();
 
   /**

@@ -352,6 +352,26 @@
                 }
             }
         }
+
+        // Show more
+        .bys-show-more {
+            display: block;
+            width: 100%;
+            padding: var(--wp--preset--spacing--3);
+            background: var(--wp--preset--color--blue-100);
+            border: none;
+            border-top: 1px solid var(--wp--preset--color--gray-200);
+            color: var(--wp--preset--color--blue-700);
+            font-weight: 600;
+            font-size: var(--wp--preset--font-size--small);
+            cursor: pointer;
+            text-align: center;
+            border-bottom-left-radius: 1rem;
+            border-bottom-right-radius: 1rem;
+
+            &:hover { background: var(--wp--preset--color--blue-200); }
+            &.hidden { display: none; }
+        }
     }
 
     /*

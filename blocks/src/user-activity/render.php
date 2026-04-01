@@ -22,36 +22,20 @@ $activity_type_filter_options = [
         "label" => "All Activities"
     ],
     [
-        "value" => "user_login",
-        "label" => "Logged in"
-    ],
-    [
-        "value" => "user_logout",
-        "label" => "Logged out"
-    ],
-    [
-        "value" => "profile_update",
-        "label" => "Updated profile"
-    ],
-    [
-        "value" => "account_settings_update",
-        "label" => "Updated account settings"
-    ],
-    [
-        "value" => "certificate_earned",
-        "label" => "Earned certificate"
-    ],
-    [
-        "value" => "certificate_viewed",
-        "label" => "Viewed certificate"
-    ],
-    [
         "value" => "lesson_completed",
         "label" => "Completed module"
     ],
     [
         "value" => "topic_completed",
         "label" => "Completed lesson"
+    ],
+    [
+        "value" => "lesson_visited",
+        "label" => "Visited module"
+    ],
+    [
+        "value" => "topic_visited",
+        "label" => "Visited lesson"
     ],
     [
         "value" => "quiz_submitted",
@@ -70,24 +54,32 @@ $activity_type_filter_options = [
         "label" => "Unenrolled"
     ],
     [
-        "value" => "lesson_visited",
-        "label" => "Visited module"
+        "value" => "certificate_earned",
+        "label" => "Earned certificate"
     ],
     [
-        "value" => "topic_visited",
-        "label" => "Visited lesson"
+        "value" => "certificate_viewed",
+        "label" => "Viewed certificate"
     ],
     [
         "value" => "achievement_earned",
         "label" => "Earned achievement"
     ],
     [
-        "value" => "user_logout",
-        "label" => "Logged out"
+        "value" => "profile_update",
+        "label" => "Updated profile"
     ],
     [
-        "value" => "quiz_started",
-        "label" => "Started a quiz"
+        "value" => "account_settings_update",
+        "label" => "Updated account settings"
+    ],
+        [
+        "value" => "user_login",
+        "label" => "Logged in"
+    ],
+    [
+        "value" => "user_logout",
+        "label" => "Logged out"
     ],
 ]
 ?>
@@ -191,17 +183,17 @@ foreach ($activity_type_filter_options as $option) {
                     <div class="filters__date-range hidden" id="date-range-dropdown" role="menu">
                         <div>
                             <label for="filter-date-from"><?php esc_html_e('From', 'bys'); ?></label>
-                            <input type="date" id="filter-date-from" name="date_from" />
+                            <input type="date" id="filter-date-from" name="date_from" data-date-input="from" />
                         </div>
                         <div>
                             <label for="filter-date-to"><?php esc_html_e('To', 'bys'); ?></label>
-                            <input type="date" id="filter-date-to" name="date_to" />
+                            <input type="date" id="filter-date-to" name="date_to" data-date-input="to" />
                         </div>
                     </div>
                 </div>
 
                  <!-- Resource Type Multiselect -->
-                <div class="filters__field filters__field--multiselect">
+                <!-- <div class="filters__field filters__field--multiselect">
                     <label><?php esc_html_e('Resource Type', 'bys'); ?></label>
                     <div class="bys-multiselect" id="bys-multiselect-resource-type" aria-haspopup="listbox" aria-expanded="false">
                         <div class="bys-multiselect__control">
@@ -232,10 +224,10 @@ foreach ($activity_type_filter_options as $option) {
                             </ul>
                         </div>
                     </div>
-                </div>
+                </div> -->
 
-                 <!-- Resource Multiselect -->
-                <div class="filters__field filters__field--multiselect">
+                <!-- Resource Multiselect -->
+                <!-- <div class="filters__field filters__field--multiselect">
                     <label><?php esc_html_e('Resource', 'bys'); ?></label>
                     <div class="bys-multiselect" id="bys-multiselect-resource" aria-haspopup="listbox" aria-expanded="false">
                         <div class="bys-multiselect__control">
@@ -266,7 +258,7 @@ foreach ($activity_type_filter_options as $option) {
                             </ul>
                         </div>
                     </div>
-                </div>
+                </div> -->
             </div>
 
             <div class="filters__actions">
@@ -292,6 +284,7 @@ foreach ($activity_type_filter_options as $option) {
                 <!-- Rows rendered by view.js from REST API -->
             </tbody>
         </table>
+        <button class="bys-show-more btn-unstyled" type="button">Show More Results</button>
     </div>
 
     <!-- Template for cloning activity rows -->
