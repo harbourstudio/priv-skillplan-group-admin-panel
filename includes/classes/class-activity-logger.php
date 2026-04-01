@@ -17,21 +17,25 @@ if (!class_exists('BYS_Groups_Activity_Logger')) {
         private function register_hooks() {
             // System events
             add_action('wp_login', [$this, 'on_user_login'], 10, 2);
-            
+            add_action('wp_logout', [$this, 'on_user_logout'], 1); // Priority 1 (before default 10) to capture before session destroyed
+
             // Gravity Form events
             add_action('gform_after_submission_16', [$this, 'on_profile_update'], 10, 2);
             add_action('gform_after_submission_15', [$this, 'on_account_settings_update'], 10, 2);
-            
+
             // Learndash events
             add_action('learndash_course_completed', [$this, 'on_certificate_earned'], 10, 1);
             add_action('learndash_lesson_completed', [$this, 'on_lesson_completed'], 10, 1);
             add_action('learndash_topic_completed', [$this, 'on_topic_completed'], 10, 1);
             add_action('template_redirect', [$this, 'on_page_view'], 10);
             add_action('learndash_update_course_access', [$this, 'on_course_access_update'], 10, 4);
-            
+
             // Learndash Quiz events
             add_action('learndash_quiz_submitted', [$this, 'on_quiz_submitted'], 10, 2);
             add_action('learndash_quiz_completed', [$this, 'on_quiz_completed'], 10, 2);
+
+            // GamiPress events
+            add_action('gamipress_insert_log', [$this, 'on_gamipress_insert_log'], 10, 1);
         }
 
 
@@ -109,32 +113,39 @@ if (!class_exists('BYS_Groups_Activity_Logger')) {
                 user_id:      $user->ID,
                 activity:     'user_login',
                 initiated_by: 'self',
-                object_id:    0, // not applicable
-                object_title: null, // not applicable
-                object_type:  null // not applicable
+                object_id:    0,
+                object_title: null,
+                object_type:  null
             );
         }
 
-        // public function capture_user_before_logout() {
-        //     $this->current_user_before_logout = get_current_user_id();
-        // }
-        
-        // public function on_user_logout() {
-        //     $user_id = $this->current_user_before_logout;
-            
-        //     if (!$user_id) {
-        //         return;
-        //     }
-            
-        //     $this->log_activity(
-        //         user_id:      $user_id,
-        //         activity:     'user_logout',
-        //         initiated_by: 'self',
-        //         object_id:    0, // not applicable
-        //         object_title: null, // not applicable
-        //         object_type:  null // not applicable
-        //     );
-        // }
+        /**
+         * Log user logout event
+         *
+         * Triggered by: wp_logout hook (called as user is logging out, before session is destroyed)
+         * Captures: When user explicitly logs out
+         */
+        public function on_user_logout($user_id = null) {
+            // If user_id not provided by hook, get current user
+            if (!$user_id) {
+                $user_id = get_current_user_id();
+            }
+
+            $user_id = intval($user_id);
+
+            if (!$user_id) {
+                return;
+            }
+
+            $this->log_activity(
+                user_id:      $user_id,
+                activity:     'user_logout',
+                initiated_by: 'self',
+                object_id:    0,
+                object_title: null,
+                object_type:  null
+            );
+        }
 
         public function on_profile_update($entry, $form){
             $user_id = isset($entry['created_by']) ? intval($entry['created_by']) : get_current_user_id();
@@ -527,5 +538,147 @@ if (!class_exists('BYS_Groups_Activity_Logger')) {
             // Set transient for 30 mins
             set_transient($transient_key, true, 30 * MINUTE_IN_SECONDS);
         }
+
+        /**
+         * Log GamiPress achievement award event
+         *
+         * Triggered by: gamipress_insert_log hook
+         * Fetches the log entry and user earnings to capture achievement details
+         *
+         * @param int $log_id The ID of the inserted log entry
+         */
+        public function on_gamipress_insert_log($log_id) {
+            // Fetch the log entry that was just inserted
+            $log_data = $this->fetch_gamipress_log_by_id($log_id);
+
+            if (!$log_data || $log_data['type'] !== 'achievement_award') {
+                return;
+            }
+
+            $trigger_type = $log_data['trigger_type'] ?? '';
+
+            // Only process manually awarded or auto-earned achievements
+            if ($trigger_type !== 'gamipress_award_achievement' && $trigger_type !== 'gamipress_earned_achievement') {
+                return;
+            }
+
+            $user_id = intval($log_data['user_id'] ?? 0);
+            if (!$user_id) {
+                return;
+            }
+
+            // Determine initiated_by based on trigger type
+            $initiated_by = ($trigger_type === 'gamipress_award_achievement') ? 'admin' : 'system';
+
+            // Fetch user's recent earnings to get achievement post_id
+            $earnings = $this->fetch_user_recent_earnings($user_id);
+            $achievement_id = 0;
+            $achievement_title = 'Achievement Earned';
+
+            if ($earnings && !empty($earnings)) {
+                $achievement_id = intval($earnings[0]['post_id'] ?? 0);
+                $achievement_title = $earnings[0]['title'] ?? 'Achievement Earned';
+            }
+
+            // Build metadata from GamiPress log entry
+            $meta = [
+                'gamipress_log' => [
+                    'log_id'       => $log_data['id'] ?? null,
+                    'title'        => $log_data['title'] ?? null,
+                    'type'         => $log_data['type'] ?? null,
+                    'trigger_type' => $log_data['trigger_type'] ?? null,
+                    'access'       => $log_data['access'] ?? null,
+                    'date'         => $log_data['date'] ?? null,
+                ],
+            ];
+
+            // Log the activity
+            $this->log_activity(
+                user_id:      $user_id,
+                activity:     'achievement_earned',
+                initiated_by: $initiated_by,
+                object_id:    $achievement_id,
+                object_title: $achievement_title,
+                object_type:  'achievement',
+                meta:         $meta
+            );
+        }
+
+        /**
+         * Fetch recent user earnings from GamiPress
+         *
+         * @param int $user_id User ID
+         * @return array|null Array of earnings or null if not found
+         */
+        private function fetch_user_recent_earnings($user_id) {
+            $user_id = intval($user_id);
+
+            $base_url = get_home_url() . '/wp-json/wp/v2/gamipress-user-earnings?user_id=' . $user_id . '&per_page=5&orderby=date&order=desc';
+
+            $auth_header = BYS_Groups_Auth::get_auth_header();
+
+            $args = [
+                'timeout'   => 10,
+                'sslverify' => false,
+            ];
+
+            if ($auth_header) {
+                $args['headers'] = ['Authorization' => $auth_header];
+            }
+
+            $response = wp_remote_get($base_url, $args);
+
+            if (is_wp_error($response)) {
+                return null;
+            }
+
+            $status = wp_remote_retrieve_response_code($response);
+            if ($status !== 200) {
+                return null;
+            }
+
+            $body = wp_remote_retrieve_body($response);
+            $data = json_decode($body, true);
+
+            return is_array($data) ? $data : null;
+        }
+
+        /**
+         * Fetch a GamiPress log entry by ID via REST API
+         *
+         */
+        private function fetch_gamipress_log_by_id($log_id) {
+            $log_id = intval($log_id);
+
+            $base_url = get_home_url() . '/wp-json/wp/v2/gamipress-logs/' . $log_id;
+
+            $auth_header = BYS_Groups_Auth::get_auth_header();
+
+            $args = [
+                'timeout'   => 10,
+                'sslverify' => false,
+            ];
+
+            if ($auth_header) {
+                $args['headers'] = ['Authorization' => $auth_header];
+            }
+
+            $response = wp_remote_get($base_url, $args);
+
+            if (is_wp_error($response)) {
+                return null;
+            }
+
+            $status = wp_remote_retrieve_response_code($response);
+            if ($status !== 200) {
+                return null;
+            }
+
+            $body = wp_remote_retrieve_body($response);
+            $data = json_decode($body, true);
+
+            return is_array($data) ? $data : null;
+        }
+
     }
 }
