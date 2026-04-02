@@ -4,28 +4,35 @@
 
 The Plugin's Activity Logging system tracks various user-related events. Some events are logged to a custom database table (`bys_groups_user_activity`) and exposed via the REST API endpoint `/wp-json/bys-groups/v1/users/{user_id}/activity`.
 
-**Implementation**:
+## Database Schema
+
+On activation, the plugin creates the `bys_groups_user_activity` database table.
+
+**Table Name**: `wp_bys_groups_user_activity` (with WordPress table prefix)
+
+| Column | Type | Nullable | Description |
+|--------|------|----------|-------------|
+| `id` | BIGINT | No | Auto-incrementing primary key |
+| `user_id` | BIGINT | No | WordPress user ID |
+| `activity` | VARCHAR(255) | No | Activity type identifier (e.g., `quiz_submitted`, `lesson_completed`) |
+| `initiated_by` | VARCHAR(50) | No | Who triggered the action: `self`, `system`, or `admin` |
+| `object_id` | BIGINT | No | ID of the related LearnDash/GamiPress object (course, quiz, achievement, etc.) |
+| `object_title` | VARCHAR(255) | Yes | Human-readable title of the object |
+| `object_type` | VARCHAR(50) | Yes | Type of object: `course`, `lesson`, `topic`, `quiz`, `form`, `achievement` |
+| `meta` | LONGTEXT | Yes | JSON-encoded metadata specific to the activity type |
+| `created_at` | DATETIME | No | Timestamp when activity occurred (UTC) |
+
+### Indexes
+- `PRIMARY KEY (id)`
+- Index on `user_id` - Fast lookup by user
+- Index on `activity` - Fast lookup by activity type
+- Index on `created_at` - Fast chronological queries
+
+## Implementation Details
+
 - `includes/classes/class-activator.php` - Database schema and plugin setup
 - `includes/classes/class-activity-logger.php` - Activity event logging (system, form, LearnDash events)
 - `includes/classes/class-rest-api.php` - REST API endpoint (merges custom table + GamiPress data)
-
-## Database Schema
-On activation, the plugin creates the `bys_groups_user_activity` database table
-
-Table: `*_bys_groups_user_activity`
-
-Column -  Type -  Description
-`id` -  INT PRIMARY KEY -  Auto-incrementing record ID
-`user_id` -  INT -  WordPress user ID
-`activity` -  VARCHAR(255) -  Activity type identifier
-`initiated_by` -  VARCHAR(50) -  Who triggered the action: `self`, `system`, or `admin`
-`object_id` -  INT -  ID of the related LearnDash/GamiPress object (course, quiz, achievement, etc.)
-`object_title` -  VARCHAR(255) -  Human-readable title of the object
-`object_type` -  VARCHAR(50) -  Type of object: `course`, `lesson`, `topic`, `quiz`, `form`, `achievement`
-`meta` -  JSON -  Additional metadata specific to the activity type
-`created_at` -  DATETIME -  Timestamp when activity occurred
-
-## Implementation Details
 
 ### Hook Registration
 
@@ -65,27 +72,37 @@ The `user-activity` Gutenberg block displays activities in the frontend.
 
 ### Block Filters
 
-## User Activity Block Filters
+### Available Filters
+- **Activity Type** - Select one or more activity types (e.g., quiz_submitted, lesson_completed, etc.)
+- **Resource Type** - Filter by object type: Course, Module (lesson), Lesson (topic), Quiz, Form, Achievement
+- **Date Range** - Optional start and end dates (YYYY-MM-DD format)
 
-The user-activity block provides filter controls for querying and displaying user activity:
-- All filter values submitted together when the **Filter** button clicked
-- When filters are applied, they are passed to the REST API as follows...
-EG:
-  | `activity[]=value1&activity[]=value2...` (multiple activity types)
-  | `date_from=YYYY-MM-DD` (optional)
-  | `date_to=YYYY-MM-DD` (optional)
-  | `per_page=20` (default)
+### Pagination
+- **Default**: 25 items per page (PER_PAGE constant)
+- **Load More**: Fetches next 25 items incrementally via view.js
+
+### Query Parameters
+When filters are applied, they are passed to the REST API endpoint as query parameters:
+- `activity[]=value1&activity[]=value2...` (multiple activity types)
+- `object_type[]=course&object_type[]=quiz...` (multiple resource types)
+- `date_from=YYYY-MM-DD` (optional, start date)
+- `date_to=YYYY-MM-DD` (optional, end date)
+- `page=1&per_page=25` (pagination)
+
+### Filter Behavior
+- All filter values are submitted together when the **Filter** button is clicked
 - Form reset button clears all filters and resets to defaults
+- Filters are cumulative (AND logic): only activities matching ALL selected filters are shown
 
 ## Other Integrations
 
+### LearnDash
+
 Some activities (like `certificate_earned`) fetch additional data from the LearnDash REST API:
 
-## GamiPress Integrations
+### GamiPress Integrations
 
 Achievement Earned events (`achievement_earned`) are fetched via GamiPress REST API at request time rather than logged to the custom table. This eliminates data duplication while maintaining metadata availability for modal displays.
-
-### Implementation Details
 
 **Location**: `includes/classes/class-rest-api.php` - `get_gamipress_achievements()` method
 
@@ -130,13 +147,22 @@ Achievement Earned events (`achievement_earned`) are fetched via GamiPress REST 
 5. Merges with custom table activities and sorts by `created_at` timestamp
 6. Applies pagination to combined results
 
-### Conditional Fetching
-
 GamiPress data is only fetched when:
 - No activity filter is applied (showing all activities), OR
 - User has specifically selected the `achievement_earned` activity type filter
 
-This improves performance by avoiding unnecessary API calls.
+AND:
+- No resource type filter is applied (showing all resource types), OR
+- User has specifically selected the `achievement` resource type filter
+
+**Key Behavior**: When filtering by `object_type` (resource type):
+- Database activities are filtered by `object_type IN (...)` clause
+- GamiPress achievements (which don't exist in custom table) are only fetched if:
+  - No object_type filter is set, OR
+  - User explicitly selected `achievement` in the resource type filter
+- This prevents requesting GamiPress data when user is filtering for non-achievement resource types
+
+This conditional logic improves performance by avoiding unnecessary API calls.
 
 ## Common issues:
 - **Missing transient deduplication**: Page views logging multiple times → check transient settings
