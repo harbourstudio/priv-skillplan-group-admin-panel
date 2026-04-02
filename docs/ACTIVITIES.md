@@ -22,17 +22,11 @@ On activation, the plugin creates the `bys_groups_user_activity` database table.
 | `meta` | LONGTEXT | Yes | JSON-encoded metadata specific to the activity type |
 | `created_at` | DATETIME | No | Timestamp when activity occurred (UTC) |
 
-### Indexes
-- `PRIMARY KEY (id)`
-- Index on `user_id` - Fast lookup by user
-- Index on `activity` - Fast lookup by activity type
-- Index on `created_at` - Fast chronological queries
-
 ## Implementation Details
 
 - `includes/classes/class-activator.php` - Database schema and plugin setup
-- `includes/classes/class-activity-logger.php` - Activity event logging (system events, page views, certificate earning, course enrollment)
-- `includes/classes/class-rest-api.php` - REST API endpoint (merges custom table + GamiPress data)
+- `includes/classes/class-activity-logger.php` - Activity event logging
+- `includes/classes/class-rest-api.php` - REST API endpoint (merges custom table + other API data)
 
 ### Hook Registration
 
@@ -42,16 +36,13 @@ Review the register_hooks() method of BYS_Groups_Activity_Logger to see what eve
 private function register_hooks() {
     // System events
     add_action('wp_login', [$this, 'on_user_login'], 10, 2);
-    
-    // LearnDash events
-    add_action('learndash_course_completed', [$this, 'on_certificate_earned'], 10, 1);
-    add_action('learndash_lesson_completed', [$this, 'on_lesson_completed'], 10, 1);
-    
+    add_action('template_redirect', [$this, 'on_page_view'], 10);
+
     // ... more hooks
 }
 ```
 
-### Transient-Based Deduplication
+### Transients for Deduplication
 
 View events (like `lesson_visited`, `topic_visited`) use WordPress transients to prevent duplicate and redundant logging:
 
@@ -70,26 +61,19 @@ set_transient($transient_key, true, 30 * MINUTE_IN_SECONDS);
 
 The `user-activity` Gutenberg block displays activities in the frontend.
 
-### Block Filters
+**Pagination**
+- Default: 25 items per page (PER_PAGE constant)
+- Load More: Fetches next 25 items incrementally via view.js
 
-### Available Filters
-- **Activity Type** - Select one or more activity types (e.g., quiz_submitted, lesson_completed, etc.)
-- **Resource Type** - Filter by object type: Course, Module (lesson), Lesson (topic), Quiz, Form, Achievement
-- **Date Range** - Optional start and end dates (YYYY-MM-DD format)
-
-### Pagination
-- **Default**: 25 items per page (PER_PAGE constant)
-- **Load More**: Fetches next 25 items incrementally via view.js
-
-### Query Parameters
+**Query Parameters**
 When filters are applied, they are passed to the REST API endpoint as query parameters:
-- `activity[]=value1&activity[]=value2...` (multiple activity types)
-- `object_type[]=course&object_type[]=quiz...` (multiple resource types)
-- `date_from=YYYY-MM-DD` (optional, start date)
-- `date_to=YYYY-MM-DD` (optional, end date)
-- `page=1&per_page=25` (pagination)
+- `activity[]=value1&activity[]=value2...`
+- `object_type[]=course&object_type[]=quiz...`
+- `date_from=YYYY-MM-DD`
+- `date_to=YYYY-MM-DD`
+- `page=1&per_page=25`
 
-### Filter Behavior
+**Filter Behavior**
 - All filter values are submitted together when the **Filter** button is clicked
 - Form reset button clears all filters and resets to defaults
 - Filters are cumulative (AND logic): only activities matching ALL selected filters are shown
@@ -98,15 +82,25 @@ When filters are applied, they are passed to the REST API endpoint as query para
 
 ### LearnDash
 
-LearnDash completion events (`lesson_completed`, `topic_completed`, `quiz_completed`, `quiz_submitted`) are **not logged to the custom table**. These activities are fetched on-demand from LearnDash's native activity API (`learndash_user_activity` table) via the REST API.
+LearnDash completion events (`lesson_completed`, `topic_completed`, `quiz_completed`, `quiz_submitted`) are not logged to the custom table, but fetched on-demand from LearnDash's API at request time.
 
-### GamiPress Integrations
+**Data Flow**
+`includes/classes/class-rest-api.php` - `get_learndash_activity()` method
+1. Queries `learndash_user_activity` table for completion events filtered by activity type (lesson, topic, quiz)
+2. Respects `activity[]` filters (`lesson_completed`, `topic_completed`, `quiz_submitted`, `quiz_completed`)
+3. Respects `object_type[]` filters (lesson, topic, quiz)
+4. Applies date range filtering (`date_from`, `date_to`)
+5. Transforms LearnDash data to activity log format with course metadata
+6. Returns transformed items for merging with custom table and other integrations
 
-Achievement Earned events (`achievement_earned`) are fetched via GamiPress REST API at request time rather than logged to the custom table. This eliminates data duplication while maintaining metadata availability for modal displays.
+---
 
-**Location**: `includes/classes/class-rest-api.php` - `get_gamipress_achievements()` method
+### GamiPress
 
-**Data Flow**:
+Achievement events (`achievement_earned`) are not logged to the custom table, but are fetched on-demand from GamiPress API at request time.
+
+**Data Flow**
+`includes/classes/class-rest-api.php` - `get_gamipress_achievements()` method
 1. Fetches achievements from `/wp-json/wp/v2/gamipress-user-earnings` endpoint
    - Filters by user_id, ordered by date (descending)
    - Only includes post_type: `badge`
@@ -115,56 +109,36 @@ Achievement Earned events (`achievement_earned`) are fetched via GamiPress REST 
    - Filters by user_id and type `achievement_award`
    - Indexes logs by date for matching with earnings
 
-3. For each earning:
-   - Matches with corresponding log entry to determine `trigger_type`
+3. For each earning, matches with corresponding log entry to determine `trigger_type`
    - Filters to only include `gamipress_award_achievement` or `gamipress_earned_achievement` trigger types
    - Determines `initiated_by`:
      - `admin` if trigger_type is `gamipress_award_achievement` (manually awarded)
      - `system` if trigger_type is `gamipress_earned_achievement` (earned by user)
 
-4. Transforms to activity log format:
-   ```
-   {
-     "activity": "achievement_earned",
-     "initiated_by": "system|admin",
-     "object_id": <achievement_id>,
-     "object_title": <achievement_title>,
-     "object_type": "achievement",
-     "meta": {
-       "gamipress_earning": {
-         "earning_id": <id>,
-         "title": <title>,
-         "post_type": "badge",
-         "points": <points>,
-         "points_type": <type>,
-         "date": <date>
-       }
-     },
-     "created_at": <mysql_date>
-   }
-   ```
+4. Transforms to activity log format with complete GamiPress earning metadata
+5. Returns transformed items for merging with custom table and other integrations
+6. Final merge and pagination happens in main `get_user_activity()` endpoint
 
-5. Merges with custom table activities and sorts by `created_at` timestamp
-6. Applies pagination to combined results
+---
 
-### Gravity Forms Integrations
+### Gravity Forms
 
-Form submission events (`profile_update`, `account_settings_update`) are fetched via Gravity Forms REST API at request time rather than logged to the custom table.
+Form submission events (`profile_update`, `account_settings_update`) are not logged to the custom table, but are fetched on-demand from Gravity Forms API at request time.
+
+**Data Flow**
+`includes/classes/class-rest-api.php` - `get_gravity_forms_submissions()` method
+1. Maps form IDs to activity slugs:
+   - Form 16 → `profile_update`
+   - Form 15 → `account_settings_update`
+2. Fetches entries from `/wp-json/gf/v2/forms/{form_id}/entries` endpoint filtered by `created_by` user
+3. Transforms each entry to activity log format with `object_type: 'form'`
+4. Returns transformed items for merging with custom table and other integrations
+5. Final merge and pagination happens in main `get_user_activity()` endpoint
 
 **Note**: Ensure that REST API is enabled for Gravity Forms
-
-**Location**: `includes/classes/class-rest-api.php` - `get_gravity_forms_submissions()` method
-
-**Data Flow**:
-1. Maps form IDs to activity slugs (form 16 → `profile_update`, form 15 → `account_settings_update`)
-2. Fetches entries from `/wp-json/gf/v2/forms/{form_id}/entries` endpoint filtered by `created_by` user
-3. Transforms to activity log format with `object_type: 'form'`
-4. Merges with custom table and GamiPress activities, sorted by `created_at`
 
 ---
 
 ## Common issues:
-- **Missing transient deduplication**: Page views logging multiple times → check transient settings
-- **API auth failures**: Achievement data not loading → verify Application Password is set and GamiPress REST is enabled
-- **Form events not logging**: Check Gravity Form IDs (16 = Profile, 15 = Settings)
-- **Achievement metadata empty**: GamiPress API authorization issue → check `BYS_Groups_Auth::get_auth_header()` configuration
+- Page views logging multiple times → check transient settings
+- Form events not showing → Check Gravity Form IDs and if REST API is enabled for Gravity Forms 
