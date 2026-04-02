@@ -46,6 +46,53 @@ jQuery(document).ready(($) => {
     'achievement': 'Achievement',
   };
 
+  // Map activity types to valid resource types (for dependency filtering)
+  const activityToResourceTypeMap = {
+    'lesson_completed': ['lesson'],
+    'lesson_visited': ['lesson'],
+    'topic_completed': ['topic'],
+    'topic_visited': ['topic'],
+    'quiz_submitted': ['quiz'],
+    'quiz_completed': ['quiz'],
+    'course_enrolled': ['course'],
+    'course_unenrolled': ['course'],
+    'certificate_earned': ['course'],
+    'certificate_viewed': ['course'],
+    'profile_update': ['form'],
+    'account_settings_update': ['form'],
+    'achievement_earned': ['achievement'],
+    // user_login and user_logout have no resource types
+  };
+
+  /**
+   * Get valid resource types for currently selected activities
+   * If user_login or user_logout are selected, return empty array (disable all resource types)
+   * Otherwise return union of all valid types for selected activities
+   */
+  const getValidResourceTypesForActivities = () => {
+    if (!selectedActivities.length) {
+      // No activity filter = all resource types valid
+      return Object.keys(resourceTypeLabels);
+    }
+
+    // Check if user_login or user_logout are selected
+    if (selectedActivities.includes('user_login') || selectedActivities.includes('user_logout')) {
+      // These activities have no resource types
+      return [];
+    }
+
+    // Get union of all valid resource types for selected activities
+    const validTypes = new Set();
+    selectedActivities.forEach(activity => {
+      const types = activityToResourceTypeMap[activity];
+      if (types) {
+        types.forEach(type => validTypes.add(type));
+      }
+    });
+
+    return Array.from(validTypes);
+  };
+
   /**
    * Sync activity pills display from selectedActivities array
    */
@@ -185,7 +232,7 @@ jQuery(document).ready(($) => {
 
       // Get activity config (label and icon) based on activity type
       const config = activityConfig[item.activity] || {};
-      const label = config.label || item.activity_label || '—';
+      const label = config.label || item.activity_label || '';
       const icon = config.icon || '';
 
       $row.attr('data-activity', item.activity);
@@ -195,14 +242,14 @@ jQuery(document).ready(($) => {
       $row.find('.cell-created-at__date').text(formatDate(item.created_at));
       $row.find('.cell-created-at__time').text(formatTime(item.created_at));
 
-      $row.find('.cell-object-title').html(item.object_title || '—');
+      $row.find('.cell-object-title').html(item.object_title || '');
 
-      const objectType = item.object_type || '—';
+      const objectType = item.object_type || '';
       const objectTypeLabel = objectTypeLabels[objectType] || objectType.charAt(0).toUpperCase() + objectType.slice(1);
       $row.find('.cell-object-type .cell-object-type__label').text(objectTypeLabel);
       $row.find('.cell-object-type .cell-object-type__dot').addClass(`cell-object-type__dot--${objectType}`);
 
-      const initiatedBy = item.initiated_by || '—';
+      const initiatedBy = item.initiated_by || '';
       $row.find('.cell-initiated-by').text(initiatedBy.charAt(0).toUpperCase() + initiatedBy.slice(1));
 
       // Store full metadata as data attribute for modal access
@@ -308,7 +355,7 @@ jQuery(document).ready(($) => {
 
     // Set modal title
     $modal.find('.title').text(activityData.activity_label || activityData.activity);
-    $modal.find('.subtitle').text(activityData.object_title || '—');
+    $modal.find('.subtitle').text(activityData.object_title || '');
 
     // Display metadata as formatted JSON
     const metaDisplay = activityData.meta && Object.keys(activityData.meta).length > 0
@@ -375,6 +422,46 @@ jQuery(document).ready(($) => {
   });
 
   /**
+   * Update resource type filter UI based on selected activities
+   * Disables resource type options that don't match any selected activity
+   */
+  const updateResourceTypeUI = () => {
+    const validTypes = getValidResourceTypesForActivities();
+    const $resourceTypeControl = $block.find('#bys-multiselect-resource-type .bys-multiselect__control');
+    const $resourceTypeDropdown = $block.find('#bys-multiselect-resource-type-dropdown');
+    const $resourceTypeOptions = $block.find('#bys-multiselect-resource-type-dropdown .bys-multiselect__checkbox');
+
+    if (validTypes.length === 0) {
+      // Disable entire resource type filter for activities like user_login/user_logout
+      $resourceTypeControl.css('pointer-events', 'none').css('opacity', '0.5');
+      $resourceTypeDropdown.css('pointer-events', 'none').css('opacity', '0.5');
+      // Clear any selected resource types
+      selectedResourceTypes = [];
+      syncResourceTypePills();
+    } else {
+      // Re-enable resource type filter
+      $resourceTypeControl.css('pointer-events', 'auto').css('opacity', '1');
+      $resourceTypeDropdown.css('pointer-events', 'auto').css('opacity', '1');
+
+      // Disable checkboxes for resource types not in validTypes
+      $resourceTypeOptions.each(function () {
+        const typeValue = $(this).val();
+        const isValid = validTypes.includes(typeValue);
+        $(this).prop('disabled', !isValid);
+        $(this).closest('.bys-multiselect__option').toggleClass('disabled', !isValid);
+
+        // If checkbox is disabled and was selected, uncheck it
+        if (!isValid && this.checked) {
+          this.checked = false;
+          selectedResourceTypes = selectedResourceTypes.filter(v => v !== typeValue);
+        }
+      });
+
+      syncResourceTypePills();
+    }
+  };
+
+  /**
    * Handle activity checkbox changes
    */
   $block.on('change', '#bys-multiselect-activity-dropdown .bys-multiselect__checkbox', function () {
@@ -389,6 +476,7 @@ jQuery(document).ready(($) => {
     }
 
     syncActivityPills();
+    updateResourceTypeUI();
     $(this).closest('.bys-multiselect__option').attr('aria-selected', this.checked);
   });
 
@@ -403,6 +491,7 @@ jQuery(document).ready(($) => {
       .prop('checked', false)
       .closest('li').attr('aria-selected', 'false');
     syncActivityPills();
+    updateResourceTypeUI();
   });
 
   /**
@@ -527,19 +616,22 @@ jQuery(document).ready(($) => {
     $block.find('#bys-multiselect-activity-dropdown .bys-multiselect__checkbox').prop('checked', false);
     $block.find('#bys-multiselect-activity .bys-multiselect__option').removeAttr('aria-selected');
     $block.find('#bys-multiselect-resource-type-dropdown .bys-multiselect__checkbox').prop('checked', false);
-    $block.find('#bys-multiselect-resource-type .bys-multiselect__option').removeAttr('aria-selected');
+    $block.find('#bys-multiselect-resource-type .bys-multiselect__option').removeAttr('aria-selected').removeClass('disabled');
+    $block.find('#bys-multiselect-resource-type-dropdown .bys-multiselect__checkbox').prop('disabled', false);
     syncActivityPills();
     syncResourceTypePills();
+    updateResourceTypeUI();
     validateDateRange();
     updateDateRangeText();
     loadActivity(1);
   });
 
   /**
-   * Initialize pills, date range text, and date validation on page load
+   * Initialize pills, date range text, date validation, and resource type UI on page load
    */
   syncActivityPills();
   syncResourceTypePills();
+  updateResourceTypeUI();
   validateDateRange();
   updateDateRangeText();
 

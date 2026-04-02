@@ -139,6 +139,11 @@
 
                         &__option {
                             &.hidden { display: none; }
+                            &.disabled label {
+                                opacity: 0.5;
+                                cursor: not-allowed;
+                                &:hover { background: transparent; }
+                            }
 
                             label {
                                 display: flex;
@@ -154,6 +159,7 @@
                             }
 
                             input[type="checkbox"] { flex-shrink: 0; }
+                            input[type="checkbox"]:disabled { cursor: not-allowed; }
 
                             &[aria-selected="true"] label { background: var(--wp--preset--color--blue-50, #f0f7ff); }
                         }
