@@ -1166,13 +1166,20 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             $skip_db_query = false;
 
             if (!empty($object_type_filters)) {
-                // Filter out 'achievement' (from GamiPress) and 'form' (from GF API) since they're not in the custom table
-                $db_object_types = array_filter($object_type_filters, fn($t) => $t !== 'achievement' && $t !== 'form');
+                // Object types now sourced exclusively from external APIs, NOT the custom DB table:
+                // - 'achievement' → GamiPress REST API
+                // - 'form'        → Gravity Forms REST API
+                // - 'lesson'      → wp_learndash_user_activity (direct $wpdb query)
+                // - 'topic'       → wp_learndash_user_activity (direct $wpdb query)
+                // - 'quiz'        → wp_learndash_user_activity (direct $wpdb query)
+                // Note: 'course' still has DB rows: course_enrolled, course_unenrolled, certificate_earned, certificate_viewed
+                $non_db_types = ['achievement', 'form', 'lesson', 'topic', 'quiz'];
+                $db_object_types = array_filter($object_type_filters, fn($t) => !in_array($t, $non_db_types));
                 if (!empty($db_object_types)) {
                     $placeholders = implode(',', array_fill(0, count($db_object_types), '%s'));
                     $where_clauses[] = $wpdb->prepare("object_type IN ({$placeholders})", ...$db_object_types);
                 } else {
-                    // If all object_type filters were excluded from DB (only achievement/form), skip DB query entirely
+                    // If all object_type filters were excluded from DB, skip DB query entirely
                     $skip_db_query = true;
                 }
             }
@@ -1250,6 +1257,24 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 $gf_items = $this->get_gravity_forms_submissions($user_id, $date_from, $date_to);
                 if ($gf_items) {
                     $items = array_merge($items, $gf_items);
+                }
+            }
+
+            // Fetch LearnDash activity from wp_learndash_user_activity if:
+            // 1. No activity filter OR at least one LD-sourced slug is in activity filters
+            // 2. No object_type filter OR at least one LD-managed type (lesson/topic/quiz) is in object_type filters
+            $ld_sourced_slugs = ['lesson_completed', 'topic_completed', 'quiz_submitted', 'quiz_completed'];
+            $ld_object_types  = ['lesson', 'topic', 'quiz'];
+
+            $should_fetch_ld = (
+                (empty($activity_filters) || !empty(array_intersect($activity_filters, $ld_sourced_slugs)))
+                && (empty($object_type_filters) || !empty(array_intersect($object_type_filters, $ld_object_types)))
+            );
+
+            if ($should_fetch_ld) {
+                $ld_items = $this->get_learndash_activity($user_id, $date_from, $date_to, $activity_filters, $object_type_filters);
+                if ($ld_items) {
+                    $items = array_merge($items, $ld_items);
                 }
             }
 
@@ -1594,6 +1619,224 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                         ),
                         'created_at'   => date('Y-m-d H:i:s', strtotime($entry_date)),
                     );
+                }
+            }
+
+            return $items;
+        }
+
+        /**
+         * Fetch LearnDash activity directly from wp_learndash_user_activity table.
+         */
+        private function get_learndash_activity($user_id, $date_from = '', $date_to = '', $activity_filters = [], $object_type_filters = []) {
+            global $wpdb;
+
+            $user_id = intval($user_id);
+            if (!$user_id) {
+                return [];
+            }
+
+            // Map BYS activity slugs to LD activity_type values
+            $ld_slug_to_type = [
+                'lesson_completed' => 'lesson',
+                'topic_completed'  => 'topic',
+                'quiz_submitted'   => 'quiz',
+                'quiz_completed'   => 'quiz',
+            ];
+
+            $ld_object_type_to_type = [
+                'lesson' => 'lesson',
+                'topic'  => 'topic',
+                'quiz'   => 'quiz',
+            ];
+
+            // Determine which LD types to query based on filters
+            $ld_activity_types_needed = [];
+            $all_ld_types = ['lesson', 'topic', 'quiz'];
+
+            if (!empty($activity_filters)) {
+                // Only include LD types that match the requested activity slugs
+                foreach ($activity_filters as $slug) {
+                    if (isset($ld_slug_to_type[$slug])) {
+                        $ld_activity_types_needed[] = $ld_slug_to_type[$slug];
+                    }
+                }
+                $ld_activity_types_needed = array_unique($ld_activity_types_needed);
+                if (empty($ld_activity_types_needed)) {
+                    return []; // No LD-sourced activities match filter
+                }
+            } elseif (!empty($object_type_filters)) {
+                // Get LD types from object_type filter
+                foreach ($object_type_filters as $ot) {
+                    if (isset($ld_object_type_to_type[$ot])) {
+                        $ld_activity_types_needed[] = $ld_object_type_to_type[$ot];
+                    }
+                }
+                $ld_activity_types_needed = array_unique($ld_activity_types_needed);
+                if (empty($ld_activity_types_needed)) {
+                    return [];
+                }
+            } else {
+                $ld_activity_types_needed = $all_ld_types;
+            }
+
+            $where_clauses = [
+                $wpdb->prepare("a.user_id = %d", $user_id),
+            ];
+
+            $type_placeholders = implode(',', array_fill(0, count($ld_activity_types_needed), '%s'));
+            $where_clauses[] = $wpdb->prepare(
+                "a.activity_type IN ({$type_placeholders})",
+                ...$ld_activity_types_needed
+            );
+
+            // Completed status filter
+            $where_clauses[] = "(
+                (a.activity_type IN ('lesson','topic') AND a.activity_status = 1 AND a.activity_completed > 0)
+                OR (a.activity_type = 'quiz' AND a.activity_completed > 0)
+            )";
+
+            // Date range filters
+            if (!empty($date_from)) {
+                $ts_from = strtotime($date_from . ' 00:00:00');
+                $where_clauses[] = $wpdb->prepare("a.activity_completed >= %d", $ts_from);
+            }
+            if (!empty($date_to)) {
+                $ts_to = strtotime($date_to . ' 23:59:59');
+                $where_clauses[] = $wpdb->prepare("a.activity_completed <= %d", $ts_to);
+            }
+
+            $where = implode(' AND ', $where_clauses);
+            $ld_table = $wpdb->prefix . 'learndash_user_activity';
+
+            // Fetch activity rows — join posts table for object title
+            $rows = $wpdb->get_results(
+                "SELECT a.activity_id, a.user_id, a.post_id, a.course_id,
+                        a.activity_type, a.activity_status,
+                        a.activity_started, a.activity_completed, a.activity_updated,
+                        p.post_title
+                 FROM {$ld_table} a
+                 LEFT JOIN {$wpdb->posts} p ON p.ID = a.post_id
+                 WHERE {$where}
+                 ORDER BY a.activity_completed DESC",
+                ARRAY_A
+            );
+
+            if (empty($rows)) {
+                return [];
+            }
+
+            // For quiz rows: batch-fetch meta (score, percentage, pass, timespent, points)
+            $quiz_activity_ids = [];
+            foreach ($rows as $row) {
+                if ($row['activity_type'] === 'quiz') {
+                    $quiz_activity_ids[] = intval($row['activity_id']);
+                }
+            }
+
+            $quiz_meta_map = [];
+            if (!empty($quiz_activity_ids)) {
+                $meta_table = $wpdb->prefix . 'learndash_user_activity_meta';
+                $id_placeholders = implode(',', array_fill(0, count($quiz_activity_ids), '%d'));
+                $meta_keys = ['score', 'percentage', 'pass', 'timespent', 'points', 'total_points', 'count'];
+                $key_placeholders = implode(',', array_fill(0, count($meta_keys), '%s'));
+
+                $meta_rows = $wpdb->get_results(
+                    $wpdb->prepare(
+                        "SELECT activity_id, activity_meta_key, activity_meta_value
+                         FROM {$meta_table}
+                         WHERE activity_id IN ({$id_placeholders})
+                         AND activity_meta_key IN ({$key_placeholders})",
+                        ...array_merge($quiz_activity_ids, $meta_keys)
+                    ),
+                    ARRAY_A
+                );
+
+                foreach ($meta_rows as $meta_row) {
+                    $aid = intval($meta_row['activity_id']);
+                    if (!isset($quiz_meta_map[$aid])) {
+                        $quiz_meta_map[$aid] = [];
+                    }
+                    $quiz_meta_map[$aid][$meta_row['activity_meta_key']] = $meta_row['activity_meta_value'];
+                }
+            }
+
+            $items = [];
+
+            foreach ($rows as $row) {
+                $type    = $row['activity_type'];
+                $post_id = intval($row['post_id']);
+                $course_id = intval($row['course_id']);
+                $title   = $row['post_title'] ?? '';
+                $activity_id = intval($row['activity_id']);
+
+                if ($type === 'lesson') {
+                    $timestamp = intval($row['activity_completed']);
+                    $items[] = [
+                        'id'           => 0,
+                        'activity'     => 'lesson_completed',
+                        'initiated_by' => 'system',
+                        'object_id'    => $post_id,
+                        'object_title' => $title,
+                        'object_type'  => 'lesson',
+                        'meta'         => ['course_id' => $course_id],
+                        'created_at'   => date('Y-m-d H:i:s', $timestamp),
+                    ];
+                } elseif ($type === 'topic') {
+                    $timestamp = intval($row['activity_completed']);
+                    $items[] = [
+                        'id'           => 0,
+                        'activity'     => 'topic_completed',
+                        'initiated_by' => 'system',
+                        'object_id'    => $post_id,
+                        'object_title' => $title,
+                        'object_type'  => 'topic',
+                        'meta'         => ['course_id' => $course_id],
+                        'created_at'   => date('Y-m-d H:i:s', $timestamp),
+                    ];
+                } elseif ($type === 'quiz') {
+                    $timestamp = intval($row['activity_completed']);
+                    $meta_raw  = $quiz_meta_map[$activity_id] ?? [];
+                    $meta = [
+                        'course_id'    => $course_id,
+                        'score'        => intval($meta_raw['score'] ?? 0),
+                        'points'       => intval($meta_raw['points'] ?? 0),
+                        'total_points' => intval($meta_raw['total_points'] ?? 0),
+                        'percentage'   => floatval($meta_raw['percentage'] ?? 0),
+                        'timespent'    => intval($meta_raw['timespent'] ?? 0),
+                        'pass'         => filter_var($meta_raw['pass'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                    ];
+                    $dt = date('Y-m-d H:i:s', $timestamp);
+
+                    // Emit quiz_submitted if filter includes it or no filter
+                    $include_submitted = empty($activity_filters) || in_array('quiz_submitted', $activity_filters);
+                    // Emit quiz_completed if filter includes it or no filter
+                    $include_completed = empty($activity_filters) || in_array('quiz_completed', $activity_filters);
+
+                    if ($include_submitted) {
+                        $items[] = [
+                            'id'           => 0,
+                            'activity'     => 'quiz_submitted',
+                            'initiated_by' => 'self',
+                            'object_id'    => $post_id,
+                            'object_title' => $title,
+                            'object_type'  => 'quiz',
+                            'meta'         => $meta,
+                            'created_at'   => $dt,
+                        ];
+                    }
+                    if ($include_completed) {
+                        $items[] = [
+                            'id'           => 0,
+                            'activity'     => 'quiz_completed',
+                            'initiated_by' => 'system',
+                            'object_id'    => $post_id,
+                            'object_title' => $title,
+                            'object_type'  => 'quiz',
+                            'meta'         => $meta,
+                            'created_at'   => $dt,
+                        ];
+                    }
                 }
             }
 

@@ -20,10 +20,7 @@
                 flex-direction: column;
 
                 label {
-                    font-size: var(--wp--preset--font-size--x-small);
-                    font-weight: 500;
-                    color: var(--wp--preset--color--gray-600);
-                    margin-bottom: 4px;
+                    margin-bottom: var(--wp--preset--spacing--1);
                 }
 
                 select,
@@ -83,21 +80,20 @@
                             display: inline-flex;
                             align-items: center;
                             gap: 4px;
-                            background: var(--wp--preset--color--blue-100);
-                            color: var(--wp--preset--color--blue-700);
-                            border-radius: 999px;
-                            padding: 2px 8px 2px 10px;
+                            background: var(--wp--preset--color--orange-100);
+                            color: var(--wp--preset--color--orange-700);
+                            border-radius: 0.25rem;
+                            padding: var(--wp--preset--spacing--1) var(--wp--preset--spacing--2);
                             font-size: var(--wp--preset--font-size--x-small);
                             font-weight: 500;
                             line-height: 1.4;
 
                             &-remove {
-                                color: var(--wp--preset--color--blue-500);
+                                color: var(--wp--preset--color--red-500);
                                 font-size: 0.65rem;
                                 line-height: 1;
                                 padding: 1px;
                                 border-radius: 50%;
-                                &:hover { color: var(--wp--preset--color--blue-700); }
                             }
                         }
 
@@ -256,12 +252,13 @@
     // Block Table
     .table-wrapper{
         margin-top: var(--wp--preset--spacing--7);
+        border-radius: 1.5rem;
+        overflow: hidden;
 
         table{
             width: 100%;
             font-size: var(--wp--preset--font-size--small);
             background: white;
-            border-radius: 1.5rem;
             text-align: left;
             border-collapse: collapse;
 

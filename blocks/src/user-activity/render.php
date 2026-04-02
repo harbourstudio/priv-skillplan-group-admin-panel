@@ -260,7 +260,7 @@ foreach ($activity_type_filter_options as $option) {
                 <!-- Rows rendered by view.js from REST API -->
             </tbody>
         </table>
-        <button class="bys-show-more btn-unstyled" type="button">Show More Results</button>
+        <button class="bys-show-more btn-unstyled" type="button"><?php esc_html_e('Show More Results', 'bys'); ?></button>
     </div>
 
     <!-- Template for cloning activity rows -->
