@@ -31,8 +31,20 @@ jQuery(document).ready(($) => {
   let currentPage = 1;
   let currentFilters = {};
   let selectedActivities = []; // Track selected activity values
+  let selectedResourceTypes = []; // Track selected resource type values
   let totalPages = 0; // Track total pages from API response
   let isLoadingMore = false; // Prevent duplicate requests
+  const PER_PAGE = 25; // Fixed pagination size
+
+  // Resource type labels for display
+  const resourceTypeLabels = {
+    'course': 'Course',
+    'lesson': 'Module',
+    'topic': 'Lesson',
+    'quiz': 'Quiz',
+    'form': 'Form',
+    'achievement': 'Achievement',
+  };
 
   /**
    * Sync activity pills display from selectedActivities array
@@ -62,6 +74,31 @@ jQuery(document).ready(($) => {
   };
 
   /**
+   * Sync resource type pills display from selectedResourceTypes array
+   */
+  const syncResourceTypePills = () => {
+    const $pills = $block.find('#bys-multiselect-resource-type-pills');
+    $pills.html('');
+
+    if (!selectedResourceTypes.length) {
+      $pills.html('<span class="bys-multiselect__placeholder">All resource types</span>');
+      return;
+    }
+
+    selectedResourceTypes.forEach(value => {
+      const label = resourceTypeLabels[value] || value;
+      $pills.append(`
+        <span class="bys-multiselect__pill" data-resource-type-value="${value}">
+          ${label}
+          <button class="bys-multiselect__pill-remove btn-unstyled" type="button" aria-label="Remove ${label}" data-resource-type-value="${value}">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </span>
+      `);
+    });
+  };
+
+  /**
    * Toggle activity multiselect dropdown
    */
   const toggleActivityDropdown = () => {
@@ -69,6 +106,16 @@ jQuery(document).ready(($) => {
     const isOpen = $multiselect.attr('aria-expanded') === 'true';
     $multiselect.attr('aria-expanded', !isOpen);
     $block.find('#bys-multiselect-activity-dropdown').toggleClass('hidden', isOpen);
+  };
+
+  /**
+   * Toggle resource type multiselect dropdown
+   */
+  const toggleResourceTypeDropdown = () => {
+    const $multiselect = $block.find('#bys-multiselect-resource-type');
+    const isOpen = $multiselect.attr('aria-expanded') === 'true';
+    $multiselect.attr('aria-expanded', !isOpen);
+    $block.find('#bys-multiselect-resource-type-dropdown').toggleClass('hidden', isOpen);
   };
 
   /**
@@ -184,13 +231,22 @@ jQuery(document).ready(($) => {
     try {
       const queryParams = new URLSearchParams();
       queryParams.append('page', page);
-      queryParams.append('per_page', $block.find('[name="per_page"]').val() || 20);
+      queryParams.append('per_page', PER_PAGE);
 
       // Add activity filters (multiple values)
       if (currentFilters.activity && Array.isArray(currentFilters.activity)) {
         currentFilters.activity.forEach(activity => {
           if (activity) {
             queryParams.append('activity[]', activity);
+          }
+        });
+      }
+
+      // Add resource type filters (multiple values)
+      if (currentFilters.object_type && Array.isArray(currentFilters.object_type)) {
+        currentFilters.object_type.forEach(type => {
+          if (type) {
+            queryParams.append('object_type[]', type);
           }
         });
       }
@@ -350,6 +406,50 @@ jQuery(document).ready(($) => {
   });
 
   /**
+   * Resource type multiselect toggle - click anywhere on the control
+   */
+  $block.on('click', '#bys-multiselect-resource-type .bys-multiselect__control', function (e) {
+    // Don't toggle if clicking the remove button
+    if ($(e.target).closest('.bys-multiselect__pill-remove').length) {
+      return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    toggleResourceTypeDropdown();
+  });
+
+  /**
+   * Handle resource type checkbox changes
+   */
+  $block.on('change', '#bys-multiselect-resource-type-dropdown .bys-multiselect__checkbox', function () {
+    const value = $(this).val();
+
+    if (this.checked) {
+      if (!selectedResourceTypes.includes(value)) {
+        selectedResourceTypes.push(value);
+      }
+    } else {
+      selectedResourceTypes = selectedResourceTypes.filter(v => v !== value);
+    }
+
+    syncResourceTypePills();
+    $(this).closest('.bys-multiselect__option').attr('aria-selected', this.checked);
+  });
+
+  /**
+   * Remove resource type pill via X button
+   */
+  $block.on('click', '#bys-multiselect-resource-type .bys-multiselect__pill-remove', function (e) {
+    e.stopPropagation();
+    const value = $(this).data('resource-type-value');
+    selectedResourceTypes = selectedResourceTypes.filter(v => v !== value);
+    $block.find(`#bys-multiselect-resource-type-dropdown input[value="${value}"]`)
+      .prop('checked', false)
+      .closest('li').attr('aria-selected', 'false');
+    syncResourceTypePills();
+  });
+
+  /**
    * Date range trigger toggle
    */
   $block.on('click', '#date-range-trigger', function (e) {
@@ -371,12 +471,19 @@ jQuery(document).ready(($) => {
   $(document).on('click', function (e) {
     const $target = $(e.target);
     const $activityField = $block.find('#bys-multiselect-activity');
+    const $resourceTypeField = $block.find('#bys-multiselect-resource-type');
     const $dateField = $block.find('.filters__field--date-range');
 
     // Close activity dropdown if click is outside the entire field (including dropdown)
     if (!$target.closest($activityField).length && $activityField.attr('aria-expanded') === 'true') {
       $activityField.attr('aria-expanded', 'false');
       $block.find('#bys-multiselect-activity-dropdown').addClass('hidden');
+    }
+
+    // Close resource type dropdown if click is outside the entire field (including dropdown)
+    if (!$target.closest($resourceTypeField).length && $resourceTypeField.attr('aria-expanded') === 'true') {
+      $resourceTypeField.attr('aria-expanded', 'false');
+      $block.find('#bys-multiselect-resource-type-dropdown').addClass('hidden');
     }
 
     // Close date range dropdown if click is outside the field
@@ -400,6 +507,7 @@ jQuery(document).ready(($) => {
     e.preventDefault();
     currentFilters = {
       activity: selectedActivities,
+      object_type: selectedResourceTypes,
       date_from: $block.find('#filter-date-from').val() || '',
       date_to: $block.find('#filter-date-to').val() || '',
     };
@@ -412,12 +520,16 @@ jQuery(document).ready(($) => {
   $resetBtn.on('click', function () {
     currentFilters = {};
     selectedActivities = [];
+    selectedResourceTypes = [];
     currentPage = 1;
     totalPages = 0;
     $form[0].reset();
     $block.find('#bys-multiselect-activity-dropdown .bys-multiselect__checkbox').prop('checked', false);
     $block.find('#bys-multiselect-activity .bys-multiselect__option').removeAttr('aria-selected');
+    $block.find('#bys-multiselect-resource-type-dropdown .bys-multiselect__checkbox').prop('checked', false);
+    $block.find('#bys-multiselect-resource-type .bys-multiselect__option').removeAttr('aria-selected');
     syncActivityPills();
+    syncResourceTypePills();
     validateDateRange();
     updateDateRangeText();
     loadActivity(1);
@@ -427,6 +539,7 @@ jQuery(document).ready(($) => {
    * Initialize pills, date range text, and date validation on page load
    */
   syncActivityPills();
+  syncResourceTypePills();
   validateDateRange();
   updateDateRangeText();
 

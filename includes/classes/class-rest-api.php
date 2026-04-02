@@ -1153,6 +1153,25 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 $where_clauses[] = $wpdb->prepare("activity IN ({$placeholders})", ...$activity_filters);
             }
 
+            // Handle object_type[] filters (resource type)
+            $object_type_filters = $request->get_param('object_type');
+            if (is_string($object_type_filters)) {
+                $object_type_filters = array($object_type_filters);
+            } elseif (!is_array($object_type_filters)) {
+                $object_type_filters = array();
+            }
+            $object_type_filters = array_map('sanitize_text_field', $object_type_filters);
+            $object_type_filters = array_filter($object_type_filters);
+
+            if (!empty($object_type_filters)) {
+                // Filter out 'achievement' since it's not in the custom table (comes from GamiPress)
+                $db_object_types = array_filter($object_type_filters, fn($t) => $t !== 'achievement');
+                if (!empty($db_object_types)) {
+                    $placeholders = implode(',', array_fill(0, count($db_object_types), '%s'));
+                    $where_clauses[] = $wpdb->prepare("object_type IN ({$placeholders})", ...$db_object_types);
+                }
+            }
+
             if (!empty($date_from)) {
                 $where_clauses[] = $wpdb->prepare("DATE(created_at) >= %s", $date_from);
             }
@@ -1198,8 +1217,13 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 );
             }
 
-            // Fetch and transform GamiPress achievement logs if no activity filter or achievement_earned is in filters
-            $should_fetch_gamipress = empty($activity_filters) || in_array('achievement_earned', $activity_filters);
+            // Fetch and transform GamiPress achievement logs if:
+            // 1. No activity filter OR achievement_earned is in activity filters
+            // 2. No object_type filter OR 'achievement' is in object_type filters
+            $should_fetch_gamipress = (
+                (empty($activity_filters) || in_array('achievement_earned', $activity_filters))
+                && (empty($object_type_filters) || in_array('achievement', $object_type_filters))
+            );
             if ($should_fetch_gamipress) {
                 $gamipress_items = $this->get_gamipress_achievements($user_id, $date_from, $date_to);
                 if ($gamipress_items) {

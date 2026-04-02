@@ -161,15 +161,59 @@ foreach ($activity_type_filter_options as $option) {
                     </div>
                 </div>
 
-                <!-- Items Per Page -->
-                <div class="filters__field">
-                    <label for="filter-per-page"><?php esc_html_e('Items per page', 'bys'); ?></label>
-                    <select id="filter-per-page" name="per_page">
-                        <option value="10">10</option>
-                        <option value="20" selected>20</option>
-                        <option value="50">50</option>
-                        <option value="100">100</option>
-                    </select>
+                <!-- Resource Type -->
+                <div class="filters__field filters__field--multiselect">
+                    <label><?php esc_html_e('Resource Type', 'bys'); ?></label>
+                    <div class="bys-multiselect" id="bys-multiselect-resource-type" aria-haspopup="listbox" aria-expanded="false">
+                        <div class="bys-multiselect__control">
+                            <div class="bys-multiselect__pills" id="bys-multiselect-resource-type-pills">
+                                <span class="bys-multiselect__placeholder"><?php esc_html_e('All resource types', 'bys'); ?></span>
+                            </div>
+                            <button class="bys-multiselect__toggle btn-unstyled" type="button" aria-label="Toggle resource type selector">
+                                <i class="fa-regular fa-chevron-down"></i>
+                            </button>
+                        </div>
+                        <div class="bys-multiselect__dropdown hidden" role="listbox" aria-multiselectable="true" id="bys-multiselect-resource-type-dropdown">
+                            <ul class="bys-multiselect__list" role="group">
+                                <li class="bys-multiselect__option" role="option">
+                                    <label>
+                                        <input type="checkbox" name="resource-type[]" value="course" class="bys-multiselect__checkbox" />
+                                        <span><?php esc_html_e('Course', 'bys'); ?></span>
+                                    </label>
+                                </li>
+                                <li class="bys-multiselect__option" role="option">
+                                    <label>
+                                        <input type="checkbox" name="resource-type[]" value="lesson" class="bys-multiselect__checkbox" />
+                                        <span><?php esc_html_e('Module', 'bys'); ?></span>
+                                    </label>
+                                </li>
+                                <li class="bys-multiselect__option" role="option">
+                                    <label>
+                                        <input type="checkbox" name="resource-type[]" value="topic" class="bys-multiselect__checkbox" />
+                                        <span><?php esc_html_e('Lesson', 'bys'); ?></span>
+                                    </label>
+                                </li>
+                                <li class="bys-multiselect__option" role="option">
+                                    <label>
+                                        <input type="checkbox" name="resource-type[]" value="quiz" class="bys-multiselect__checkbox" />
+                                        <span><?php esc_html_e('Quiz', 'bys'); ?></span>
+                                    </label>
+                                </li>
+                                <li class="bys-multiselect__option" role="option">
+                                    <label>
+                                        <input type="checkbox" name="resource-type[]" value="form" class="bys-multiselect__checkbox" />
+                                        <span><?php esc_html_e('Form', 'bys'); ?></span>
+                                    </label>
+                                </li>
+                                <li class="bys-multiselect__option" role="option">
+                                    <label>
+                                        <input type="checkbox" name="resource-type[]" value="achievement" class="bys-multiselect__checkbox" />
+                                        <span><?php esc_html_e('Achievement', 'bys'); ?></span>
+                                    </label>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Date Range Picker -->
@@ -191,74 +235,6 @@ foreach ($activity_type_filter_options as $option) {
                         </div>
                     </div>
                 </div>
-
-                 <!-- Resource Type Multiselect -->
-                <!-- <div class="filters__field filters__field--multiselect">
-                    <label><?php esc_html_e('Resource Type', 'bys'); ?></label>
-                    <div class="bys-multiselect" id="bys-multiselect-resource-type" aria-haspopup="listbox" aria-expanded="false">
-                        <div class="bys-multiselect__control">
-                            <div class="bys-multiselect__pills" id="bys-multiselect-resource-type-pills">
-                                <span class="bys-multiselect__placeholder"><?php esc_html_e('All Resource Type', 'bys'); ?></span>
-                            </div>
-                            <button class="bys-multiselect__toggle btn-unstyled" type="button" aria-label="Toggle resource type selector">
-                                <i class="fa-regular fa-chevron-down"></i>
-                            </button>
-                        </div>
-                        <div class="bys-multiselect__dropdown hidden" role="listbox" aria-multiselectable="true" id="bys-multiselect-resource-type-dropdown">
-                            <ul class="bys-multiselect__list" role="group">
-                                <?php foreach ($activity_type_filter_options as $option) : ?>
-                                    <?php if (!empty($option['value'])) : ?>
-                                        <li class="bys-multiselect__option" role="option">
-                                            <label>
-                                                <input
-                                                    type="checkbox"
-                                                    name="resource-type[]"
-                                                    value="<?php echo esc_attr($option['value']); ?>"
-                                                    class="bys-multiselect__checkbox"
-                                                />
-                                                <span><?php echo esc_html($option['label']); ?></span>
-                                            </label>
-                                        </li>
-                                    <?php endif; ?>
-                                <?php endforeach; ?>
-                            </ul>
-                        </div>
-                    </div>
-                </div> -->
-
-                <!-- Resource Multiselect -->
-                <!-- <div class="filters__field filters__field--multiselect">
-                    <label><?php esc_html_e('Resource', 'bys'); ?></label>
-                    <div class="bys-multiselect" id="bys-multiselect-resource" aria-haspopup="listbox" aria-expanded="false">
-                        <div class="bys-multiselect__control">
-                            <div class="bys-multiselect__pills" id="bys-multiselect-resource-pills">
-                                <span class="bys-multiselect__placeholder"><?php esc_html_e('All Resources', 'bys'); ?></span>
-                            </div>
-                            <button class="bys-multiselect__toggle btn-unstyled" type="button" aria-label="Toggle resource selector">
-                                <i class="fa-regular fa-chevron-down"></i>
-                            </button>
-                        </div>
-                        <div class="bys-multiselect__dropdown hidden" role="listbox" aria-multiselectable="true" id="bys-multiselect-resource-dropdown">
-                            <ul class="bys-multiselect__list" role="group">
-                                <?php foreach ($activity_type_filter_options as $option) : ?>
-                                    <?php if (!empty($option['value'])) : ?>
-                                        <li class="bys-multiselect__option" role="option">
-                                            <label>
-                                                <input
-                                                    type="checkbox"
-                                                    name="resource[]"
-                                                    value="<?php echo esc_attr($option['value']); ?>"
-                                                    class="bys-multiselect__checkbox"
-                                                />
-                                                <span><?php echo esc_html($option['label']); ?></span>
-                                            </label>
-                                        </li>
-                                    <?php endif; ?>
-                                <?php endforeach; ?>
-                            </ul>
-                        </div>
-                    </div>
-                </div> -->
             </div>
 
             <div class="filters__actions">
