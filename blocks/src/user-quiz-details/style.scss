@@ -30,11 +30,85 @@
                 align-items: center;
                 gap: var(--wp--preset--spacing--3);
 
+
                 .filters__reset{
                     background: white;
                     color: var(--wp--preset--color--primary);
                 }
             }
+
+            &__toggles{
+                display: flex;
+                align-items: center;
+                gap: var(--wp--preset--spacing--3);
+            }
+        }
+    }
+
+    /* iOS-style toggle switch */
+    .toggle-switch {
+        display: flex;
+        align-items: center;
+        gap: var(--wp--preset--spacing--2);
+        cursor: pointer;
+        user-select: none;
+
+        input[type="checkbox"] {
+            display: none;
+        }
+
+        .toggle-slider {
+            position: relative;
+            display: inline-block;
+            width: 3rem;
+            height: 1.75rem;
+            background-color: #ccc;
+            border-radius: 1.75rem;
+            transition: background-color 0.3s ease;
+            flex-shrink: 0;
+
+            &::after {
+                content: '';
+                position: absolute;
+                top: 0.125rem;
+                left: 0.125rem;
+                width: 1.5rem;
+                height: 1.5rem;
+                background-color: white;
+                border-radius: 50%;
+                transition: transform 0.3s ease;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            }
+        }
+
+        input[type="checkbox"]:checked + .toggle-slider {
+            background-color: var(--wp--preset--color--primary);
+
+            &::after {
+                transform: translateX(1.25rem);
+            }
+        }
+
+        .toggle-label {
+            font-size: var(--wp--preset--font-size--small);
+            font-weight: 500;
+            color: var(--wp--preset--color--gray-700);
+        }
+    }
+
+    /* Course group styling for grouped view */
+    .course-group {
+        margin-bottom: var(--wp--preset--spacing--8);
+
+        &__title {
+            font-size: var(--wp--preset--font-size--base);
+            font-weight: 600;
+            margin-bottom: var(--wp--preset--spacing--4);
+            color: var(--wp--preset--color--gray-900);
+        }
+
+        &__table {
+            margin-bottom: var(--wp--preset--spacing--6);
         }
     }
 
@@ -52,6 +126,7 @@
             align-items: center;
             gap: 0.25rem;
             font-weight: 400;
+            cursor: pointer;
         }
     }
 
@@ -59,7 +134,8 @@
         width: 100%;
         font-size: var(--wp--preset--font-size--small);
         background: white;
-        border-radius: 1.5rem;
+        border-radius: 1rem;
+        overflow: hidden;
         text-align: left;
         border-collapse: collapse;
 
@@ -69,6 +145,14 @@
         .cell_score_latest,
         .cell_result_latest {
             display: none;
+        }
+
+        .cell_total_attempts {
+            cursor: pointer;
+
+            &:hover{
+                background-color: var(--wp--preset--color--gray-50);
+            }
         }
 
         thead {
