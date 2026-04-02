@@ -14,7 +14,7 @@ On activation, the plugin creates the `bys_groups_user_activity` database table.
 |--------|------|----------|-------------|
 | `id` | BIGINT | No | Auto-incrementing primary key |
 | `user_id` | BIGINT | No | WordPress user ID |
-| `activity` | VARCHAR(255) | No | Activity type identifier (e.g., `quiz_submitted`, `lesson_completed`) |
+| `activity` | VARCHAR(255) | No | Activity type identifier (e.g., `user_login`, `lesson_visited`, `certificate_earned`) |
 | `initiated_by` | VARCHAR(50) | No | Who triggered the action: `self`, `system`, or `admin` |
 | `object_id` | BIGINT | No | ID of the related LearnDash/GamiPress object (course, quiz, achievement, etc.) |
 | `object_title` | VARCHAR(255) | Yes | Human-readable title of the object |
@@ -31,7 +31,7 @@ On activation, the plugin creates the `bys_groups_user_activity` database table.
 ## Implementation Details
 
 - `includes/classes/class-activator.php` - Database schema and plugin setup
-- `includes/classes/class-activity-logger.php` - Activity event logging (system, form, LearnDash events)
+- `includes/classes/class-activity-logger.php` - Activity event logging (system events, page views, certificate earning, course enrollment)
 - `includes/classes/class-rest-api.php` - REST API endpoint (merges custom table + GamiPress data)
 
 ### Hook Registration
@@ -98,7 +98,7 @@ When filters are applied, they are passed to the REST API endpoint as query para
 
 ### LearnDash
 
-Some activities (like `certificate_earned`) fetch additional data from the LearnDash REST API:
+LearnDash completion events (`lesson_completed`, `topic_completed`, `quiz_completed`, `quiz_submitted`) are **not logged to the custom table**. These activities are fetched on-demand from LearnDash's native activity API (`learndash_user_activity` table) via the REST API.
 
 ### GamiPress Integrations
 
@@ -147,22 +147,19 @@ Achievement Earned events (`achievement_earned`) are fetched via GamiPress REST 
 5. Merges with custom table activities and sorts by `created_at` timestamp
 6. Applies pagination to combined results
 
-GamiPress data is only fetched when:
-- No activity filter is applied (showing all activities), OR
-- User has specifically selected the `achievement_earned` activity type filter
+### Gravity Forms Integrations
 
-AND:
-- No resource type filter is applied (showing all resource types), OR
-- User has specifically selected the `achievement` resource type filter
+Form submission events (`profile_update`, `account_settings_update`) are fetched via Gravity Forms REST API at request time rather than logged to the custom table.
 
-**Key Behavior**: When filtering by `object_type` (resource type):
-- Database activities are filtered by `object_type IN (...)` clause
-- GamiPress achievements (which don't exist in custom table) are only fetched if:
-  - No object_type filter is set, OR
-  - User explicitly selected `achievement` in the resource type filter
-- This prevents requesting GamiPress data when user is filtering for non-achievement resource types
+**Location**: `includes/classes/class-rest-api.php` - `get_gravity_forms_submissions()` method
 
-This conditional logic improves performance by avoiding unnecessary API calls.
+**Data Flow**:
+1. Maps form IDs to activity slugs (form 16 → `profile_update`, form 15 → `account_settings_update`)
+2. Fetches entries from `/wp-json/gf/v2/forms/{form_id}/entries` endpoint filtered by `created_by` user
+3. Transforms to activity log format with `object_type: 'form'`
+4. Merges with custom table and GamiPress activities, sorted by `created_at`
+
+---
 
 ## Common issues:
 - **Missing transient deduplication**: Page views logging multiple times → check transient settings
