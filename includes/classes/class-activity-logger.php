@@ -19,10 +19,6 @@ if (!class_exists('BYS_Groups_Activity_Logger')) {
             add_action('wp_login', [$this, 'on_user_login'], 10, 2);
             add_action('wp_logout', [$this, 'on_user_logout'], 1); // Priority 1 (before default 10) to capture before session destroyed
 
-            // Gravity Form events
-            add_action('gform_after_submission_16', [$this, 'on_profile_update'], 10, 2);
-            add_action('gform_after_submission_15', [$this, 'on_account_settings_update'], 10, 2);
-
             // Learndash events
             add_action('learndash_course_completed', [$this, 'on_certificate_earned'], 10, 1);
             add_action('learndash_lesson_completed', [$this, 'on_lesson_completed'], 10, 1);
@@ -141,48 +137,6 @@ if (!class_exists('BYS_Groups_Activity_Logger')) {
                 object_id:    0,
                 object_title: null,
                 object_type:  null
-            );
-        }
-
-        public function on_profile_update($entry, $form){
-            $user_id = isset($entry['created_by']) ? intval($entry['created_by']) : get_current_user_id();
-            
-            if (!$user_id) {
-                return;
-            }
-            
-            $this->log_activity(
-                user_id:      $user_id,
-                activity:     'profile_update',
-                initiated_by: 'self',
-                object_id:    intval($form['id']), // use form ID
-                object_title: 'Gravity Form: ' .$form['title'], // use form title
-                object_type:  'form',
-                meta:         [
-                    'entry_id' => intval($entry['id']),
-                    'form_id'  => intval($form['id']),
-                ]
-            );
-        }
-
-        public function on_account_settings_update($entry, $form) {
-            $user_id = isset($entry['created_by']) ? intval($entry['created_by']) : get_current_user_id();
-            
-            if (!$user_id) {
-                return;
-            }
-            
-            $this->log_activity(
-                user_id:      $user_id,
-                activity:     'account_settings_update',
-                initiated_by: 'self',
-                object_id:    intval($form['id']), // use form ID
-                object_title: 'Gravity Form: ' .$form['title'], // use form title
-                object_type:  'form',
-                meta:         [
-                    'entry_id' => intval($entry['id']),
-                    'form_id'  => intval($form['id']),
-                ]
             );
         }
 

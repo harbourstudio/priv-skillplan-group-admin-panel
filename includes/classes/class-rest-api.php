@@ -1163,12 +1163,17 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             $object_type_filters = array_map('sanitize_text_field', $object_type_filters);
             $object_type_filters = array_filter($object_type_filters);
 
+            $skip_db_query = false;
+
             if (!empty($object_type_filters)) {
-                // Filter out 'achievement' since it's not in the custom table (comes from GamiPress)
-                $db_object_types = array_filter($object_type_filters, fn($t) => $t !== 'achievement');
+                // Filter out 'achievement' (from GamiPress) and 'form' (from GF API) since they're not in the custom table
+                $db_object_types = array_filter($object_type_filters, fn($t) => $t !== 'achievement' && $t !== 'form');
                 if (!empty($db_object_types)) {
                     $placeholders = implode(',', array_fill(0, count($db_object_types), '%s'));
                     $where_clauses[] = $wpdb->prepare("object_type IN ({$placeholders})", ...$db_object_types);
+                } else {
+                    // If all object_type filters were excluded from DB (only achievement/form), skip DB query entirely
+                    $skip_db_query = true;
                 }
             }
 
@@ -1180,15 +1185,19 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 $where_clauses[] = $wpdb->prepare("DATE(created_at) <= %s", $date_to);
             }
 
-            $where = implode(" AND ", $where_clauses);
-            $table = $wpdb->prefix . BYS_GROUPS_USER_ACTIVITY_TABLE;
+            $rows = array();
 
-            $rows = $wpdb->get_results(
-                "SELECT id, activity, initiated_by, object_id, object_title, object_type, meta, created_at
-                 FROM {$table}
-                 WHERE {$where}",
-                ARRAY_A
-            );
+            if (!$skip_db_query) {
+                $where = implode(" AND ", $where_clauses);
+                $table = $wpdb->prefix . BYS_GROUPS_USER_ACTIVITY_TABLE;
+
+                $rows = $wpdb->get_results(
+                    "SELECT id, activity, initiated_by, object_id, object_title, object_type, meta, created_at
+                     FROM {$table}
+                     WHERE {$where}",
+                    ARRAY_A
+                );
+            }
 
             $items = array();
             foreach ($rows as $row) {
@@ -1228,6 +1237,19 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 $gamipress_items = $this->get_gamipress_achievements($user_id, $date_from, $date_to);
                 if ($gamipress_items) {
                     $items = array_merge($items, $gamipress_items);
+                }
+            }
+
+            // Fetch Gravity Forms submissions if not filtered away by activity or object_type
+            $should_fetch_gf = (
+                (empty($activity_filters) || in_array('profile_update', $activity_filters) || in_array('account_settings_update', $activity_filters))
+                && (empty($object_type_filters) || in_array('form', $object_type_filters))
+            );
+
+            if ($should_fetch_gf) {
+                $gf_items = $this->get_gravity_forms_submissions($user_id, $date_from, $date_to);
+                if ($gf_items) {
+                    $items = array_merge($items, $gf_items);
                 }
             }
 
@@ -1474,6 +1496,105 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                     'meta'            => $meta,
                     'created_at'      => $mysql_date,
                 );
+            }
+
+            return $items;
+        }
+
+        /**
+         * Fetch Gravity Forms submissions from REST API
+         * Mirrors the GamiPress pattern: query GF API instead of logging to custom table
+         * Maps form IDs to activity slugs (16 → profile_update, 15 → account_settings_update)
+         */
+        private function get_gravity_forms_submissions($user_id, $date_from = '', $date_to = '') {
+            $user_id = intval($user_id);
+            if (!$user_id) {
+                return array();
+            }
+
+            // Map form ID → activity slug
+            $form_map = array(
+                16 => 'profile_update',
+                15 => 'account_settings_update',
+            );
+
+            $auth_header = BYS_Groups_Auth::get_auth_header();
+
+            $request_args = array(
+                'timeout'   => 10,
+                'sslverify' => false,
+            );
+            if ($auth_header) {
+                $request_args['headers'] = array('Authorization' => $auth_header);
+            }
+
+            $items = array();
+
+            foreach ($form_map as $form_id => $activity_slug) {
+                $args = array(
+                    'search'  => json_encode(array(
+                        'field_filters' => array(
+                            array('key' => 'created_by', 'value' => $user_id)
+                        )
+                    )),
+                    'sorting' => json_encode(array('key' => 'date_created', 'direction' => 'DESC')),
+                    'paging'  => json_encode(array('page_size' => 100)),
+                );
+
+                $url = add_query_arg($args, get_home_url() . "/wp-json/gf/v2/forms/{$form_id}/entries");
+
+                $response = wp_remote_get($url, $request_args);
+
+                if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
+                    continue;
+                }
+
+                $body = wp_remote_retrieve_body($response);
+                $data = json_decode($body, true);
+
+                if (!is_array($data)) {
+                    continue;
+                }
+
+                $entries = $data['entries'] ?? (is_array($data) ? $data : array());
+
+                foreach ($entries as $entry) {
+                    $entry_date = $entry['date_created'] ?? null;
+                    if (!$entry_date) {
+                        continue;
+                    }
+
+                    // Apply date range filters
+                    if ($date_from && strtotime($entry_date) < strtotime($date_from)) {
+                        continue;
+                    }
+                    if ($date_to && strtotime($entry_date) > strtotime($date_to . ' 23:59:59')) {
+                        continue;
+                    }
+
+                    // Extract field values (numeric keys are field data)
+                    $field_data = array();
+                    foreach ($entry as $key => $value) {
+                        if (is_numeric($key) && $value !== '' && $value !== null) {
+                            $field_data[$key] = $value;
+                        }
+                    }
+
+                    $items[] = array(
+                        'id'           => 0,
+                        'activity'     => $activity_slug,
+                        'initiated_by' => 'self',
+                        'object_id'    => $form_id,
+                        'object_title' => $entry['form_title'] ?? '',
+                        'object_type'  => 'form',
+                        'meta'         => array(
+                            'entry_id' => intval($entry['id'] ?? 0),
+                            'form_id'  => $form_id,
+                            'fields'   => $field_data,
+                        ),
+                        'created_at'   => date('Y-m-d H:i:s', strtotime($entry_date)),
+                    );
+                }
             }
 
             return $items;
