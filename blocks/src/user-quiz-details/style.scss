@@ -16,6 +16,72 @@
             .filters__field{
                 display: flex;
                 flex-direction: column;
+
+                // Date range picker field
+                &--date-range {
+                    position: relative;
+    
+                    .date-range__trigger {
+                        min-height: 3rem;
+                        background: white;
+                        border: 1px solid var(--wp--preset--color--gray-300);
+                        border-radius: 0.375rem;
+                        padding: var(--wp--preset--spacing--1) var(--wp--preset--spacing--3);
+                        font-size: var(--wp--preset--font-size--small);
+                        color: var(--wp--preset--color--gray-700);
+                        text-align: left;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        cursor: pointer;
+                        transition: border-color 0.15s ease;
+                        width: 100%;
+    
+                        &:hover {
+                            border-color: var(--wp--preset--color--gray-400);
+                        }
+    
+                        &:focus {
+                            outline: none;
+                            border-color: var(--wp--preset--color--primary);
+                        }
+    
+                        i {
+                            flex-shrink: 0;
+                            margin-left: var(--wp--preset--spacing--2);
+                        }
+                    }
+                }
+    
+                // Date range picker dropdown
+                .filters__date-range {
+                    position: absolute;
+                    top: calc(100% + 4px);
+                    left: 0;
+                    right: 0;
+                    z-index: 100;
+                    background: white;
+                    border: 1px solid var(--wp--preset--color--gray-200);
+                    border-radius: 0.5rem;
+                    box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+                    padding: var(--wp--preset--spacing--4);
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--wp--preset--spacing--3);
+    
+                    > div {
+                        display: flex;
+                        flex-direction: column;
+                        gap: var(--wp--preset--spacing--2);
+
+    
+                        input[type="date"] {
+                            min-height: 2.5rem;
+                        }
+                    }
+    
+                    &.hidden { display: none; }
+                }
             }
         }
 
@@ -135,9 +201,9 @@
         font-size: var(--wp--preset--font-size--small);
         background: white;
         border-radius: 1rem;
-        overflow: hidden;
         text-align: left;
         border-collapse: collapse;
+        overflow: hidden;
 
         // Hide 'latest' columns by default (shown when 'latest' sort is selected)
         .col_score_latest,
@@ -204,6 +270,25 @@
                 }
             }
         }
+    }
+
+    // Show more
+    .bys-show-more {
+        display: block;
+        width: 100%;
+        padding: var(--wp--preset--spacing--3);
+        background: var(--wp--preset--color--blue-100);
+        border: none;
+        border-top: 1px solid var(--wp--preset--color--gray-200);
+        color: var(--wp--preset--color--blue-700);
+        font-weight: 600;
+        font-size: var(--wp--preset--font-size--small);
+        cursor: pointer;
+        text-align: center;
+        border-bottom-left-radius: 1rem;
+        border-bottom-right-radius: 1rem;
+
+        &:hover { background: var(--wp--preset--color--blue-200); }
     }
 
 }

@@ -30,7 +30,7 @@ $auth_header = BYS_Groups_Auth::get_auth_header();
 
 <div <?= $wrapper_attributes; ?>>
 
-    <div id="filters-box" class="filters__box overflow-hidden">
+    <div id="filters-box" class="filters__box">
         <form class="filters__form" method="get">
             <div class="filters__fields">
 
@@ -39,9 +39,23 @@ $auth_header = BYS_Groups_Auth::get_auth_header();
                     <input type="text" id="filter-keyword" name="keyword" placeholder="<?php esc_attr_e('Search courses or quizzes...', 'bys'); ?>" />
                 </div>
 
-                <div class="filters__field">
-                    <label for="filter-date_range"><?php esc_html_e('Date Range', 'bys'); ?></label>
-                    <input type="date" id="filter-date_range" name="date_range"/>
+                <div class="filters__field filters__field--date-range">
+                    <label><?php esc_html_e('Date Range', 'bys'); ?></label>
+                    <button id="date-range-trigger" type="button" class="date-range__trigger">
+                        <span id="date-range-text"><?php esc_html_e('Select a date range', 'bys'); ?></span>
+                        <i class="fa-regular fa-calendar"></i>
+                    </button>
+
+                    <div class="filters__date-range hidden" id="date-range-dropdown" role="menu">
+                        <div>
+                            <label for="filter-date-from"><?php esc_html_e('From', 'bys'); ?></label>
+                            <input type="date" id="filter-date-from" name="date_from" data-date-input="from" />
+                        </div>
+                        <div>
+                            <label for="filter-date-to"><?php esc_html_e('To', 'bys'); ?></label>
+                            <input type="date" id="filter-date-to" name="date_to" data-date-input="to" />
+                        </div>
+                    </div>
                 </div>
 
                 <div class="filters__field">
@@ -102,6 +116,8 @@ $auth_header = BYS_Groups_Auth::get_auth_header();
             <tbody>
             </tbody>
         </table>
+        <button class="bys-show-more btn-unstyled" type="button"><?php esc_html_e('Show More Results', 'bys'); ?></button>
+
 
         <!-- Grouped view: container for course tables (hidden by default) -->
         <div id="quizzes-grouped" class="quizzes-grouped" style="display: none;">

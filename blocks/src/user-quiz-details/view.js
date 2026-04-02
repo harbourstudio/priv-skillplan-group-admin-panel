@@ -15,21 +15,129 @@ jQuery(document).ready(($) => {
 
     const $block = $('.wp-block-bys-groups-user-quiz-details').first();
     const $filterForm = $block.find('.filters__form');
-    const $quizzesContainer = $block.find('#quizzes-container');
     const $flatTable = $block.find('#quizzes-table-flat');
     const $groupedContainer = $block.find('#quizzes-grouped');
     const $flatTableBody = $flatTable.find('tbody');
     const tableTemplate = $block.find('#user-quiz-details_template-row')[0];
     const courseTableTemplate = $block.find('#user-quiz-details_template-course-table')[0];
+    const $showMore = $block.find('.bys-show-more');
 
     let dataLoaded = false;
     let allQuizzes = [];
     let groupByCourse = false;
+    let currentPage = 1;
+    let totalPages = 0;
+    let isLoadingMore = false;
+    const PER_PAGE = 25;
+    let coursePages = {}; // Track pagination per course in grouped view
+
+    // Helper to escape HTML in data attributes
+    const escapeHtml = (text) => {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    };
+
+    // Date range validation and UI helpers
+    const validateDateRange = () => {
+        const $dateFrom = $block.find('#filter-date-from');
+        const $dateTo = $block.find('#filter-date-to');
+        const dateFrom = $dateFrom.val();
+        const dateTo = $dateTo.val();
+
+        if (dateFrom) {
+            $dateTo.attr('min', dateFrom);
+        } else {
+            $dateTo.removeAttr('min');
+        }
+
+        if (dateTo) {
+            $dateFrom.attr('max', dateTo);
+        } else {
+            $dateFrom.removeAttr('max');
+        }
+
+        if (dateFrom && dateTo && dateFrom > dateTo) {
+            $dateFrom.val(dateTo);
+        }
+    };
+
+    const updateDateRangeText = () => {
+        const dateFrom = $block.find('#filter-date-from').val();
+        const dateTo = $block.find('#filter-date-to').val();
+
+        if (!dateFrom && !dateTo) {
+            $block.find('#date-range-text').text('Select a date range');
+        } else if (dateFrom && dateTo) {
+            $block.find('#date-range-text').text(`${dateFrom} - ${dateTo}`);
+        } else if (dateFrom) {
+            $block.find('#date-range-text').text(`From ${dateFrom}`);
+        } else {
+            $block.find('#date-range-text').text(`Until ${dateTo}`);
+        }
+    };
+
+    const toggleDateRangeDropdown = () => {
+        $block.find('#date-range-dropdown').toggleClass('hidden');
+    };
+
+    // Handle date range inputs - validation and UI updates
+    $block.find('#filter-date-from, #filter-date-to').on('change', function() {
+        validateDateRange();
+        updateDateRangeText();
+    });
+
+    // Handle date range dropdown toggle
+    $block.find('#date-range-trigger').on('click', function(e) {
+        e.preventDefault();
+        toggleDateRangeDropdown();
+    });
+
+    // Close date range dropdown when clicking outside
+    $(document).on('click', function(e) {
+        const $dateRangeField = $block.find('.filters__field--date-range');
+        const dateRangeElement = $dateRangeField[0];
+        if (dateRangeElement && !dateRangeElement.contains(e.target)) {
+            $block.find('#date-range-dropdown').addClass('hidden');
+        }
+    });
+
+    // Handle filter form submission
+    $filterForm.on('submit', function(e) {
+        e.preventDefault();
+        currentPage = 1;
+        coursePages = {}; // Reset per-course pagination
+        renderDisplayedQuizzes();
+    });
+
+    // Handle filter form reset
+    $filterForm.on('reset', function() {
+        setTimeout(() => {
+            validateDateRange();
+            updateDateRangeText();
+            currentPage = 1;
+            coursePages = {}; // Reset per-course pagination
+            renderDisplayedQuizzes();
+        }, 0);
+    });
+
+    // Handle show more button click
+    $showMore.on('click', function(e) {
+        e.preventDefault();
+        if (!isLoadingMore && currentPage < totalPages) {
+            isLoadingMore = true;
+            currentPage++;
+            renderDisplayedQuizzes();
+            isLoadingMore = false;
+        }
+    });
 
     // Handle group by course toggle
     $block.find('.group-by-course-toggle').on('change', function() {
         groupByCourse = $(this).is(':checked');
-        renderQuizzes(allQuizzes, groupByCourse);
+        currentPage = 1;
+        coursePages = {}; // Reset per-course pagination when toggling view
+        renderDisplayedQuizzes();
     });
 
     // Handle score_sort radio button change
@@ -41,7 +149,6 @@ jQuery(document).ready(($) => {
         $flatTable.find('.col_score_latest, .col_result_latest').toggle(!isHighest);
         $flatTableBody.find('.cell_score_latest, .cell_result_latest').toggle(!isHighest);
 
-        // Also update grouped tables
         $groupedContainer.find('.col_score_highest, .col_result_highest').toggle(isHighest);
         $groupedContainer.find('.cell_score_highest, .cell_result_highest').toggle(isHighest);
         $groupedContainer.find('.col_score_latest, .col_result_latest').toggle(!isHighest);
@@ -53,13 +160,84 @@ jQuery(document).ready(($) => {
     });
     updateColumnVisibility('highest');
 
+    // Update show more button visibility (flat view only)
+    const updateShowMoreButton = () => {
+        if (groupByCourse) {
+            // In grouped view, show more buttons are per-course
+            $showMore.addClass('hidden');
+            return;
+        }
+        const displayedCount = $flatTableBody.find('tr').length;
+        if (displayedCount >= applyFiltersToQuizzes().length) {
+            $showMore.addClass('hidden');
+        } else {
+            $showMore.removeClass('hidden');
+        }
+    };
+
+    // Render paginated quizzes (respects current page and filters)
+    const renderDisplayedQuizzes = () => {
+        const filtered = applyFiltersToQuizzes();
+        if (groupByCourse) {
+            // Grouped view: paginate per course
+            renderQuizzes(filtered, true);
+        } else {
+            // Flat view: global pagination
+            const start = 0;
+            const end = currentPage * PER_PAGE;
+            const paginated = filtered.slice(start, end);
+            renderQuizzes(paginated, false);
+            updateShowMoreButton();
+        }
+    };
+
+    // Apply all active filters to quiz list (keyword, status, date range)
+    const applyFiltersToQuizzes = () => {
+        if (!allQuizzes.length) return [];
+
+        return allQuizzes.filter((quiz) => {
+            const keyword = $block.find('#filter-keyword').val().toLowerCase();
+            if (keyword) {
+                const matchesKeyword =
+                    quiz.title.toLowerCase().includes(keyword) ||
+                    quiz.parent_course_title.toLowerCase().includes(keyword);
+                if (!matchesKeyword) return false;
+            }
+
+            const status = $block.find('#filter-status').val();
+            if (status) {
+                if (status === 'pass' && !quiz.pass_latest) return false;
+                if (status === 'fail' && quiz.pass_latest) return false;
+                if (status === 'ungraded' && quiz.pass_latest !== null) return false;
+            }
+
+            // Date range filter on latest_timestamp (last activity date)
+            const dateFrom = $block.find('#filter-date-from').val();
+            const dateTo = $block.find('#filter-date-to').val();
+            if (dateFrom || dateTo) {
+                const quizDate = new Date(quiz.latest_timestamp);
+                if (dateFrom) {
+                    const fromDate = new Date(dateFrom);
+                    if (quizDate < fromDate) return false;
+                }
+                if (dateTo) {
+                    const toDate = new Date(dateTo);
+                    // Include full day by extending to end of day
+                    toDate.setHours(23, 59, 59, 999);
+                    if (quizDate > toDate) return false;
+                }
+            }
+
+            return true;
+        });
+    };
+
     const loadQuizData = async () => {
         if (dataLoaded) return;
         dataLoaded = true;
 
         const loadingCells = Array(6).fill(`<td>${LOADING}</td>`).join('');
         $flatTableBody.html(`<tr>${loadingCells}</tr>`);
-
 
         try {
             const courseIds = (window.bysGroupsCache?.courses || []).map(c => c.id).join(',');
@@ -79,54 +257,13 @@ jQuery(document).ready(($) => {
             window.bysGroupsCache.quizzesPassed = passedCount;
             jQuery(window).trigger('bys:statsUpdated', [{ key: 'total_quizzes_passed', value: passedCount }]);
 
-            renderQuizzes(quizzes, groupByCourse);
-
-            $filterForm.on('submit', function(e) {
-                e.preventDefault();
-                applyFilters();
-            });
-
-            $filterForm.find('.filters__reset').on('click', function() {
-                $filterForm[0].reset();
-                groupByCourse = false;
-                $block.find('.group-by-course-toggle').prop('checked', false);
-                renderQuizzes(allQuizzes, groupByCourse);
-            });
+            currentPage = 1;
+            totalPages = Math.ceil(allQuizzes.length / PER_PAGE);
+            renderDisplayedQuizzes();
         } catch (err) {
             console.error('[user-quiz-details] Failed to fetch quiz progress:', err);
             $flatTableBody.html('<tr><td colspan="8">Failed to load quiz data.</td></tr>');
         }
-    };
-
-    const applyFilters = () => {
-        const keyword = $filterForm.find('#filter-keyword').val().toLowerCase();
-        const status = $filterForm.find('#filter-status').val();
-        const dateRange = $filterForm.find('#filter-date_range').val();
-
-        const filtered = allQuizzes.filter((quiz) => {
-            if (keyword) {
-                const matchesKeyword =
-                    quiz.title.toLowerCase().includes(keyword) ||
-                    quiz.parent_course_title.toLowerCase().includes(keyword);
-                if (!matchesKeyword) return false;
-            }
-
-            if (status) {
-                if (status === 'pass' && !quiz.pass_latest) return false;
-                if (status === 'fail' && quiz.pass_latest) return false;
-                if (status === 'ungraded' && quiz.pass_latest !== null) return false;
-            }
-
-            if (dateRange) {
-                const selectedDate = new Date(dateRange).getTime();
-                const quizDate = new Date(quiz.latest_timestamp).getTime();
-                if (quizDate < selectedDate) return false;
-            }
-
-            return true;
-        });
-
-        renderQuizzes(filtered, groupByCourse);
     };
 
     const renderQuizzes = (quizzes, grouped = false) => {
@@ -137,7 +274,7 @@ jQuery(document).ready(($) => {
         }
 
         if (grouped) {
-            // Group by course and render separate tables
+            // Group by course and render separate tables with per-course pagination
             $flatTable.hide();
             $groupedContainer.show().empty();
 
@@ -149,17 +286,43 @@ jQuery(document).ready(($) => {
             });
 
             Object.entries(groupedQuizzes).forEach(([courseTitle, courseQuizzes]) => {
+                // Initialize course pagination if needed
+                if (!coursePages[courseTitle]) {
+                    coursePages[courseTitle] = 1;
+                }
+
+                const coursePageNum = coursePages[courseTitle];
+                const courseStart = 0;
+                const courseEnd = coursePageNum * PER_PAGE;
+                const coursePaginated = courseQuizzes.slice(courseStart, courseEnd);
+
                 const courseTableNode = courseTableTemplate.content.cloneNode(true);
                 const $courseGroup = $(courseTableNode);
                 const $courseTbody = $courseGroup.find('.course-group__tbody');
 
                 $courseGroup.find('.course-group__title').html(courseTitle);
 
-                courseQuizzes.forEach(quiz => {
+                coursePaginated.forEach(quiz => {
                     renderQuizRow(quiz, $courseTbody, tableTemplate);
                 });
 
+                // Add show more button for this course if there are more quizzes
+                if (coursePaginated.length < courseQuizzes.length) {
+                    const $showMoreBtn = $('<button class="bys-show-more bys-course-show-more btn-unstyled" type="button" data-course-title="' + escapeHtml(courseTitle) + '">' + 'Show More Results' + '</button>');
+                    $courseGroup.append($showMoreBtn);
+                }
+
                 $groupedContainer.append($courseGroup);
+            });
+
+            // Bind per-course show more button click handlers
+            $groupedContainer.on('click', '.bys-course-show-more', function(e) {
+                e.preventDefault();
+                const courseTitle = $(this).data('courseTitle');
+                if (coursePages[courseTitle] !== undefined) {
+                    coursePages[courseTitle]++;
+                    renderDisplayedQuizzes();
+                }
             });
 
             // Bind tooltips in grouped view
@@ -170,7 +333,11 @@ jQuery(document).ready(($) => {
             // Flat view: single table
             $flatTable.show();
             $groupedContainer.hide().empty();
-            $flatTableBody.empty();
+
+            // Only clear table body if starting fresh pagination
+            if (currentPage === 1) {
+                $flatTableBody.empty();
+            }
 
             quizzes.forEach(quiz => {
                 renderQuizRow(quiz, $flatTableBody, tableTemplate);
