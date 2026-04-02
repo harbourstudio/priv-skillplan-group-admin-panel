@@ -82,7 +82,8 @@ npm run build
 - Database schema modifications
 - Class additions and structure changes
 2. Update code comments if hook behavior or activity types change
-
+3. Ensure that REST API for Gravity Forms is enabled
+ 
 ## Links & References
 
 - [LearnDash REST API Documentation](https://developers.learndash.com/learndash-rest-api-ldlms-v2/)

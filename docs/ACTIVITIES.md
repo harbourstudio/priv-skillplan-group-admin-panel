@@ -151,6 +151,8 @@ Achievement Earned events (`achievement_earned`) are fetched via GamiPress REST 
 
 Form submission events (`profile_update`, `account_settings_update`) are fetched via Gravity Forms REST API at request time rather than logged to the custom table.
 
+**Note**: Ensure that REST API is enabled for Gravity Forms
+
 **Location**: `includes/classes/class-rest-api.php` - `get_gravity_forms_submissions()` method
 
 **Data Flow**:
