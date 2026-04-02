@@ -93,8 +93,6 @@ LearnDash completion events (`lesson_completed`, `topic_completed`, `quiz_comple
 5. Transforms LearnDash data to activity log format with course metadata
 6. Returns transformed items for merging with custom table and other integrations
 
----
-
 ### GamiPress
 
 Achievement events (`achievement_earned`) are not logged to the custom table, but are fetched on-demand from GamiPress API at request time.
@@ -119,7 +117,6 @@ Achievement events (`achievement_earned`) are not logged to the custom table, bu
 5. Returns transformed items for merging with custom table and other integrations
 6. Final merge and pagination happens in main `get_user_activity()` endpoint
 
----
 
 ### Gravity Forms
 
@@ -136,8 +133,6 @@ Form submission events (`profile_update`, `account_settings_update`) are not log
 5. Final merge and pagination happens in main `get_user_activity()` endpoint
 
 **Note**: Ensure that REST API is enabled for Gravity Forms
-
----
 
 ## Common issues:
 - Page views logging multiple times → check transient settings

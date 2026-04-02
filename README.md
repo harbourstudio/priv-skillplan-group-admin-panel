@@ -7,8 +7,6 @@ A custom WordPress plugin for managing group-based learning experiences within t
 - [Key Features](#key-features)
 - [Requirements](#requirements)
 - [Installation & Setup](#installation--setup)
-- [Architecture](#architecture)
-- [Documentation](#documentation)
 - [Development](#development)
 
 ## Key Features
@@ -45,24 +43,20 @@ The plugin requires an **Application Password** to authenticate API requests to 
 5. Add Application Password to the plugin settings page and save
 
 
-## Key Classes
-
-Class - Purpose
-`BYS_Groups_Core` - Plugin initialization and dependency checking
-`BYS_Groups_Rest_API` - Defines all REST API endpoints and callbacks
-`BYS_Groups_Activity_Logger` - Logs user activities (logins, course completions, etc.)
-`BYS_Groups_Auth` - Manages application password authentication
-`BYS_Groups_Blocks` - Registers all Gutenberg blocks
-`BYS_Groups_Admin_Settings` - Admin settings UI and storage
-
-## Documentation
-
-Comprehensive documentation is available in separate markdown files:
-
-- **[ACTIVITIES.md](./docs/ACTIVITIES.md)** - Activity logging system, tracked events, database schema
-
 ## Development
 
+### Key Classes
+
+| Class | Purpose |
+|-------|---------|
+| `BYS_Groups_Core` | Plugin initialization, dependency checking, and bootstrap |
+| `BYS_Groups_Rest_API` | Defines all REST API endpoints, callbacks, and data fetching |
+| `BYS_Groups_Activity_Logger` | Logs user activities (logins, course completions, page views, enrollments) |
+| `BYS_Groups_Auth` | Manages application password authentication for API requests |
+| `BYS_Groups_Blocks` | Registers all Gutenberg blocks and enqueues assets |
+| `BYS_Groups_Admin_Settings` | Admin settings page UI and configuration storage |
+
+### Block Development
 Blocks use WordPress Script packages (`@wordpress/scripts`) and webpack for compilation.
 
 ```bash
@@ -76,16 +70,18 @@ npm run watch
 npm run build
 ```
 
-## Important Notes for Development
-1. **Keep this documentation and other .md files updated** to reflect major changes, including those related to:
-- API endpoints
-- Database schema modifications
-- Class additions and structure changes
-2. Update code comments if hook behavior or activity types change
-3. Ensure that REST API for Gravity Forms is enabled
+**Important Notes for Development**
+
+Additional documentation is available in separate markdown files:
+- **[ACTIVITIES.md](./docs/ACTIVITIES.md)** - Activity logging system, tracked events, database schema
+
+- Keep this documentation and other .md files updated to reflect major changes, including those related to API endpoints, database schema modifications, class additions and structure changes
+- Update code comments if hook behavior or activity types change
+- Ensure that REST API for Gravity Forms is enabled
  
 ## Links & References
-
 - [LearnDash REST API Documentation](https://developers.learndash.com/learndash-rest-api-ldlms-v2/)
 - [LearnDash Open API](http://skillplanlearn.local/wp-json/ldlms/v2)
+- [GamiPress REST API](https://gamipress.com/docs/rest-api/)
+- [Gravity Forms REST API](https://docs.gravityforms.com/rest-api-v2/)
 
