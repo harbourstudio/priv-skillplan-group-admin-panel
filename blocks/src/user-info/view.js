@@ -56,7 +56,7 @@ jQuery(document).ready(async ($) => {
     $block.find('.user-name').text(fullName);
     $block.find('.user-email').text(user.email);
     $block.find('.user-enrolled-date').text(enrolledDate);
-    $block.find('.user-last-active-date').text(lastLoginDate);
+    $block.find('.user-last-login-date').text(lastLoginDate);
     $block.find('.user-status-item').addClass(`user-info__meta-item--${statusClass}`);
     $block.find('.user-status-text').text(statusText);
   }
