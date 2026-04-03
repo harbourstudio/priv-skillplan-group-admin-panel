@@ -35,6 +35,9 @@ jQuery(document).ready(async ($) => {
   const sfwdLessonTemplate = $block.find('#user-progress-lesson-template')[0];
   const sfwdTopicTemplate = $block.find('#user-progress-topic-template')[0];
 
+  // Track completed topics across all opened courses for user-stats coordination
+  let topicsCompletedCount = 0;
+
   try {
     const courses = await api.get(endpoints.groupCourses(groupId));
 
@@ -174,12 +177,22 @@ jQuery(document).ready(async ($) => {
                 const topicTooltip = buildTooltipContent(topicData);
                 if (topicTooltip) $topicBadge.attr('data-tooltip', topicTooltip);
 
+                // Count completed topics (post_type === 'sfwd-topic' with step_status === 'completed')
+                if (topicData?.post_type === 'sfwd-topic' && topicStatus === 'completed') {
+                  topicsCompletedCount++;
+                }
+
                 $tbody.append($topic);
               }
             }
 
             $accordionContent.append($lesson);
           }
+
+          // Write topics completed count to cache and notify user-stats block
+          window.bysGroupsCache ??= {};
+          window.bysGroupsCache.topicsCompleted = topicsCompletedCount;
+          jQuery(window).trigger('bys:statsUpdated', [{ key: 'total_topics_completed', value: topicsCompletedCount }]);
 
           // Attach tooltip handlers
           $accordionContent.on('mouseenter', '[data-tooltip]', function() {
