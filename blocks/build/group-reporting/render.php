@@ -172,9 +172,12 @@ $detail_url = home_url( '/administrator-dashboard/user-progress-detail/' );
                         <button class="bys-course-toggle btn-unstyled" type="button" aria-expanded="false" data-course-idx="">
                             <!-- course title inserted here -->
                         </button>
-                        <a class="bys-dl-link" href="#" title="">
-                            <i class="fa-regular fa-download"></i>
-                        </a>
+                        <div class="course-col-header__meta">
+                            <span class="bys-required-badge hidden" aria-label="Required" title="Required"><i class="fa-regular fa-circle-exclamation"></i></span>
+                            <a class="bys-dl-link" href="#" title="">
+                                <i class="fa-regular fa-download"></i>
+                            </a>
+                        </div>
                     </div>
                 </th>
                 <th class="course-sub-col course-sub-col--progress course-sub-col--hidden" data-course-idx="">Completion Progress</th>

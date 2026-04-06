@@ -1,3 +1,4 @@
+
 <?php
 $attrs = ['blockId'];
 foreach ($attrs as $a) {
@@ -29,7 +30,7 @@ $auth_header = BYS_Groups_Auth::get_auth_header();
 
 <div <?= $wrapper_attributes; ?>>
 
-    <div id="filters-box" class="filters__box overflow-hidden">
+    <div id="filters-box" class="filters__box">
         <form class="filters__form" method="get">
             <div class="filters__fields">
 
@@ -38,15 +39,29 @@ $auth_header = BYS_Groups_Auth::get_auth_header();
                     <input type="text" id="filter-keyword" name="keyword" placeholder="<?php esc_attr_e('Search courses or quizzes...', 'bys'); ?>" />
                 </div>
 
-                <div class="filters__field">
-                    <label for="filter-date_range"><?php esc_html_e('Date Range', 'bys'); ?></label>
-                    <input type="date" id="filter-date_range" name="date_range" />
+                <div class="filters__field filters__field--date-range">
+                    <label><?php esc_html_e('Date Range', 'bys'); ?></label>
+                    <button id="date-range-trigger" type="button" class="date-range__trigger">
+                        <span id="date-range-text"><?php esc_html_e('Select a date range', 'bys'); ?></span>
+                        <i class="fa-regular fa-calendar"></i>
+                    </button>
+
+                    <div class="filters__date-range hidden" id="date-range-dropdown" role="menu">
+                        <div>
+                            <label for="filter-date-from"><?php esc_html_e('From', 'bys'); ?></label>
+                            <input type="date" id="filter-date-from" name="date_from" data-date-input="from" />
+                        </div>
+                        <div>
+                            <label for="filter-date-to"><?php esc_html_e('To', 'bys'); ?></label>
+                            <input type="date" id="filter-date-to" name="date_to" data-date-input="to" />
+                        </div>
+                    </div>
                 </div>
 
                 <div class="filters__field">
                     <label for="filter-status"><?php esc_html_e('Status', 'bys'); ?></label>
                     <select id="filter-status" name="status">
-                        <option value=""><?php esc_html_e('All Statuses', 'bys'); ?></option>
+                        <option value=""><?php esc_html_e('Any', 'bys'); ?></option>
                         <option value="pass"><?php esc_html_e('Passed', 'bys'); ?></option>
                         <option value="fail"><?php esc_html_e('Failed', 'bys'); ?></option>
                         <option value="ungraded"><?php esc_html_e('Ungraded', 'bys'); ?></option>
@@ -61,7 +76,11 @@ $auth_header = BYS_Groups_Auth::get_auth_header();
                     <button class="filters__reset" type="reset"><?php esc_html_e('Reset', 'bys'); ?></button>
                 </div>
                 <div class="filters__actions__toggles">
-                    <?php esc_html_e('Group by Course', 'bys'); ?>
+                    <label class="toggle-switch">
+                        <input type="checkbox" class="group-by-course-toggle" />
+                        <span class="toggle-slider"></span>
+                        <span class="toggle-label"><?php esc_html_e('Group by Course', 'bys'); ?></span>
+                    </label>
                 </div>
             </div>
         </form>
@@ -79,42 +98,40 @@ $auth_header = BYS_Groups_Auth::get_auth_header();
         </label>
     </div>
 
-    <table class="reporting-table">
-        <thead>
-            <tr>
-                <th class="col_quiz_title"><?php esc_html_e('Quiz', 'bys'); ?></th>
-                <th class="col_last_activity"><?php esc_html_e('Last Activity', 'bys'); ?></th>
-                <th class="col_parent_course"><?php esc_html_e('Course', 'bys'); ?></th>
-                <th class="col_total_attempts"><?php esc_html_e('Attempts', 'bys'); ?></th>
-                <th class="col_score_highest"><?php esc_html_e('Highest Score', 'bys'); ?></th>
-                <th class="col_score_latest"><?php esc_html_e('Latest Score', 'bys'); ?></th>
-                <th class="col_result_highest"><?php esc_html_e('Result', 'bys'); ?></th>
-                <th class="col_result_latest"><?php esc_html_e('Result', 'bys'); ?></th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-            <!-- Dynamically render rows using table row template --> <tr>
-        </tbody>
-    </table>
+    <div id="quizzes-container" class="quizzes-container">
+        <!-- Flat view: single table with all quizzes -->
+        <table id="quizzes-table-flat" class="reporting-table">
+            <thead>
+                <tr>
+                    <th class="col_quiz_title"><?php esc_html_e('Quiz', 'bys'); ?></th>
+                    <th class="col_last_activity"><?php esc_html_e('Last Activity', 'bys'); ?></th>
+                    <th class="col_parent_course"><?php esc_html_e('Course', 'bys'); ?></th>
+                    <th class="col_total_attempts"><?php esc_html_e('Attempts', 'bys'); ?></th>
+                    <th class="col_score_highest"><?php esc_html_e('Highest Score', 'bys'); ?></th>
+                    <th class="col_score_latest"><?php esc_html_e('Latest Score', 'bys'); ?></th>
+                    <th class="col_result_highest"><?php esc_html_e('Result', 'bys'); ?></th>
+                    <th class="col_result_latest"><?php esc_html_e('Result', 'bys'); ?></th>
+                </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+        <button class="bys-show-more btn-unstyled" type="button"><?php esc_html_e('Show More Results', 'bys'); ?></button>
 
-    <!-- Template: Table Row -->
+
+        <!-- Grouped view: container for course tables (hidden by default) -->
+        <div id="quizzes-grouped" class="quizzes-grouped" style="display: none;">
+        </div>
+    </div>
+
+    <!-- Template: Quiz Table Row -->
     <template id="user-quiz-details_template-row">
         <tr class="quiz-item" data-quiz-id="">
             <td class="cell_quiz_title"></td>
             <td class="cell_last_activity"></td>
             <td class="cell_parent_course"></td>
-            <td class="cell_total_attempts">
-                <span class="attemps-count">
-
-                </span>
-                <button
-                    type="button"
-                    class="modal-quiz-attempts__trigger btn-unstyled"
-                    data-hs-overlay="#modal-quiz-attempts"
-                >
-                    <i class="fa-solid fa-ellipsis"></i>
-                </button>
+            <td class="cell_total_attempts" role="button" tabindex="0">
+                <span class="attemps-count"></span>
             </td>
             <td class="cell_score_highest"></td>
             <td class="cell_score_latest"></td>
@@ -125,5 +142,28 @@ $auth_header = BYS_Groups_Auth::get_auth_header();
                 <span class="status-badge"></span>
             </td>
         </tr>
+    </template>
+
+    <!-- Template: Course Group Table (for grouped view) -->
+    <template id="user-quiz-details_template-course-table">
+        <div class="course-group">
+            <h3 class="course-group__title"></h3>
+            <table class="reporting-table course-group__table">
+                <thead>
+                    <tr>
+                        <th class="col_quiz_title"><?php esc_html_e('Quiz', 'bys'); ?></th>
+                        <th class="col_last_activity"><?php esc_html_e('Last Activity', 'bys'); ?></th>
+                        <th class="col_parent_course"><?php esc_html_e('Course', 'bys'); ?></th>
+                        <th class="col_total_attempts"><?php esc_html_e('Attempts', 'bys'); ?></th>
+                        <th class="col_score_highest"><?php esc_html_e('Highest Score', 'bys'); ?></th>
+                        <th class="col_score_latest"><?php esc_html_e('Latest Score', 'bys'); ?></th>
+                        <th class="col_result_highest"><?php esc_html_e('Result', 'bys'); ?></th>
+                        <th class="col_result_latest"><?php esc_html_e('Result', 'bys'); ?></th>
+                    </tr>
+                </thead>
+                <tbody class="course-group__tbody">
+                </tbody>
+            </table>
+        </div>
     </template>
 </div>

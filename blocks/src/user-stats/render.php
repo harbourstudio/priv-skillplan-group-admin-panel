@@ -48,6 +48,24 @@ if ($user_id) {
         $required_ids = (array) get_post_meta($group_id, \BYS_Required_Courses::META_KEY, true);
         $server_stats['required_courses'] = count($required_ids);
     }
+
+    // total_topics_completed and total_quizzes_completed via LearnDash activity table
+    global $wpdb;
+    $ld_activity_table = $wpdb->prefix . 'learndash_user_activity';
+
+    $server_stats['total_topics_completed'] = (int) $wpdb->get_var( $wpdb->prepare(
+        "SELECT COUNT(DISTINCT post_id)
+         FROM {$ld_activity_table}
+         WHERE user_id = %d AND activity_type = 'topic' AND activity_status = 1 AND activity_completed > 0",
+        $user_id
+    ) );
+
+    $server_stats['total_quizzes_completed'] = (int) $wpdb->get_var( $wpdb->prepare(
+        "SELECT COUNT(DISTINCT post_id)
+         FROM {$ld_activity_table}
+         WHERE user_id = %d AND activity_type = 'quiz' AND activity_completed > 0",
+        $user_id
+    ) );
 }
 
 $stats = [

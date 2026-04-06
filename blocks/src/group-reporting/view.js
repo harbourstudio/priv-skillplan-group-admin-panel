@@ -503,11 +503,14 @@ jQuery(document).ready(function($) {
 
       $headers.find('[data-course-idx]').attr('data-course-idx', idx);
 
-      const courseTitle = course.shortname || course.title?.rendered || course.title || '';
-      const requiredBadge = course.required
-        ? ' <span class="bys-required-badge" aria-label="Required" title="Required">*</span>'
-        : '';
-      $headers.find('.bys-course-toggle').html(escapeHtml(courseTitle) + requiredBadge).attr('data-course-idx', idx);
+      const courseTitle = course.title?.rendered || course.title || '';
+      $headers.find('.bys-course-toggle')
+        .text(truncateTitle(courseTitle))
+        .attr('title', courseTitle)
+        .attr('data-course-idx', idx);
+      if (course.required) {
+        $headers.find('.bys-required-badge').removeClass('hidden');
+      }
       $headers.find('.bys-dl-link').attr('title', `Download ${escapeHtml(courseTitle)}`).attr('data-course-idx', idx);
 
       $headers.children().each(function() {
@@ -1302,5 +1305,12 @@ jQuery(document).ready(function($) {
     if (!text || typeof text !== 'string') return '';
     const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
     return text.replace(/[&<>"']/g, m => map[m]);
+  }
+
+  // Truncate a column header title to at most maxChars at a word boundary, appending '…'
+  function truncateTitle(title, maxChars = 28) {
+    if (!title || title.length <= maxChars) return title;
+    const cut = title.lastIndexOf(' ', maxChars);
+    return (cut > 0 ? title.substring(0, cut) : title.substring(0, maxChars)) + '\u2026';
   }
 });

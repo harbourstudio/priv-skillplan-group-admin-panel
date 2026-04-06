@@ -388,6 +388,7 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'status'               => $status,
                 'group_enrolled_date'  => $group_enrolled_date ?: null,
                 'last_login'           => $last_login_timestamp,
+                'avatar_url'           => get_avatar_url($user_id, ['size' => 80]),
             );
 
             return new \WP_REST_Response($user_data, 200);
@@ -1935,6 +1936,79 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 }
 
                 $page++;
+            }
+
+            // Augment steps with activity detail (last accessed, time spent, visits)
+            // via 2 batch DB queries — no N+1
+            if ( ! empty( $all_steps ) ) {
+                global $wpdb;
+                $ld_table   = $wpdb->prefix . 'learndash_user_activity';
+                $meta_table = $wpdb->prefix . 'learndash_user_activity_meta';
+
+                // Query 1: all topic/lesson activity rows for this user + course
+                $activity_rows = $wpdb->get_results( $wpdb->prepare(
+                    "SELECT post_id, activity_id, activity_started, activity_completed, activity_updated
+                     FROM {$ld_table}
+                     WHERE user_id = %d AND course_id = %d AND activity_type IN ('topic','lesson')
+                     ORDER BY activity_updated DESC",
+                    $user_id, $course_id
+                ), ARRAY_A );
+
+                // Key by post_id — keep the most-recent row per step
+                $activity_map = [];
+                foreach ( $activity_rows as $row ) {
+                    $pid = intval( $row['post_id'] );
+                    if ( ! isset( $activity_map[ $pid ] ) ) {
+                        $activity_map[ $pid ] = $row;
+                    }
+                }
+
+                // Query 2: timespent + count meta for those activity IDs (Uncanny Owl xAPI)
+                $meta_map = [];
+                $activity_ids = array_column( $activity_rows, 'activity_id' );
+                if ( ! empty( $activity_ids ) ) {
+                    $placeholders = implode( ',', array_fill( 0, count( $activity_ids ), '%d' ) );
+                    $meta_rows = $wpdb->get_results( $wpdb->prepare(
+                        "SELECT activity_id, meta_key, meta_value
+                         FROM {$meta_table}
+                         WHERE activity_id IN ({$placeholders}) AND meta_key IN ('timespent','count')",
+                        ...$activity_ids
+                    ), ARRAY_A );
+
+                    foreach ( $meta_rows as $m ) {
+                        $meta_map[ intval( $m['activity_id'] ) ][ $m['meta_key'] ] = $m['meta_value'];
+                    }
+                }
+
+                // Merge extra fields into each step
+                foreach ( $all_steps as &$step ) {
+                    $pid = intval( $step['step'] );
+                    if ( ! isset( $activity_map[ $pid ] ) ) continue;
+
+                    $act  = $activity_map[ $pid ];
+                    $meta = $meta_map[ intval( $act['activity_id'] ) ] ?? [];
+
+                    // last_accessed_gmt — most recent activity_updated timestamp
+                    if ( ! empty( $act['activity_updated'] ) ) {
+                        $step['last_accessed_gmt'] = gmdate( 'Y-m-d\TH:i:s', intval( $act['activity_updated'] ) );
+                    }
+
+                    // time_spent_seconds — Uncanny Owl meta first, then calculated fallback
+                    if ( isset( $meta['timespent'] ) && intval( $meta['timespent'] ) > 0 ) {
+                        $step['time_spent_seconds'] = intval( $meta['timespent'] );
+                    } elseif ( ! empty( $act['activity_completed'] ) && ! empty( $act['activity_started'] ) ) {
+                        $diff = intval( $act['activity_completed'] ) - intval( $act['activity_started'] );
+                        if ( $diff > 0 ) {
+                            $step['time_spent_seconds'] = $diff;
+                        }
+                    }
+
+                    // visits — Uncanny Owl meta only; core LD doesn't track per-topic visit counts
+                    if ( isset( $meta['count'] ) && intval( $meta['count'] ) > 0 ) {
+                        $step['visits'] = intval( $meta['count'] );
+                    }
+                }
+                unset( $step );
             }
 
             return new \WP_REST_Response($all_steps, 200);

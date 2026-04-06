@@ -1,6 +1,6 @@
 .wp-block-bys-groups-user-progress {
     display: grid;
-    grid-template-columns: 1fr 21.25rem;
+    grid-template-columns: 2fr 1fr;
     gap: var(--wp--preset--spacing--6);
     align-items: start;
 
@@ -236,5 +236,26 @@
     
     @media (max-width: 1024px) {
         grid-template-columns: 1fr;
+    }
+
+    // Achievements
+    .user-progress-achievements__list{
+        .gamipress-achievements-container{
+            background: white;
+            border-radius: 1rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+
+            .gamipress-achievement:not(:last-of-type){
+                border-bottom: 1px solid var(--wp--preset--color--gray-200) !important;
+            }
+        }
+
+        .gamipress-load-more-button{
+            background: none;
+            border: 0;
+            color: var(--wp--preset--color--primary);
+            padding: 0;
+            margin-top: var(--wp--preset--spacing--4);
+        }
     }
 }

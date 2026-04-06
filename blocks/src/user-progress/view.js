@@ -1,6 +1,6 @@
 import { api, endpoints } from '../_shared/api-client.js';
 import { LOADING } from '../_shared/loading.js';
-import { formatDateTime } from '../_shared/helpers.js';
+import { formatDateTime, formatDuration } from '../_shared/helpers.js';
 import { createTooltip, destroyTooltip } from '../_shared/tooltip.js';
 
 // Status label mapping (reusable)
@@ -181,6 +181,17 @@ jQuery(document).ready(async ($) => {
                 if (topicData?.post_type === 'sfwd-topic' && topicStatus === 'completed') {
                   topicsCompletedCount++;
                 }
+
+                // Populate activity columns from augmented step data
+                $topic.find('.topic-visits').text(
+                  topicData?.visits != null ? topicData.visits : '—'
+                );
+                $topic.find('.topic-timespent').text(
+                  formatDuration(topicData?.time_spent_seconds)
+                );
+                $topic.find('.topic-last-accessed').text(
+                  topicData?.last_accessed_gmt ? formatDateTime(topicData.last_accessed_gmt) : '—'
+                );
 
                 $tbody.append($topic);
               }

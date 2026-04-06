@@ -16,6 +16,7 @@ if (!class_exists('BYS_Groups_Blocks')) {
             'group-reporting',
             'group-select',
             'group-stats',
+            'group-quizzing',
             'user-activity',
             'user-info',
             'user-progress',
