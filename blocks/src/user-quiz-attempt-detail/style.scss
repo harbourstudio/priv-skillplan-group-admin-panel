@@ -1,0 +1,242 @@
+@keyframes bys-shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+.wp-block-bys-groups-user-quiz-attempt-detail {
+
+    .attempt-detail__loading,
+    .attempt-detail__empty,
+    .attempt-detail__error,
+    .attempt-detail__list {
+        &.hidden { display: none; }
+    }
+
+    // ── Skeleton loader ───────────────────────────────────────────────────────
+
+    .attempt-detail__loading {
+        display: flex;
+        flex-direction: column;
+        gap: var(--wp--preset--spacing--4);
+    }
+
+    .skel {
+        border-radius: 0.3rem;
+        background: linear-gradient(
+            90deg,
+            #EAECF0 25%,
+            #F3F4F6 50%,
+            #EAECF0 75%
+        );
+        background-size: 200% 100%;
+        animation: bys-shimmer 1.4s ease-in-out infinite;
+
+        // Q1 label chip
+        &--qnum  { height: 1rem; width: 1.75rem; }
+
+        // Result badge
+        &--badge { height: 1.5rem; width: 4.5rem; border-radius: 0.25rem; }
+
+        // Points — pushed to the right by margin-left: auto on the parent
+        &--points { height: 1rem; width: 3.5rem; margin-left: auto; }
+
+        // Full-width question text line
+        &--line {
+            height: 1rem;
+            width: 100%;
+            margin-top: var(--wp--preset--spacing--3);
+
+            &-short { width: 60%; }
+        }
+
+        // Individual answer row
+        &--answer { height: 2.25rem; width: 100%; border-radius: 0.375rem; }
+    }
+
+    .skel-card {
+        border: 1px solid var(--wp--preset--color--gray-100);
+        border-left: 4px solid #EAECF0;
+        border-radius: 0.75rem;
+        padding: var(--wp--preset--spacing--5) var(--wp--preset--spacing--6);
+        background: white;
+
+        &__header {
+            display: flex;
+            align-items: center;
+            gap: var(--wp--preset--spacing--3);
+            margin-bottom: var(--wp--preset--spacing--3);
+        }
+
+        &__answers {
+            display: flex;
+            flex-direction: column;
+            gap: 0.375rem;
+            margin-top: var(--wp--preset--spacing--4);
+        }
+    }
+
+    .attempt-detail__filters{
+        background-color: var(--wp--preset--color--gray-100);
+        padding: var(--wp--preset--spacing--4);
+        border-radius: 0.5rem;
+        margin-bottom: var(--wp--preset--spacing--5);
+    }
+
+    // ── Question list ─────────────────────────────────────────────────────────
+
+    .attempt-detail__list {
+        display: flex;
+        flex-direction: column;
+        gap: var(--wp--preset--spacing--4);
+    }
+
+    // ── Question card ─────────────────────────────────────────────────────────
+
+    .question-card {
+        // Offset anchor scroll to clear the fixed site header + a little breathing room
+        scroll-margin-top: calc(var(--header-height, 6rem) + 1.5rem);
+        border: 1px solid var(--wp--preset--color--gray-100);
+        border-left: 12px solid var(--wp--preset--color--gray-200);
+        border-radius: 0.75rem;
+        padding: var(--wp--preset--spacing--5) var(--wp--preset--spacing--6);
+        background: white;
+
+        // Result-based left-border colour
+        &--correct   { border-left-color: #25CB83; }
+        &--incorrect { border-left-color: #FE4D43; }
+        &--partial   { border-left-color: #F59E0B; }
+        &--ungraded  { border-left-color: var(--wp--preset--color--gray-300); }
+
+        &__header {
+            display: flex;
+            align-items: center;
+            gap: var(--wp--preset--spacing--3);
+            margin-bottom: var(--wp--preset--spacing--3);
+        }
+
+        &__number {
+            font-size: var(--wp--preset--font-size--small);
+            font-weight: 600;
+            color: var(--wp--preset--color--gray-400);
+            min-width: 2rem;
+        }
+
+        &__points {
+            margin-left: auto;
+            font-size: var(--wp--preset--font-size--small);
+            color: var(--wp--preset--color--gray-500);
+
+            &.hidden { display: none; }
+        }
+
+        &__text {
+            font-size: var(--wp--preset--font-size--medium);
+            color: var(--wp--preset--color--gray-700);
+            line-height: 1.5;
+
+            // Preserve any embedded images or formatting from LearnDash
+            img { max-width: 100%; height: auto; }
+            p:last-child { margin-bottom: 0; }
+        }
+
+        &__answers {
+            margin-top: var(--wp--preset--spacing--4);
+            display: flex;
+            flex-direction: column;
+            gap: 0.375rem;
+
+            &.hidden { display: none; }
+        }
+
+        &__user-text {
+            margin-top: var(--wp--preset--spacing--4);
+            padding: var(--wp--preset--spacing--3) var(--wp--preset--spacing--4);
+            background: var(--wp--preset--color--gray-50, #F9FAFB);
+            border-radius: 0.375rem;
+            font-size: var(--wp--preset--font-size--small);
+            color: var(--wp--preset--color--gray-700);
+            line-height: 1.6;
+
+            &::before {
+                content: 'Student answer';
+                display: block;
+                font-size: 0.6875rem;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
+                color: var(--wp--preset--color--gray-400);
+                margin-bottom: 0.375rem;
+            }
+
+            &.hidden { display: none; }
+        }
+    }
+
+    // ── Answer choices ────────────────────────────────────────────────────────
+
+    .answer-choice {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.625rem;
+        padding: 0.5rem 0.75rem;
+        border-radius: 0.375rem;
+        font-size: var(--wp--preset--font-size--small);
+        color: var(--wp--preset--color--gray-600);
+        background: var(--wp--preset--color--gray-50, #F9FAFB);
+        border: 1px solid transparent;
+
+        &__icon {
+            margin-top: 0.125rem;
+            flex-shrink: 0;
+            font-size: 0.875rem;
+        }
+
+        &__text {
+            flex: 1;
+            line-height: 1.5;
+        }
+
+        // Correct answer → green fill + border
+        // Note: LearnDash doesn't store which specific option was selected for choice questions,
+        // so we only highlight what the correct answer(s) were.
+        &--correct {
+            background: #ECFDF5;
+            border-color: #A7F3D0;
+            color: #065F46;
+
+            .answer-choice__icon { color: #25CB83; }
+        }
+    }
+
+    // ── Result badges ─────────────────────────────────────────────────────────
+
+    .result-badge {
+        display: inline-flex;
+        align-items: center;
+        font-size: var(--wp--preset--font-size--small);
+        font-weight: 500;
+        padding: var(--wp--preset--spacing--1) var(--wp--preset--spacing--2);
+        border-radius: 0.25rem;
+
+        &--correct {
+            color: var(--wp--preset--color--green-700);
+            background: var(--wp--preset--color--green-100);
+        }
+
+        &--incorrect {
+            color: var(--wp--preset--color--red-700);
+            background: var(--wp--preset--color--red-100);
+        }
+
+        &--partial {
+            color: var(--wp--preset--color--yellow-700);
+            background: var(--wp--preset--color--yellow-100);
+        }
+
+        &--ungraded {
+            color: var(--wp--preset--color--gray-600);
+            background: var(--wp--preset--color--gray-100);
+        }
+    }
+
+}

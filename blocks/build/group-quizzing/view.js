@@ -1,1 +1,388 @@
-(()=>{"use strict";const t={_cache:new Map,_pending:new Map,async get(t,e=!1){if(!e&&this._cache.has(t))return this._cache.get(t);if(this._pending.has(t))return this._pending.get(t);const s={},n=window.bysGroupsAuth&&window.bysGroupsAuth.header?window.bysGroupsAuth.header:null;n&&(s.Authorization=n);const i=jQuery.ajax({url:t,type:"GET",headers:s,dataType:"json"}).done((e,s,n)=>{console.log(`Success for ${t}:`,{status:n.status,data:e})}).then(e=>(this._cache.set(t,e),e)).catch((e,s,n)=>{throw console.error(`API request failed for ${t}:`,{status:e.status,statusText:e.statusText,responseText:e.responseText?.substring(0,500),textStatus:s,errorThrown:n?.message}),new Error(`API request failed: ${e.status} ${e.statusText} - ${e.responseText?.substring(0,100)}`)}).always(()=>{this._pending.delete(t)});return this._pending.set(t,i),i},invalidate(t){for(const e of this._cache.keys())e.includes(t)&&this._cache.delete(e)},clear(){this._cache.clear()}};function e(t){if(!t)return"—";try{return new Date(t).toLocaleString("en-US",{year:"numeric",month:"short",day:"numeric"})}catch{return"—"}}jQuery(document).ready(s=>{const n=s(".wp-block-bys-groups-group-quizzing").first();if(!n.length)return;const i=n.find("#group-quizzing-skeleton"),o=n.find("#group-quizzing-courses-list"),r=n.find("#group-quizzing-course-template")[0],a=n.find("#group-quizzing-quiz-template")[0];async function u(n,u){if(o.empty(),!Array.isArray(u)||0===u.length)return void console.log("[group-quizzing] No courses in payload");const c={};await Promise.all(u.map(async e=>{try{const n=await t.get((s=e.id,`/wp-json/bys-groups/v1/courses/${s}/quiz-steps`));c[e.id]=Array.isArray(n)?n:[]}catch(t){console.error(`[group-quizzing] Failed to fetch quiz steps for course ${e.id}:`,t),c[e.id]=[]}var s}));const d=Object.values(c).flat().map(t=>t.step_id);let l={};if(d.length>0)try{const e=await t.get(((t,e)=>`/wp-json/bys-groups/v1/groups/${t}/quiz-submission-stats?quiz_ids=${e.join(",")}`)(n,d));Array.isArray(e)&&e.forEach(t=>{l[t.quiz_id]=t})}catch(t){console.error("[group-quizzing] Failed to fetch quiz submission stats:",t)}i.addClass("hidden");let p=0;u.forEach(t=>{const i=c[t.id];if(!i.length)return;p++;const u=r.content.cloneNode(!0),d=s(u),g=`hs-quiz-course-heading-${p}`,h=`hs-quiz-course-collapse-${p}`,f=d.find(".hs-accordion"),y=d.find(".hs-accordion-toggle"),_=d.find(".accordion-content__inner");f.attr("id",g).attr("data-course-id",t.id),y.attr("aria-controls",h),d.find(".hs-accordion-content").attr("id",h).attr("aria-labelledby",g);const z="string"==typeof t.title?t.title:t.title?.rendered||"Untitled",w=t.shortname||z;d.find(".accordion-toggle__course-name").text(z),d.find(".quiz-count-value").text(i.length);const q=i.reduce((t,e)=>{const s=l[e.step_id]?.last_submission_gmt;return s&&(!t||s>t)?s:t},null);d.find(".accordion-toggle__date .date-value").text(e(q));let m=!1;y.on("click",function(){m||(m=!0,_.empty(),i.forEach(t=>{const i=a.content.cloneNode(!0),o=s(i),r=l[t.step_id];o.find(".quiz-row__name").text(t.step_title),o.find(".quiz-row__last-submission .date-value").text(e(r?.last_submission_gmt)),o.find(".quiz-row").on("click",function(){s(window).trigger("bysQuizAttemptsOpen",[{groupId:n,quizId:t.step_id,quizTitle:t.step_title,parentCourse:w}])}),_.append(o)}))}),o.append(d)})}s(document).on("bys:groupSelected",function(t,e){u(e.groupId,e.courses)}),window.bysGroupData?.courses&&u(window.bysGroupData.groupId,window.bysGroupData.courses)})})();
+/******/ (() => { // webpackBootstrap
+/******/ 	"use strict";
+/******/ 	var __webpack_modules__ = ({
+
+/***/ "./src/_shared/api-client.js"
+/*!***********************************!*\
+  !*** ./src/_shared/api-client.js ***!
+  \***********************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   api: () => (/* binding */ api),
+/* harmony export */   endpoints: () => (/* binding */ endpoints)
+/* harmony export */ });
+/**
+ * Shared API client with in-memory caching and request deduplication.
+ * Prevents duplicate requests when multiple blocks fetch the same data.
+ * Uses basic auth via Authorization header (from plugin settings).
+ */
+
+// Get basic auth credentials from WP
+function getAuthorizationHeader() {
+  if (window.bysGroupsAuth && window.bysGroupsAuth.header) {
+    return window.bysGroupsAuth.header;
+  }
+  return null;
+}
+
+// custom API endpoint definitions
+const endpoints = {
+  currentUserGroups: () => '/wp-json/bys-groups/v1/me/groups',
+  groupBaseUsersStats: groupId => `/wp-json/bys-groups/v1/groups/${groupId}/base-user-stats`,
+  groupUsers: (groupId, userIds) => `/wp-json/bys-groups/v1/groups/${groupId}/users?user_ids=${userIds}`,
+  groupUserInfo: (groupId, userId) => `/wp-json/bys-groups/v1/groups/${groupId}/users/${userId}`,
+  groupCourses: groupId => `/wp-json/bys-groups/v1/groups/${groupId}/courses`,
+  groupCourseCompletionStats: groupId => `/wp-json/bys-groups/v1/groups/${groupId}/course-completion-stats`,
+  courseHierarchialBreakdown: courseId => `/wp-json/bys-groups/v1/courses/${courseId}/steps`,
+  groupUserCourseProgress: (userId, courseIds) => `/wp-json/bys-groups/v1/users/${userId}/course-progress?course_ids=${courseIds}`,
+  courseQuizSteps: courseId => `/wp-json/bys-groups/v1/courses/${courseId}/quiz-steps`,
+  groupQuizSubmissionStats: (groupId, quizIds) => `/wp-json/bys-groups/v1/groups/${groupId}/quiz-submission-stats?quiz_ids=${quizIds.join(',')}`,
+  groupQuizAttempts: (groupId, quizId) => `/wp-json/bys-groups/v1/groups/${groupId}/quizzes/${quizId}/attempts`,
+  userQuizAttempts: (userId, courseId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-attempts?course_id=${courseId}`,
+  userQuizProgress: userId => `/wp-json/bys-groups/v1/users/${userId}/quiz-progress`,
+  userQuizAttemptsDetails: (userId, quizId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-attempts/${quizId}`,
+  attemptDetail: activityId => `/wp-json/bys-groups/v1/attempts/${activityId}`,
+  attemptQuestions: activityId => `/wp-json/bys-groups/v1/attempts/${activityId}/questions`,
+  userActivity: userId => `/wp-json/bys-groups/v1/users/${userId}/activity`,
+  userCourseActivity: (userId, courseId) => `/wp-json/bys-groups/v1/users/${userId}/activity?course_id=${courseId}`,
+  userCourseStepsProgress: (userId, courseId) => `/wp-json/bys-groups/v1/users/${userId}/course-progress-steps/${courseId}`
+};
+const api = {
+  _cache: new Map(),
+  _pending: new Map(),
+  /**
+   * Fetch data with automatic caching and deduplication.
+   */
+  async get(url, forceRefresh = false) {
+    // Return cached response if available
+    if (!forceRefresh && this._cache.has(url)) {
+      return this._cache.get(url);
+    }
+
+    // Return existing pending request if existing
+    if (this._pending.has(url)) {
+      return this._pending.get(url);
+    }
+
+    // Send request and cache the result
+    const headers = {};
+    const authHeader = getAuthorizationHeader();
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
+    }
+    const promise = jQuery.ajax({
+      url: url,
+      type: 'GET',
+      headers: headers,
+      dataType: 'json'
+    }).done((data, textStatus, jqXHR) => {
+      console.log(`Success for ${url}:`, {
+        status: jqXHR.status,
+        data
+      });
+    }).then(data => {
+      this._cache.set(url, data);
+      return data;
+    }).catch((jqXHR, textStatus, errorThrown) => {
+      console.error(`API request failed for ${url}:`, {
+        status: jqXHR.status,
+        statusText: jqXHR.statusText,
+        responseText: jqXHR.responseText?.substring(0, 500),
+        textStatus: textStatus,
+        errorThrown: errorThrown?.message
+      });
+      throw new Error(`API request failed: ${jqXHR.status} ${jqXHR.statusText} - ${jqXHR.responseText?.substring(0, 100)}`);
+    }).always(() => {
+      this._pending.delete(url);
+    });
+    this._pending.set(url, promise);
+    return promise;
+  },
+  /**
+   * Invalidate cached responses
+   */
+  invalidate(keyFragment) {
+    for (const key of this._cache.keys()) {
+      if (key.includes(keyFragment)) {
+        this._cache.delete(key);
+      }
+    }
+  },
+  /**
+   * Clear all cached data
+   */
+  clear() {
+    this._cache.clear();
+  }
+};
+
+/***/ },
+
+/***/ "./src/_shared/helpers.js"
+/*!********************************!*\
+  !*** ./src/_shared/helpers.js ***!
+  \********************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   formatDate: () => (/* binding */ formatDate),
+/* harmony export */   formatDateTime: () => (/* binding */ formatDateTime),
+/* harmony export */   formatDuration: () => (/* binding */ formatDuration),
+/* harmony export */   formatScore: () => (/* binding */ formatScore),
+/* harmony export */   formatTime: () => (/* binding */ formatTime)
+/* harmony export */ });
+/**
+ * Shared block functions
+ *
+ * Usage:
+ *   import { formatScore, formatDate } from '../_shared/helpers.js';
+ *
+ */
+
+function formatScore(percent, pointsScored, pointsTotal) {
+  if (percent === null || percent === undefined) return '—';
+  if (pointsScored === null || pointsTotal === null) return `${percent}%`;
+  return `${pointsScored}/${pointsTotal} (${percent}%)`;
+}
+function formatDate(timestamp) {
+  if (!timestamp) return '—';
+  try {
+    return new Date(timestamp).toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  } catch {
+    return '—';
+  }
+}
+function formatTime(timestamp) {
+  if (!timestamp) return '—';
+  try {
+    return new Date(timestamp).toLocaleString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    });
+  } catch {
+    return '—';
+  }
+}
+function formatDuration(seconds) {
+  if (!seconds || seconds <= 0) return '—';
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor(seconds % 3600 / 60);
+  const s = Math.floor(seconds % 60);
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+function formatDateTime(timestamp) {
+  if (!timestamp) return '—';
+  try {
+    return new Date(timestamp).toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    });
+  } catch {
+    return '—';
+  }
+}
+
+/***/ }
+
+/******/ 	});
+/************************************************************************/
+/******/ 	// The module cache
+/******/ 	var __webpack_module_cache__ = {};
+/******/ 	
+/******/ 	// The require function
+/******/ 	function __webpack_require__(moduleId) {
+/******/ 		// Check if module is in cache
+/******/ 		var cachedModule = __webpack_module_cache__[moduleId];
+/******/ 		if (cachedModule !== undefined) {
+/******/ 			return cachedModule.exports;
+/******/ 		}
+/******/ 		// Create a new module (and put it into the cache)
+/******/ 		var module = __webpack_module_cache__[moduleId] = {
+/******/ 			// no module.id needed
+/******/ 			// no module.loaded needed
+/******/ 			exports: {}
+/******/ 		};
+/******/ 	
+/******/ 		// Execute the module function
+/******/ 		if (!(moduleId in __webpack_modules__)) {
+/******/ 			delete __webpack_module_cache__[moduleId];
+/******/ 			var e = new Error("Cannot find module '" + moduleId + "'");
+/******/ 			e.code = 'MODULE_NOT_FOUND';
+/******/ 			throw e;
+/******/ 		}
+/******/ 		__webpack_modules__[moduleId](module, module.exports, __webpack_require__);
+/******/ 	
+/******/ 		// Return the exports of the module
+/******/ 		return module.exports;
+/******/ 	}
+/******/ 	
+/************************************************************************/
+/******/ 	/* webpack/runtime/define property getters */
+/******/ 	(() => {
+/******/ 		// define getter functions for harmony exports
+/******/ 		__webpack_require__.d = (exports, definition) => {
+/******/ 			for(var key in definition) {
+/******/ 				if(__webpack_require__.o(definition, key) && !__webpack_require__.o(exports, key)) {
+/******/ 					Object.defineProperty(exports, key, { enumerable: true, get: definition[key] });
+/******/ 				}
+/******/ 			}
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/hasOwnProperty shorthand */
+/******/ 	(() => {
+/******/ 		__webpack_require__.o = (obj, prop) => (Object.prototype.hasOwnProperty.call(obj, prop))
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/make namespace object */
+/******/ 	(() => {
+/******/ 		// define __esModule on exports
+/******/ 		__webpack_require__.r = (exports) => {
+/******/ 			if(typeof Symbol !== 'undefined' && Symbol.toStringTag) {
+/******/ 				Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
+/******/ 			}
+/******/ 			Object.defineProperty(exports, '__esModule', { value: true });
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/************************************************************************/
+var __webpack_exports__ = {};
+// This entry needs to be wrapped in an IIFE because it needs to be isolated against other modules in the chunk.
+(() => {
+/*!************************************!*\
+  !*** ./src/group-quizzing/view.js ***!
+  \************************************/
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../_shared/api-client.js */ "./src/_shared/api-client.js");
+/* harmony import */ var _shared_helpers_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../_shared/helpers.js */ "./src/_shared/helpers.js");
+
+
+jQuery(document).ready($ => {
+  const $block = $('.wp-block-bys-groups-group-quizzing').first();
+  if (!$block.length) return;
+  const $skeleton = $block.find('#group-quizzing-skeleton');
+  const $coursesList = $block.find('#group-quizzing-courses-list');
+  const courseTemplate = $block.find('#group-quizzing-course-template')[0];
+  const quizTemplate = $block.find('#group-quizzing-quiz-template')[0];
+  async function renderCourses(groupId, courses) {
+    $coursesList.empty();
+    if (!Array.isArray(courses) || courses.length === 0) {
+      console.log('[group-quizzing] No courses in payload');
+      return;
+    }
+
+    // Fetch quiz steps for all courses upfront (needed for count, filtering, and stats query)
+    const quizStepsByCourse = {};
+    await Promise.all(courses.map(async course => {
+      try {
+        const steps = await _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.api.get(_shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.endpoints.courseQuizSteps(course.id));
+        quizStepsByCourse[course.id] = Array.isArray(steps) ? steps : [];
+      } catch (err) {
+        console.error(`[group-quizzing] Failed to fetch quiz steps for course ${course.id}:`, err);
+        quizStepsByCourse[course.id] = [];
+      }
+    }));
+
+    // Gather all quiz IDs across all courses and fetch submission stats in one request
+    const allQuizIds = Object.values(quizStepsByCourse).flat().map(s => s.step_id);
+    let submissionStats = {}; // keyed by quiz_id
+
+    if (allQuizIds.length > 0) {
+      try {
+        const statsArray = await _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.api.get(_shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.endpoints.groupQuizSubmissionStats(groupId, allQuizIds));
+        if (Array.isArray(statsArray)) {
+          statsArray.forEach(s => {
+            submissionStats[s.quiz_id] = s;
+          });
+        }
+      } catch (err) {
+        console.error('[group-quizzing] Failed to fetch quiz submission stats:', err);
+      }
+    }
+    $skeleton.addClass('hidden');
+    let courseNum = 0;
+    courses.forEach(course => {
+      const quizSteps = quizStepsByCourse[course.id];
+
+      // Skip courses with no quizzes
+      if (!quizSteps.length) return;
+      courseNum++;
+      const courseNode = courseTemplate.content.cloneNode(true);
+      const $course = $(courseNode);
+      const courseId = `hs-quiz-course-heading-${courseNum}`;
+      const contentId = `hs-quiz-course-collapse-${courseNum}`;
+      const $accordion = $course.find('.hs-accordion');
+      const $toggle = $course.find('.hs-accordion-toggle');
+      const $accordionContent = $course.find('.accordion-content__inner');
+      $accordion.attr('id', courseId).attr('data-course-id', course.id);
+      $toggle.attr('aria-controls', contentId);
+      $course.find('.hs-accordion-content').attr('id', contentId).attr('aria-labelledby', courseId);
+      const courseTitle = typeof course.title === 'string' ? course.title : course.title?.rendered || 'Untitled';
+      const courseDisplay = course.shortname || courseTitle;
+      $course.find('.accordion-toggle__course-name').text(courseTitle);
+      $course.find('.quiz-count-value').text(quizSteps.length);
+
+      // Latest submission across all quizzes in this course
+      const courseLastTs = quizSteps.reduce((latest, quiz) => {
+        const ts = submissionStats[quiz.step_id]?.last_submission_gmt;
+        if (!ts) return latest;
+        return !latest || ts > latest ? ts : latest;
+      }, null);
+      $course.find('.accordion-toggle__date .date-value').text((0,_shared_helpers_js__WEBPACK_IMPORTED_MODULE_1__.formatDate)(courseLastTs));
+
+      // Lazy-render quiz rows on first open
+      let quizzesRendered = false;
+      $toggle.on('click', function () {
+        if (quizzesRendered) return;
+        quizzesRendered = true;
+        $accordionContent.empty();
+        quizSteps.forEach(quiz => {
+          const quizNode = quizTemplate.content.cloneNode(true);
+          const $quiz = $(quizNode);
+          const stats = submissionStats[quiz.step_id];
+          $quiz.find('.quiz-row__name').text(quiz.step_title);
+          $quiz.find('.quiz-row__last-submission .date-value').text((0,_shared_helpers_js__WEBPACK_IMPORTED_MODULE_1__.formatDate)(stats?.last_submission_gmt));
+
+          // Open attempts modal on click — no user pre-filter
+          $quiz.find('.quiz-row').on('click', function () {
+            $(window).trigger('bysQuizAttemptsOpen', [{
+              groupId: groupId,
+              quizId: quiz.step_id,
+              quizTitle: quiz.step_title,
+              parentCourse: courseDisplay
+            }]);
+          });
+          $accordionContent.append($quiz);
+        });
+      });
+      $coursesList.append($course);
+    });
+  }
+  $(document).on('bys:groupSelected', function (_, data) {
+    renderCourses(data.groupId, data.courses);
+  });
+  if (window.bysGroupData?.courses) {
+    renderCourses(window.bysGroupData.groupId, window.bysGroupData.courses);
+  }
+});
+})();
+
+/******/ })()
+;
+//# sourceMappingURL=view.js.map

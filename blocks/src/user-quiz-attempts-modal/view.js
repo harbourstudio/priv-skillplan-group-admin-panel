@@ -11,7 +11,13 @@ jQuery(document).ready(($) => {
   const rowTemplate = $block.find('#user-quiz-attempts-modal__template-row')[0];
 
   let allAttempts = [];
-  let sortState = { col: null, dir: 'asc' };
+  let sortState = { col: 'user', dir: 'asc' };
+
+  // Track current quiz/group context so the grading-page link can carry it forward
+  let currentGroupId  = null;
+  let currentQuizId   = null;
+  let currentQuizTitle  = '';
+  let currentCourse     = '';
 
   const round2 = (n) => n != null ? Math.round(n * 100) / 100 : n;
 
@@ -88,7 +94,7 @@ jQuery(document).ready(($) => {
       const rowNode = rowTemplate.content.cloneNode(true);
       const $row = $(rowNode);
 
-      $row.find('tr').attr('data-user-id', attempt.user_id);
+      $row.find('tr').attr('data-user-id', attempt.user_id).attr('data-activity-id', attempt.activity_id);
       $row.find('.cell_attempt_index').text(index + 1);
       $row.find('.cell_attempt_user').text(attempt.display_name);
 
@@ -116,9 +122,21 @@ jQuery(document).ready(($) => {
       createTooltip($(this), $(this).attr('data-tooltip'));
     }).on('mouseleave', '[data-tooltip]', destroyTooltip);
 
-    // Click a collapsed row to drill into that user's full attempts
+    // Collapsed view: click to drill into that user's attempts.
+    // Expanded view (user selected): click to navigate to the grading page.
     $tbody.on('click', 'tr[data-user-id]', function() {
-      if (!$userFilter.val()) {
+      if ($userFilter.val()) {
+        const activityId = $(this).data('activityId');
+        if (activityId) {
+          const gradingUrl = $block.data('gradingUrl');
+          const params = new URLSearchParams({
+            attempt_id: activityId,
+            group_id:   currentGroupId  ?? '',
+            quiz_id:    currentQuizId   ?? '',
+          });
+          window.location.href = `${gradingUrl}?${params}`;
+        }
+      } else {
         $userFilter.val(String($(this).data('userId'))).trigger('change');
       }
     });
@@ -161,6 +179,11 @@ jQuery(document).ready(($) => {
   $(window).on('bysQuizAttemptsOpen', async function(_event, data) {
     const { quizId, quizTitle, parentCourse, groupId, userId } = data;
 
+    currentGroupId  = groupId;
+    currentQuizId   = quizId;
+    currentQuizTitle  = quizTitle;
+    currentCourse     = parentCourse;
+
     $modal.find('.quiz-title').text(quizTitle);
     $modal.find('.course-title').text(parentCourse);
 
@@ -169,7 +192,7 @@ jQuery(document).ready(($) => {
     $userFilter.val('');
     $modeFilter.val('highest');
     $modeFilter.closest('.filter-bar__group').removeClass('hidden');
-    sortState = { col: null, dir: 'asc' };
+    sortState = { col: 'user', dir: 'asc' };
     updateSortIcons();
 
     $tbody.html('<tr><td colspan="5">Loading attempts…</td></tr>');

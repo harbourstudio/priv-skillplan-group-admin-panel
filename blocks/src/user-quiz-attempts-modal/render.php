@@ -14,7 +14,8 @@ foreach ($attrs as $a) {
     }
 }
 
-$wrapper_attributes = get_block_wrapper_attributes();
+$grading_page_url   = esc_url(home_url('/administrator-dashboard/quiz-attempt-detail/'));
+$wrapper_attributes = get_block_wrapper_attributes(['data-grading-url' => $grading_page_url]);
 ?>
 
 <div <?= $wrapper_attributes; ?>>
@@ -77,7 +78,7 @@ $wrapper_attributes = get_block_wrapper_attributes();
 
     <!-- Template for table row -->
     <template id="user-quiz-attempts-modal__template-row">
-        <tr>
+        <tr data-user-id="" data-activity-id="">
             <td class="cell_attempt_index"></td>
             <td class="cell_attempt_user"></td>
             <td class="cell_attempt_date"></td>

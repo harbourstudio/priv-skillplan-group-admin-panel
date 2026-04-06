@@ -100,6 +100,20 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'permission_callback' => array($this, 'check_user_permission'),
             ));
 
+            // attemptQuestions - per-question results for a single quiz attempt
+            register_rest_route($this->namespace, '/attempts/(?P<activity_id>\d+)/questions', array(
+                'methods'             => 'GET',
+                'callback'            => array($this, 'get_attempt_questions'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
+
+            // attemptDetail - full detail for a single quiz attempt by activity ID
+            register_rest_route($this->namespace, '/attempts/(?P<activity_id>\d+)', array(
+                'methods'             => 'GET',
+                'callback'            => array($this, 'get_attempt_detail'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
+
             // groupQuizSubmissionStats - per-quiz submission count and last submission date for group members
             register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/quiz-submission-stats', array(
                 'methods'             => 'GET',
@@ -736,7 +750,7 @@ if (!class_exists('BYS_Groups_Rest_API')) {
 
             $rows = $wpdb->get_results(
                 $wpdb->prepare(
-                    "SELECT activity_id, user_id, activity_completed
+                    "SELECT activity_id, user_id, activity_started, activity_completed
                      FROM {$ld_table}
                      WHERE activity_type = 'quiz'
                        AND post_id = %d
@@ -789,8 +803,12 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 $meta = $meta_map[$aid] ?? array();
 
                 $result[] = array(
+                    'activity_id'   => $aid,
                     'user_id'       => $uid,
                     'display_name'  => $user_names[$uid] ?? 'Unknown User',
+                    'started_gmt'   => $row['activity_started']
+                        ? gmdate('Y-m-d\TH:i:s', intval($row['activity_started']))
+                        : null,
                     'completed_gmt' => $row['activity_completed']
                         ? gmdate('Y-m-d\TH:i:s', intval($row['activity_completed']))
                         : null,
@@ -802,6 +820,276 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             }
 
             return new \WP_REST_Response($result, 200);
+        }
+
+        /**
+         * Get full detail for a single quiz attempt by activity ID.
+         */
+        public function get_attempt_detail($request) {
+            $activity_id = intval($request['activity_id']);
+
+            if (!$activity_id) {
+                return new \WP_REST_Response(array('error' => 'Invalid activity_id'), 400);
+            }
+
+            global $wpdb;
+            $ld_table   = $wpdb->prefix . 'learndash_user_activity';
+            $meta_table = $wpdb->prefix . 'learndash_user_activity_meta';
+
+            $row = $wpdb->get_row(
+                $wpdb->prepare(
+                    "SELECT activity_id, user_id, post_id, activity_started, activity_completed
+                     FROM {$ld_table}
+                     WHERE activity_id = %d AND activity_type = 'quiz'",
+                    $activity_id
+                ),
+                ARRAY_A
+            );
+
+            if (!$row) {
+                return new \WP_REST_Response(array('error' => 'Attempt not found'), 404);
+            }
+
+            $uid     = intval($row['user_id']);
+            $quiz_id = intval($row['post_id']);
+
+            // Fetch meta for this attempt
+            $meta_keys        = ['pass', 'percentage', 'points', 'total_points', 'timespent'];
+            $key_placeholders = implode(',', array_fill(0, count($meta_keys), '%s'));
+
+            $meta_rows = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT activity_meta_key, activity_meta_value
+                     FROM {$meta_table}
+                     WHERE activity_id = %d AND activity_meta_key IN ({$key_placeholders})",
+                    ...array_merge([$activity_id], $meta_keys)
+                ),
+                ARRAY_A
+            );
+
+            $meta = array();
+            foreach ($meta_rows as $m) {
+                $meta[$m['activity_meta_key']] = $m['activity_meta_value'];
+            }
+
+            // User display name
+            $user         = get_userdata($uid);
+            $display_name = $user ? $user->display_name : 'Unknown User';
+
+            // Quiz and course titles
+            $quiz_title   = get_the_title($quiz_id) ?: 'Unknown Quiz';
+            $course_id    = learndash_get_course_id($quiz_id);
+            $course_title = $course_id ? get_the_title($course_id) : '';
+
+            // Attempt number: count of this user's attempts for this quiz with activity_id <= current
+            $attempt_number = (int) $wpdb->get_var(
+                $wpdb->prepare(
+                    "SELECT COUNT(*) FROM {$ld_table}
+                     WHERE user_id = %d AND post_id = %d AND activity_type = 'quiz' AND activity_id <= %d",
+                    $uid, $quiz_id, $activity_id
+                )
+            );
+
+            return new \WP_REST_Response(array(
+                'activity_id'    => $activity_id,
+                'user_id'        => $uid,
+                'display_name'   => $display_name,
+                'quiz_id'        => $quiz_id,
+                'quiz_title'     => $quiz_title,
+                'course_id'      => $course_id ?: null,
+                'course_title'   => $course_title,
+                'started_gmt'    => $row['activity_started']
+                    ? gmdate('Y-m-d\TH:i:s', intval($row['activity_started']))
+                    : null,
+                'completed_gmt'  => $row['activity_completed']
+                    ? gmdate('Y-m-d\TH:i:s', intval($row['activity_completed']))
+                    : null,
+                'timespent'      => isset($meta['timespent']) ? intval($meta['timespent']) : null,
+                'percentage'     => isset($meta['percentage']) ? floatval($meta['percentage']) : null,
+                'points_scored'  => isset($meta['points']) ? floatval($meta['points']) : null,
+                'points_total'   => isset($meta['total_points']) ? floatval($meta['total_points']) : null,
+                'pass'           => isset($meta['pass']) ? (bool) intval($meta['pass']) : null,
+                'attempt_number' => $attempt_number,
+            ), 200);
+        }
+
+        /**
+         * Get per-question results for a single quiz attempt.
+         */
+        public function get_attempt_questions($request) {
+            $activity_id = intval($request['activity_id']);
+
+            if (!$activity_id) {
+                return new \WP_REST_Response(array('error' => 'Invalid activity_id'), 400);
+            }
+
+            global $wpdb;
+            $meta_table     = $wpdb->prefix . 'learndash_user_activity_meta';
+            $stat_table     = LDLMS_DB::get_table_name('quiz_statistic');
+            $question_table = LDLMS_DB::get_table_name('quiz_question');
+
+            if (!$stat_table || !$question_table) {
+                return new \WP_REST_Response(array('error' => 'LearnDash statistics tables not available'), 500);
+            }
+
+            // Step 1: Resolve statistic_ref_id from activity meta
+            $statistic_ref_id = $wpdb->get_var(
+                $wpdb->prepare(
+                    "SELECT activity_meta_value FROM {$meta_table}
+                     WHERE activity_id = %d AND activity_meta_key = 'statistic_ref_id'",
+                    $activity_id
+                )
+            );
+
+            if (!$statistic_ref_id) {
+                return new \WP_REST_Response(array(), 200);
+            }
+
+            // Step 2: Fetch per-question stats for this attempt
+            $stat_rows = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT question_id, question_post_id, correct_count, incorrect_count, points, answer_data
+                     FROM {$stat_table}
+                     WHERE statistic_ref_id = %d",
+                    intval($statistic_ref_id)
+                ),
+                ARRAY_A
+            );
+
+            if (empty($stat_rows)) {
+                return new \WP_REST_Response(array(), 200);
+            }
+
+            // Step 3: Fetch question definitions (text, type, max points, sort order)
+            $question_ids   = array_map('intval', array_column($stat_rows, 'question_id'));
+            $placeholders   = implode(',', array_fill(0, count($question_ids), '%d'));
+            $question_rows  = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT id, title, question, answer_type, points AS max_points, sort, answer_data
+                     FROM {$question_table}
+                     WHERE id IN ({$placeholders})",
+                    ...$question_ids
+                ),
+                ARRAY_A
+            );
+
+            $question_map = array();
+            foreach ($question_rows as $q) {
+                $question_map[intval($q['id'])] = $q;
+            }
+
+            // Step 4: Combine and determine result per question
+            $result = array();
+            foreach ($stat_rows as $stat) {
+                $qid  = intval($stat['question_id']);
+                $qdef = $question_map[$qid] ?? null;
+
+                $answer_type  = $qdef['answer_type'] ?? '';
+                $points_max   = $qdef ? floatval($qdef['max_points']) : 0;
+                $points_earned = floatval($stat['points']);
+                $correct_count   = intval($stat['correct_count']);
+                $incorrect_count = intval($stat['incorrect_count']);
+
+                if ($answer_type === 'assessment_answer') {
+                    $question_result = 'ungraded';
+                } elseif ($answer_type === 'free_answer' && $correct_count === 0 && $incorrect_count === 0) {
+                    $question_result = 'ungraded';
+                } elseif ($points_max > 0 && $points_earned >= $points_max) {
+                    $question_result = 'correct';
+                } elseif ($points_earned > 0 && $points_earned < $points_max) {
+                    $question_result = 'partial';
+                } else {
+                    $question_result = 'incorrect';
+                }
+
+                $result[] = array(
+                    'question_id'      => $qid,
+                    'question_post_id' => intval($stat['question_post_id']),
+                    'title'            => $qdef ? sanitize_text_field($qdef['title']) : '',
+                    'question_text'    => $qdef ? wp_kses_post($qdef['question']) : '',
+                    'answer_type'      => $answer_type,
+                    'points_earned'    => $points_earned,
+                    'points_max'       => $points_max,
+                    'result'           => $question_result,
+                    'sort'             => $qdef ? intval($qdef['sort']) : 0,
+                    'user_answers'     => $this->parse_question_answers(
+                        $stat['answer_data'] ?? '',
+                        $qdef['answer_data'] ?? '',
+                        $answer_type
+                    ),
+                );
+            }
+
+            // Sort by quiz question order
+            usort($result, fn($a, $b) => $a['sort'] - $b['sort']);
+
+            return new \WP_REST_Response($result, 200);
+        }
+
+        /**
+         * Parse a user's answer from the statistic table and the question's answer options
+         * into a structured format suitable for the frontend.
+         *
+         * Supported answer types:
+         *   - single / multiple  → list of choices with is_correct + was_selected flags
+         *   - free_answer / essay → plain user text
+         *
+         * Returns null for complex types (sort, matrix, cloze, assessment) where a
+         * structured breakdown isn't yet implemented.
+         */
+        private function parse_question_answers($stat_answer_raw, $q_answer_raw, $answer_type) {
+
+            // ── Choice-based questions ─────────────────────────────────────────
+            if (in_array($answer_type, array('single', 'multiple'), true)) {
+
+                // Question answer options — array of WpProQuiz_Model_AnswerTypes objects
+                $q_options = @unserialize($q_answer_raw); // phpcs:ignore
+                if (!is_array($q_options)) {
+                    return null;
+                }
+
+                // User's selections — serialized array, index → 1 (selected) or 0 (not selected)
+                $s_data = @unserialize($stat_answer_raw, array('allowed_classes' => false)); // phpcs:ignore
+                if (!is_array($s_data)) {
+                    $s_data = array();
+                }
+
+                $choices = array();
+                foreach ($q_options as $i => $opt) {
+                    $text       = '';
+                    $is_correct = false;
+                    $is_html    = false;
+
+                    if (is_object($opt) && !($opt instanceof \__PHP_Incomplete_Class)) {
+                        if (method_exists($opt, 'getAnswer'))  $text       = $opt->getAnswer();
+                        if (method_exists($opt, 'isCorrect'))  $is_correct = (bool) $opt->isCorrect();
+                        if (method_exists($opt, 'isHtml'))     $is_html    = (bool) $opt->isHtml();
+                    }
+
+                    $was_selected = isset($s_data[$i]) && (int) $s_data[$i] === 1;
+
+                    $choices[] = array(
+                        'text'         => $is_html ? wp_kses_post($text) : sanitize_text_field($text),
+                        'is_html'      => $is_html,
+                        'is_correct'   => $is_correct,
+                        'was_selected' => $was_selected,
+                    );
+                }
+
+                return array('type' => 'choices', 'items' => $choices);
+            }
+
+            // ── Free-text questions ────────────────────────────────────────────
+            if (in_array($answer_type, array('free_answer', 'essay'), true)) {
+                $s_data = @unserialize($stat_answer_raw, array('allowed_classes' => false)); // phpcs:ignore
+                $text   = is_string($s_data) ? $s_data : (is_string($stat_answer_raw) ? $stat_answer_raw : '');
+                if ($text === '') {
+                    return null;
+                }
+                return array('type' => 'text', 'user_text' => wp_kses_post($text));
+            }
+
+            return null;
         }
 
         /**

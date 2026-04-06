@@ -28,6 +28,8 @@ export const endpoints = {
   userQuizAttempts: (userId, courseId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-attempts?course_id=${courseId}`,
   userQuizProgress: (userId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-progress`,
   userQuizAttemptsDetails: (userId, quizId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-attempts/${quizId}`,
+  attemptDetail: (activityId) => `/wp-json/bys-groups/v1/attempts/${activityId}`,
+  attemptQuestions: (activityId) => `/wp-json/bys-groups/v1/attempts/${activityId}/questions`,
   userActivity: (userId) => `/wp-json/bys-groups/v1/users/${userId}/activity`,
   userCourseActivity: (userId, courseId) => `/wp-json/bys-groups/v1/users/${userId}/activity?course_id=${courseId}`,
   userCourseStepsProgress: (userId, courseId) => `/wp-json/bys-groups/v1/users/${userId}/course-progress-steps/${courseId}`,

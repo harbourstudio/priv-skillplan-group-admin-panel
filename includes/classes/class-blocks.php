@@ -13,13 +13,15 @@ if (!class_exists('BYS_Groups_Blocks')) {
     class BYS_Groups_Blocks {
 
         private $blocks = [
+            'group-quizzing',
             'group-reporting',
             'group-select',
             'group-stats',
-            'group-quizzing',
             'user-activity',
             'user-info',
             'user-progress',
+            'user-quiz-attempt-detail',
+            'user-quiz-attempt-header',
             'user-quiz-attempts-modal',
             'user-quiz-details',
             'user-stats',
