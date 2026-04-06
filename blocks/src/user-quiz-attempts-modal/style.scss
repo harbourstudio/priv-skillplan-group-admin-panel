@@ -132,11 +132,21 @@
     
             thead {
                 background-color: var(--wp--preset--color--primary);
-    
+
                 th {
                     color: var(--wp--preset--color--white);
                     padding: var(--wp--preset--spacing--3) var(--wp--preset--spacing--4);
                     font-weight: 400;
+
+                    &.sortable {
+                        cursor: pointer;
+                        user-select: none;
+                        white-space: nowrap;
+
+                        &:hover { opacity: 0.85; }
+
+                        .sort-icon { opacity: 0.6; }
+                    }
                 }
             }
     

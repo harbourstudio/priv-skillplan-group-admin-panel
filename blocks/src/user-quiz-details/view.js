@@ -377,12 +377,13 @@ jQuery(document).ready(($) => {
         $attempsCell.on('click', function(e) {
             e.preventDefault();
             e.stopPropagation();
+            const cachedCourse = (window.bysGroupsCache?.courses || []).find(c => c.id === quiz.parent_course_id);
             $(window).trigger('bysQuizAttemptsOpen', [{
                 groupId: groupId,
                 userId: userId,
                 quizId: quiz.id,
                 quizTitle: quiz.title,
-                parentCourse: quiz.parent_course_title
+                parentCourse: cachedCourse?.shortname || quiz.parent_course_title
             }]);
         });
 

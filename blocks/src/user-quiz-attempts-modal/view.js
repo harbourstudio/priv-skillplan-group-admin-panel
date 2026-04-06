@@ -10,16 +10,74 @@ jQuery(document).ready(($) => {
   const $modeFilter = $modal.find('#quiz-attempts-mode-filter');
   const rowTemplate = $block.find('#user-quiz-attempts-modal__template-row')[0];
 
-  let allAttempts = []; // full unfiltered data for current open
+  let allAttempts = [];
+  let sortState = { col: null, dir: 'asc' };
+
+  const round2 = (n) => n != null ? Math.round(n * 100) / 100 : n;
 
   function closeModal() {
     $modal.addClass('hidden').removeClass('open');
     $('html').css('overflow', 'unset');
   }
 
+  // ── Sorting ────────────────────────────────────────────────────────────────
+
+  function sortRows(rows) {
+    if (!sortState.col) return rows;
+    return [...rows].sort((a, b) => {
+      let va, vb;
+      switch (sortState.col) {
+        case 'user':
+          va = (a.display_name || '').toLowerCase();
+          vb = (b.display_name || '').toLowerCase();
+          break;
+        case 'submitted':
+          va = a.completed_gmt ?? '';
+          vb = b.completed_gmt ?? '';
+          break;
+        case 'score':
+          va = a.percentage ?? -1;
+          vb = b.percentage ?? -1;
+          break;
+        case 'status':
+          va = a.pass === true ? 2 : a.pass === false ? 1 : 0;
+          vb = b.pass === true ? 2 : b.pass === false ? 1 : 0;
+          break;
+        default:
+          return 0;
+      }
+      if (va < vb) return sortState.dir === 'asc' ? -1 : 1;
+      if (va > vb) return sortState.dir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }
+
+  function updateSortIcons() {
+    $modal.find('thead th[data-sort-col]').each(function() {
+      const $icon = $(this).find('.sort-icon');
+      const col = $(this).data('sortCol');
+      $icon.removeClass('fa-sort fa-sort-up fa-sort-down');
+      $icon.addClass(col === sortState.col
+        ? (sortState.dir === 'asc' ? 'fa-sort-up' : 'fa-sort-down')
+        : 'fa-sort'
+      );
+    });
+  }
+
+  $modal.find('thead th[data-sort-col]').on('click', function() {
+    const col = $(this).data('sortCol');
+    sortState = sortState.col === col
+      ? { col, dir: sortState.dir === 'asc' ? 'desc' : 'asc' }
+      : { col, dir: 'asc' };
+    updateSortIcons();
+    applyFilters();
+  });
+
+  // ── Rendering ──────────────────────────────────────────────────────────────
+
   function renderRows(attempts) {
     $tbody.empty();
-    $tbody.off('mouseenter mouseleave');
+    $tbody.off('mouseenter mouseleave click');
 
     if (!attempts.length) {
       $tbody.html('<tr><td colspan="5">No attempts found.</td></tr>');
@@ -39,7 +97,7 @@ jQuery(document).ready(($) => {
            .attr('data-tooltip', attempt.completed_gmt ? formatDateTime(attempt.completed_gmt) : '—');
 
       $row.find('.cell_attempt_score').text(
-        formatScore(attempt.percentage, attempt.points_scored, attempt.points_total)
+        formatScore(round2(attempt.percentage), attempt.points_scored, attempt.points_total)
       );
 
       const $badge = $row.find('.status-badge');
@@ -58,24 +116,21 @@ jQuery(document).ready(($) => {
       createTooltip($(this), $(this).attr('data-tooltip'));
     }).on('mouseleave', '[data-tooltip]', destroyTooltip);
 
-    // Click a row to drill into that user's full attempts
+    // Click a collapsed row to drill into that user's full attempts
     $tbody.on('click', 'tr[data-user-id]', function() {
-      const userId = $(this).data('userId');
       if (!$userFilter.val()) {
-        $userFilter.val(String(userId)).trigger('change');
+        $userFilter.val(String($(this).data('userId'))).trigger('change');
       }
     });
   }
 
-  // Collapse to one row per user based on mode (highest % or most recent date)
+  // ── Filtering ──────────────────────────────────────────────────────────────
+
   function collapseByUser(attempts, mode) {
     const best = {};
     attempts.forEach(a => {
       const existing = best[a.user_id];
-      if (!existing) {
-        best[a.user_id] = a;
-        return;
-      }
+      if (!existing) { best[a.user_id] = a; return; }
       if (mode === 'recent') {
         if ((a.completed_gmt ?? '') > (existing.completed_gmt ?? '')) best[a.user_id] = a;
       } else {
@@ -91,52 +146,50 @@ jQuery(document).ready(($) => {
 
     let rows;
     if (selectedUserId) {
-      // Specific user selected — show all their attempts
       rows = allAttempts.filter(a => a.user_id === selectedUserId);
       $tbody.removeClass('is-collapsed');
     } else {
-      // All users — collapse to one row per user
       rows = collapseByUser(allAttempts, mode);
       $tbody.addClass('is-collapsed');
     }
 
-    renderRows(rows);
+    renderRows(sortRows(rows));
   }
+
+  // ── Open event ─────────────────────────────────────────────────────────────
 
   $(window).on('bysQuizAttemptsOpen', async function(_event, data) {
     const { quizId, quizTitle, parentCourse, groupId, userId } = data;
 
-    // Set header titles
     $modal.find('.quiz-title').text(quizTitle);
     $modal.find('.course-title').text(parentCourse);
 
-    // Reset filters
+    // Reset filters and sort
     $userFilter.find('option:not(:first)').remove();
     $userFilter.val('');
     $modeFilter.val('highest');
+    $modeFilter.closest('.filter-bar__group').removeClass('hidden');
+    sortState = { col: null, dir: 'asc' };
+    updateSortIcons();
 
-    // Show modal with loading state
     $tbody.html('<tr><td colspan="5">Loading attempts…</td></tr>');
     $modal.removeClass('hidden').addClass('open');
     $('html').css('overflow', 'hidden');
 
-    if (typeof HSStaticMethods !== 'undefined') {
-      HSStaticMethods.autoInit();
-    }
+    if (typeof HSStaticMethods !== 'undefined') HSStaticMethods.autoInit();
 
     try {
       allAttempts = await api.get(endpoints.groupQuizAttempts(groupId, quizId), true);
 
-      // Build unique user list for filter
       const usersMap = {};
       allAttempts.forEach(a => { usersMap[a.user_id] = a.display_name; });
       Object.entries(usersMap).forEach(([id, name]) => {
         $userFilter.append(`<option value="${id}">${name}</option>`);
       });
 
-      // Pre-select user if provided (coming from user-quiz-details)
       if (userId) {
         $userFilter.val(String(userId));
+        $modeFilter.closest('.filter-bar__group').addClass('hidden');
       }
 
       applyFilters();
@@ -147,14 +200,16 @@ jQuery(document).ready(($) => {
     }
   });
 
+  // ── Filter change handlers ─────────────────────────────────────────────────
+
   $userFilter.on('change', function() {
-    const hasUser = !!$userFilter.val();
-    $modeFilter.closest('.filter-bar__group').toggleClass('hidden', hasUser);
+    $modeFilter.closest('.filter-bar__group').toggleClass('hidden', !!$userFilter.val());
     applyFilters();
   });
   $modeFilter.on('change', applyFilters);
 
-  // Close handlers
+  // ── Close handlers ─────────────────────────────────────────────────────────
+
   $modal.find('.modal__close').on('click', closeModal);
   $modal.find('[data-hs-overlay]').on('click', function(e) {
     e.stopPropagation();

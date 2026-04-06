@@ -61,10 +61,10 @@ $wrapper_attributes = get_block_wrapper_attributes();
                     <thead>
                         <tr>
                             <th class="col_attempt_index">#</th>
-                            <th class="col_attempt_user"><?php esc_html_e('User', 'bys'); ?></th>
-                            <th class="col_attempt_date"><?php esc_html_e('Submitted', 'bys'); ?></th>
-                            <th class="col_attempt_score"><?php esc_html_e('Score', 'bys'); ?></th>
-                            <th class="col_attempt_status"><?php esc_html_e('Status', 'bys'); ?></th>
+                            <th class="col_attempt_user sortable" data-sort-col="user"><?php esc_html_e('User', 'bys'); ?> <i class="fa-solid fa-sort sort-icon"></i></th>
+                            <th class="col_attempt_date sortable" data-sort-col="submitted"><?php esc_html_e('Submitted', 'bys'); ?> <i class="fa-solid fa-sort sort-icon"></i></th>
+                            <th class="col_attempt_score sortable" data-sort-col="score"><?php esc_html_e('Score', 'bys'); ?> <i class="fa-solid fa-sort sort-icon"></i></th>
+                            <th class="col_attempt_status sortable" data-sort-col="status"><?php esc_html_e('Status', 'bys'); ?> <i class="fa-solid fa-sort sort-icon"></i></th>
                         </tr>
                     </thead>
                     <tbody>

@@ -70,6 +70,7 @@ jQuery(document).ready(($) => {
       $course.find('.hs-accordion-content').attr('id', contentId).attr('aria-labelledby', courseId);
 
       const courseTitle = typeof course.title === 'string' ? course.title : course.title?.rendered || 'Untitled';
+      const courseDisplay = course.shortname || courseTitle;
       $course.find('.accordion-toggle__course-name').text(courseTitle);
       $course.find('.quiz-count-value').text(quizSteps.length);
 
@@ -104,7 +105,7 @@ jQuery(document).ready(($) => {
               groupId: groupId,
               quizId: quiz.step_id,
               quizTitle: quiz.step_title,
-              parentCourse: courseTitle,
+              parentCourse: courseDisplay,
             }]);
           });
 
