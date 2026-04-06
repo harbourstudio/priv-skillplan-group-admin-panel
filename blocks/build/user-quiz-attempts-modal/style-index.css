@@ -62,7 +62,14 @@
   font-size: var(--wp--preset--font-size--large);
   margin-bottom: 0 !important;
 }
-.wp-block-bys-groups-user-quiz-attempts-modal .modal__close {
+.wp-block-bys-groups-user-quiz-attempts-modal .modal__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+.wp-block-bys-groups-user-quiz-attempts-modal .modal__close,
+.wp-block-bys-groups-user-quiz-attempts-modal .modal__export {
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -75,8 +82,14 @@
   transition: opacity 0.15s;
   font-size: 1.1rem;
 }
-.wp-block-bys-groups-user-quiz-attempts-modal .modal__close:hover {
+.wp-block-bys-groups-user-quiz-attempts-modal .modal__close:hover,
+.wp-block-bys-groups-user-quiz-attempts-modal .modal__export:hover {
   opacity: 1;
+}
+.wp-block-bys-groups-user-quiz-attempts-modal .modal__close:disabled,
+.wp-block-bys-groups-user-quiz-attempts-modal .modal__export:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 .wp-block-bys-groups-user-quiz-attempts-modal .modal__filter-bar {
   display: flex;
@@ -142,7 +155,7 @@
 .wp-block-bys-groups-user-quiz-attempts-modal .modal__body table tbody td {
   padding: var(--wp--preset--spacing--3) var(--wp--preset--spacing--4);
 }
-.wp-block-bys-groups-user-quiz-attempts-modal .modal__body table tbody.is-collapsed tr {
+.wp-block-bys-groups-user-quiz-attempts-modal .modal__body table tbody tr {
   cursor: pointer;
 }
 .wp-block-bys-groups-user-quiz-attempts-modal .modal__body table tbody tr:not(:last-of-type) td {
@@ -172,8 +185,8 @@
   color: var(--wp--preset--color--red-700);
 }
 .wp-block-bys-groups-user-quiz-attempts-modal .status-badge--ungraded {
-  background-color: var(--wp--preset--color--orange-100);
-  color: var(--wp--preset--color--orange-700);
+  background-color: var(--wp--preset--color--yellow-100);
+  color: var(--wp--preset--color--yellow-700);
 }
 
 /*# sourceMappingURL=style-index.css.map*/

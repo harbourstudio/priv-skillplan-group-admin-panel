@@ -357,6 +357,7 @@ jQuery(document).ready($ => {
   const $modeFilter = $modal.find('#quiz-attempts-mode-filter');
   const rowTemplate = $block.find('#user-quiz-attempts-modal__template-row')[0];
   let allAttempts = [];
+  let currentRows = []; // tracks the currently rendered rows (for CSV export)
   let sortState = {
     col: 'user',
     dir: 'asc'
@@ -428,6 +429,7 @@ jQuery(document).ready($ => {
   // ── Rendering ──────────────────────────────────────────────────────────────
 
   function renderRows(attempts) {
+    currentRows = attempts; // snapshot for CSV export
     $tbody.empty();
     $tbody.off('mouseenter mouseleave click');
     if (!attempts.length) {
@@ -480,6 +482,18 @@ jQuery(document).ready($ => {
   // ── Filtering ──────────────────────────────────────────────────────────────
 
   function collapseByUser(attempts, mode) {
+    // Ungraded mode: show only users who have at least one ungraded attempt,
+    // picking their most recent ungraded attempt as the representative row.
+    if (mode === 'ungraded') {
+      const best = {};
+      attempts.filter(a => a.pass === null).forEach(a => {
+        const existing = best[a.user_id];
+        if (!existing || (a.completed_gmt ?? '') > (existing.completed_gmt ?? '')) {
+          best[a.user_id] = a;
+        }
+      });
+      return Object.values(best);
+    }
     const best = {};
     attempts.forEach(a => {
       const existing = best[a.user_id];
@@ -494,6 +508,40 @@ jQuery(document).ready($ => {
       }
     });
     return Object.values(best);
+  }
+
+  // ── CSV export ──────────────────────────────────────────────────────────────
+
+  function downloadCsv(rows, filename) {
+    const csv = rows.map(row => row.map(cell => {
+      const str = String(cell ?? '');
+      if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        return '"' + str.replace(/"/g, '""') + '"';
+      }
+      return str;
+    }).join(',')).join('\n');
+    const blob = new Blob(['\uFEFF' + csv], {
+      type: 'text/csv;charset=utf-8;'
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+  function exportToCsv() {
+    const headers = ['#', 'User', 'Submitted', 'Score', 'Status'];
+    const dataRows = currentRows.map((attempt, index) => {
+      const status = attempt.pass === null ? 'Ungraded' : attempt.pass ? 'Pass' : 'Fail';
+      const score = (0,_shared_helpers_js__WEBPACK_IMPORTED_MODULE_1__.formatScore)(round2(attempt.percentage), attempt.points_scored, attempt.points_total);
+      return [index + 1, attempt.display_name, attempt.completed_gmt ? (0,_shared_helpers_js__WEBPACK_IMPORTED_MODULE_1__.formatDateTime)(attempt.completed_gmt) : '', score, status];
+    });
+    const slug = currentQuizTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const today = new Date().toISOString().split('T')[0];
+    downloadCsv([headers, ...dataRows], `quiz-attempts-${slug}-${today}.csv`);
   }
   function applyFilters() {
     const selectedUserId = parseInt($userFilter.val()) || null;
@@ -567,6 +615,16 @@ jQuery(document).ready($ => {
     applyFilters();
   });
   $modeFilter.on('change', applyFilters);
+
+  // ── Export handler ─────────────────────────────────────────────────────────
+
+  $modal.find('.modal__export').on('click', function () {
+    if (!currentRows.length) return;
+    const $btn = $(this);
+    $btn.prop('disabled', true);
+    exportToCsv();
+    $btn.prop('disabled', false);
+  });
 
   // ── Close handlers ─────────────────────────────────────────────────────────
 

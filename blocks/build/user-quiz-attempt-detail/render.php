@@ -19,8 +19,26 @@ $wrapper_attributes = get_block_wrapper_attributes();
 
 <div <?= $wrapper_attributes; ?>>
 
-    <div class="attempt-detail__filters">
-        Filters here
+    <div class="attempt-detail__filters hidden">
+        <?php
+        $filters = [
+            'all'       => __( 'All',       'bys' ),
+            'correct'   => __( 'Correct',   'bys' ),
+            'incorrect' => __( 'Incorrect', 'bys' ),
+            'partial'   => __( 'Partial',   'bys' ),
+            'ungraded'  => __( 'Ungraded',  'bys' ),
+        ];
+        foreach ( $filters as $key => $label ) :
+            $is_active = $key === 'all' ? 'filter-btn--active' : '';
+        ?>
+        <button type="button"
+                class="filter-btn <?php echo $is_active; ?>"
+                data-filter="<?php echo esc_attr( $key ); ?>"
+        >
+            <?php echo esc_html( $label ); ?>
+            <span class="filter-btn__count"></span>
+        </button>
+        <?php endforeach; ?>
     </div>
 
     <div class="attempt-detail__loading" aria-hidden="true">

@@ -78,8 +78,8 @@
   background: var(--wp--preset--color--red-100);
 }
 .wp-block-bys-groups-user-quiz-attempt-header .attempt-header__row--primary .attempt-header__badges .attempt-header__badge.status-badge--ungraded {
-  color: var(--wp--preset--color--gray-600);
-  background: var(--wp--preset--color--gray-100);
+  color: var(--wp--preset--color--yellow-700);
+  background: var(--wp--preset--color--yellow-100);
 }
 .wp-block-bys-groups-user-quiz-attempt-header .attempt-header__row--primary .attempt-header__badges .attempt-header__score {
   color: var(--wp--preset--color--gray-500);

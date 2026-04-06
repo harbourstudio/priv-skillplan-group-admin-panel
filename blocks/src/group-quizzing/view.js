@@ -82,6 +82,17 @@ jQuery(document).ready(($) => {
       }, null);
       $course.find('.accordion-toggle__date .date-value').text(formatDate(courseLastTs));
 
+      // Accordion header: total ungraded across all quizzes in this course
+      const courseUngradedCount = quizSteps.reduce(
+        (sum, quiz) => sum + (submissionStats[quiz.step_id]?.ungraded_count ?? 0), 0
+      );
+      const $courseBadge = $course.find('.accordion-toggle__ungraded-badge');
+      if (courseUngradedCount > 0) {
+        $courseBadge
+          .text(`${courseUngradedCount} ungraded`)
+          .addClass('ungraded-badge--has-ungraded');
+      }
+
       // Lazy-render quiz rows on first open
       let quizzesRendered = false;
       $toggle.on('click', function() {
@@ -98,6 +109,33 @@ jQuery(document).ready(($) => {
           $quiz.find('.quiz-row__last-submission .date-value').text(
             formatDate(stats?.last_submission_gmt)
           );
+
+          const totalSubs     = stats?.total_submissions ?? 0;
+          const ungradedCount = stats?.ungraded_count    ?? 0;
+
+          // Submission count
+          $quiz.find('.quiz-row__submissions').text(
+            totalSubs === 1 ? '1 submission' : `${totalSubs} submissions`
+          );
+
+          // Status icon: green check (all graded) or yellow exclamation (has ungraded)
+          const $icon = $quiz.find('.quiz-row__status-icon');
+          if (totalSubs > 0) {
+            if (ungradedCount > 0) {
+              $icon.addClass('status-icon--ungraded')
+                   .append('<i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i>');
+            } else {
+              $icon.addClass('status-icon--graded')
+                   .append('<i class="fa-solid fa-circle-check" aria-hidden="true"></i>');
+            }
+          }
+
+          // Ungraded badge
+          if (ungradedCount > 0) {
+            $quiz.find('.quiz-row__ungraded')
+              .text(`${ungradedCount} ungraded`)
+              .addClass('quiz-row__ungraded--active');
+          }
 
           // Open attempts modal on click — no user pre-filter
           $quiz.find('.quiz-row').on('click', function() {

@@ -37,9 +37,14 @@ $wrapper_attributes = get_block_wrapper_attributes(['data-grading-url' => $gradi
                     <h4 class="quiz-title"></h4>
                     <span class="course-title"></span>
                 </div>
-                <button class="modal__close btn-unstyled" aria-label="<?php esc_attr_e('Close', 'bys'); ?>">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
+                <div class="modal__header-actions">
+                    <button class="modal__export btn-unstyled" title="<?php esc_attr_e('Export to CSV', 'bys'); ?>" aria-label="<?php esc_attr_e('Export to CSV', 'bys'); ?>">
+                        <i class="fa-regular fa-download"></i>
+                    </button>
+                    <button class="modal__close btn-unstyled" aria-label="<?php esc_attr_e('Close', 'bys'); ?>">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
             </div>
 
             <div class="modal__filter-bar">
@@ -53,6 +58,7 @@ $wrapper_attributes = get_block_wrapper_attributes(['data-grading-url' => $gradi
                     <select id="quiz-attempts-mode-filter" class="quiz-attempts-mode-filter">
                         <option value="highest"><?php esc_html_e('Highest Attempt', 'bys'); ?></option>
                         <option value="recent"><?php esc_html_e('Most Recent Attempt', 'bys'); ?></option>
+                        <option value="ungraded"><?php esc_html_e('Ungraded Attempts', 'bys'); ?></option>
                     </select>
                 </div>
             </div>

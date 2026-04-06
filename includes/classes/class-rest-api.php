@@ -768,7 +768,7 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             // Batch-fetch meta for all activity IDs
             $activity_ids    = array_column($rows, 'activity_id');
             $id_placeholders = implode(',', array_fill(0, count($activity_ids), '%d'));
-            $meta_keys       = ['pass', 'percentage', 'points', 'total_points'];
+            $meta_keys       = ['pass', 'percentage', 'points', 'total_points', 'statistic_ref_id'];
             $key_placeholders = implode(',', array_fill(0, count($meta_keys), '%s'));
 
             $meta_rows = $wpdb->get_results(
@@ -796,11 +796,52 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 $user_names[intval($uid)] = $user ? $user->display_name : 'Unknown User';
             }
 
+            // Batch-check which attempts have ungraded questions.
+            // Build a map: statistic_ref_id → activity_id, then query once.
+            $ref_to_activity = array();
+            foreach ($meta_map as $aid => $m) {
+                if (!empty($m['statistic_ref_id'])) {
+                    $ref_to_activity[intval($m['statistic_ref_id'])] = $aid;
+                }
+            }
+
+            $ungraded_activity_ids = array();
+            if (!empty($ref_to_activity)) {
+                $stat_table     = LDLMS_DB::get_table_name('quiz_statistic');
+                $question_table = LDLMS_DB::get_table_name('quiz_question');
+
+                if ($stat_table && $question_table) {
+                    $ref_placeholders = implode(',', array_fill(0, count($ref_to_activity), '%d'));
+                    $ungraded_refs    = $wpdb->get_col(
+                        $wpdb->prepare(
+                            "SELECT DISTINCT s.statistic_ref_id
+                             FROM {$stat_table} s
+                             INNER JOIN {$question_table} q ON q.id = s.question_id
+                             WHERE s.statistic_ref_id IN ({$ref_placeholders})
+                               AND (
+                                   q.answer_type = 'essay'
+                                   OR q.answer_type = 'assessment_answer'
+                                   OR (q.answer_type = 'free_answer' AND s.correct_count = 0 AND s.incorrect_count = 0)
+                               )",
+                            ...array_keys($ref_to_activity)
+                        )
+                    );
+
+                    foreach ($ungraded_refs as $ref_id) {
+                        $aid = $ref_to_activity[intval($ref_id)] ?? null;
+                        if ($aid) {
+                            $ungraded_activity_ids[] = $aid;
+                        }
+                    }
+                }
+            }
+
             $result = array();
             foreach ($rows as $row) {
-                $aid  = intval($row['activity_id']);
-                $uid  = intval($row['user_id']);
-                $meta = $meta_map[$aid] ?? array();
+                $aid         = intval($row['activity_id']);
+                $uid         = intval($row['user_id']);
+                $meta        = $meta_map[$aid] ?? array();
+                $is_ungraded = in_array($aid, $ungraded_activity_ids, true);
 
                 $result[] = array(
                     'activity_id'   => $aid,
@@ -815,7 +856,9 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                     'percentage'    => isset($meta['percentage']) ? floatval($meta['percentage']) : null,
                     'points_scored' => isset($meta['points']) ? floatval($meta['points']) : null,
                     'points_total'  => isset($meta['total_points']) ? floatval($meta['total_points']) : null,
-                    'pass'          => isset($meta['pass']) ? (bool)intval($meta['pass']) : null,
+                    // If any question is pending grading, override pass → null so the
+                    // modal badge shows "Ungraded" rather than a premature pass/fail.
+                    'pass'          => $is_ungraded ? null : (isset($meta['pass']) ? (bool)intval($meta['pass']) : null),
                 );
             }
 
@@ -854,7 +897,7 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             $quiz_id = intval($row['post_id']);
 
             // Fetch meta for this attempt
-            $meta_keys        = ['pass', 'percentage', 'points', 'total_points', 'timespent'];
+            $meta_keys        = ['pass', 'percentage', 'points', 'total_points', 'timespent', 'statistic_ref_id'];
             $key_placeholders = implode(',', array_fill(0, count($meta_keys), '%s'));
 
             $meta_rows = $wpdb->get_results(
@@ -890,6 +933,14 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 )
             );
 
+            // If the attempt contains any ungraded questions, override pass → null
+            // so the header shows "Ungraded" rather than a premature pass/fail.
+            $statistic_ref_id = isset($meta['statistic_ref_id']) ? intval($meta['statistic_ref_id']) : 0;
+            $pass_value       = isset($meta['pass']) ? (bool) intval($meta['pass']) : null;
+            if ($statistic_ref_id && $this->attempt_has_ungraded_questions($statistic_ref_id)) {
+                $pass_value = null;
+            }
+
             return new \WP_REST_Response(array(
                 'activity_id'    => $activity_id,
                 'user_id'        => $uid,
@@ -908,7 +959,7 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'percentage'     => isset($meta['percentage']) ? floatval($meta['percentage']) : null,
                 'points_scored'  => isset($meta['points']) ? floatval($meta['points']) : null,
                 'points_total'   => isset($meta['total_points']) ? floatval($meta['total_points']) : null,
-                'pass'           => isset($meta['pass']) ? (bool) intval($meta['pass']) : null,
+                'pass'           => $pass_value,
                 'attempt_number' => $attempt_number,
             ), 200);
         }
@@ -990,7 +1041,7 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 $correct_count   = intval($stat['correct_count']);
                 $incorrect_count = intval($stat['incorrect_count']);
 
-                if ($answer_type === 'assessment_answer') {
+                if (in_array($answer_type, array('assessment_answer', 'essay'), true)) {
                     $question_result = 'ungraded';
                 } elseif ($answer_type === 'free_answer' && $correct_count === 0 && $incorrect_count === 0) {
                     $question_result = 'ungraded';
@@ -1079,10 +1130,40 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 return array('type' => 'choices', 'items' => $choices);
             }
 
-            // ── Free-text questions ────────────────────────────────────────────
-            if (in_array($answer_type, array('free_answer', 'essay'), true)) {
+            // ── Essay questions (manual grading) ───────────────────────────────
+            // LearnDash stores {"graded_id": XXXX} in answer_data, where XXXX is
+            // the post ID of the sfwd-essays CPT holding the student's actual text.
+            if ($answer_type === 'essay') {
+                $data      = json_decode($stat_answer_raw, true);
+                $graded_id = isset($data['graded_id']) ? intval($data['graded_id']) : 0;
+                if ($graded_id) {
+                    $essay_post = get_post($graded_id);
+                    if ($essay_post && !empty($essay_post->post_content)) {
+                        return array('type' => 'text', 'user_text' => wp_kses_post($essay_post->post_content));
+                    }
+                }
+                return null; // Submitted but no content available yet
+            }
+
+            // ── Free-text questions (auto-graded) ──────────────────────────────
+            if ($answer_type === 'free_answer') {
                 $s_data = @unserialize($stat_answer_raw, array('allowed_classes' => false)); // phpcs:ignore
-                $text   = is_string($s_data) ? $s_data : (is_string($stat_answer_raw) ? $stat_answer_raw : '');
+
+                if (is_array($s_data)) {
+                    // PHP-serialised array — flatten to comma-separated string
+                    $text = implode(', ', array_filter(array_map('strval', $s_data), 'strlen'));
+                } elseif (is_string($s_data) && $s_data !== '') {
+                    $text = $s_data;
+                } else {
+                    // Fallback: try JSON (LearnDash sometimes stores ["answer"] JSON)
+                    $j_data = json_decode($stat_answer_raw, true);
+                    if (is_array($j_data)) {
+                        $text = implode(', ', array_filter(array_map('strval', $j_data), 'strlen'));
+                    } else {
+                        $text = is_string($stat_answer_raw) ? $stat_answer_raw : '';
+                    }
+                }
+
                 if ($text === '') {
                     return null;
                 }
@@ -1090,6 +1171,42 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             }
 
             return null;
+        }
+
+        /**
+         * Returns true if the attempt identified by $statistic_ref_id contains
+         * any questions that require manual grading (essay, assessment, or an
+         * auto-graded free_answer with no recorded result yet).
+         */
+        private function attempt_has_ungraded_questions($statistic_ref_id) {
+            if (!$statistic_ref_id) {
+                return false;
+            }
+
+            global $wpdb;
+            $stat_table     = LDLMS_DB::get_table_name('quiz_statistic');
+            $question_table = LDLMS_DB::get_table_name('quiz_question');
+
+            if (!$stat_table || !$question_table) {
+                return false;
+            }
+
+            $count = (int) $wpdb->get_var(
+                $wpdb->prepare(
+                    "SELECT COUNT(*)
+                     FROM {$stat_table} s
+                     INNER JOIN {$question_table} q ON q.id = s.question_id
+                     WHERE s.statistic_ref_id = %d
+                       AND (
+                           q.answer_type = 'essay'
+                           OR q.answer_type = 'assessment_answer'
+                           OR (q.answer_type = 'free_answer' AND s.correct_count = 0 AND s.incorrect_count = 0)
+                       )",
+                    $statistic_ref_id
+                )
+            );
+
+            return $count > 0;
         }
 
         /**
@@ -1120,20 +1237,25 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 $result = array();
                 foreach ($quiz_ids as $qid) {
                     $result[] = array(
-                        'quiz_id'              => $qid,
-                        'total_submissions'    => 0,
-                        'last_submission_gmt'  => null,
+                        'quiz_id'             => $qid,
+                        'total_submissions'   => 0,
+                        'ungraded_count'      => 0,
+                        'last_submission_gmt' => null,
                     );
                 }
                 return new \WP_REST_Response($result, 200);
             }
 
             global $wpdb;
-            $ld_table = $wpdb->prefix . 'learndash_user_activity';
+            $ld_table   = $wpdb->prefix . 'learndash_user_activity';
+            $meta_table = $wpdb->prefix . 'learndash_user_activity_meta';
+            $stat_table     = LDLMS_DB::get_table_name('quiz_statistic');
+            $question_table = LDLMS_DB::get_table_name('quiz_question');
 
             $user_placeholders = implode(',', array_fill(0, count($user_ids), '%d'));
             $quiz_placeholders = implode(',', array_fill(0, count($quiz_ids), '%d'));
 
+            // ── Total submissions + last submission per quiz ───────────────────
             $rows = $wpdb->get_results(
                 $wpdb->prepare(
                     "SELECT post_id AS quiz_id,
@@ -1154,10 +1276,49 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             foreach ($rows as $row) {
                 $stats_map[intval($row['quiz_id'])] = array(
                     'total_submissions'   => intval($row['total_submissions']),
+                    'ungraded_count'      => 0,
                     'last_submission_gmt' => $row['last_submission_ts']
                         ? gmdate('Y-m-d\TH:i:s', intval($row['last_submission_ts']))
                         : null,
                 );
+            }
+
+            // ── Ungraded submissions per quiz ─────────────────────────────────
+            // Count distinct attempts that contain at least one question requiring
+            // manual grading (essay, assessment, or unscored free_answer).
+            if ($stat_table && $question_table) {
+                $ungraded_rows = $wpdb->get_results(
+                    $wpdb->prepare(
+                        "SELECT a.post_id AS quiz_id,
+                                COUNT(DISTINCT a.activity_id) AS ungraded_count
+                         FROM {$ld_table} a
+                         INNER JOIN {$meta_table} m
+                             ON m.activity_id = a.activity_id
+                             AND m.activity_meta_key = 'statistic_ref_id'
+                         INNER JOIN {$stat_table} s
+                             ON s.statistic_ref_id = CAST(m.activity_meta_value AS UNSIGNED)
+                         INNER JOIN {$question_table} q
+                             ON q.id = s.question_id
+                         WHERE a.activity_type = 'quiz'
+                           AND a.user_id IN ({$user_placeholders})
+                           AND a.post_id IN ({$quiz_placeholders})
+                           AND (
+                               q.answer_type = 'essay'
+                               OR q.answer_type = 'assessment_answer'
+                               OR (q.answer_type = 'free_answer' AND s.correct_count = 0 AND s.incorrect_count = 0)
+                           )
+                         GROUP BY a.post_id",
+                        ...array_merge($user_ids, $quiz_ids)
+                    ),
+                    ARRAY_A
+                );
+
+                foreach ($ungraded_rows as $row) {
+                    $qid = intval($row['quiz_id']);
+                    if (isset($stats_map[$qid])) {
+                        $stats_map[$qid]['ungraded_count'] = intval($row['ungraded_count']);
+                    }
+                }
             }
 
             // Return a result for every requested quiz_id (zero-fill missing)
@@ -1166,6 +1327,7 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 $result[] = array(
                     'quiz_id'             => $qid,
                     'total_submissions'   => $stats_map[$qid]['total_submissions'] ?? 0,
+                    'ungraded_count'      => $stats_map[$qid]['ungraded_count'] ?? 0,
                     'last_submission_gmt' => $stats_map[$qid]['last_submission_gmt'] ?? null,
                 );
             }

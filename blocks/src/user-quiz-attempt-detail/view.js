@@ -6,6 +6,7 @@ jQuery(document).ready(($) => {
 
   const $block    = $('.wp-block-bys-groups-user-quiz-attempt-detail').first();
   const $loading  = $block.find('.attempt-detail__loading');
+  const $filters  = $block.find('.attempt-detail__filters');
   const $list     = $block.find('.attempt-detail__list');
   const $empty    = $block.find('.attempt-detail__empty');
   const $error    = $block.find('.attempt-detail__error');
@@ -119,6 +120,36 @@ jQuery(document).ready(($) => {
       });
 
       $list.removeClass('hidden');
+
+      // ── Filters ─────────────────────────────────────────────────────────────
+
+      // Count results
+      const counts = { all: questions.length, correct: 0, incorrect: 0, partial: 0, ungraded: 0 };
+      questions.forEach(q => { if (q.result in counts) counts[q.result]++; });
+
+      // Populate count badges and disable filters with no matches
+      $filters.find('.filter-btn').each(function() {
+        const filter = $(this).data('filter');
+        const count  = counts[filter] ?? 0;
+        $(this).find('.filter-btn__count').text(count);
+        if (count === 0 && filter !== 'all') {
+          $(this).prop('disabled', true);
+        }
+      });
+
+      $filters.removeClass('hidden');
+
+      // Filter click handler
+      $filters.on('click', '.filter-btn:not(:disabled)', function() {
+        const filter = $(this).data('filter');
+        $filters.find('.filter-btn').removeClass('filter-btn--active');
+        $(this).addClass('filter-btn--active');
+
+        $list.find('.question-card').each(function() {
+          const matches = filter === 'all' || $(this).hasClass(`question-card--${filter}`);
+          $(this).toggleClass('is-hidden', !matches);
+        });
+      });
 
       // Notify the sidebar nav with a compact summary of each question's result
       $(window).trigger('bysQuestionsRendered', [
