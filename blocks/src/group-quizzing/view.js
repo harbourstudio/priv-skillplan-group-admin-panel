@@ -1,214 +1,126 @@
 import { api, endpoints } from '../_shared/api-client.js';
-import { LOADING } from '../_shared/loading.js';
-import { formatDateTime } from '../_shared/helpers.js';
-import { createTooltip, destroyTooltip } from '../_shared/tooltip.js';
+import { formatDate } from '../_shared/helpers.js';
 
-// Status label mapping (reusable)
-const STATUS_LABELS = {
-  'completed': 'Completed',
-  'in_progress': 'In Progress',
-  'not_started': 'Not Started'
-};
+jQuery(document).ready(($) => {
+  const $block = $('.wp-block-bys-groups-group-quizzing').first();
+  if (!$block.length) return;
 
-// Helper to build tooltip content from progress data
-function buildTooltipContent(progressData) {
-  if (!progressData) return '';
-  const parts = [];
-  if (progressData.date_started_gmt) parts.push(`Started: ${formatDateTime(progressData.date_started_gmt)}`);
-  if (progressData.date_completed_gmt) parts.push(`Completed: ${formatDateTime(progressData.date_completed_gmt)}`);
-  return parts.join(' | ');
-}
+  const $skeleton = $block.find('#group-quizzing-skeleton');
+  const $coursesList = $block.find('#group-quizzing-courses-list');
+  const courseTemplate = $block.find('#group-quizzing-course-template')[0];
+  const quizTemplate = $block.find('#group-quizzing-quiz-template')[0];
 
-jQuery(document).ready(async ($) => {
-  const params = new URLSearchParams(window.location.search);
-  const groupId = params.get('group_id');
-  const userId = params.get('user_id');
-
-  if (!groupId || !userId) {
-    console.error('[user-progress] Missing group_id or user_Id URL parameter');
-    return;
-  }
-
-  const $block = $('.wp-block-bys-groups-user-progress').first();
-  const $coursesList = $block.find('#user-progress-courses-list');
-  const courseTemplate = $block.find('#user-progress-course-template')[0];
-  const sfwdLessonTemplate = $block.find('#user-progress-lesson-template')[0];
-  const sfwdTopicTemplate = $block.find('#user-progress-topic-template')[0];
-
-  // Track completed topics across all opened courses for user-stats coordination
-  let topicsCompletedCount = 0;
-
-  try {
-    const courses = await api.get(endpoints.groupCourses(groupId));
+  async function renderCourses(groupId, courses) {
+    $coursesList.empty();
 
     if (!Array.isArray(courses) || courses.length === 0) {
-      console.log('[user-progress] No courses found for group:', groupId);
+      console.log('[group-quizzing] No courses in payload');
       return;
     }
 
-    // Cache data globally
-    window.bysGroupsCache = window.bysGroupsCache || {};
-    window.bysGroupsCache.groupId = groupId;
-    window.bysGroupsCache.courses = courses;
+    // Fetch quiz steps for all courses upfront (needed for count, filtering, and stats query)
+    const quizStepsByCourse = {};
+    await Promise.all(courses.map(async (course) => {
+      try {
+        const steps = await api.get(endpoints.courseQuizSteps(course.id));
+        quizStepsByCourse[course.id] = Array.isArray(steps) ? steps : [];
+      } catch (err) {
+        console.error(`[group-quizzing] Failed to fetch quiz steps for course ${course.id}:`, err);
+        quizStepsByCourse[course.id] = [];
+      }
+    }));
 
-    // Render course shells with deferred structure loading
-    courses.forEach((course, courseIndex) => {
+    // Gather all quiz IDs across all courses and fetch submission stats in one request
+    const allQuizIds = Object.values(quizStepsByCourse).flat().map(s => s.step_id);
+    let submissionStats = {}; // keyed by quiz_id
+
+    if (allQuizIds.length > 0) {
+      try {
+        const statsArray = await api.get(endpoints.groupQuizSubmissionStats(groupId, allQuizIds));
+        if (Array.isArray(statsArray)) {
+          statsArray.forEach(s => { submissionStats[s.quiz_id] = s; });
+        }
+      } catch (err) {
+        console.error('[group-quizzing] Failed to fetch quiz submission stats:', err);
+      }
+    }
+
+    $skeleton.addClass('hidden');
+
+    let courseNum = 0;
+    courses.forEach((course) => {
+      const quizSteps = quizStepsByCourse[course.id];
+
+      // Skip courses with no quizzes
+      if (!quizSteps.length) return;
+
+      courseNum++;
+
       const courseNode = courseTemplate.content.cloneNode(true);
       const $course = $(courseNode);
-      const courseNum = courseIndex + 1;
+      const courseId = `hs-quiz-course-heading-${courseNum}`;
+      const contentId = `hs-quiz-course-collapse-${courseNum}`;
 
-      // Set course name
-      const courseTitle = typeof course.title === 'string' ? course.title : course.title?.rendered || 'Untitled';
-
-      // Build DOM references once
       const $accordion = $course.find('.hs-accordion');
       const $toggle = $course.find('.hs-accordion-toggle');
       const $accordionContent = $course.find('.accordion-content__inner');
-      const courseId = `hs-course-heading-${courseNum}`;
-      const contentId = `hs-course-collapse-${courseNum}`;
 
-      // Set course name and accordion structure
-      $course.find('.accordion-toggle__course-name').html(courseTitle);
       $accordion.attr('id', courseId).attr('data-course-id', course.id);
       $toggle.attr('aria-controls', contentId);
       $course.find('.hs-accordion-content').attr('id', contentId).attr('aria-labelledby', courseId);
 
-      // Set loading placeholder
-      $accordionContent.html('<p>Click to load course structure...</p>');
+      const courseTitle = typeof course.title === 'string' ? course.title : course.title?.rendered || 'Untitled';
+      $course.find('.accordion-toggle__course-name').text(courseTitle);
+      $course.find('.quiz-count-value').text(quizSteps.length);
 
-      // Fetch course-level completion data asynchronously
-      api.get(endpoints.groupUserCourseProgress(userId, course.id))
-        .then(courseProgress => {
-          if (!Array.isArray(courseProgress) || !courseProgress.length) return;
+      // Latest submission across all quizzes in this course
+      const courseLastTs = quizSteps.reduce((latest, quiz) => {
+        const ts = submissionStats[quiz.step_id]?.last_submission_gmt;
+        if (!ts) return latest;
+        return !latest || ts > latest ? ts : latest;
+      }, null);
+      $course.find('.accordion-toggle__date .date-value').text(formatDate(courseLastTs));
 
-          const progress = courseProgress[0];
-          const $stepsCompleted = $toggle.find('.course-steps-completed');
-          const $stepsTotal = $toggle.find('.course-steps-total');
-          const $completionBadge = $toggle.find('.accordion-toggle__completion .completion-badge');
-          const $dateElement = $toggle.find('.accordion-toggle__date');
+      // Lazy-render quiz rows on first open
+      let quizzesRendered = false;
+      $toggle.on('click', function() {
+        if (quizzesRendered) return;
+        quizzesRendered = true;
+        $accordionContent.empty();
 
-          // Update course header
-          $stepsCompleted.html(progress.steps_completed || 0);
-          $stepsTotal.html(progress.steps_total || 0);
-          $completionBadge.addClass(`completion-badge--${progress.progress_status}`);
-          $completionBadge.text(STATUS_LABELS[progress.progress_status] || progress.progress_status);
+        quizSteps.forEach((quiz) => {
+          const quizNode = quizTemplate.content.cloneNode(true);
+          const $quiz = $(quizNode);
+          const stats = submissionStats[quiz.step_id];
 
-          // Update date: completed or last activity
-          if (progress.progress_status === 'completed' && progress.date_completed_gmt) {
-            $dateElement.html(formatDateTime(progress.date_completed_gmt));
-          } else if (progress.progress_status !== 'not_started') {
-            api.get(endpoints.userCourseActivity(userId, course.id))
-              .then(activityData => {
-                if (activityData?.last_activity_gmt) {
-                  $dateElement.html(formatDateTime(activityData.last_activity_gmt));
-                }
-              })
-              .catch(err => console.warn(`[user-progress] Failed to fetch course activity for course ${course.id}:`, err));
-          }
-        })
-        .catch(err => console.error(`[user-progress] Failed to fetch course progress for course ${course.id}:`, err));
-
-      // Fetch and render course structure on-demand
-      let structureLoaded = false;
-      $toggle.on('click', async function() {
-        if (structureLoaded) return;
-        structureLoaded = true;
-        $accordionContent.html(LOADING);
-
-        try {
-          const courseData = await api.get(endpoints.courseHierarchialBreakdown(course.id));
-          const modules = courseData.lessons || courseData;
-          const quizIds = courseData.quiz_ids || [];
-
-          // Cache quiz IDs
-          if (quizIds.length) {
-            window.bysGroupsCache.courseQuizzes ??= {};
-            window.bysGroupsCache.courseQuizzes[course.id] = quizIds;
-          }
-
-          // Fetch steps progress in single request
-          const stepsResponse = await api.get(endpoints.userCourseStepsProgress(userId, course.id));
-          const courseProgressSteps = Array.isArray(stepsResponse) ? stepsResponse : stepsResponse?.data || [];
-
-          // Map steps by ID for quick lookup
-          const stepsMap = Object.fromEntries(
-            courseProgressSteps.map(step => [step.step, step])
+          $quiz.find('.quiz-row__name').text(quiz.step_title);
+          $quiz.find('.quiz-row__last-submission .date-value').text(
+            formatDate(stats?.last_submission_gmt)
           );
 
-          $accordionContent.empty();
+          // Open attempts modal on click — no user pre-filter
+          $quiz.find('.quiz-row').on('click', function() {
+            $(window).trigger('bysQuizAttemptsOpen', [{
+              groupId: groupId,
+              quizId: quiz.step_id,
+              quizTitle: quiz.step_title,
+              parentCourse: courseTitle,
+            }]);
+          });
 
-          if (!Array.isArray(modules) || !modules.length) {
-            $accordionContent.html('<p>No modules found.</p>');
-            return;
-          }
-
-          // Render lessons with nested topics
-          for (const lesson of modules) {
-            const lessonNode = sfwdLessonTemplate.content.cloneNode(true);
-            const $lesson = $(lessonNode);
-            const lessonData = stepsMap[lesson.id];
-            const lessonStatus = lessonData?.step_status || 'not_started';
-
-            $lesson.find('.lesson__name').html(lesson.title);
-            $lesson.attr('data-lesson-id', lesson.id);
-
-            const $lessonBadge = $lesson.find('.lesson__completion .completion-badge');
-            $lessonBadge.addClass(`completion-badge--${lessonStatus}`).attr('data-status', lessonStatus);
-
-            const lessonTooltip = buildTooltipContent(lessonData);
-            if (lessonTooltip) $lessonBadge.attr('data-tooltip', lessonTooltip);
-
-            const $tbody = $lesson.find('tbody');
-
-            // Render topics
-            if (Array.isArray(lesson.topics)) {
-              for (const topic of lesson.topics) {
-                const topicNode = sfwdTopicTemplate.content.cloneNode(true);
-                const $topic = $(topicNode);
-                const topicData = stepsMap[topic.id];
-                const topicStatus = topicData?.step_status || 'not_started';
-
-                $topic.find('.topic-name').html(topic.title);
-                $topic.attr('data-topic-id', topic.id);
-
-                const $topicBadge = $topic.find('.completion-badge');
-                $topicBadge.addClass(`completion-badge--${topicStatus}`).attr('data-status', topicStatus);
-
-                const topicTooltip = buildTooltipContent(topicData);
-                if (topicTooltip) $topicBadge.attr('data-tooltip', topicTooltip);
-
-                // Count completed topics (post_type === 'sfwd-topic' with step_status === 'completed')
-                if (topicData?.post_type === 'sfwd-topic' && topicStatus === 'completed') {
-                  topicsCompletedCount++;
-                }
-
-                $tbody.append($topic);
-              }
-            }
-
-            $accordionContent.append($lesson);
-          }
-
-          // Write topics completed count to cache and notify user-stats block
-          window.bysGroupsCache ??= {};
-          window.bysGroupsCache.topicsCompleted = topicsCompletedCount;
-          jQuery(window).trigger('bys:statsUpdated', [{ key: 'total_topics_completed', value: topicsCompletedCount }]);
-
-          // Attach tooltip handlers
-          $accordionContent.on('mouseenter', '[data-tooltip]', function() {
-            createTooltip($(this), $(this).attr('data-tooltip'));
-          }).on('mouseleave', '[data-tooltip]', destroyTooltip);
-
-        } catch (err) {
-          console.error(`[user-progress] Failed to fetch course structure for course ${course.id}:`, err);
-          $accordionContent.html('<p>Failed to load course structure.</p>');
-        }
+          $accordionContent.append($quiz);
+        });
       });
 
       $coursesList.append($course);
     });
+  }
 
-  } catch (err) {
-    console.error('[user-progress] Failed to fetch courses:', err);
+  $(document).on('bys:groupSelected', function(_, data) {
+    renderCourses(data.groupId, data.courses);
+  });
+
+  if (window.bysGroupData?.courses) {
+    renderCourses(window.bysGroupData.groupId, window.bysGroupData.courses);
   }
 });

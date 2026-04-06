@@ -93,6 +93,20 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'permission_callback' => array($this, 'check_user_permission'),
             ));
 
+            // groupQuizAttempts - all group member attempts for a specific quiz
+            register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/quizzes/(?P<quiz_id>\d+)/attempts', array(
+                'methods'             => 'GET',
+                'callback'            => array($this, 'get_group_quiz_attempts'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
+
+            // groupQuizSubmissionStats - per-quiz submission count and last submission date for group members
+            register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/quiz-submission-stats', array(
+                'methods'             => 'GET',
+                'callback'            => array($this, 'get_group_quiz_submission_stats'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
+
             // courseQuizSteps (more specific route, register first)
             register_rest_route($this->namespace, '/courses/(?P<course_id>\d+)/quiz-steps', array(
                 'methods'             => 'GET',
@@ -698,8 +712,182 @@ if (!class_exists('BYS_Groups_Rest_API')) {
         }
 
         /**
+         * Get all attempts for a specific quiz from group members.
+         * Returns flat list sorted by completed desc, with user display names.
+         */
+        public function get_group_quiz_attempts($request) {
+            $group_id = intval($request['group_id']);
+            $quiz_id  = intval($request['quiz_id']);
+
+            if (!$group_id || !$quiz_id) {
+                return new \WP_REST_Response(array('error' => 'Invalid group_id or quiz_id'), 400);
+            }
+
+            $user_ids = learndash_get_groups_user_ids($group_id);
+            if (empty($user_ids)) {
+                return new \WP_REST_Response(array(), 200);
+            }
+
+            global $wpdb;
+            $ld_table   = $wpdb->prefix . 'learndash_user_activity';
+            $meta_table = $wpdb->prefix . 'learndash_user_activity_meta';
+
+            $user_placeholders = implode(',', array_fill(0, count($user_ids), '%d'));
+
+            $rows = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT activity_id, user_id, activity_completed
+                     FROM {$ld_table}
+                     WHERE activity_type = 'quiz'
+                       AND post_id = %d
+                       AND user_id IN ({$user_placeholders})
+                     ORDER BY activity_completed DESC",
+                    ...array_merge([$quiz_id], $user_ids)
+                ),
+                ARRAY_A
+            );
+
+            if (empty($rows)) {
+                return new \WP_REST_Response(array(), 200);
+            }
+
+            // Batch-fetch meta for all activity IDs
+            $activity_ids    = array_column($rows, 'activity_id');
+            $id_placeholders = implode(',', array_fill(0, count($activity_ids), '%d'));
+            $meta_keys       = ['pass', 'percentage', 'points', 'total_points'];
+            $key_placeholders = implode(',', array_fill(0, count($meta_keys), '%s'));
+
+            $meta_rows = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT activity_id, activity_meta_key, activity_meta_value
+                     FROM {$meta_table}
+                     WHERE activity_id IN ({$id_placeholders})
+                       AND activity_meta_key IN ({$key_placeholders})",
+                    ...array_merge($activity_ids, $meta_keys)
+                ),
+                ARRAY_A
+            );
+
+            $meta_map = array();
+            foreach ($meta_rows as $meta) {
+                $aid = intval($meta['activity_id']);
+                $meta_map[$aid][$meta['activity_meta_key']] = $meta['activity_meta_value'];
+            }
+
+            // Batch-fetch user display names
+            $unique_user_ids = array_unique(array_column($rows, 'user_id'));
+            $user_names = array();
+            foreach ($unique_user_ids as $uid) {
+                $user = get_userdata(intval($uid));
+                $user_names[intval($uid)] = $user ? $user->display_name : 'Unknown User';
+            }
+
+            $result = array();
+            foreach ($rows as $row) {
+                $aid  = intval($row['activity_id']);
+                $uid  = intval($row['user_id']);
+                $meta = $meta_map[$aid] ?? array();
+
+                $result[] = array(
+                    'user_id'       => $uid,
+                    'display_name'  => $user_names[$uid] ?? 'Unknown User',
+                    'completed_gmt' => $row['activity_completed']
+                        ? gmdate('Y-m-d\TH:i:s', intval($row['activity_completed']))
+                        : null,
+                    'percentage'    => isset($meta['percentage']) ? floatval($meta['percentage']) : null,
+                    'points_scored' => isset($meta['points']) ? floatval($meta['points']) : null,
+                    'points_total'  => isset($meta['total_points']) ? floatval($meta['total_points']) : null,
+                    'pass'          => isset($meta['pass']) ? (bool)intval($meta['pass']) : null,
+                );
+            }
+
+            return new \WP_REST_Response($result, 200);
+        }
+
+        /**
+         * Get per-quiz submission stats for all group members.
+         * Accepts ?quiz_ids=1,2,3 (comma-separated).
+         * Returns: [ { quiz_id, total_submissions, last_submission_gmt }, ... ]
+         */
+        public function get_group_quiz_submission_stats($request) {
+            $group_id = intval($request['group_id']);
+            if (!$group_id) {
+                return new \WP_REST_Response(array('error' => 'Invalid group ID'), 400);
+            }
+
+            $quiz_ids_param = $request->get_param('quiz_ids');
+            if (empty($quiz_ids_param)) {
+                return new \WP_REST_Response(array('error' => 'quiz_ids parameter required'), 400);
+            }
+
+            $quiz_ids = array_filter(array_map('intval', explode(',', $quiz_ids_param)));
+            if (empty($quiz_ids)) {
+                return new \WP_REST_Response(array('error' => 'No valid quiz IDs provided'), 400);
+            }
+
+            // Get all user IDs in this group directly via LD function (no API call needed)
+            $user_ids = learndash_get_groups_user_ids($group_id);
+            if (empty($user_ids)) {
+                // Return zeroed-out stats rather than an error
+                $result = array();
+                foreach ($quiz_ids as $qid) {
+                    $result[] = array(
+                        'quiz_id'              => $qid,
+                        'total_submissions'    => 0,
+                        'last_submission_gmt'  => null,
+                    );
+                }
+                return new \WP_REST_Response($result, 200);
+            }
+
+            global $wpdb;
+            $ld_table = $wpdb->prefix . 'learndash_user_activity';
+
+            $user_placeholders = implode(',', array_fill(0, count($user_ids), '%d'));
+            $quiz_placeholders = implode(',', array_fill(0, count($quiz_ids), '%d'));
+
+            $rows = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT post_id AS quiz_id,
+                            COUNT(*) AS total_submissions,
+                            MAX(activity_completed) AS last_submission_ts
+                     FROM {$ld_table}
+                     WHERE activity_type = 'quiz'
+                       AND user_id IN ({$user_placeholders})
+                       AND post_id IN ({$quiz_placeholders})
+                     GROUP BY post_id",
+                    ...array_merge($user_ids, $quiz_ids)
+                ),
+                ARRAY_A
+            );
+
+            // Index results by quiz_id
+            $stats_map = array();
+            foreach ($rows as $row) {
+                $stats_map[intval($row['quiz_id'])] = array(
+                    'total_submissions'   => intval($row['total_submissions']),
+                    'last_submission_gmt' => $row['last_submission_ts']
+                        ? gmdate('Y-m-d\TH:i:s', intval($row['last_submission_ts']))
+                        : null,
+                );
+            }
+
+            // Return a result for every requested quiz_id (zero-fill missing)
+            $result = array();
+            foreach ($quiz_ids as $qid) {
+                $result[] = array(
+                    'quiz_id'             => $qid,
+                    'total_submissions'   => $stats_map[$qid]['total_submissions'] ?? 0,
+                    'last_submission_gmt' => $stats_map[$qid]['last_submission_gmt'] ?? null,
+                );
+            }
+
+            return new \WP_REST_Response($result, 200);
+        }
+
+        /**
          * Get quiz steps for a course
-         * Returns first 3 quizzes in a course with caching
+         * Returns quizzes in a course with caching
          */
         public function get_course_quiz_steps($request) {
             $course_id = intval($request['course_id']);
@@ -709,7 +897,7 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             }
 
             // Check transient cache
-            $cache_key = "bys_quiz_steps_{$course_id}";
+            $cache_key = "bys_quiz_steps_v2_{$course_id}";
             $cached = get_transient($cache_key);
             if ($cached !== false) {
                 return new \WP_REST_Response($cached, 200);
@@ -723,8 +911,7 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                  JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
                  WHERE pm.meta_key = 'course_id' AND pm.meta_value = %d
                  AND p.post_type = 'sfwd-quiz' AND p.post_status = 'publish'
-                 ORDER BY p.menu_order ASC
-                 LIMIT 3",
+                 ORDER BY p.menu_order ASC",
                 $course_id
             ));
 

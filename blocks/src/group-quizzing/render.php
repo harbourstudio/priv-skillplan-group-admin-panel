@@ -30,14 +30,33 @@ $auth_header = BYS_Groups_Auth::get_auth_header();
 
 <div <?= $wrapper_attributes; ?>>
 
-    <div class="user-progress__courses">
-        <h3 class="user-progress__section-title">Group Quizzing</h3>
+    <div class="group-quizzing__courses">
+        <h3 class="group-quizzing__section-title">Quizzing</h3>
+
+        <!-- Skeleton: shown until JS populates real data -->
+        <div class="group-quizzing__skeleton" id="group-quizzing-skeleton">
+            <?php foreach ( [ 200, 160, 220, 180 ] as $name_width ) : ?>
+            <div class="skeleton-item">
+                <div class="skeleton-toggle">
+                    <div class="skeleton-toggle__left">
+                        <span class="skeleton-icon"></span>
+                        <span class="skeleton-text" style="width: <?php echo $name_width; ?>px"></span>
+                    </div>
+                    <div class="skeleton-toggle__right">
+                        <span class="skeleton-text" style="width: 110px"></span>
+                        <span class="skeleton-text" style="width: 130px; border-radius: 999px;"></span>
+                        <span class="skeleton-text" style="width: 55px; border-radius: 999px;"></span>
+                    </div>
+                </div>
+            </div>
+            <?php endforeach; ?>
+        </div>
 
         <!-- Mount target: JS will populate with courses -->
-        <div class="hs-accordion-group" id="user-progress-courses-list"></div>
+        <div class="hs-accordion-group" id="group-quizzing-courses-list"></div>
 
         <!-- Template: Course accordion item -->
-        <template id="user-progress-course-template">
+        <template id="group-quizzing-course-template">
             <div class="hs-accordion" data-course-id="">
                 <button class="hs-accordion-toggle btn-unstyled" aria-expanded="false">
                     <div class="accordion-toggle__left-wrapper">
@@ -48,13 +67,13 @@ $auth_header = BYS_Groups_Auth::get_auth_header();
                         <span class="accordion-toggle__course-name"></span>
                     </div>
                     <div class="accordion-toggle__right-wrapper">
-                        <span class="accordion-toggle__date"></span>
-                        <span class="accordion-toggle__completion">
-                            <span class="completion-badge"></span>
+                        <span class="accordion-toggle__date">
+                            <span class="date-label"><?php esc_html_e( 'Latest Submission:', 'bys' ); ?></span>
+                            <span class="date-value"></span>
                         </span>
-                        <span class="accordion-toggle__progress">
-                            <span class="course-steps-completed">0</span>/<span class="course-steps-total">0</span>
-                            <?php esc_html_e('Lessons', 'bys'); ?>
+                        <span class="accordion-toggle__ungraded-badge"></span>
+                        <span class="accordion-toggle__quiz-count">
+                            <span class="quiz-count-value">0</span>&nbsp;<?php esc_html_e( 'Quizzes', 'bys' ); ?>
                         </span>
                     </div>
                 </button>
@@ -64,43 +83,22 @@ $auth_header = BYS_Groups_Auth::get_auth_header();
             </div>
         </template>
 
-        <!-- Template: sfwd-lesson (module) section with nested sfwd-topics -->
-        <template id="user-progress-lesson-template">
-            <div class="lesson">
-                <div class="lesson__header">
-                    <span class="lesson__name"></span>
-                    <span class="lesson__completion">
-                        <span class="completion-badge"></span>
-                    </span>
+        <!-- Template: Quiz row -->
+        <template id="group-quizzing-quiz-template">
+            <div class="quiz-row">
+                <div class="quiz-row__left">
+                    <span class="quiz-row__status-icon"></span>
+                    <span class="quiz-row__name"></span>
                 </div>
-                <div class="lesson__content">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th><?php esc_html_e('Lesson', 'bys'); ?></th>
-                                <th><?php esc_html_e('Status', 'bys'); ?></th>
-                                <th><?php esc_html_e('Visits', 'bys'); ?></th>
-                                <th><?php esc_html_e('Time Spent', 'bys'); ?></th>
-                                <th><?php esc_html_e('Last Accessed', 'bys'); ?></th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
+                <div class="quiz-row__meta">
+                    <span class="quiz-row__submissions"></span>
+                    <span class="quiz-row__ungraded"></span>
                 </div>
+                <span class="quiz-row__last-submission">
+                    <span class="date-label"><?php esc_html_e( 'Last Submission:', 'bys' ); ?></span>
+                    <span class="date-value"></span>
+                </span>
             </div>
-        </template>
-
-        <!-- Template: sfwd-topic row -->
-        <template id="user-progress-topic-template">
-            <tr>
-                <td class="topic-name"></td>
-                <td class="topic-completion">
-                    <span class="completion-badge"></span>
-                </td>
-                <td class="topic-visits"></td>
-                <td class="topic-timespent"></td>
-                <td class="topic-last-accessed"></td>
-            </tr>
         </template>
 
     </div>

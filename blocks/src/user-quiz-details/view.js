@@ -378,6 +378,7 @@ jQuery(document).ready(($) => {
             e.preventDefault();
             e.stopPropagation();
             $(window).trigger('bysQuizAttemptsOpen', [{
+                groupId: groupId,
                 userId: userId,
                 quizId: quiz.id,
                 quizTitle: quiz.title,

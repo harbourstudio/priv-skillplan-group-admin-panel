@@ -32,8 +32,28 @@ $wrapper_attributes = get_block_wrapper_attributes();
 
         <div class="modal__inner">
             <div class="modal__header">
-                <h4 class="quiz-title"></h4>
-                <span class="course-title"></span>
+                <div class="modal__header-titles">
+                    <h4 class="quiz-title"></h4>
+                    <span class="course-title"></span>
+                </div>
+                <button class="modal__close btn-unstyled" aria-label="<?php esc_attr_e('Close', 'bys'); ?>">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="modal__filter-bar">
+                <label for="quiz-attempts-user-filter"><?php esc_html_e('User', 'bys'); ?></label>
+                <select id="quiz-attempts-user-filter" class="quiz-attempts-user-filter">
+                    <option value=""><?php esc_html_e('All Users', 'bys'); ?></option>
+                </select>
+
+                <div class="filter-bar__group">
+                    <label for="quiz-attempts-mode-filter"><?php esc_html_e('Show', 'bys'); ?></label>
+                    <select id="quiz-attempts-mode-filter" class="quiz-attempts-mode-filter">
+                        <option value="highest"><?php esc_html_e('Highest Attempt', 'bys'); ?></option>
+                        <option value="recent"><?php esc_html_e('Most Recent Attempt', 'bys'); ?></option>
+                    </select>
+                </div>
             </div>
 
             <div class="modal__body">
@@ -41,10 +61,10 @@ $wrapper_attributes = get_block_wrapper_attributes();
                     <thead>
                         <tr>
                             <th class="col_attempt_index">#</th>
+                            <th class="col_attempt_user"><?php esc_html_e('User', 'bys'); ?></th>
                             <th class="col_attempt_date"><?php esc_html_e('Submitted', 'bys'); ?></th>
                             <th class="col_attempt_score"><?php esc_html_e('Score', 'bys'); ?></th>
                             <th class="col_attempt_status"><?php esc_html_e('Status', 'bys'); ?></th>
-                            <th class="col_attempt_details"></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -59,16 +79,10 @@ $wrapper_attributes = get_block_wrapper_attributes();
     <template id="user-quiz-attempts-modal__template-row">
         <tr>
             <td class="cell_attempt_index"></td>
+            <td class="cell_attempt_user"></td>
             <td class="cell_attempt_date"></td>
             <td class="cell_attempt_score"></td>
             <td><span class="status-badge"></span></td>
-            <td class="cell_attempt_details">
-                <a
-                    class="cell_attempt_details"
-                >
-                    <i class="fa-solid fa-ellipsis"></i>
-                </a>
-            </td>
         </tr>
     </template>
 

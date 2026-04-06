@@ -1,19 +1,21 @@
-.wp-block-bys-groups-user-quizzing {
-    display: grid;
-    grid-template-columns: 1fr 21.25rem;
-    gap: var(--wp--preset--spacing--6);
-    align-items: start;
+@keyframes bys-shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
 
-    .user-progress__section-title {
-        color: var(--wp--preset--color--gray-500) !important;
-        margin: 0 0 var(--wp--preset--spacing--3) !important;
+.wp-block-bys-groups-group-quizzing {
+
+    margin-block-start: 0 !important;
+
+    .group-quizzing__section-title {
+        margin-bottom: var(--wp--preset--spacing--4);
+    }
+
+    .group-quizzing__courses {
+        min-width: 0;
     }
 
     // Course Accordion (Preline)
-    .user-progress__courses {
-        min-width: 0; // prevent overflow in grid
-    }
-
     .hs-accordion-group {
         display: flex;
         flex-direction: column;
@@ -68,7 +70,7 @@
             height: 2rem;
             color: var(--wp--preset--color--primary);
 
-            i{
+            i {
                 font-size: var(--wp--preset--font-size--base);
             }
         }
@@ -80,161 +82,189 @@
             min-width: 10rem;
         }
 
-        &__completion {
-                    
-            .completion-badge {
-                display: inline-flex;
-                align-items: center;
-                justify-content: space-between;
-                gap: var(--wp--preset--spacing--2);
-                border-radius: 999px;
-                padding: var(--wp--preset--spacing--1) var(--wp--preset--spacing--3);
+        &__date {
+            font-size: var(--wp--preset--font-size--x-small);
+            color: var(--wp--preset--color--gray-500);
+
+            .date-label {
                 font-weight: 500;
-
-                &::before {
-                    display: inline-flex;
-                }
-
-                &--completed{
-                    background-color: var(--wp--preset--color--green-100);
-                    color: var(--wp--preset--color--green-700);
-                }
-                &--in_progress{
-                    background-color: var(--wp--preset--color--orange-100);
-                    color: var(--wp--preset--color--orange-700);
-                }
-                &--not_started{
-                    background-color: var(--wp--preset--color--gray-100);
-                    color: var(--wp--preset--color--gray-700);
-                }
+                margin-right: 0.2em;
             }
         }
 
-        &__progress {
+        &__ungraded-badge {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            padding: var(--wp--preset--spacing--1) var(--wp--preset--spacing--3);
+            font-size: var(--wp--preset--font-size--x-small);
+            font-weight: 500;
+            white-space: nowrap;
+
+            &.ungraded-badge--has-ungraded {
+                background-color: var(--wp--preset--color--orange-100);
+                color: var(--wp--preset--color--orange-700);
+            }
+
+            &.ungraded-badge--caught-up {
+                background-color: var(--wp--preset--color--green-100);
+                color: var(--wp--preset--color--green-700);
+            }
+        }
+
+        &__quiz-count {
             color: var(--wp--preset--color--gray-700);
             background-color: var(--wp--preset--color--gray-100);
             border-radius: 999px;
             font-size: var(--wp--preset--font-size--x-small);
             padding: var(--wp--preset--spacing--1) var(--wp--preset--spacing--2);
+            white-space: nowrap;
         }
-
     }
-    
+
     // Accordion Content
     .accordion-content__inner {
-        padding: var(--wp--preset--spacing--5) var(--wp--preset--spacing--5) var(--wp--preset--spacing--5);
+        padding: var(--wp--preset--spacing--3) var(--wp--preset--spacing--5) var(--wp--preset--spacing--4);
         border-top: 1px solid var(--wp--preset--color--gray-200);
+        background-color: var(--wp--preset--color--gray-100);
+        display: flex;
+        flex-direction: column;
+        gap: var(--wp--preset--spacing--2);
     }
 
-    // Modules (sfwd-lessons) Table
-    .lesson {
-        margin-bottom: var(--wp--preset--spacing--4);
+    // Quiz rows
+    .quiz-row {
+        display: flex;
+        cursor: pointer;
+        background: white;
 
-        &:last-child {
-            margin-bottom: 0;
+        &:hover {
+            background-color: var(--wp--preset--color--gray-50);
+            border-radius: 0.375rem;
         }
-        &__header {
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--wp--preset--spacing--4);
+        padding: var(--wp--preset--spacing--3) var(--wp--preset--spacing--3);
+        border-radius: 0.5rem;
+        font-size: var(--wp--preset--font-size--small);
+
+        &:not(:last-child) {
+            border-bottom: 1px solid var(--wp--preset--color--gray-100);
+        }
+
+        &__left {
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            padding: var(--wp--preset--spacing--3) var(--wp--preset--spacing--3);
-            background-color: var(--wp--preset--color--gray-50);
-            border-radius: 0.5rem;
-            margin-bottom: var(--wp--preset--spacing--2);
+            gap: var(--wp--preset--spacing--2);
+            min-width: 10rem;
+            flex: 1;
         }
-    
+
         &__name {
-            font-size: var(--wp--preset--font-size--small);
             font-weight: 500;
             color: var(--wp--preset--color--gray-800);
         }
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
+        &__meta {
+            display: flex;
+            align-items: center;
+            gap: var(--wp--preset--spacing--4);
+            color: var(--wp--preset--color--gray-500);
             font-size: var(--wp--preset--font-size--x-small);
-    
-            thead {
-                th {
-                    text-align: left;
-                    font-weight: 500;
-                    color: var(--wp--preset--color--gray-500);
-                    padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--3);
-                    border-bottom: 1px solid var(--wp--preset--color--gray-200);
-                    white-space: nowrap;
-                    background: transparent;
-                    font-size: 0.7rem;
-                    text-transform: uppercase;
-                    letter-spacing: 0.04em;
-                    width:15%;
-                }
-                th:first-of-type {
-                    width: 40%;
-                }
-            }
-    
-            tbody {
-                td {
-                    padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--3);
-                    color: var(--wp--preset--color--gray-700);
-                    border-bottom: 1px solid var(--wp--preset--color--gray-100);
-                    vertical-align: middle;
-                }
-    
-                tr:last-child td {
-                    border-bottom: none;
-                }
+        }
+
+        &__last-submission {
+            font-size: var(--wp--preset--font-size--x-small);
+            color: var(--wp--preset--color--gray-500);
+            white-space: nowrap;
+
+            .date-label {
+                font-weight: 500;
+                margin-right: 0.2em;
             }
         }
     }
 
-    // Shared utilities
-    .completion-badge {
+    // Status icons (SVG via pseudo-element)
+    .quiz-row__status-icon {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-            
-        &::before {
-            content: '';
-            display: block;
-            background-size: contain;
-            background-repeat: no-repeat;
-            background-position: center;
+        flex-shrink: 0;
+        width: 1.25rem;
+        height: 1.25rem;
+
+        &.status-icon--graded::before {
+            content: url("data:image/svg+xml,%3Csvg width='19' height='18' viewBox='0 0 19 18' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M9.42188 1.6875C6.78516 1.6875 4.39453 3.09375 3.05859 5.34375C1.75781 7.62891 1.75781 10.4062 3.05859 12.6562C4.39453 14.9414 6.78516 16.3125 9.42188 16.3125C12.0234 16.3125 14.4141 14.9414 15.75 12.6562C17.0508 10.4062 17.0508 7.62891 15.75 5.34375C14.4141 3.09375 12.0234 1.6875 9.42188 1.6875ZM9.42188 18C6.1875 18 3.23438 16.3125 1.61719 13.5C0 10.7227 0 7.3125 1.61719 4.5C3.23438 1.72266 6.1875 0 9.42188 0C12.6211 0 15.5742 1.72266 17.1914 4.5C18.8086 7.3125 18.8086 10.7227 17.1914 13.5C15.5742 16.3125 12.6211 18 9.42188 18ZM13.3945 7.34766L8.89453 11.8477C8.54297 12.1992 8.01562 12.1992 7.69922 11.8477L5.44922 9.59766C5.09766 9.28125 5.09766 8.75391 5.44922 8.4375C5.76562 8.08594 6.29297 8.08594 6.64453 8.4375L8.29688 10.0898L12.1992 6.1875C12.5156 5.83594 13.043 5.83594 13.3945 6.1875C13.7109 6.50391 13.7109 7.03125 13.3945 7.34766Z' fill='%2303C571'/%3E%3C/svg%3E");
         }
 
-        &--completed::before {
-            content: url("data:image/svg+xml,%3Csvg width='19' height='18' viewBox='0 0 19 18' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M9.42188 1.6875C6.78516 1.6875 4.39453 3.09375 3.05859 5.34375C1.75781 7.62891 1.75781 10.4062 3.05859 12.6562C4.39453 14.9414 6.78516 16.3125 9.42188 16.3125C12.0234 16.3125 14.4141 14.9414 15.75 12.6562C17.0508 10.4062 17.0508 7.62891 15.75 5.34375C14.4141 3.09375 12.0234 1.6875 9.42188 1.6875ZM9.42188 18C6.1875 18 3.23438 16.3125 1.61719 13.5C0 10.7227 0 7.3125 1.61719 4.5C3.23438 1.72266 6.1875 0 9.42188 0C12.6211 0 15.5742 1.72266 17.1914 4.5C18.8086 7.3125 18.8086 10.7227 17.1914 13.5C15.5742 16.3125 12.6211 18 9.42188 18ZM13.3945 7.34766L8.89453 11.8477C8.54297 12.1992 8.01562 12.1992 7.69922 11.8477L5.44922 9.59766C5.09766 9.28125 5.09766 8.75391 5.44922 8.4375C5.76562 8.08594 6.29297 8.08594 6.64453 8.4375L8.29688 10.0898L12.1992 6.1875C12.5156 5.83594 13.043 5.83594 13.3945 6.1875C13.7109 6.50391 13.7109 7.03125 13.3945 7.34766Z' fill='%2303C571'/%3E%3C/svg%3E%0A");
-        }
-        &--in_progress::before {
+        &.status-icon--ungraded::before {
             content: url('data:image/svg+xml;utf8,<svg width="16" height="17" viewBox="0 0 16 17" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14.5 8.34375C14.5 4.78125 11.5625 1.84375 8 1.84375V14.8438C11.5625 14.8438 14.5 11.9375 14.5 8.34375ZM0 8.34375C0 5.5 1.5 2.875 4 1.4375C6.46875 0 9.5 0 12 1.4375C14.4688 2.875 16 5.5 16 8.34375C16 11.2188 14.4688 13.8438 12 15.2812C9.5 16.7188 6.46875 16.7188 4 15.2812C1.5 13.8438 0 11.2188 0 8.34375Z" fill="%23FC9344"/></svg>');
-        }
-        
-        &--not_started::before {
-            content: url("data:image/svg+xml,%3Csvg width='18' height='19' viewBox='0 0 18 19' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M16.3125 9.38672C16.3125 6.78516 14.9062 4.39453 12.6562 3.05859C10.3711 1.75781 7.59375 1.75781 5.34375 3.05859C3.05859 4.39453 1.6875 6.78516 1.6875 9.38672C1.6875 12.0234 3.05859 14.4141 5.34375 15.75C7.59375 17.0508 10.3711 17.0508 12.6562 15.75C14.9062 14.4141 16.3125 12.0234 16.3125 9.38672ZM0 9.38672C0 6.1875 1.6875 3.23438 4.5 1.61719C7.27734 0 10.6875 0 13.5 1.61719C16.2773 3.23438 18 6.1875 18 9.38672C18 12.6211 16.2773 15.5742 13.5 17.1914C10.6875 18.8086 7.27734 18.8086 4.5 17.1914C1.6875 15.5742 0 12.6211 0 9.38672Z' fill='%23BBC3CF'/%3E%3C/svg%3E%0A");
         }
     }
 
-    // Responsive
+    // Skeleton loader
+    .group-quizzing__skeleton {
+        display: flex;
+        flex-direction: column;
+        gap: var(--wp--preset--spacing--3);
+
+        &.hidden { display: none; }
+    }
+
+    .skeleton-item {
+        background: white;
+        border-radius: 1rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+        padding: var(--wp--preset--spacing--4) var(--wp--preset--spacing--5);
+    }
+
+    .skeleton-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--wp--preset--spacing--3);
+
+        &__left,
+        &__right {
+            display: flex;
+            align-items: center;
+            gap: var(--wp--preset--spacing--3);
+        }
+    }
+
+    .skeleton-icon {
+        width: 2rem;
+        height: 2rem;
+        border-radius: 4px;
+        flex-shrink: 0;
+        background: linear-gradient(90deg, #e8e8e8 25%, #f2f2f2 50%, #e8e8e8 75%);
+        background-size: 200% 100%;
+        animation: bys-shimmer 1.4s infinite linear;
+    }
+
+    .skeleton-text {
+        display: inline-block;
+        height: 0.85em;
+        border-radius: 4px;
+        background: linear-gradient(90deg, #e8e8e8 25%, #f2f2f2 50%, #e8e8e8 75%);
+        background-size: 200% 100%;
+        animation: bys-shimmer 1.4s infinite linear;
+    }
+
     @media (max-width: 768px) {
-        .user-progress__header {
-            flex-direction: column;
-            text-align: center;
-        }
-
-        .user-progress__meta {
-            justify-content: center;
-        }
-
-        .accordion-toggle__details {
+        .accordion-toggle__date,
+        .accordion-toggle__quiz-count {
             display: none;
         }
 
         .accordion-toggle__course-name {
             min-width: auto;
         }
-    }
-    
-    @media (max-width: 1024px) {
-        grid-template-columns: 1fr;
+
+        .quiz-row__meta {
+            display: none;
+        }
     }
 }
