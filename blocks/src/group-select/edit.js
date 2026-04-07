@@ -1,13 +1,7 @@
 import { __ } from '@wordpress/i18n';
-import { useEffect, useState } from 'react';
-import {
-	InspectorControls,
-	blockProps
-} from '@wordpress/block-editor';
-import {
-	PanelBody,
-	PanelRow,
-} from '@wordpress/components';
+import { useEffect } from 'react';
+import { useBlockProps } from '@wordpress/block-editor';
+import './editor.scss';
 
 export default function Edit({ clientId, attributes, setAttributes }) {
 	const { blockId } = attributes;
@@ -17,17 +11,12 @@ export default function Edit({ clientId, attributes, setAttributes }) {
 	}, [clientId]);
 
 	return (
-	<>
-		<InspectorControls>
-			<PanelBody title={__('Block-specific Settings', 'bys')} initialOpen={true}>
-				<PanelRow>
-				</PanelRow>
-			</PanelBody>
-		</InspectorControls>
-
-		<div {...blockProps}>
-			Block will show on frontend
+		<div {...useBlockProps()}>
+			<div className="group-selector">
+				<select className="group-selector__select" disabled>
+					<option>{__('Select a group…', 'bys')}</option>
+				</select>
+			</div>
 		</div>
-	</>
 	);
 }

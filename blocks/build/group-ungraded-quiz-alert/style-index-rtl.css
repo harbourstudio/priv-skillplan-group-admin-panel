@@ -33,7 +33,7 @@
   flex-shrink: 0;
   font-size: var(--wp--preset--font-size--small);
   font-weight: 500;
-  color: var(--wp--preset--color--yellow-800);
+  color: var(--wp--preset--color--yellow-800) !important;
   text-decoration: underline;
   cursor: pointer;
   padding: 0;

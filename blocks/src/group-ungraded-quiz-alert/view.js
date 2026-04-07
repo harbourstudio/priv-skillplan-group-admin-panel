@@ -45,15 +45,6 @@ jQuery(document).ready(($) => {
     $alert.removeClass('hidden');
   }
 
-  // ── "See all" — scroll to the group-quizzing block ──────────────────────────
-
-  $seeAll.on('click', function() {
-    const $quizzingBlock = $('.wp-block-bys-groups-group-quizzing').first();
-    if ($quizzingBlock.length) {
-      $quizzingBlock[0].scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  });
-
   // ── Bootstrap ────────────────────────────────────────────────────────────────
 
   $(document).on('bys:groupSelected', function(_, data) {

@@ -17,6 +17,7 @@ if (!class_exists('BYS_Groups_Blocks')) {
             'group-reporting',
             'group-select',
             'group-stats',
+            'group-tabs',
             'group-ungraded-quiz-alert',
             'user-activity',
             'user-info',

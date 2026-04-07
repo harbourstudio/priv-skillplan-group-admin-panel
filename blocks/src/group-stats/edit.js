@@ -1,24 +1,13 @@
 import { __ } from '@wordpress/i18n';
-import { useEffect, useState } from 'react';
-import {
-	useBlockProps,
-	InspectorControls,
-	RichText,
-	useInnerBlocksProps,
-	MediaUpload,
-	MediaUploadCheck,
-	blockProps
-} from '@wordpress/block-editor';
-import {
-	Button,
-	PanelBody,
-	PanelRow,
-	SearchControl,
-	SelectControl,
-	__experimentalToggleGroupControl as ToggleGroupControl,
-	__experimentalToggleGroupControlOption as ToggleGroupControlOption,
-} from '@wordpress/components';
-import { gallery } from '@wordpress/icons';
+import { useEffect } from 'react';
+import { useBlockProps } from '@wordpress/block-editor';
+
+const STATS = [
+	{ label: __('Members', 'bys'),         value: '—' },
+	{ label: __('Active Users', 'bys'),     value: '—' },
+	{ label: __('Courses', 'bys'),          value: '—' },
+	{ label: __('Avg. Completion', 'bys'),  value: '—' },
+];
 
 export default function Edit({ clientId, attributes, setAttributes }) {
 	const { blockId } = attributes;
@@ -28,17 +17,17 @@ export default function Edit({ clientId, attributes, setAttributes }) {
 	}, [clientId]);
 
 	return (
-		<>
-			<InspectorControls>
-				<PanelBody title={__('Block-specific Settings', 'bys')} initialOpen={true}>
-					<PanelRow>
-					</PanelRow>
-				</PanelBody>
-			</InspectorControls>
-
-			<div {...blockProps}>
-				Block will show on frontend
+		<div {...useBlockProps()}>
+			<div className="stats__grid">
+				{STATS.map(({ label, value }) => (
+					<div key={label} className="stat__box">
+						<div className="stat__content">
+							<span className="stat__number">{value}</span>
+							<span>{label}</span>
+						</div>
+					</div>
+				))}
 			</div>
-		</>
+		</div>
 	);
 }

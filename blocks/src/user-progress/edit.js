@@ -1,24 +1,6 @@
 import { __ } from '@wordpress/i18n';
-import { useEffect, useState } from 'react';
-import {
-	useBlockProps,
-	InspectorControls,
-	RichText,
-	useInnerBlocksProps,
-	MediaUpload,
-	MediaUploadCheck,
-	blockProps
-} from '@wordpress/block-editor';
-import {
-	Button,
-	PanelBody,
-	PanelRow,
-	SearchControl,
-	SelectControl,
-	__experimentalToggleGroupControl as ToggleGroupControl,
-	__experimentalToggleGroupControlOption as ToggleGroupControlOption,
-} from '@wordpress/components';
-import { gallery } from '@wordpress/icons';
+import { useEffect } from 'react';
+import { useBlockProps } from '@wordpress/block-editor';
 
 export default function Edit({ clientId, attributes, setAttributes }) {
 	const { blockId } = attributes;
@@ -28,17 +10,32 @@ export default function Edit({ clientId, attributes, setAttributes }) {
 	}, [clientId]);
 
 	return (
-		<>
-			<InspectorControls>
-				<PanelBody title={__('Block-specific Settings', 'bys')} initialOpen={true}>
-					<PanelRow>
-					</PanelRow>
-				</PanelBody>
-			</InspectorControls>
-
-			<div {...blockProps}>
-				Block will show on frontend
+		<div {...useBlockProps()}>
+			<div className="user-progress__courses">
+				<p className="user-progress__section-title">{__('Course Progress', 'bys')}</p>
+				<div className="hs-accordion-group">
+					{['Example Course A', 'Example Course B'].map((name) => (
+						<div key={name} className="hs-accordion">
+							<div className="hs-accordion-toggle">
+								<div className="accordion-toggle__left-wrapper">
+									<span className="accordion-toggle__icon">
+										<i className="fa-solid fa-plus" />
+									</span>
+									<span className="accordion-toggle__course-name">{name}</span>
+								</div>
+								<div className="accordion-toggle__right-wrapper">
+									<span className="accordion-toggle__completion">
+										<span className="completion-badge completion-badge--in_progress">
+											{__('In Progress', 'bys')}
+										</span>
+									</span>
+									<span className="accordion-toggle__progress">60%</span>
+								</div>
+							</div>
+						</div>
+					))}
+				</div>
 			</div>
-		</>
+		</div>
 	);
 }

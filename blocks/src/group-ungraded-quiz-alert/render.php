@@ -25,9 +25,9 @@ $wrapper_attributes = get_block_wrapper_attributes();
             <span class="ungraded-alert__count"></span>
             <?php esc_html_e( 'quiz submissions still require manual grading', 'bys' ); ?>
         </span>
-        <button type="button" class="ungraded-alert__btn btn-unstyled">
+        <a href="/administrator-dashboard/grading/" class="ungraded-alert__btn btn-unstyled">
             <?php esc_html_e( 'See all', 'bys' ); ?>
-        </button>
+        </a>
     </div>
 
 </div>

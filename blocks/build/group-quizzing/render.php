@@ -31,7 +31,7 @@ $auth_header = BYS_Groups_Auth::get_auth_header();
 <div <?= $wrapper_attributes; ?>>
 
     <div class="group-quizzing__courses">
-        <h3 class="group-quizzing__section-title">Quizzing</h3>
+        <!-- <h3 class="group-quizzing__section-title">Quizzing</h3> -->
 
         <!-- Skeleton: shown until JS populates real data -->
         <div class="group-quizzing__skeleton" id="group-quizzing-skeleton">
