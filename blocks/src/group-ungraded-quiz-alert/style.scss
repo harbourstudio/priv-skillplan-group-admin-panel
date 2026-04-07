@@ -1,0 +1,47 @@
+.wp-block-bys-groups-group-ungraded-quiz-alert {
+
+    margin-block-start: 0 !important;
+
+    .ungraded-alert {
+        display: flex;
+        align-items: center;
+        gap: var(--wp--preset--spacing--3);
+        padding: var(--wp--preset--spacing--4) var(--wp--preset--spacing--5);
+        background-color: var(--wp--preset--color--yellow-100);
+        border: 1px solid var(--wp--preset--color--yellow-600);
+        border-radius: 0.5rem;
+
+        &.hidden { display: none; }
+
+        &__icon {
+            color: var(--wp--preset--color--yellow-700);
+            font-size: var(--wp--preset--font-size--medium);
+            flex-shrink: 0;
+        }
+
+        &__text {
+            flex: 1;
+            font-size: var(--wp--preset--font-size--base);
+            color: var(--wp--preset--color--yellow-800);
+        }
+
+        &__count {
+            font-weight: 700;
+        }
+
+        &__btn {
+            flex-shrink: 0;
+            font-size: var(--wp--preset--font-size--small);
+            font-weight: 500;
+            color: var(--wp--preset--color--yellow-800);
+            text-decoration: underline;
+            cursor: pointer;
+            padding: 0;
+            background: none;
+            border: none;
+            font-family: inherit;
+
+            &:hover { opacity: 0.75; }
+        }
+    }
+}
