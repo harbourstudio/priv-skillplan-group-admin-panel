@@ -14,8 +14,13 @@ foreach ($attrs as $a) {
     }
 }
 
-$wrapper_attributes = get_block_wrapper_attributes();
+$can_grade = current_user_can('manage_options') || in_array('marker', (array) wp_get_current_user()->roles, true);
+$wrapper_attributes = get_block_wrapper_attributes(array('data-can-grade' => $can_grade ? '1' : '0'));
 ?>
+
+<script>
+window.bysGradingNonce = window.bysGradingNonce || '<?php echo esc_js( wp_create_nonce( 'wp_rest' ) ); ?>';
+</script>
 
 <div <?= $wrapper_attributes; ?>>
 

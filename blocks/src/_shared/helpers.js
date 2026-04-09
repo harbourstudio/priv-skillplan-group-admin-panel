@@ -11,7 +11,8 @@ export function formatScore(percent, pointsScored, pointsTotal) {
 
   if (pointsScored === null || pointsTotal === null) return `${percent}%`;
 
-  return `${pointsScored}/${pointsTotal} (${percent}%)`;
+  const pct = parseFloat(Number(percent).toFixed(2));
+  return `${pointsScored}/${pointsTotal} (${pct}%)`;
 }
 
 export function formatDate(timestamp) {

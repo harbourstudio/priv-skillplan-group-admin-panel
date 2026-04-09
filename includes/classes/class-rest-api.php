@@ -107,6 +107,13 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'permission_callback' => array($this, 'check_user_permission'),
             ));
 
+            // gradeAttemptQuestions - POST to grade questions in an attempt (admin/marker only)
+            register_rest_route($this->namespace, '/attempts/(?P<activity_id>\d+)/grade', array(
+                'methods'             => 'POST',
+                'callback'            => array($this, 'grade_attempt_questions'),
+                'permission_callback' => array($this, 'check_grader_permission'),
+            ));
+
             // attemptDetail - full detail for a single quiz attempt by activity ID
             register_rest_route($this->namespace, '/attempts/(?P<activity_id>\d+)', array(
                 'methods'             => 'GET',
@@ -179,6 +186,34 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             }
             // fallback: require user to be logged in
             return is_user_logged_in();
+        }
+
+        /**
+         * Permission callback for grading endpoints — requires admin or 'marker' role.
+         *
+         * Follows the same Basic-auth bypass pattern as check_user_permission:
+         * the bysGroupsAuth header is a server-rendered service-account credential,
+         * not a WP Application Password, so is_user_logged_in() may return false for
+         * REST POST requests without a nonce even when the page-level user is an admin.
+         * We additionally check the WP role when the user can be resolved.
+         */
+        public function check_grader_permission($request) {
+            $auth_header = $request->get_header('Authorization');
+            if ($auth_header && strpos($auth_header, 'Basic ') === 0) {
+                // Basic auth header present. If WP resolved a user (Application Passwords),
+                // verify the role; otherwise trust the header like check_user_permission.
+                $user = wp_get_current_user();
+                if ($user->ID > 0) {
+                    return user_can($user, 'manage_options') || in_array('marker', (array) $user->roles, true);
+                }
+                return true;
+            }
+            // Cookie-based auth (nonce sent from browser session)
+            if (!is_user_logged_in()) {
+                return false;
+            }
+            $user = wp_get_current_user();
+            return user_can($user, 'manage_options') || in_array('marker', (array) $user->roles, true);
         }
 
         /**
@@ -1041,9 +1076,22 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 $correct_count   = intval($stat['correct_count']);
                 $incorrect_count = intval($stat['incorrect_count']);
 
-                if (in_array($answer_type, array('assessment_answer', 'essay'), true)) {
-                    $question_result = 'ungraded';
-                } elseif ($answer_type === 'free_answer' && $correct_count === 0 && $incorrect_count === 0) {
+                if ($answer_type === 'essay') {
+                    // LearnDash sets incorrect_count=1 on essays by default;
+                    // use the sfwd-essays post status as the true graded/ungraded signal.
+                    $essay_data = json_decode($stat['answer_data'] ?? '', true);
+                    $graded_id  = isset($essay_data['graded_id']) ? intval($essay_data['graded_id']) : 0;
+                    if (!$graded_id || get_post_status($graded_id) !== 'graded') {
+                        $question_result = 'ungraded';
+                    } elseif ($points_max > 0 && $points_earned >= $points_max) {
+                        $question_result = 'correct';
+                    } elseif ($points_earned > 0 && $points_earned < $points_max) {
+                        $question_result = 'partial';
+                    } else {
+                        $question_result = 'incorrect';
+                    }
+                } elseif (in_array($answer_type, array('assessment_answer', 'free_answer'), true)
+                          && $correct_count === 0 && $incorrect_count === 0) {
                     $question_result = 'ungraded';
                 } elseif ($points_max > 0 && $points_earned >= $points_max) {
                     $question_result = 'correct';
@@ -1057,7 +1105,7 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                     'question_id'      => $qid,
                     'question_post_id' => intval($stat['question_post_id']),
                     'title'            => $qdef ? sanitize_text_field($qdef['title']) : '',
-                    'question_text'    => $qdef ? wp_kses_post($qdef['question']) : '',
+                    'question_text'    => $qdef ? wp_kses_post(apply_filters('the_content', $qdef['question'])) : '',
                     'answer_type'      => $answer_type,
                     'points_earned'    => $points_earned,
                     'points_max'       => $points_max,
@@ -1075,6 +1123,247 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             usort($result, fn($a, $b) => $a['sort'] - $b['sort']);
 
             return new \WP_REST_Response($result, 200);
+        }
+
+        /**
+         * Grade questions for a quiz attempt.
+         * Body: { "grades": [ { "question_id": 123, "result": "correct|incorrect|partial|ungraded", "points": 2.5 } ] }
+         */
+        public function grade_attempt_questions($request) {
+            $activity_id = intval($request['activity_id']);
+
+            if (!$activity_id) {
+                return new \WP_REST_Response(array('error' => 'Invalid activity_id'), 400);
+            }
+
+            $body   = $request->get_json_params();
+            $grades = isset($body['grades']) && is_array($body['grades']) ? $body['grades'] : array();
+
+            if (empty($grades)) {
+                return new \WP_REST_Response(array('error' => 'No grades provided'), 400);
+            }
+
+            global $wpdb;
+            $meta_table     = $wpdb->prefix . 'learndash_user_activity_meta';
+            $ld_table       = $wpdb->prefix . 'learndash_user_activity';
+            $stat_table     = LDLMS_DB::get_table_name('quiz_statistic');
+            $question_table = LDLMS_DB::get_table_name('quiz_question');
+
+            if (!$stat_table || !$question_table) {
+                return new \WP_REST_Response(array('error' => 'LearnDash statistics tables not available'), 500);
+            }
+
+            // Resolve statistic_ref_id and quiz_id for this attempt
+            $statistic_ref_id = intval($wpdb->get_var(
+                $wpdb->prepare(
+                    "SELECT activity_meta_value FROM {$meta_table}
+                     WHERE activity_id = %d AND activity_meta_key = 'statistic_ref_id'",
+                    $activity_id
+                )
+            ));
+
+            if (!$statistic_ref_id) {
+                return new \WP_REST_Response(array('error' => 'Attempt statistics not found'), 404);
+            }
+
+            $quiz_id = intval($wpdb->get_var(
+                $wpdb->prepare(
+                    "SELECT post_id FROM {$ld_table} WHERE activity_id = %d AND activity_type = 'quiz'",
+                    $activity_id
+                )
+            ));
+
+            // Quiz pass mark (percentage threshold)
+            $pass_mark = 80.0;
+            if ($quiz_id) {
+                $quiz_settings = get_post_meta($quiz_id, '_sfwd-quiz', true);
+                if (isset($quiz_settings['sfwd-quiz_passMark'])) {
+                    $pass_mark = floatval($quiz_settings['sfwd-quiz_passMark']);
+                }
+            }
+
+            // Apply each grade to the statistic row
+            $valid_results = array('correct', 'incorrect', 'partial', 'ungraded');
+
+            foreach ($grades as $grade) {
+                $question_id = intval($grade['question_id'] ?? 0);
+                $result      = sanitize_text_field($grade['result'] ?? '');
+
+                if (!$question_id || !in_array($result, $valid_results, true)) {
+                    continue;
+                }
+
+                // Fetch question definition + current stat answer_data in one query
+                $stat_row = $wpdb->get_row(
+                    $wpdb->prepare(
+                        "SELECT q.points AS points_max, q.answer_type, s.answer_data
+                         FROM {$stat_table} s
+                         LEFT JOIN {$question_table} q ON q.id = s.question_id
+                         WHERE s.statistic_ref_id = %d AND s.question_id = %d",
+                        $statistic_ref_id, $question_id
+                    ),
+                    ARRAY_A
+                );
+
+                if (!$stat_row) {
+                    continue;
+                }
+
+                $points_max  = floatval($stat_row['points_max']);
+                $answer_type = $stat_row['answer_type'] ?? '';
+
+                switch ($result) {
+                    case 'correct':
+                        $correct_count   = 1;
+                        $incorrect_count = 0;
+                        $points_earned   = $points_max;
+                        break;
+                    case 'incorrect':
+                        $correct_count   = 0;
+                        $incorrect_count = 1;
+                        $points_earned   = 0;
+                        break;
+                    case 'partial':
+                        $raw_points      = isset($grade['points']) ? floatval($grade['points']) : 0.0;
+                        $points_earned   = max(0.0, min($raw_points, $points_max));
+                        $correct_count   = 1;
+                        $incorrect_count = 0;
+                        break;
+                    case 'ungraded':
+                    default:
+                        $correct_count   = 0;
+                        $incorrect_count = 0;
+                        $points_earned   = 0;
+                        break;
+                }
+
+                $wpdb->update(
+                    $stat_table,
+                    array(
+                        'correct_count'   => $correct_count,
+                        'incorrect_count' => $incorrect_count,
+                        'points'          => $points_earned,
+                    ),
+                    array(
+                        'statistic_ref_id' => $statistic_ref_id,
+                        'question_id'      => $question_id,
+                    ),
+                    array('%d', '%d', '%f'),
+                    array('%d', '%d')
+                );
+
+                // For essay questions, sync the sfwd-essays post status and LearnDash's
+                // _sfwd-quizzes user meta — the source the LD admin reads for points/status.
+                if ($answer_type === 'essay') {
+                    $stat_answer   = json_decode($stat_row['answer_data'] ?? '', true);
+                    $graded_id     = isset($stat_answer['graded_id']) ? intval($stat_answer['graded_id']) : 0;
+                    $essay_post    = $graded_id ? get_post($graded_id) : null;
+
+                    if ($essay_post) {
+                        $new_status = ($result === 'ungraded') ? 'not_graded' : 'graded';
+
+                        // Update sfwd-essays post status
+                        wp_update_post(array('ID' => $graded_id, 'post_status' => $new_status));
+
+                        // Update _sfwd-quizzes user meta (what the LD admin reads for points)
+                        $quiz_pro_id     = intval(get_post_meta($graded_id, 'quiz_id', true));
+                        $question_pro_id = intval(get_post_meta($graded_id, 'question_id', true));
+
+                        if ($quiz_pro_id && $question_pro_id) {
+                            $essay_ld_data = learndash_get_submitted_essay_data($quiz_pro_id, $question_pro_id, $essay_post);
+                            if (is_array($essay_ld_data)) {
+                                $essay_ld_data['status']         = $new_status;
+                                $essay_ld_data['points_awarded'] = ($result === 'ungraded') ? 0 : $points_earned;
+                                learndash_update_submitted_essay_data($quiz_pro_id, $question_pro_id, $essay_post, $essay_ld_data);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Recalculate totals from all stat rows
+            $stat_rows = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT s.points AS points_earned, q.points AS points_max,
+                            q.answer_type, s.correct_count, s.incorrect_count, s.answer_data
+                     FROM {$stat_table} s
+                     LEFT JOIN {$question_table} q ON q.id = s.question_id
+                     WHERE s.statistic_ref_id = %d",
+                    $statistic_ref_id
+                ),
+                ARRAY_A
+            );
+
+            $total_earned = 0.0;
+            $total_max    = 0.0;
+            $has_ungraded = false;
+
+            foreach ($stat_rows as $row) {
+                $answer_type = $row['answer_type'] ?? '';
+                $total_max   += floatval($row['points_max']);
+                $total_earned += floatval($row['points_earned']);
+
+                if ($answer_type === 'essay') {
+                    $e_data    = json_decode($row['answer_data'] ?? '', true);
+                    $graded_id = isset($e_data['graded_id']) ? intval($e_data['graded_id']) : 0;
+                    if (!$graded_id || get_post_status($graded_id) !== 'graded') {
+                        $has_ungraded = true;
+                    }
+                } elseif (
+                    in_array($answer_type, array('assessment_answer', 'free_answer'), true)
+                    && intval($row['correct_count']) === 0
+                    && intval($row['incorrect_count']) === 0
+                ) {
+                    $has_ungraded = true;
+                }
+            }
+
+            $percentage = $total_max > 0 ? ($total_earned / $total_max) * 100.0 : 0.0;
+            $pass       = $has_ungraded ? null : ($percentage >= $pass_mark ? 1 : 0);
+
+            // Update activity meta: points, percentage, and conditionally pass
+            $meta_updates = array('points' => $total_earned, 'percentage' => $percentage);
+            if (!$has_ungraded) {
+                $meta_updates['pass'] = $pass;
+            }
+
+            foreach ($meta_updates as $key => $value) {
+                $exists = (int) $wpdb->get_var(
+                    $wpdb->prepare(
+                        "SELECT COUNT(*) FROM {$meta_table}
+                         WHERE activity_id = %d AND activity_meta_key = %s",
+                        $activity_id, $key
+                    )
+                );
+
+                if ($exists) {
+                    $wpdb->update(
+                        $meta_table,
+                        array('activity_meta_value' => $value),
+                        array('activity_id' => $activity_id, 'activity_meta_key' => $key),
+                        array('%s'),
+                        array('%d', '%s')
+                    );
+                } else {
+                    $wpdb->insert(
+                        $meta_table,
+                        array(
+                            'activity_id'         => $activity_id,
+                            'activity_meta_key'   => $key,
+                            'activity_meta_value' => $value,
+                        ),
+                        array('%d', '%s', '%s')
+                    );
+                }
+            }
+
+            return new \WP_REST_Response(array(
+                'success'       => true,
+                'points_scored' => $total_earned,
+                'points_total'  => $total_max,
+                'percentage'    => $percentage,
+                'pass'          => $pass,
+            ), 200);
         }
 
         /**
@@ -1191,22 +1480,44 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 return false;
             }
 
+            // Check assessment_answer / free_answer via counts (LD leaves these at 0,0 when ungraded)
             $count = (int) $wpdb->get_var(
                 $wpdb->prepare(
                     "SELECT COUNT(*)
                      FROM {$stat_table} s
                      INNER JOIN {$question_table} q ON q.id = s.question_id
                      WHERE s.statistic_ref_id = %d
-                       AND (
-                           q.answer_type = 'essay'
-                           OR q.answer_type = 'assessment_answer'
-                           OR (q.answer_type = 'free_answer' AND s.correct_count = 0 AND s.incorrect_count = 0)
-                       )",
+                       AND q.answer_type IN ('assessment_answer', 'free_answer')
+                       AND s.correct_count = 0 AND s.incorrect_count = 0",
                     $statistic_ref_id
                 )
             );
 
-            return $count > 0;
+            if ($count > 0) {
+                return true;
+            }
+
+            // Check essay questions via sfwd-essays post_status ('not_graded' means ungraded).
+            // LearnDash sets incorrect_count=1 on essays by default so counts are unreliable.
+            $essay_answer_data = $wpdb->get_col(
+                $wpdb->prepare(
+                    "SELECT s.answer_data
+                     FROM {$stat_table} s
+                     INNER JOIN {$question_table} q ON q.id = s.question_id
+                     WHERE s.statistic_ref_id = %d AND q.answer_type = 'essay'",
+                    $statistic_ref_id
+                )
+            );
+
+            foreach ($essay_answer_data as $raw) {
+                $data      = json_decode($raw, true);
+                $graded_id = isset($data['graded_id']) ? intval($data['graded_id']) : 0;
+                if (!$graded_id || get_post_status($graded_id) !== 'graded') {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /**
