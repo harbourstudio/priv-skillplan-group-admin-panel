@@ -38,8 +38,17 @@ jQuery(document).ready(async ($) => {
   // Track completed topics across all opened courses for user-stats coordination
   let topicsCompletedCount = 0;
 
+  // Show skeleton accordions while courses load
+  const skeletonTemplate = document.getElementById('user-progress-skeleton-template');
+  const SKELETON_COUNT = 5;
+  for (let i = 0; i < SKELETON_COUNT; i++) {
+    $coursesList.append(skeletonTemplate.content.cloneNode(true));
+  }
+
   try {
     const courses = await api.get(endpoints.groupCourses(groupId));
+
+    $coursesList.find('.hs-accordion--skeleton').remove();
 
     if (!Array.isArray(courses) || courses.length === 0) {
       console.log('[user-progress] No courses found for group:', groupId);

@@ -6,13 +6,17 @@ jQuery(document).ready(($) => {
   const $block = $('.wp-block-bys-groups-user-quiz-attempts-modal').first();
   const $modal = $block.find('#quiz-attempts-modal');
   const $tbody = $modal.find('tbody');
-  const $userFilter = $modal.find('#quiz-attempts-user-filter');
   const $modeFilter = $modal.find('#quiz-attempts-mode-filter');
+  const $userSearch = $modal.find('#quiz-attempts-user-search');
+  const $userClear  = $modal.find('.user-search-clear');
+  const $suggestions = $modal.find('#user-search-suggestions');
   const rowTemplate = $block.find('#user-quiz-attempts-modal__template-row')[0];
 
-  let allAttempts  = [];
-  let currentRows  = []; // tracks the currently rendered rows (for CSV export)
-  let sortState    = { col: 'user', dir: 'asc' };
+  let allAttempts   = [];
+  let currentRows   = []; // tracks the currently rendered rows (for CSV export)
+  let sortState     = { col: 'user', dir: 'asc' };
+  let usersIndex    = []; // [{ id, name, email, label }] — built once after load
+  let selectedUserId = null; // currently selected user ID (null = all)
 
   // Track current quiz/group context so the grading-page link can carry it forward
   let currentGroupId  = null;
@@ -29,14 +33,18 @@ jQuery(document).ready(($) => {
 
   // ── Sorting ────────────────────────────────────────────────────────────────
 
+  function userName(attempt) {
+    return [attempt.first_name, attempt.last_name].filter(Boolean).join(' ') || attempt.display_name || '';
+  }
+
   function sortRows(rows) {
     if (!sortState.col) return rows;
     return [...rows].sort((a, b) => {
       let va, vb;
       switch (sortState.col) {
         case 'user':
-          va = (a.display_name || '').toLowerCase();
-          vb = (b.display_name || '').toLowerCase();
+          va = userName(a).toLowerCase();
+          vb = userName(b).toLowerCase();
           break;
         case 'submitted':
           va = a.completed_gmt ?? '';
@@ -98,7 +106,7 @@ jQuery(document).ready(($) => {
 
       $row.find('tr').attr('data-user-id', attempt.user_id).attr('data-activity-id', attempt.activity_id);
       $row.find('.cell_attempt_index').text(index + 1);
-      $row.find('.cell_attempt_user').text(attempt.display_name);
+      $row.find('.cell_attempt_user').text(userName(attempt));
 
       const $date = $row.find('.cell_attempt_date');
       $date.text(formatDate(attempt.completed_gmt))
@@ -127,7 +135,7 @@ jQuery(document).ready(($) => {
     // Collapsed view: click to drill into that user's attempts.
     // Expanded view (user selected): click to navigate to the grading page.
     $tbody.on('click', 'tr[data-user-id]', function() {
-      if ($userFilter.val()) {
+      if (selectedUserId) {
         const activityId = $(this).data('activityId');
         if (activityId) {
           const gradingUrl = $block.data('gradingUrl');
@@ -139,7 +147,7 @@ jQuery(document).ready(($) => {
           window.location.href = `${gradingUrl}?${params}`;
         }
       } else {
-        $userFilter.val(String($(this).data('userId'))).trigger('change');
+        selectUser(parseInt($(this).data('userId'), 10));
       }
     });
   }
@@ -198,15 +206,20 @@ jQuery(document).ready(($) => {
   }
 
   function exportToCsv() {
-    const headers = ['#', 'User', 'Submitted', 'Score', 'Status'];
+    const headers = ['#', 'User', 'Submitted', 'Score', 'Percentage', 'Status'];
     const dataRows = currentRows.map((attempt, index) => {
       const status = attempt.pass === null ? 'Ungraded' : attempt.pass ? 'Pass' : 'Fail';
-      const score  = formatScore(round2(attempt.percentage), attempt.points_scored, attempt.points_total);
+      const hasPoints = attempt.points_scored !== null && attempt.points_total !== null;
+      const score = hasPoints ? `${attempt.points_scored}/${attempt.points_total}` : '';
+      const pct   = attempt.percentage !== null && attempt.percentage !== undefined
+        ? `${round2(attempt.percentage)}%`
+        : '';
       return [
         index + 1,
-        attempt.display_name,
+        userName(attempt),
         attempt.completed_gmt ? formatDateTime(attempt.completed_gmt) : '',
         score,
+        pct,
         status,
       ];
     });
@@ -217,7 +230,6 @@ jQuery(document).ready(($) => {
   }
 
   function applyFilters() {
-    const selectedUserId = parseInt($userFilter.val()) || null;
     const mode = $modeFilter.val();
 
     let rows;
@@ -232,22 +244,140 @@ jQuery(document).ready(($) => {
     renderRows(sortRows(rows));
   }
 
+  // ── User autosuggest ───────────────────────────────────────────────────────
+
+  function buildUsersIndex(attempts) {
+    const seen = new Set();
+    const index = [];
+    attempts.forEach(a => {
+      if (seen.has(a.user_id)) return;
+      seen.add(a.user_id);
+      const name = [a.first_name, a.last_name].filter(Boolean).join(' ') || a.display_name || '';
+      index.push({
+        id:    a.user_id,
+        name,
+        email: a.email || '',
+        label: a.email ? `${name} (${a.email})` : name,
+      });
+    });
+    index.sort((a, b) => a.name.localeCompare(b.name));
+    return index;
+  }
+
+  function showSuggestions(query) {
+    const q = query.toLowerCase().trim();
+    const matches = q
+      ? usersIndex.filter(u =>
+          u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
+        )
+      : usersIndex;
+
+    $suggestions.empty();
+    if (!matches.length) {
+      $suggestions.append('<li class="user-suggestion user-suggestion--empty" role="option">No users found</li>');
+    } else {
+      matches.forEach(u => {
+        $suggestions.append(
+          `<li class="user-suggestion" role="option" data-user-id="${u.id}" data-user-name="${escapeAttr(u.name)}">${escapeHtml(u.label)}</li>`
+        );
+      });
+    }
+    $suggestions.removeClass('hidden');
+    $userSearch.attr('aria-expanded', 'true');
+  }
+
+  function hideSuggestions() {
+    $suggestions.addClass('hidden').empty();
+    $userSearch.attr('aria-expanded', 'false');
+  }
+
+  function selectUser(userId) {
+    const user = usersIndex.find(u => u.id === userId);
+    if (!user) return;
+    selectedUserId = userId;
+    $userSearch.val(user.name).prop('readonly', true);
+    $userClear.removeClass('hidden');
+    $modeFilter.closest('.filter-bar__group').addClass('hidden');
+    hideSuggestions();
+    applyFilters();
+  }
+
+  function clearUserSelection() {
+    selectedUserId = null;
+    $userSearch.val('').prop('readonly', false).trigger('focus');
+    $userClear.addClass('hidden');
+    $modeFilter.closest('.filter-bar__group').removeClass('hidden');
+    applyFilters();
+  }
+
+  const escapeHtml = s => $('<div>').text(s).html();
+  const escapeAttr = s => s.replace(/"/g, '&quot;');
+
+  $userSearch.on('input', function() {
+    if (selectedUserId) return; // locked to a selection
+    showSuggestions($(this).val());
+  });
+
+  $userSearch.on('focus', function() {
+    if (!selectedUserId) showSuggestions($(this).val());
+  });
+
+  // Keyboard navigation in suggestions
+  $userSearch.on('keydown', function(e) {
+    if ($suggestions.hasClass('hidden')) return;
+    const $items = $suggestions.find('.user-suggestion:not(.user-suggestion--empty)');
+    const $active = $suggestions.find('.user-suggestion--active');
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const $next = $active.length ? $active.removeClass('user-suggestion--active').next('.user-suggestion') : $items.first();
+      $next.addClass('user-suggestion--active');
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const $prev = $active.length ? $active.removeClass('user-suggestion--active').prev('.user-suggestion') : $items.last();
+      $prev.addClass('user-suggestion--active');
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if ($active.length) selectUser(parseInt($active.data('userId'), 10));
+    } else if (e.key === 'Escape') {
+      hideSuggestions();
+    }
+  });
+
+  $suggestions.on('mousedown', '.user-suggestion:not(.user-suggestion--empty)', function(e) {
+    e.preventDefault(); // prevent input blur before click fires
+    selectUser(parseInt($(this).data('userId'), 10));
+  });
+
+  // Close suggestions when clicking outside
+  $(document).on('click.userSearch', function(e) {
+    if (!$(e.target).closest('.user-search-wrap').length) {
+      hideSuggestions();
+      // If nothing was selected, clear any partial text
+      if (!selectedUserId) $userSearch.val('');
+    }
+  });
+
+  $userClear.on('click', clearUserSelection);
+
   // ── Open event ─────────────────────────────────────────────────────────────
 
   $(window).on('bysQuizAttemptsOpen', async function(_event, data) {
     const { quizId, quizTitle, parentCourse, groupId, userId } = data;
 
-    currentGroupId  = groupId;
-    currentQuizId   = quizId;
-    currentQuizTitle  = quizTitle;
-    currentCourse     = parentCourse;
+    currentGroupId   = groupId;
+    currentQuizId    = quizId;
+    currentQuizTitle = quizTitle;
+    currentCourse    = parentCourse;
 
     $modal.find('.quiz-title').text(quizTitle);
     $modal.find('.course-title').text(parentCourse);
 
-    // Reset filters and sort
-    $userFilter.find('option:not(:first)').remove();
-    $userFilter.val('');
+    // Reset state
+    selectedUserId = null;
+    usersIndex = [];
+    $userSearch.val('').prop('readonly', false);
+    $userClear.addClass('hidden');
+    hideSuggestions();
     $modeFilter.val('highest');
     $modeFilter.closest('.filter-bar__group').removeClass('hidden');
     sortState = { col: 'user', dir: 'asc' };
@@ -261,19 +391,13 @@ jQuery(document).ready(($) => {
 
     try {
       allAttempts = await api.get(endpoints.groupQuizAttempts(groupId, quizId), true);
-
-      const usersMap = {};
-      allAttempts.forEach(a => { usersMap[a.user_id] = a.display_name; });
-      Object.entries(usersMap).forEach(([id, name]) => {
-        $userFilter.append(`<option value="${id}">${name}</option>`);
-      });
+      usersIndex  = buildUsersIndex(allAttempts);
 
       if (userId) {
-        $userFilter.val(String(userId));
-        $modeFilter.closest('.filter-bar__group').addClass('hidden');
+        selectUser(parseInt(userId, 10));
+      } else {
+        applyFilters();
       }
-
-      applyFilters();
 
     } catch (err) {
       console.error('[user-quiz-attempts-modal] Failed to fetch quiz attempts:', err);
@@ -283,10 +407,6 @@ jQuery(document).ready(($) => {
 
   // ── Filter change handlers ─────────────────────────────────────────────────
 
-  $userFilter.on('change', function() {
-    $modeFilter.closest('.filter-bar__group').toggleClass('hidden', !!$userFilter.val());
-    applyFilters();
-  });
   $modeFilter.on('change', applyFilters);
 
   // ── Export handler ─────────────────────────────────────────────────────────

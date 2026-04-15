@@ -359,7 +359,7 @@ jQuery(document).ready(($) => {
 
         $row.find('.cell_quiz_title').html(quiz.title);
         const $lastActivity = $row.find('.cell_last_activity');
-        $lastActivity.text(formatDate(quiz.latest_timestamp)).attr('data-tooltip', quiz.latest_timestamp_gmt ? formatDateTime(quiz.latest_timestamp_gmt) : '—');
+        $lastActivity.text(formatDate(quiz.latest_timestamp)).attr('data-tooltip', quiz.latest_timestamp ? formatDateTime(quiz.latest_timestamp) : '—');
         $row.find('.cell_parent_course').html(quiz.parent_course_title);
         $row.find('.attemps-count').text(quiz.total_attempts);
 

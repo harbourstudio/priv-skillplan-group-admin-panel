@@ -48,10 +48,26 @@ $wrapper_attributes = get_block_wrapper_attributes(['data-grading-url' => $gradi
             </div>
 
             <div class="modal__filter-bar">
-                <label for="quiz-attempts-user-filter"><?php esc_html_e('User', 'bys'); ?></label>
-                <select id="quiz-attempts-user-filter" class="quiz-attempts-user-filter">
-                    <option value=""><?php esc_html_e('All Users', 'bys'); ?></option>
-                </select>
+                <div class="filter-bar__user-search">
+                    <label for="quiz-attempts-user-search"><?php esc_html_e('User', 'bys'); ?></label>
+                    <div class="user-search-wrap">
+                        <input
+                            type="text"
+                            id="quiz-attempts-user-search"
+                            class="quiz-attempts-user-search"
+                            placeholder="<?php esc_attr_e('Search by name or email…', 'bys'); ?>"
+                            autocomplete="off"
+                            role="combobox"
+                            aria-expanded="false"
+                            aria-autocomplete="list"
+                            aria-controls="user-search-suggestions"
+                        />
+                        <button class="user-search-clear btn-unstyled hidden" type="button" aria-label="<?php esc_attr_e('Show all users', 'bys'); ?>">
+                            <i class="fa-solid fa-xmark"></i> <?php esc_html_e('All Users', 'bys'); ?>
+                        </button>
+                        <ul class="user-search-suggestions hidden" id="user-search-suggestions" role="listbox" aria-label="<?php esc_attr_e('User suggestions', 'bys'); ?>"></ul>
+                    </div>
+                </div>
 
                 <div class="filter-bar__group">
                     <label for="quiz-attempts-mode-filter"><?php esc_html_e('Show', 'bys'); ?></label>

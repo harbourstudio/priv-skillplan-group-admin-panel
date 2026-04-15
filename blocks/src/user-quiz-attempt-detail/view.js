@@ -93,6 +93,29 @@ jQuery(document).ready(($) => {
     }
   }
 
+  // ── Correct answer section ──────────────────────────────────────────────────
+
+  function renderCorrectAnswer($card, q) {
+    if (!q.correct_answer || !q.correct_answer.length) return;
+
+    const $el    = $card.find('.question-card__correct-answer');
+    const label  = q.answer_type === 'essay' ? 'Answer key' : 'Correct answer';
+
+    $el.attr('data-label', label);
+
+    q.correct_answer.forEach((answer) => {
+      const $item = $('<div class="correct-answer__item">');
+      if (answer.is_html) {
+        $item.html(answer.text);
+      } else {
+        $item.text(answer.text);
+      }
+      $el.append($item);
+    });
+
+    $el.removeClass('hidden');
+  }
+
   // ── Grade controls (rendered per-card in edit mode) ─────────────────────────
 
   function renderGradeControls($card, q) {
@@ -189,6 +212,13 @@ jQuery(document).ready(($) => {
     pendingGrades.clear();
   }
 
+  // Returns true if the pending grade differs from the question's original state.
+  function gradeChanged(q, grade) {
+    if (grade.result !== q.result) return true;
+    if (grade.result === 'partial' && grade.points !== q.points_earned) return true;
+    return false;
+  }
+
   // Apply pending grades to the card visuals (called before exiting after save)
   function applyGradesToCards(questions) {
     questions.forEach((q, i) => {
@@ -206,6 +236,14 @@ jQuery(document).ready(($) => {
         .removeClass('result-badge--correct result-badge--incorrect result-badge--partial result-badge--ungraded')
         .addClass(config.cls)
         .text(config.label);
+
+      // Only show the badge if this specific question's grade was changed,
+      // or if it was already marked as manually graded from a previous session.
+      if (gradeChanged(q, grade) || q.manually_graded) {
+        $card.find('.question-card__manual-badge')
+          .html('<i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>Manually graded')
+          .removeClass('hidden');
+      }
 
       if (q.points_max > 0) {
         const earned = grade.result === 'correct'  ? q.points_max
@@ -249,6 +287,12 @@ jQuery(document).ready(($) => {
           .addClass(`result-badge ${config.cls}`)
           .text(config.label);
 
+        if (q.manually_graded) {
+          $card.find('.question-card__manual-badge')
+            .html('<i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>Manually graded')
+            .removeClass('hidden');
+        }
+
         if (q.points_max > 0) {
           $card.find('.question-card__points').text(`${q.points_earned} / ${q.points_max} pts`);
         } else {
@@ -259,6 +303,7 @@ jQuery(document).ready(($) => {
         $card.find('.question-card__text').html(q.question_text || q.title || '');
 
         renderUserAnswers($card, q);
+        renderCorrectAnswer($card, q);
 
         $list.append($card);
       });
@@ -325,10 +370,19 @@ jQuery(document).ready(($) => {
           $saveBtn.prop('disabled', true).text('Saving\u2026');
           $statusEl.text('').removeClass('grade-save-bar__status--error');
 
+          // Only submit grades that were actually changed from their original state.
           const grades = [];
           pendingGrades.forEach((grade, questionId) => {
-            grades.push({ question_id: questionId, result: grade.result, points: grade.points });
+            const q = questions.find(q => q.question_id === questionId);
+            if (q && gradeChanged(q, grade)) {
+              grades.push({ question_id: questionId, result: grade.result, points: grade.points });
+            }
           });
+
+          if (!grades.length) {
+            exitEditMode();
+            return;
+          }
 
           try {
             const authHeader = window.bysGroupsAuth && window.bysGroupsAuth.header
@@ -356,7 +410,8 @@ jQuery(document).ready(($) => {
             questions.forEach(q => {
               const grade = pendingGrades.get(q.question_id);
               if (!grade) return;
-              q.result       = grade.result;
+              if (gradeChanged(q, grade)) q.manually_graded = true;
+              q.result        = grade.result;
               q.points_earned = grade.result === 'correct'  ? q.points_max
                               : grade.result === 'incorrect' ? 0
                               : grade.result === 'partial'   ? grade.points

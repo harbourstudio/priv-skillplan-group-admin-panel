@@ -23,6 +23,7 @@ export const endpoints = {
   courseHierarchialBreakdown: (courseId) => `/wp-json/bys-groups/v1/courses/${courseId}/steps`,
   groupUserCourseProgress: (userId, courseIds) => `/wp-json/bys-groups/v1/users/${userId}/course-progress?course_ids=${courseIds}`,
   courseQuizSteps: (courseId) => `/wp-json/bys-groups/v1/courses/${courseId}/quiz-steps`,
+  courseQuizProgressBatch: (courseId, userIds) => `/wp-json/bys-groups/v1/courses/${courseId}/quiz-progress-batch?user_ids=${userIds}`,
   groupQuizSubmissionStats: (groupId, quizIds) => `/wp-json/bys-groups/v1/groups/${groupId}/quiz-submission-stats?quiz_ids=${quizIds.join(',')}`,
   groupQuizAttempts: (groupId, quizId) => `/wp-json/bys-groups/v1/groups/${groupId}/quizzes/${quizId}/attempts`,
   userQuizAttempts: (userId, courseId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-attempts?course_id=${courseId}`,
@@ -33,6 +34,7 @@ export const endpoints = {
   userActivity: (userId) => `/wp-json/bys-groups/v1/users/${userId}/activity`,
   userCourseActivity: (userId, courseId) => `/wp-json/bys-groups/v1/users/${userId}/activity?course_id=${courseId}`,
   userCourseStepsProgress: (userId, courseId) => `/wp-json/bys-groups/v1/users/${userId}/course-progress-steps/${courseId}`,
+  trackTopicVisit: (userId) => `/wp-json/bys-groups/v1/users/${userId}/track-topic-visit`,
 };
 
 export const api = {
@@ -90,6 +92,25 @@ export const api = {
 
     this._pending.set(url, promise);
     return promise;
+  },
+
+  /**
+   * Fire-and-forget POST. Does not cache. Auth header included automatically.
+   */
+  post(url, body = {}) {
+    const headers = { 'Content-Type': 'application/json' };
+    const authHeader = getAuthorizationHeader();
+    if (authHeader) headers['Authorization'] = authHeader;
+
+    return jQuery.ajax({
+      url,
+      type: 'POST',
+      headers,
+      data: JSON.stringify(body),
+      dataType: 'json',
+    }).catch((jqXHR) => {
+      console.error(`POST failed for ${url}:`, jqXHR.status, jqXHR.responseText?.substring(0, 200));
+    });
   },
 
   /**

@@ -38,6 +38,23 @@ $auth_header = BYS_Groups_Auth::get_auth_header();
         <!-- Mount target: JS will populate with courses -->
         <div class="hs-accordion-group" id="user-progress-courses-list"></div>
 
+        <!-- Skeleton accordion item template -->
+        <template id="user-progress-skeleton-template">
+            <div class="hs-accordion hs-accordion--skeleton">
+                <div class="hs-accordion-toggle hs-accordion-toggle--skeleton" aria-hidden="true">
+                    <div class="accordion-toggle__left-wrapper">
+                        <span class="accordion-toggle__icon--skeleton"></span>
+                        <span class="accordion-toggle__name--skeleton"></span>
+                    </div>
+                    <div class="accordion-toggle__right-wrapper">
+                        <span class="accordion-toggle__date--skeleton"></span>
+                        <span class="accordion-toggle__badge--skeleton"></span>
+                        <span class="accordion-toggle__progress--skeleton"></span>
+                    </div>
+                </div>
+            </div>
+        </template>
+
         <!-- Template: Course accordion item -->
         <template id="user-progress-course-template">
             <div class="hs-accordion" data-course-id="">

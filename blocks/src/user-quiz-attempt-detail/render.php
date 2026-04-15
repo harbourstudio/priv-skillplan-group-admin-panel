@@ -84,6 +84,7 @@ window.bysGradingNonce = window.bysGradingNonce || '<?php echo esc_js( wp_create
             <div class="question-card__header">
                 <span class="question-card__number"></span>
                 <span class="question-card__result-badge"></span>
+                <span class="question-card__manual-badge hidden"></span>
                 <span class="question-card__points"></span>
             </div>
             <div class="question-card__text"></div>
@@ -91,6 +92,8 @@ window.bysGradingNonce = window.bysGradingNonce || '<?php echo esc_js( wp_create
             <div class="question-card__answers hidden"></div>
             <!-- Free-text user answer (free_answer / essay) -->
             <div class="question-card__user-text hidden"></div>
+            <!-- Expected correct answer -->
+            <div class="question-card__correct-answer hidden"></div>
         </div>
     </template>
 

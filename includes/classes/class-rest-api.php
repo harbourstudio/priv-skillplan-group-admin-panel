@@ -135,6 +135,13 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'permission_callback' => array($this, 'check_user_permission'),
             ));
 
+            // Batch quiz progress for multiple users in one course — used by CSV export
+            register_rest_route($this->namespace, '/courses/(?P<course_id>\d+)/quiz-progress-batch', array(
+                'methods'             => 'GET',
+                'callback'            => array($this, 'get_course_quiz_progress_batch'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
+
             // courseHierarchialBreakdown
             register_rest_route($this->namespace, '/courses/(?P<course_id>\d+)/steps', array(
                 'methods'             => 'GET',
@@ -174,6 +181,13 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             register_rest_route($this->namespace, '/users/(?P<user_id>\d+)/log-certificate-view', array(
                 'methods'             => 'POST',
                 'callback'            => array($this, 'log_certificate_view'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
+
+            // trackTopicVisit - increment per-topic visit counter
+            register_rest_route($this->namespace, '/users/(?P<user_id>\d+)/track-topic-visit', array(
+                'methods'             => 'POST',
+                'callback'            => array($this, 'track_topic_visit'),
                 'permission_callback' => array($this, 'check_user_permission'),
             ));
         }
@@ -823,12 +837,17 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 $meta_map[$aid][$meta['activity_meta_key']] = $meta['activity_meta_value'];
             }
 
-            // Batch-fetch user display names
+            // Batch-fetch user data (name + email)
             $unique_user_ids = array_unique(array_column($rows, 'user_id'));
-            $user_names = array();
+            $user_data = array();
             foreach ($unique_user_ids as $uid) {
                 $user = get_userdata(intval($uid));
-                $user_names[intval($uid)] = $user ? $user->display_name : 'Unknown User';
+                $user_data[intval($uid)] = array(
+                    'first_name'   => $user ? ($user->first_name ?: '') : '',
+                    'last_name'    => $user ? ($user->last_name  ?: '') : '',
+                    'email'        => $user ? $user->user_email         : '',
+                    'display_name' => $user ? $user->display_name       : 'Unknown User',
+                );
             }
 
             // Batch-check which attempts have ungraded questions.
@@ -881,7 +900,10 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 $result[] = array(
                     'activity_id'   => $aid,
                     'user_id'       => $uid,
-                    'display_name'  => $user_names[$uid] ?? 'Unknown User',
+                    'first_name'    => $user_data[$uid]['first_name']   ?? '',
+                    'last_name'     => $user_data[$uid]['last_name']    ?? '',
+                    'email'         => $user_data[$uid]['email']        ?? '',
+                    'display_name'  => $user_data[$uid]['display_name'] ?? 'Unknown User',
                     'started_gmt'   => $row['activity_started']
                         ? gmdate('Y-m-d\TH:i:s', intval($row['activity_started']))
                         : null,
@@ -1064,6 +1086,40 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 $question_map[intval($q['id'])] = $q;
             }
 
+            // Step 3b: Resolve WordPress post IDs for questions.
+            // The stat table's question_post_id is 0 in many LD versions, and the LDLMS
+            // question IDs don't match the legacy question_pro_id stored in WP post meta.
+            // Instead, fetch all sfwd-question posts for this quiz and match by title —
+            // the question title in the LDLMS table matches the sfwd-question post_title.
+            $question_post_id_map = array(); // keyed by trimmed question title
+
+            $quiz_post_id = (int) $wpdb->get_var(
+                $wpdb->prepare(
+                    "SELECT post_id FROM {$wpdb->prefix}learndash_user_activity
+                     WHERE activity_id = %d AND activity_type = 'quiz'",
+                    $activity_id
+                )
+            );
+
+            if ($quiz_post_id) {
+                $sfwd_q_rows = $wpdb->get_results(
+                    $wpdb->prepare(
+                        "SELECT p.ID, p.post_title
+                         FROM {$wpdb->posts} p
+                         INNER JOIN {$wpdb->postmeta} pm
+                             ON  pm.post_id  = p.ID
+                             AND pm.meta_key = 'quiz_id'
+                             AND pm.meta_value = %d
+                         WHERE p.post_type = 'sfwd-question'",
+                        $quiz_post_id
+                    ),
+                    ARRAY_A
+                );
+                foreach ($sfwd_q_rows as $row) {
+                    $question_post_id_map[trim($row['post_title'])] = intval($row['ID']);
+                }
+            }
+
             // Step 4: Combine and determine result per question
             $result = array();
             foreach ($stat_rows as $stat) {
@@ -1101,6 +1157,9 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                     $question_result = 'incorrect';
                 }
 
+                $stat_answer_data = json_decode($stat['answer_data'] ?? '', true);
+                $manually_graded  = !empty($stat_answer_data['manually_graded']);
+
                 $result[] = array(
                     'question_id'      => $qid,
                     'question_post_id' => intval($stat['question_post_id']),
@@ -1110,11 +1169,18 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                     'points_earned'    => $points_earned,
                     'points_max'       => $points_max,
                     'result'           => $question_result,
+                    'manually_graded'  => $manually_graded,
                     'sort'             => $qdef ? intval($qdef['sort']) : 0,
                     'user_answers'     => $this->parse_question_answers(
                         $stat['answer_data'] ?? '',
                         $qdef['answer_data'] ?? '',
                         $answer_type
+                    ),
+                    'correct_answer'   => $this->parse_correct_answer(
+                        $qdef['answer_data'] ?? '',
+                        $answer_type,
+                        intval($stat['question_post_id']) ?: ($question_post_id_map[trim($qdef['title'] ?? '')] ?? 0),
+                        $qid
                     ),
                 );
             }
@@ -1249,6 +1315,17 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                         'question_id'      => $question_id,
                     ),
                     array('%d', '%d', '%f'),
+                    array('%d', '%d')
+                );
+
+                // Persist manually_graded flag in answer_data
+                $answer_data_arr                    = json_decode($stat_row['answer_data'] ?? '', true) ?: array();
+                $answer_data_arr['manually_graded'] = true;
+                $wpdb->update(
+                    $stat_table,
+                    array('answer_data' => wp_json_encode($answer_data_arr)),
+                    array('statistic_ref_id' => $statistic_ref_id, 'question_id' => $question_id),
+                    array('%s'),
                     array('%d', '%d')
                 );
 
@@ -1434,8 +1511,8 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 return null; // Submitted but no content available yet
             }
 
-            // ── Free-text questions (auto-graded) ──────────────────────────────
-            if ($answer_type === 'free_answer') {
+            // ── Free-text / cloze (fill-in-the-blank) (auto-graded) ───────────
+            if (in_array($answer_type, array('free_answer', 'cloze_answer'), true)) {
                 $s_data = @unserialize($stat_answer_raw, array('allowed_classes' => false)); // phpcs:ignore
 
                 if (is_array($s_data)) {
@@ -1457,6 +1534,134 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                     return null;
                 }
                 return array('type' => 'text', 'user_text' => wp_kses_post($text));
+            }
+
+            return null;
+        }
+
+        /**
+         * Extract the expected correct answer(s) for a question.
+         *
+         * - single / multiple : deserialise answer_data, return options where isCorrect() is true.
+         * - cloze_answer      : deserialise answer_data, format {word}/[a|b] template for display.
+         * - free_answer       : all listed options are valid correct answers — return all of them.
+         * - essay             : no programmatic answer; look up the 'essay_answer_key' post meta.
+         *
+         * $question_id is the WpProQuiz ID used as a fallback to resolve the WordPress post ID
+         * when $question_post_id is 0 in the stat table.
+         */
+        private function parse_correct_answer($q_answer_raw, $answer_type, $question_post_id = 0, $question_id = 0) {
+
+            // ── Choice-based (single / multiple) ──────────────────────────────
+            if (in_array($answer_type, array('single', 'multiple'), true)) {
+                $q_options = @unserialize($q_answer_raw); // phpcs:ignore
+                if (!is_array($q_options)) {
+                    return null;
+                }
+
+                $correct = array();
+                foreach ($q_options as $opt) {
+                    if (!is_object($opt) || ($opt instanceof \__PHP_Incomplete_Class)) {
+                        continue;
+                    }
+                    if (!method_exists($opt, 'isCorrect') || !$opt->isCorrect()) {
+                        continue;
+                    }
+                    $text    = method_exists($opt, 'getAnswer') ? $opt->getAnswer() : '';
+                    $is_html = method_exists($opt, 'isHtml')    && $opt->isHtml();
+                    if ($text !== '') {
+                        $correct[] = array(
+                            'text'    => $is_html ? wp_kses_post($text) : sanitize_text_field($text),
+                            'is_html' => $is_html,
+                        );
+                    }
+                }
+
+                return $correct ?: null;
+            }
+
+            // ── Cloze / fill-in-the-blank ─────────────────────────────────────
+            // The question's answer_data holds the full answer template, e.g.
+            // "{41.34} tonnes" or "I {play} [football|soccer]".
+            // We unserialise, grab the template string, and format it for display.
+            if ($answer_type === 'cloze_answer') {
+                $q_options = @unserialize($q_answer_raw); // phpcs:ignore
+                if (!is_array($q_options)) {
+                    return null;
+                }
+
+                $correct = array();
+                foreach ($q_options as $opt) {
+                    if (!is_object($opt) || ($opt instanceof \__PHP_Incomplete_Class)) {
+                        continue;
+                    }
+                    $template = method_exists($opt, 'getAnswer') ? $opt->getAnswer() : '';
+                    if ($template === '') {
+                        continue;
+                    }
+
+                    // Convert {word} and {[a|b]} → the word/alternatives (required blank)
+                    $formatted = preg_replace_callback(
+                        '/\{(\[([^\]]+)\]|([^}]+))\}/',
+                        function ($m) {
+                            $inner = $m[2] !== '' ? $m[2] : $m[3];
+                            return str_replace('|', ' / ', $inner);
+                        },
+                        $template
+                    );
+                    // Convert remaining [a|b] outside braces → alternatives
+                    $formatted = preg_replace_callback(
+                        '/\[([^\]]+)\]/',
+                        function ($m) {
+                            return str_replace('|', ' / ', $m[1]);
+                        },
+                        $formatted
+                    );
+
+                    $correct[] = array(
+                        'text'    => sanitize_text_field($formatted),
+                        'is_html' => false,
+                    );
+                }
+
+                return $correct ?: null;
+            }
+
+            // ── Free-answer ───────────────────────────────────────────────────
+            // Every option the admin enters is a valid correct answer, so we
+            // return all of them rather than filtering by isCorrect().
+            if ($answer_type === 'free_answer') {
+                $q_options = @unserialize($q_answer_raw); // phpcs:ignore
+                if (!is_array($q_options)) {
+                    return null;
+                }
+
+                $correct = array();
+                foreach ($q_options as $opt) {
+                    if (!is_object($opt) || ($opt instanceof \__PHP_Incomplete_Class)) {
+                        continue;
+                    }
+                    $text = method_exists($opt, 'getAnswer') ? $opt->getAnswer() : '';
+                    if ($text !== '') {
+                        $correct[] = array(
+                            'text'    => sanitize_text_field($text),
+                            'is_html' => false,
+                        );
+                    }
+                }
+
+                return $correct ?: null;
+            }
+
+            // ── Essay ─────────────────────────────────────────────────────────
+            // No programmatic correct answer — look for an instructor-set answer key.
+            // $question_post_id is resolved upstream from the LDLMS question table's
+            // post_id column, which is the reliable link to the sfwd-question post.
+            if ($answer_type === 'essay' && $question_post_id) {
+                $answer_key = get_post_meta($question_post_id, 'essay_answer_key', true);
+                if ($answer_key) {
+                    return array(array('text' => wp_kses_post($answer_key), 'is_html' => true));
+                }
             }
 
             return null;
@@ -1699,6 +1904,94 @@ if (!class_exists('BYS_Groups_Rest_API')) {
          * Get quiz attempts for a user in a course
          * Returns the best attempt (highest percentage) for each quiz with configured pass threshold
          */
+        /**
+         * Batch quiz progress for multiple users in a single course.
+         * Returns { user_id: { quiz_id: { total_attempts, percent_highest, pass_highest } } }
+         * Uses direct DB queries — two queries total regardless of user/quiz count.
+         * Params: ?user_ids=1,2,3
+         */
+        public function get_course_quiz_progress_batch($request) {
+            $course_id     = intval($request['course_id']);
+            $user_ids_param = $request->get_param('user_ids');
+
+            if (!$course_id || !$user_ids_param) {
+                return new \WP_REST_Response(array('error' => 'course_id and user_ids are required'), 400);
+            }
+
+            $user_ids = array_values(array_unique(array_filter(array_map('intval', explode(',', $user_ids_param)))));
+            if (empty($user_ids)) {
+                return new \WP_REST_Response(array(), 200);
+            }
+
+            global $wpdb;
+            $activity_table = $wpdb->prefix . 'learndash_user_activity';
+            $meta_table     = $wpdb->prefix . 'learndash_user_activity_meta';
+
+            // Sanitise IDs for inline IN() — all guaranteed integers
+            $user_ids_str = implode(',', $user_ids);
+
+            // ── Query 1: all completed quiz activities for these users in this course ──
+            $activities = $wpdb->get_results($wpdb->prepare(
+                "SELECT a.activity_id, a.user_id, a.post_id AS quiz_id, a.activity_status
+                 FROM {$activity_table} a
+                 WHERE a.course_id   = %d
+                   AND a.user_id    IN ({$user_ids_str})
+                   AND a.activity_type      = 'quiz'
+                   AND a.activity_completed > 0",
+                $course_id
+            ));
+
+            if (empty($activities)) {
+                return new \WP_REST_Response(array(), 200);
+            }
+
+            // ── Query 2: percentage metadata for all returned activity rows ──
+            $activity_ids     = array_unique(array_map(function($a) { return intval($a->activity_id); }, $activities));
+            $activity_ids_str = implode(',', $activity_ids);
+
+            $metas = $wpdb->get_results(
+                "SELECT activity_id, activity_meta_value
+                 FROM {$meta_table}
+                 WHERE activity_id     IN ({$activity_ids_str})
+                   AND activity_meta_key = 'percentage'"
+            );
+
+            $pct_map = array(); // activity_id => float
+            foreach ($metas as $meta) {
+                $pct_map[intval($meta->activity_id)] = floatval($meta->activity_meta_value);
+            }
+
+            // ── Group activities: [user_id][quiz_id] = [ {pass, pct}, … ] ──
+            $grouped = array();
+            foreach ($activities as $act) {
+                $uid = intval($act->user_id);
+                $qid = intval($act->quiz_id);
+                $aid = intval($act->activity_id);
+                $grouped[$uid][$qid][] = array(
+                    'pass' => intval($act->activity_status) === 1,
+                    'pct'  => $pct_map[$aid] ?? 0.0,
+                );
+            }
+
+            // ── Build summary per user/quiz ──
+            $result = array();
+            foreach ($grouped as $uid => $quizzes) {
+                foreach ($quizzes as $qid => $attempts) {
+                    $best = $attempts[0];
+                    foreach ($attempts as $attempt) {
+                        if ($attempt['pct'] > $best['pct']) $best = $attempt;
+                    }
+                    $result[$uid][$qid] = array(
+                        'total_attempts'  => count($attempts),
+                        'percent_highest' => round($best['pct'], 2),
+                        'pass_highest'    => $best['pass'],
+                    );
+                }
+            }
+
+            return new \WP_REST_Response($result, 200);
+        }
+
         /**
          * Get quiz progress summary for all quizzes in group courses
          * Optional: Pass course_ids to avoid server-side fetch
@@ -2887,7 +3180,7 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             }
 
             // Augment steps with activity detail (last accessed, time spent, visits)
-            // via 2 batch DB queries — no N+1
+            // via batch DB queries — no N+1
             if ( ! empty( $all_steps ) ) {
                 global $wpdb;
                 $ld_table   = $wpdb->prefix . 'learndash_user_activity';
@@ -2928,6 +3221,23 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                     }
                 }
 
+                // Query 3: batch-fetch custom visit counts from user meta (bys_topic_visits_{id})
+                $step_ids = array_keys( $activity_map );
+                $visit_map = [];
+                if ( ! empty( $step_ids ) ) {
+                    $meta_key_placeholders = implode( ',', array_fill( 0, count( $step_ids ), '%s' ) );
+                    $meta_keys_needed = array_map( fn($id) => 'bys_topic_visits_' . $id, $step_ids );
+                    $visit_rows = $wpdb->get_results( $wpdb->prepare(
+                        "SELECT meta_key, meta_value FROM {$wpdb->usermeta}
+                         WHERE user_id = %d AND meta_key IN ({$meta_key_placeholders})",
+                        $user_id, ...$meta_keys_needed
+                    ), ARRAY_A );
+                    foreach ( $visit_rows as $vr ) {
+                        $pid_from_key = intval( str_replace( 'bys_topic_visits_', '', $vr['meta_key'] ) );
+                        $visit_map[ $pid_from_key ] = intval( $vr['meta_value'] );
+                    }
+                }
+
                 // Merge extra fields into each step
                 foreach ( $all_steps as &$step ) {
                     $pid = intval( $step['step'] );
@@ -2951,15 +3261,35 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                         }
                     }
 
-                    // visits — Uncanny Owl meta only; core LD doesn't track per-topic visit counts
-                    if ( isset( $meta['count'] ) && intval( $meta['count'] ) > 0 ) {
-                        $step['visits'] = intval( $meta['count'] );
+                    // visits — from our custom bys_topic_visits_{id} user meta
+                    if ( isset( $visit_map[ $pid ] ) && $visit_map[ $pid ] > 0 ) {
+                        $step['visits'] = $visit_map[ $pid ];
                     }
                 }
                 unset( $step );
             }
 
             return new \WP_REST_Response($all_steps, 200);
+        }
+
+        /**
+         * Increment a per-topic visit counter stored in user meta.
+         * Meta key: bys_topic_visits_{topic_id}
+         */
+        public function track_topic_visit($request) {
+            $user_id  = intval($request['user_id']);
+            $topic_id = intval($request->get_param('topic_id'));
+
+            if (!$user_id || !$topic_id) {
+                return new \WP_REST_Response(array('error' => 'Missing user_id or topic_id'), 400);
+            }
+
+            $meta_key = 'bys_topic_visits_' . $topic_id;
+            $current  = intval(get_user_meta($user_id, $meta_key, true));
+            $new_count = $current + 1;
+            update_user_meta($user_id, $meta_key, $new_count);
+
+            return new \WP_REST_Response(array('visits' => $new_count), 200);
         }
     }
 }
