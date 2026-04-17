@@ -1,1 +1,1630 @@
-(()=>{"use strict";function e(){return window.bysGroupsAuth&&window.bysGroupsAuth.header?window.bysGroupsAuth.header:null}const t=e=>`/wp-json/bys-groups/v1/courses/${e}/quiz-steps`,s=e=>`/wp-json/bys-groups/v1/users/${e}/quiz-progress`,n={_cache:new Map,_pending:new Map,async get(t,s=!1){if(!s&&this._cache.has(t))return this._cache.get(t);if(this._pending.has(t))return this._pending.get(t);const n={},o=e();o&&(n.Authorization=o);const i=jQuery.ajax({url:t,type:"GET",headers:n,dataType:"json"}).done((e,s,n)=>{console.log(`Success for ${t}:`,{status:n.status,data:e})}).then(e=>(this._cache.set(t,e),e)).catch((e,s,n)=>{throw console.error(`API request failed for ${t}:`,{status:e.status,statusText:e.statusText,responseText:e.responseText?.substring(0,500),textStatus:s,errorThrown:n?.message}),new Error(`API request failed: ${e.status} ${e.statusText} - ${e.responseText?.substring(0,100)}`)}).always(()=>{this._pending.delete(t)});return this._pending.set(t,i),i},post(t,s={}){const n={"Content-Type":"application/json"},o=e();return o&&(n.Authorization=o),jQuery.ajax({url:t,type:"POST",headers:n,data:JSON.stringify(s),dataType:"json"}).catch(e=>{console.error(`POST failed for ${t}:`,e.status,e.responseText?.substring(0,200))})},invalidate(e){for(const t of this._cache.keys())t.includes(e)&&this._cache.delete(t)},clear(){this._cache.clear()}};jQuery(document).ready(function(e){const o=e(".wp-block-bys-groups-group-reporting").first(),i=o.find(".reporting-table"),a=i.data("detailUrl")||"/administrator-dashboard/user-progress-detail/";if(!i.length)return;let r=null,l=[],c=[],d={},u=new Set,f={},p={},m=0,h="first_name_asc";let g=[],_=0,y=[],b=[],$=[],v=[],w=!1,C={courseIds:[],userIds:[],courseStatus:"",userStatus:"",enrolmentDate:{from:"",to:""},completionDate:{from:"",to:""}};function x(e){i.find(`.course-col-header[data-course-idx="${e}"]`).removeClass("course-col-header--collapsed").addClass("course-col-header--expanded").find(".bys-course-toggle").attr("aria-expanded","true"),i.find(`.course-sub-col[data-course-idx="${e}"]`).removeClass("course-sub-col--hidden"),i.find(`.course-sub-cell[data-course-idx="${e}"]`).removeClass("course-sub-col--hidden"),i.find(`.course-col-header:not([data-course-idx="${e}"])`).addClass("course-col--hidden"),i.find(`.course-cell--badge:not([data-course-idx="${e}"])`).addClass("course-col--hidden")}function I(t){const s=t.data("tip");if(!s)return;e(".bys-tooltip-instance").remove();let n=s,o="",i="";if(s.includes("|")){const e=s.split("|");n=e[0]||"",o=e[1]||"",i=e[2]||""}const a=e('<div class="bys-tooltip-instance" role="tooltip"></div>');o||i?a.html(`\n        <div class="bys-tooltip__title">${ie(n)}</div>\n        <div class="bys-tooltip__content">\n          <div class="bys-tooltip__fraction">${ie(o)}</div>\n          <div class="bys-tooltip__percentage">${ie(i)}</div>\n        </div>\n      `):a.text(n),a.appendTo("body");const r=t[0].getBoundingClientRect();a.css({position:"fixed",top:r.top+r.height+6+"px",left:r.left+"px"})}function k(){e(".bys-tooltip-instance").remove()}o.find(".filters__toggle").on("click",function(){const t=e(this),s=o.find("#filters-box"),n="true"===t.attr("aria-expanded");t.attr("aria-expanded",!n),s.attr("aria-hidden",n),s.toggleClass("hidden",n),n||(H(),W())}),i.on("click",".bys-course-toggle",function(o){o.stopPropagation();const a=parseInt(e(this).data("courseIdx"),10),d=r!==a;i.find(".course-col-header").removeClass("course-col-header--expanded").addClass("course-col-header--collapsed").removeClass("course-col--hidden").find(".bys-course-toggle").attr("aria-expanded","false"),i.find(".course-cell--badge").removeClass("course-col--hidden"),i.find(".course-sub-col, .course-sub-cell").addClass("course-sub-col--hidden"),z(),d?(x(a),r=a,u.has(a)||async function(o){const a=c[o];if(!a)return;u.add(o);let r=[];if(f[a.id])r=f[a.id];else try{r=await n.get(t(a.id))||[],f[a.id]=r}catch(e){console.error(`[group-reporting] Failed to fetch quiz steps for course ${a.id}:`,e)}p[a.id]||(p[a.id]={});const d={};for(const e of l)try{const t=s(e.id)+`?group_id=${q}&course_ids=${a.id}`,o=await n.get(t);d[e.id]={},Array.isArray(o)&&o.forEach(t=>{d[e.id][t.id]=t}),p[a.id][e.id]=d[e.id]}catch(t){console.error(`[group-reporting] Failed to fetch quiz progress for user ${e.id}:`,t),d[e.id]={},p[a.id][e.id]={}}i.find(`.course-sub-cell--quizzing[data-course-idx="${o}"]`).each(function(){const t=e(this).closest("tr").data("userId"),s=d[t]||{};e(this).html(P(r,t,s))})}(a)):r=null}),i.on("click",".reporting-table__row",function(t){if(e(t.target).closest(".bys-course-toggle").length)return;if(e(t.target).closest("a").length)return;const s=e(this).data("userId");s&&(window.location.href=a+"?user_id="+s+"&group_id="+q)}),i.on("mouseenter",".bys-quiz-icon[data-quiz-id]:not([data-tip-loaded])",async function(){const t=e(this),s=parseInt(t.data("quizId")),o=parseInt(t.data("userId"));if(o&&s)try{const e=await n.get(((e,t)=>`/wp-json/bys-groups/v1/users/${e}/quiz-attempts/${t}`)(o,s));if(!Array.isArray(e)||0===e.length)return t.attr("data-tip-loaded","1"),void I(t);const i=e.reduce((e,t)=>parseFloat(t.percentage||0)>=parseFloat(e.percentage||0)?t:e,e[0]),a=null!=i.points_scored&&null!=i.points_total?`${i.points_scored}/${i.points_total}`:"N/A",r=`${t.data("quizTitle")}|${a}|${t.data("percent")}%`;t.attr("data-tip",ie(r)).attr("data-tip-loaded","1"),I(t)}catch(e){console.error(`[group-reporting] Failed to fetch quiz attempts for user ${o}, quiz ${s}:`,e),t.attr("data-tip-loaded","1"),I(t)}else I(t)}),i.on("mouseenter",".bys-quiz-icon[data-tip-loaded]",function(){I(e(this))}),i.on("mouseleave",".bys-quiz-icon",function(){k()}),i.on("mouseenter",".status-badge__icon[data-tip]",function(){I(e(this))}),i.on("mouseleave",".status-badge__icon",function(){k()}),i.on("click","[data-tip]",function(t){t.stopPropagation(),I(e(this))}),e(document).on("click",function(){k()});let q=null;function E(){z(),i.find("tbody tr.reporting-table__row").each(function(){const t=parseInt(e(this).data("userId"),10),s=l.find(e=>e.id===t);if(!s)return;const n=j(s);e(this).toggleClass("reporting-table__row--filtered",!n),e(this).css("display",n?"":"none")})}function z(){const e=C.courseIds.length>0;c.forEach((t,s)=>{!e||C.courseIds.includes(t.id)?r!==s&&(i.find(`[data-course-idx="${s}"]`).removeClass("course-col--hidden"),i.find(`.course-sub-col[data-course-idx="${s}"]`).addClass("course-sub-col--hidden"),i.find(`.course-sub-cell[data-course-idx="${s}"]`).addClass("course-sub-col--hidden")):i.find(`[data-course-idx="${s}"]`).addClass("course-col--hidden")})}function j(e){const{userIds:t,courseStatus:s,userStatus:n,enrolmentDate:o,completionDate:i}=C;let a=!0;if(t.length>0&&(a=t.includes(e.id)),a&&n&&(a=(e.status||"never")===n),a&&s){const t=d[e.id]||[],n=C.courseIds.length>0?t.filter(e=>C.courseIds.includes(e.course_id)):t,o="inactive"===s?"not_started":s;a=n.some(e=>(e.progress_status||"not_started")===o)}if(a&&(o.from||o.to)){const t=d[e.id]||[];a=(C.courseIds.length>0?t.filter(e=>C.courseIds.includes(e.course_id)):t).some(e=>{if(!e.enrolled_at)return!1;const t=new Date(e.enrolled_at);if(o.from&&t<new Date(o.from))return!1;if(o.to){const e=new Date(o.to);if(e.setHours(23,59,59,999),t>e)return!1}return!0})}if(a&&(i.from||i.to)){const t=d[e.id]||[];a=(C.courseIds.length>0?t.filter(e=>C.courseIds.includes(e.course_id)):t).some(e=>{if(!e.date_completed)return!1;const t=new Date(e.date_completed);if(i.from&&t<new Date(i.from))return!1;if(i.to){const e=new Date(i.to);if(e.setHours(23,59,59,999),t>e)return!1}return!0})}return a}function S(){const e=1===y.length,t=o.find(".filters__field--course-dep");t.toggleClass("is-disabled",!e),t.find('select, input[type="date"], .date-range__trigger').prop("disabled",!e),e||(o.find("#filter-status").val("").addClass("is-placeholder"),A("filter-enrolment-date-from","filter-enrolment-date-to","enrolment-date-range-text","enrolment-date-range-dropdown"),A("filter-completion-date-from","filter-completion-date-to","completion-date-range-text","completion-date-range-dropdown"))}function D(){const e=1===C.courseIds.length;o.find(".sort-option--completion").toggleClass("hidden",!e),e||"completion_date_asc"!==h&&"completion_date_desc"!==h||(h="first_name_asc",o.find("#sort-select").val("first_name_asc"))}function A(e,t,s,n){o.find("#"+e).val("").removeAttr("min").removeAttr("max"),o.find("#"+t).val("").removeAttr("min").removeAttr("max"),o.find("#"+s).text("Select a date range"),o.find("#"+n).addClass("hidden")}function L(e,t){const s=o.find("#"+e),n=o.find("#"+t),i=s.val(),a=n.val();i?n.attr("min",i):n.removeAttr("min"),a?s.attr("max",a):s.removeAttr("max"),i&&a&&i>a&&s.val(a)}function N(e,t,s){const n=o.find("#"+e).val(),i=o.find("#"+t).val();n||i?n&&i?o.find("#"+s).text(`${n} – ${i}`):n?o.find("#"+s).text(`From ${n}`):o.find("#"+s).text(`Until ${i}`):o.find("#"+s).text("Select a date range")}function T(){o.find("#filter-status").val("").addClass("is-placeholder"),o.find("#filter-user-status").val("").addClass("is-placeholder"),A("filter-enrolment-date-from","filter-enrolment-date-to","enrolment-date-range-text","enrolment-date-range-dropdown"),A("filter-completion-date-from","filter-completion-date-to","completion-date-range-text","completion-date-range-dropdown")}function F(t){const s=i.find("thead");s.html("");const n=document.createElement("tr");n.className="reporting-table__head";const o=document.createElement("th");o.className="col-status",n.appendChild(o);const a=document.createElement("th");a.className="col-name",a.textContent="Name",n.appendChild(a);const r=document.createElement("th");r.className="col-email",r.textContent="Email",n.appendChild(r);const l=document.getElementById("course-header-template");t.forEach((t,s)=>{const o=l.content.cloneNode(!0),i=e(o);i.find("[data-course-idx]").attr("data-course-idx",s);const a=t.title?.rendered||t.title||"";i.find(".bys-course-toggle").text(function(e,t=28){if(!e||e.length<=t)return e;const s=e.lastIndexOf(" ",t);return(s>0?e.substring(0,s):e.substring(0,t))+"…"}(a)).attr("title",a).attr("data-course-idx",s),t.required&&i.find(".bys-required-badge").removeClass("hidden"),i.find(".bys-dl-link").attr("title",`Download ${ie(a)}`).attr("data-course-idx",s),i.children().each(function(){n.appendChild(this)})}),s.append(n)}function P(e,t,s){return e&&0!==e.length?`<div class="bys-quiz-icons">${e.map(e=>{const n=e.step_id,o=e.step_title,i=s[n];if(!i||0===i.total_attempts)return`<span class="bys-quiz-icon bys-quiz-icon--neutral" data-tip="${ie(`${o}|Not attempted`)}" data-quiz-id="${n}" data-quiz-title="${ie(o)}"></span>`;const a=i.pass_highest?"bys-quiz-icon--pass":"bys-quiz-icon--fail",r=.01*i.percent_highest*24;return`<span class="bys-quiz-icon ${a}" data-tip="${ie(`${o}|Loading...|${Math.round(i.percent_highest)}%`)}" data-quiz-id="${n}" data-user-id="${t}" data-quiz-title="${ie(o)}" data-percent="${Math.round(i.percent_highest)}" style="height: ${r}px"></span>`}).join("")}</div>`:'<span class="bys-quiz-empty">—</span>'}function B(e,t,s){i.find("tbody").html(""),O(e,t,s)}function O(t,s,n){const o=i.find("tbody"),l=document.getElementById("skeleton-row-template"),c=document.getElementById("course-cell-template");s.forEach(s=>{const i=n[s.id]||[],d=l.content.cloneNode(!0),u=e(d);u.find("tr").attr("data-user-id",s.id).removeClass("reporting-table__row--loading");const f=`status-badge--${s.status||"never"}`;let p='<i class="fa-solid fa-circle"></i>';s.last_login&&(p=`<span class="status-badge__icon" data-tip="${ie(`Last login: ${oe(s.last_login)} (${s.last_login_unix||""})`)}"><i class="fa-solid fa-circle"></i></span>`),u.find(".status-badge").attr("class",`status-badge ${f}`).html(p);const m=[s.first_name,s.last_name].filter(Boolean).join(" ")||s.display_name||"";u.find(".col-name").html(`\n        <a href="${a}?group_id=${q}&user_id=${s.id}" class="reporting-table__name-link" onclick="event.stopPropagation();">\n          ${ie(m)}\n        </a>\n      `),u.find(".col-email").html(ie(s.email)),t.forEach((t,s)=>{const n=i.find(e=>e.course_id===t.id),o=n?.progress_status||"not_started";let a="not-started";"completed"===o?a="completed":"in_progress"===o&&(a="in-progress");const l=c.content.cloneNode(!0),d=e(l);d.find("td").attr("data-course-idx",s),d.find(".course-cell--badge span").attr("class",`completion-badge completion-badge--${a}`);const f=n?.steps_completed||0,p=n?.steps_total||0,m=p>0?Math.round(f/p*100):0;let h=100===m?"complete":0===m?"not-started":"in-progress";d.find(".course-sub-cell--progress").html(`\n          <div class="bys-progress-wrap"><div class="bys-progress-bar" style="width:${m}%;"></div></div>\n          <span class="bys-percent bys-percent--${h}">${m}%</span>\n        `),d.find(".course-sub-cell--quizzing").html('<span class="bys-quiz-loading"><i class="fa-regular fa-spinner-third fa-spin"></i></span>');const g=n?.enrolled_at||"",_=n?.date_completed||"";d.find(".course-sub-cell--enrolment").html(`<span class="bys-date">${g?oe(g):"Not started"}</span>`),d.find(".course-sub-cell--completion").html(`<span class="bys-date">${_?oe(_):"Not completed"}</span>`),null!==r&&(s!==r?d.find(".course-cell--badge").addClass("course-col--hidden"):d.find(".course-sub-cell").removeClass("course-sub-col--hidden")),u.find("tr").append(d)}),o.append(u)})}function M(){const e=o.find(".bys-show-more"),t=g.length>0?_<g.length:m<$.length;e.toggleClass("hidden",!t)}async function R(e){const t=`/wp-json/bys-groups/v1/groups/${q}/users?user_ids=${e.join(",")}`,s=await n.get(t,!0);if(!s||!Array.isArray(s))return[];const o=c.map(e=>e.id).join(",");if(o)for(const e of s){const t=`/wp-json/bys-groups/v1/users/${e.id}/course-progress?course_ids=${o}`;try{d[e.id]=await n.get(t,!0)}catch(t){console.error(`Failed to fetch course progress for user ${e.id}:`,t),d[e.id]=[]}}else s.forEach(e=>{d[e.id]=[]});return l=l.concat(s),m+=s.length,O(c,s,d),null!==r&&u.has(r)&&await G(r,s),s}async function U(){for(;m<$.length;){const e=$.slice(m,m+10);if(!e.length)break;try{await R(e)}catch(e){console.error("[group-reporting] Failed to load remaining users for filter:",e);break}}M()}async function G(e,t){const o=c[e];if(!o)return;const a=f[o.id]||[];if(a.length)for(const r of t)try{const t=s(r.id)+`?group_id=${q}&course_ids=${o.id}`,l=await n.get(t),c={};Array.isArray(l)&&l.forEach(e=>{c[e.id]=e}),i.find(`tr[data-user-id="${r.id}"] .course-sub-cell--quizzing[data-course-idx="${e}"]`).html(P(a,r.id,c))}catch(e){console.error(`[group-reporting] Failed to fetch quiz progress for new user ${r.id}:`,e)}}function Q(e){const t=d[e.id]||[],s=(C.courseIds.length>0?t.filter(e=>C.courseIds.includes(e.course_id)):t).map(e=>e.enrolled_at?new Date(e.enrolled_at).getTime():0).filter(e=>e>0);return s.length?Math.max(...s):0}function H(){const e=o.find("#bys-multiselect-course"),t=e.find(".bys-multiselect__list");t.html(""),c.length?(e.find(".bys-multiselect__empty").addClass("hidden"),c.forEach(e=>{const s=e.id,n=e.title?.rendered||e.title||"",o=y.includes(s),i=e.required?' <span class="bys-required-badge" aria-hidden="true">*</span>':"";t.append(`\n        <li class="bys-multiselect__option" role="option" aria-selected="${o}" data-course-id="${s}">\n          <label>\n            <input type="checkbox" value="${s}" ${o?"checked":""} />\n            <span>${ie(n)}${i}</span>\n          </label>\n        </li>\n      `)}),J(e)):e.find(".bys-multiselect__empty").removeClass("hidden")}function J(e){const t=e.find(".bys-multiselect__pills");t.html(""),y.length?y.forEach(e=>{const s=c.find(t=>t.id===e);if(!s)return;const n=s.title?.rendered||s.title||"";t.append(`\n        <span class="bys-multiselect__pill" data-course-id="${e}">\n          ${ie(n)}\n          <button class="bys-multiselect__pill-remove btn-unstyled" type="button" aria-label="Remove ${ie(n)}" data-course-id="${e}">\n            <i class="fa-solid fa-xmark"></i>\n          </button>\n        </span>\n      `)}):t.html('<span class="bys-multiselect__placeholder">All courses</span>')}function K(e){const t="true"===e.attr("aria-expanded");e.attr("aria-expanded",t?"false":"true"),e.find(".bys-multiselect__dropdown").toggleClass("hidden",t),t||e.find(".bys-multiselect__search").val("").trigger("input").focus()}function V(e){e.attr("aria-expanded","false"),e.find(".bys-multiselect__dropdown").addClass("hidden")}async function W(){const e=o.find("#bys-multiselect-users"),t=e.find(".bys-multiselect__list"),s=e.find(".bys-multiselect__loading"),i=e.find(".bys-multiselect__empty");if(!$.length)return t.html(""),void i.removeClass("hidden");if(w)X(e,t,i);else{t.html(""),i.addClass("hidden"),s.removeClass("hidden");try{const e=`/wp-json/bys-groups/v1/groups/${q}/users?user_ids=${$.join(",")}`,t=await n.get(e,!0);v=Array.isArray(t)?t:[],v.sort((e,t)=>{const s=[e.first_name||"",e.last_name||""].filter(Boolean).join(" ")||e.display_name||"",n=[t.first_name||"",t.last_name||""].filter(Boolean).join(" ")||t.display_name||"";return s.localeCompare(n)}),w=!0}catch(e){console.error("[group-reporting] Failed to fetch all group users for filter:",e),v=[],w=!0}s.addClass("hidden"),X(e,t,i)}}function X(e,t,s){if(t.html(""),!v.length)return s.removeClass("hidden"),void Y(e);s.addClass("hidden"),v.forEach(e=>{const s=e.id,n=e.email||"",o=[e.first_name||"",e.last_name||""].filter(Boolean).join(" "),i=b.includes(s),a=o?`${ie(o)} (${ie(n)})`:ie(n);t.append(`\n        <li class="bys-multiselect__option" role="option" aria-selected="${i}" data-user-id="${s}" data-name="${ie(o.toLowerCase())}" data-email="${ie(n.toLowerCase())}">\n          <label>\n            <input type="checkbox" value="${s}" ${i?"checked":""} />\n            <span class="bys-multiselect__user-label">${a}</span>\n          </label>\n        </li>\n      `)}),Y(e)}function Y(e){const t=e.find(".bys-multiselect__pills");t.html(""),b.length?b.forEach(e=>{const s=v.find(t=>t.id===e);if(!s)return;const n=s.email||"",o=[s.first_name||"",s.last_name||""].filter(Boolean).join(" "),i=o?`${ie(o)} (${ie(n)})`:ie(n);t.append(`\n        <span class="bys-multiselect__pill" data-user-id="${e}">\n          ${i}\n          <button class="bys-multiselect__pill-remove btn-unstyled" type="button" aria-label="Remove ${ie(o||n)}" data-user-id="${e}">\n            <i class="fa-solid fa-xmark"></i>\n          </button>\n        </span>\n      `)}):t.html('<span class="bys-multiselect__placeholder">All users</span>')}async function Z(){return m<$.length&&await U(),(g.length>0?[...g]:[...l]).filter(e=>j(e))}function ee(e,t){const s=e.map(e=>e.map(e=>{const t=String(e??"");return t.includes(",")||t.includes('"')||t.includes("\n")?'"'+t.replace(/"/g,'""')+'"':t}).join(",")).join("\n"),n=new Blob(["\ufeff"+s],{type:"text/csv;charset=utf-8;"}),o=URL.createObjectURL(n),i=document.createElement("a");i.href=o,i.download=t,document.body.appendChild(i),i.click(),document.body.removeChild(i),URL.revokeObjectURL(o)}function te(e){const t=e?.progress_status||"not_started",s=e?.steps_completed||0,n=e?.steps_total||0,o=n>0?Math.round(s/n*100):0;return[{completed:"Completed",in_progress:"In Progress",not_started:"Not Started"}[t]||t,`${o}%`,e?.enrolled_at?oe(e.enrolled_at):"",e?.date_completed?oe(e.date_completed):""]}async function se(e,s){let o=f[e.id];if(!o)try{o=await n.get(t(e.id))||[],f[e.id]=o}catch(t){console.error(`[group-reporting] Failed to fetch quiz steps for course ${e.id}:`,t),o=[],f[e.id]=o}if(!o.length)return o;p[e.id]||(p[e.id]={});const i=s.filter(t=>void 0===p[e.id][t.id]);if(!i.length)return o;try{const t=i.map(e=>e.id).join(","),s=((e,t)=>`/wp-json/bys-groups/v1/courses/${e}/quiz-progress-batch?user_ids=${t}`)(e.id,t),o=await n.get(s,!0);i.forEach(t=>{const s=o&&o[t.id]?o[t.id]:{},n={};Object.keys(s).forEach(e=>{n[parseInt(e,10)]=s[e]}),p[e.id][t.id]=n})}catch(t){console.error(`[group-reporting] Batch quiz progress fetch failed for course ${e.id}:`,t),i.forEach(t=>{p[e.id][t.id]={}})}return o}function ne(e,t){const s=t[e.step_id];if(!s||0===s.total_attempts)return"Not attempted";const n=Math.round(s.percent_highest);return s.pass_highest?`Pass (${n}%)`:`Fail (${n}%)`}function oe(e){if(!e)return"";try{return new Date(e).toLocaleString("en-US",{year:"numeric",month:"short",day:"numeric",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:!1})}catch(t){return e}}function ie(e){if(!e||"string"!=typeof e)return"";const t={"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"};return e.replace(/[&<>"']/g,e=>t[e])}e(document).on("bys:groupSelected",async function(e,t){const s=t.groupId,a=t.baseUsersStats||{},r=t.courses||[];s&&(q=s,y=[],b=[],$=t.baseUsersStats?.user_ids||[],v=[],w=!1,C={courseIds:[],userIds:[],courseStatus:"",userStatus:"",enrolmentDate:{from:"",to:""},completionDate:{from:"",to:""}},d={},f={},p={},m=0,h="first_name_asc",g=[],_=0,o.find("#sort-select").val("first_name_asc"),T(),D(),await async function(e,t,s){try{const o=(t.user_ids||[]).slice(0,10);if(F(s),function(e,t=0){const s=i.find("tbody");s.html("");const n=document.getElementById("skeleton-row-template");for(let o=0;o<e;o++){const e=n.content.cloneNode(!0),o=e.querySelector("tr");for(let e=0;e<t;e++){const e=document.createElement("td");e.className="course-cell course-cell--badge";const t=document.createElement("span");t.style.width="24px",e.appendChild(t),o.appendChild(e)}s.append(e)}}(o.length||10,s.length),!o.length)return void B(s,[],{});const a=`/wp-json/bys-groups/v1/groups/${e}/users?user_ids=${o.join(",")}`,r=await n.get(a,!0);if(!r||!Array.isArray(r))return void console.error("Invalid users response:",r);l=r,c=s,u.clear();const f=s.map(e=>e.id).join(",");if(f)for(const e of r){const t=`/wp-json/bys-groups/v1/users/${e.id}/course-progress?course_ids=${f}`;try{d[e.id]=await n.get(t,!0)}catch(t){console.error(`Failed to fetch course progress for user ${e.id}:`,t),d[e.id]=[]}}else r.forEach(e=>{d[e.id]=[]});F(s),B(s,r,d),m=o.length,M()}catch(e){console.error("Failed to fetch group reporting data:",e)}}(s,a,r))}),o.find(".filters__form").on("submit",async function(e){e.preventDefault();const t=1===y.length;if(C.courseIds=y.slice(),C.userIds=b.slice(),C.courseStatus=t?o.find("#filter-status").val():"",C.userStatus=o.find("#filter-user-status").val(),C.enrolmentDate=t?{from:o.find("#filter-enrolment-date-from").val(),to:o.find("#filter-enrolment-date-to").val()}:{from:"",to:""},C.completionDate=t?{from:o.find("#filter-completion-date-from").val(),to:o.find("#filter-completion-date-to").val()}:{from:"",to:""},V(o.find("#bys-multiselect-course")),V(o.find("#bys-multiselect-users")),(C.userIds.length>0||C.courseStatus||C.userStatus||C.enrolmentDate.from||C.enrolmentDate.to||C.completionDate.from||C.completionDate.to)&&m<$.length){const e=o.find(".filters__submit");e.prop("disabled",!0).text("Loading…"),await U(),e.prop("disabled",!1).text("Filter")}E(),D()}),o.find(".filters__reset").on("click",function(){y=[],b=[],C={courseIds:[],userIds:[],courseStatus:"",userStatus:"",enrolmentDate:{from:"",to:""},completionDate:{from:"",to:""}},T(),S(),D(),V(o.find("#bys-multiselect-course")),V(o.find("#bys-multiselect-users")),H(),W(),i.find("tbody tr").css("display","").removeClass("reporting-table__row--filtered"),i.find("[data-course-idx]").removeClass("course-col--hidden"),i.find(".course-sub-col, .course-sub-cell").addClass("course-sub-col--hidden"),r=null}),o.on("click",".bys-show-more",function(){!async function(){const e=o.find(".bys-show-more");if(g.length>0&&_<g.length){const e=g.slice(_,_+10);return _+=e.length,O(c,e,d),null!==r&&u.has(r)&&await G(r,e),E(),null!==r&&x(r),void M()}const t=$.slice(m,m+10);if(t.length){e.prop("disabled",!0).text("Loading…");try{await R(t),E(),null!==r&&x(r),M()}catch(e){console.error("[group-reporting] Failed to load more users:",e)}finally{e.prop("disabled",!1).text("Show More Results")}}else e.addClass("hidden")}()}),o.on("change","#sort-select",async function(){h=e(this).val();const t=e(this);m<$.length&&(t.prop("disabled",!0),await U(),t.prop("disabled",!1)),function(){switch(g=[...l],h){case"first_name_asc":g.sort((e,t)=>(e.first_name||e.display_name||"").toLowerCase().localeCompare((t.first_name||t.display_name||"").toLowerCase()));break;case"first_name_desc":g.sort((e,t)=>(t.first_name||t.display_name||"").toLowerCase().localeCompare((e.first_name||e.display_name||"").toLowerCase()));break;case"last_name_asc":g.sort((e,t)=>(e.last_name||e.display_name||"").toLowerCase().localeCompare((t.last_name||t.display_name||"").toLowerCase()));break;case"last_name_desc":g.sort((e,t)=>(t.last_name||t.display_name||"").toLowerCase().localeCompare((e.last_name||e.display_name||"").toLowerCase()));break;case"date_asc":g.sort((e,t)=>Q(e)-Q(t));break;case"completion_date_asc":case"completion_date_desc":{const e=C.courseIds[0],t=t=>{const s=(d[t.id]||[]).find(t=>t.course_id===e);return s?.date_completed?new Date(s.date_completed).getTime():0};g.sort((e,s)=>{const n=t(e),o=t(s);return n||o?n?o?"completion_date_asc"===h?n-o:o-n:-1:1:0});break}default:g.sort((e,t)=>Q(t)-Q(e))}_=Math.min(10,g.length);const t=r;if(B(c,g.slice(0,_),d),null!==t){x(t),z();const s=c[t];if(s&&u.has(t)&&p[s.id]){const n=f[s.id]||[];i.find(`.course-sub-cell--quizzing[data-course-idx="${t}"]`).each(function(){const t=e(this).closest("tr").data("userId"),o=p[s.id][t]||{};e(this).html(P(n,t,o))})}}M(),E()}()}),o.on("click","#bys-multiselect-course .bys-multiselect__toggle",function(e){e.stopPropagation(),K(o.find("#bys-multiselect-course"))}),o.on("click","#bys-multiselect-course .bys-multiselect__control",function(t){e(t.target).closest(".bys-multiselect__pill-remove").length||K(o.find("#bys-multiselect-course"))}),e(document).on("click",function(t){e(t.target).closest("#bys-multiselect-course").length||V(o.find("#bys-multiselect-course")),e(t.target).closest("#bys-multiselect-users").length||V(o.find("#bys-multiselect-users"))}),o.on("change",'#bys-multiselect-course-dropdown input[type="checkbox"]',function(){const t=parseInt(e(this).val(),10);e(this).is(":checked")?(y.includes(t)||y.push(t),e(this).closest("li").attr("aria-selected","true")):(y=y.filter(e=>e!==t),e(this).closest("li").attr("aria-selected","false")),J(o.find("#bys-multiselect-course")),S()}),o.on("click",".bys-multiselect__pill-remove",function(t){t.stopPropagation();const s=parseInt(e(this).data("courseId"),10);y=y.filter(e=>e!==s),o.find(`#bys-multiselect-course-dropdown input[value="${s}"]`).prop("checked",!1).closest("li").attr("aria-selected","false"),J(o.find("#bys-multiselect-course")),S()}),o.on("input","#bys-multiselect-course .bys-multiselect__search",function(){const t=e(this).val().toLowerCase().trim(),s=o.find("#bys-multiselect-course-dropdown .bys-multiselect__option");let n=0;s.each(function(){const s=e(this).find("span").first().text().toLowerCase(),o=!t||s.includes(t);e(this).toggleClass("hidden",!o),o&&n++}),o.find("#bys-multiselect-course .bys-multiselect__empty").toggleClass("hidden",n>0)}),o.on("click","#bys-multiselect-users .bys-multiselect__toggle",function(e){e.stopPropagation(),K(o.find("#bys-multiselect-users"))}),o.on("click","#bys-multiselect-users .bys-multiselect__control",function(t){e(t.target).closest(".bys-multiselect__pill-remove").length||K(o.find("#bys-multiselect-users"))}),o.on("change",'#bys-multiselect-users-dropdown input[type="checkbox"]',function(){const t=parseInt(e(this).val(),10);e(this).is(":checked")?(b.includes(t)||b.push(t),e(this).closest("li").attr("aria-selected","true")):(b=b.filter(e=>e!==t),e(this).closest("li").attr("aria-selected","false")),Y(o.find("#bys-multiselect-users"))}),o.on("click","#bys-multiselect-users .bys-multiselect__pill-remove",function(t){t.stopPropagation();const s=parseInt(e(this).data("userId"),10);b=b.filter(e=>e!==s),o.find(`#bys-multiselect-users-dropdown input[value="${s}"]`).prop("checked",!1).closest("li").attr("aria-selected","false"),Y(o.find("#bys-multiselect-users"))}),o.on("input","#bys-multiselect-users .bys-multiselect__search",function(){const t=e(this).val().toLowerCase().trim(),s=o.find("#bys-multiselect-users-dropdown .bys-multiselect__option");let n=0;s.each(function(){const s=e(this).data("name")||"",o=e(this).data("email")||"",i=!t||s.includes(t)||o.includes(t);e(this).toggleClass("hidden",!i),i&&n++}),o.find("#bys-multiselect-users .bys-multiselect__empty").toggleClass("hidden",n>0)}),o.on("change","#filter-status, #filter-user-status",function(){e(this).toggleClass("is-placeholder",!e(this).val())}),o.on("click","#enrolment-date-range-trigger",function(e){e.preventDefault(),o.find("#enrolment-date-range-dropdown").toggleClass("hidden")}),o.on("click","#completion-date-range-trigger",function(e){e.preventDefault(),o.find("#completion-date-range-dropdown").toggleClass("hidden")}),e(document).on("click.bys-date-range",function(t){e(t.target).closest("#filters__field--enrolment-date").length||o.find("#enrolment-date-range-dropdown").addClass("hidden"),e(t.target).closest("#filters__field--completion-date").length||o.find("#completion-date-range-dropdown").addClass("hidden")}),o.on("change","#filter-enrolment-date-from, #filter-enrolment-date-to",function(){L("filter-enrolment-date-from","filter-enrolment-date-to"),N("filter-enrolment-date-from","filter-enrolment-date-to","enrolment-date-range-text")}),o.on("change","#filter-completion-date-from, #filter-completion-date-to",function(){L("filter-completion-date-from","filter-completion-date-to"),N("filter-completion-date-from","filter-completion-date-to","completion-date-range-text")}),o.on("click",".table__actions__export a",async function(t){if(t.preventDefault(),!q)return;const s=e(this);s.addClass("is-loading").text("Exporting…");try{await async function(){const e=await Z(),t=C.courseIds.length>0?c.filter(e=>C.courseIds.includes(e.id)):[...c],s={};for(const n of t)s[n.id]=await se(n,e);const n={online:"Online",offline:"Offline",never:"Never Logged In"},o=["Status","Name","Email"];t.forEach(e=>{const t=e.shortname||e.title?.rendered||e.title||"",n=e.required?" (Required)":"";o.push(`${t}${n} - Course Status`,`${t}${n} - Progress`,`${t}${n} - Enrolled`,`${t}${n} - Completed`),(s[e.id]||[]).forEach(e=>{o.push(`${t}${n} - ${e.step_title}`)})});const i=[o];e.forEach(e=>{const o=d[e.id]||[],a=[e.first_name,e.last_name].filter(Boolean).join(" ")||e.display_name||"",r=[n[e.status]||"Never Logged In",a,e.email||""];t.forEach(t=>{r.push(...te(o.find(e=>e.course_id===t.id)));const n=(p[t.id]||{})[e.id]||{};(s[t.id]||[]).forEach(e=>{r.push(ne(e,n))})}),i.push(r)});const a=(new Date).toISOString().split("T")[0];ee(i,`group-report-${q}-${a}.csv`)}()}finally{s.removeClass("is-loading").html('<i class="fa-regular fa-download"></i> Export Table')}}),i.on("click",".bys-dl-link",async function(t){if(t.preventDefault(),t.stopPropagation(),!q)return;const s=parseInt(e(this).data("courseIdx"),10),n=c[s];if(!n)return;const o=e(this);o.addClass("is-loading").html('<i class="fa-regular fa-spinner fa-spin"></i>');try{await async function(e){const t=await Z(),s=await se(e,t),n=e.shortname||e.title?.rendered||e.title||"",o=e.required?" (Required)":"",i=["Name","Email",`${n}${o} - Course Status`,`${n}${o} - Progress`,`${n}${o} - Enrolled`,`${n}${o} - Completed`];s.forEach(e=>i.push(`${n}${o} - ${e.step_title}`));const a=[i];t.forEach(t=>{const n=d[t.id]||[],o=[t.first_name,t.last_name].filter(Boolean).join(" ")||t.display_name||"",i=(p[e.id]||{})[t.id]||{},r=s.map(e=>ne(e,i));a.push([o,t.email||"",...te(n.find(t=>t.course_id===e.id)),...r])});const r=n.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,""),l=(new Date).toISOString().split("T")[0];ee(a,`course-report-${r}-${l}.csv`)}(n)}finally{o.removeClass("is-loading").html('<i class="fa-regular fa-download"></i>')}})})})();
+/******/ (() => { // webpackBootstrap
+/******/ 	"use strict";
+/******/ 	var __webpack_modules__ = ({
+
+/***/ "./src/_shared/api-client.js"
+/*!***********************************!*\
+  !*** ./src/_shared/api-client.js ***!
+  \***********************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   api: () => (/* binding */ api),
+/* harmony export */   endpoints: () => (/* binding */ endpoints)
+/* harmony export */ });
+/**
+ * Shared API client with in-memory caching and request deduplication.
+ * Prevents duplicate requests when multiple blocks fetch the same data.
+ * Uses basic auth via Authorization header (from plugin settings).
+ */
+
+// Get basic auth credentials from WP
+function getAuthorizationHeader() {
+  if (window.bysGroupsAuth && window.bysGroupsAuth.header) {
+    return window.bysGroupsAuth.header;
+  }
+  return null;
+}
+
+// custom API endpoint definitions
+const endpoints = {
+  currentUserGroups: () => '/wp-json/bys-groups/v1/me/groups',
+  groupBaseUsersStats: groupId => `/wp-json/bys-groups/v1/groups/${groupId}/base-user-stats`,
+  groupUsers: (groupId, userIds) => `/wp-json/bys-groups/v1/groups/${groupId}/users?user_ids=${userIds}`,
+  groupUserInfo: (groupId, userId) => `/wp-json/bys-groups/v1/groups/${groupId}/users/${userId}`,
+  groupCourses: groupId => `/wp-json/bys-groups/v1/groups/${groupId}/courses`,
+  groupCourseCompletionStats: groupId => `/wp-json/bys-groups/v1/groups/${groupId}/course-completion-stats`,
+  courseHierarchialBreakdown: courseId => `/wp-json/bys-groups/v1/courses/${courseId}/steps`,
+  groupUserCourseProgress: (userId, courseIds) => `/wp-json/bys-groups/v1/users/${userId}/course-progress?course_ids=${courseIds}`,
+  courseQuizSteps: courseId => `/wp-json/bys-groups/v1/courses/${courseId}/quiz-steps`,
+  courseQuizProgressBatch: (courseId, userIds) => `/wp-json/bys-groups/v1/courses/${courseId}/quiz-progress-batch?user_ids=${userIds}`,
+  groupQuizSubmissionStats: (groupId, quizIds) => `/wp-json/bys-groups/v1/groups/${groupId}/quiz-submission-stats?quiz_ids=${quizIds.join(',')}`,
+  groupQuizAttempts: (groupId, quizId) => `/wp-json/bys-groups/v1/groups/${groupId}/quizzes/${quizId}/attempts`,
+  userQuizAttempts: (userId, courseId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-attempts?course_id=${courseId}`,
+  userQuizProgress: userId => `/wp-json/bys-groups/v1/users/${userId}/quiz-progress`,
+  userQuizAttemptsDetails: (userId, quizId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-attempts/${quizId}`,
+  attemptDetail: activityId => `/wp-json/bys-groups/v1/attempts/${activityId}`,
+  attemptQuestions: activityId => `/wp-json/bys-groups/v1/attempts/${activityId}/questions`,
+  userActivity: userId => `/wp-json/bys-groups/v1/users/${userId}/activity`,
+  userCourseActivity: (userId, courseId) => `/wp-json/bys-groups/v1/users/${userId}/activity?course_id=${courseId}`,
+  userCourseStepsProgress: (userId, courseId) => `/wp-json/bys-groups/v1/users/${userId}/course-progress-steps/${courseId}`,
+  trackTopicVisit: userId => `/wp-json/bys-groups/v1/users/${userId}/track-topic-visit`
+};
+const api = {
+  _cache: new Map(),
+  _pending: new Map(),
+  /**
+   * Fetch data with automatic caching and deduplication.
+   */
+  async get(url, forceRefresh = false) {
+    // Return cached response if available
+    if (!forceRefresh && this._cache.has(url)) {
+      return this._cache.get(url);
+    }
+
+    // Return existing pending request if existing
+    if (this._pending.has(url)) {
+      return this._pending.get(url);
+    }
+
+    // Send request and cache the result
+    const headers = {};
+    const authHeader = getAuthorizationHeader();
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
+    }
+    const promise = jQuery.ajax({
+      url: url,
+      type: 'GET',
+      headers: headers,
+      dataType: 'json'
+    }).done((data, textStatus, jqXHR) => {
+      console.log(`Success for ${url}:`, {
+        status: jqXHR.status,
+        data
+      });
+    }).then(data => {
+      this._cache.set(url, data);
+      return data;
+    }).catch((jqXHR, textStatus, errorThrown) => {
+      console.error(`API request failed for ${url}:`, {
+        status: jqXHR.status,
+        statusText: jqXHR.statusText,
+        responseText: jqXHR.responseText?.substring(0, 500),
+        textStatus: textStatus,
+        errorThrown: errorThrown?.message
+      });
+      throw new Error(`API request failed: ${jqXHR.status} ${jqXHR.statusText} - ${jqXHR.responseText?.substring(0, 100)}`);
+    }).always(() => {
+      this._pending.delete(url);
+    });
+    this._pending.set(url, promise);
+    return promise;
+  },
+  /**
+   * Fire-and-forget POST. Does not cache. Auth header included automatically.
+   */
+  post(url, body = {}) {
+    const headers = {
+      'Content-Type': 'application/json'
+    };
+    const authHeader = getAuthorizationHeader();
+    if (authHeader) headers['Authorization'] = authHeader;
+    return jQuery.ajax({
+      url,
+      type: 'POST',
+      headers,
+      data: JSON.stringify(body),
+      dataType: 'json'
+    }).catch(jqXHR => {
+      console.error(`POST failed for ${url}:`, jqXHR.status, jqXHR.responseText?.substring(0, 200));
+    });
+  },
+  /**
+   * Invalidate cached responses
+   */
+  invalidate(keyFragment) {
+    for (const key of this._cache.keys()) {
+      if (key.includes(keyFragment)) {
+        this._cache.delete(key);
+      }
+    }
+  },
+  /**
+   * Clear all cached data
+   */
+  clear() {
+    this._cache.clear();
+  }
+};
+
+/***/ }
+
+/******/ 	});
+/************************************************************************/
+/******/ 	// The module cache
+/******/ 	var __webpack_module_cache__ = {};
+/******/ 	
+/******/ 	// The require function
+/******/ 	function __webpack_require__(moduleId) {
+/******/ 		// Check if module is in cache
+/******/ 		var cachedModule = __webpack_module_cache__[moduleId];
+/******/ 		if (cachedModule !== undefined) {
+/******/ 			return cachedModule.exports;
+/******/ 		}
+/******/ 		// Create a new module (and put it into the cache)
+/******/ 		var module = __webpack_module_cache__[moduleId] = {
+/******/ 			// no module.id needed
+/******/ 			// no module.loaded needed
+/******/ 			exports: {}
+/******/ 		};
+/******/ 	
+/******/ 		// Execute the module function
+/******/ 		if (!(moduleId in __webpack_modules__)) {
+/******/ 			delete __webpack_module_cache__[moduleId];
+/******/ 			var e = new Error("Cannot find module '" + moduleId + "'");
+/******/ 			e.code = 'MODULE_NOT_FOUND';
+/******/ 			throw e;
+/******/ 		}
+/******/ 		__webpack_modules__[moduleId](module, module.exports, __webpack_require__);
+/******/ 	
+/******/ 		// Return the exports of the module
+/******/ 		return module.exports;
+/******/ 	}
+/******/ 	
+/************************************************************************/
+/******/ 	/* webpack/runtime/define property getters */
+/******/ 	(() => {
+/******/ 		// define getter functions for harmony exports
+/******/ 		__webpack_require__.d = (exports, definition) => {
+/******/ 			for(var key in definition) {
+/******/ 				if(__webpack_require__.o(definition, key) && !__webpack_require__.o(exports, key)) {
+/******/ 					Object.defineProperty(exports, key, { enumerable: true, get: definition[key] });
+/******/ 				}
+/******/ 			}
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/hasOwnProperty shorthand */
+/******/ 	(() => {
+/******/ 		__webpack_require__.o = (obj, prop) => (Object.prototype.hasOwnProperty.call(obj, prop))
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/make namespace object */
+/******/ 	(() => {
+/******/ 		// define __esModule on exports
+/******/ 		__webpack_require__.r = (exports) => {
+/******/ 			if(typeof Symbol !== 'undefined' && Symbol.toStringTag) {
+/******/ 				Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
+/******/ 			}
+/******/ 			Object.defineProperty(exports, '__esModule', { value: true });
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/************************************************************************/
+var __webpack_exports__ = {};
+// This entry needs to be wrapped in an IIFE because it needs to be isolated against other modules in the chunk.
+(() => {
+/*!*************************************!*\
+  !*** ./src/group-reporting/view.js ***!
+  \*************************************/
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../_shared/api-client.js */ "./src/_shared/api-client.js");
+
+jQuery(document).ready(function ($) {
+  const $block = $('.wp-block-bys-groups-group-reporting').first();
+  const $table = $block.find('.reporting-table');
+  const detailUrl = $table.data('detailUrl') || '/administrator-dashboard/user-progress-detail/';
+  if (!$table.length) return;
+  let expandedIdx = null;
+  let usersInView = []; // current page of users
+  let coursesInView = []; // current courses (from bys:groupSelected)
+  let userCourseProgressAll = {}; // promoted to module scope: { [userId]: [...progress] }
+  let courseQuizLoadedIdx = new Set();
+  let courseQuizStepsCache = {}; // { [courseId]: [...steps] }
+  let userQuizProgressCache = {}; // { [courseId]: { [userId]: { [quizId]: quizData } } }
+  let loadedOffset = 0; // how many users have been loaded into the table
+  let currentSort = 'first_name_asc';
+  const PAGE_SIZE = 10;
+  let sortedUsers = []; // sorted order after an explicit sort; empty = use lazy-load order
+  let displayedCount = 0; // how many of sortedUsers are currently rendered
+
+  // ── Filter state ────────────────────────────────────────────────────────────
+  let selectedCourseIds = []; // course multiselect state
+  let selectedUserIds = []; // user multiselect state
+  let allGroupUserIds = []; // full list of user IDs for current group (from baseUsersStats)
+  let allGroupUsers = []; // full fetched user objects for the filter list (lazy-loaded)
+  let allGroupUsersLoaded = false; // whether the full user list has been fetched
+
+  let activeFilters = {
+    // current applied filter values
+    courseIds: [],
+    // array of course IDs (empty = all)
+    userIds: [],
+    // array of user IDs (empty = all)
+    courseStatus: '',
+    // course-level: completed | in_progress | inactive
+    userStatus: '',
+    // user-level: online | offline | never
+    enrolmentDate: {
+      from: '',
+      to: ''
+    },
+    completionDate: {
+      from: '',
+      to: ''
+    }
+  };
+
+  // ── Filter panel toggle ──────────────────────────────────────────────────────
+  $block.find('.filters__toggle').on('click', function () {
+    const $toggle = $(this);
+    const $box = $block.find('#filters-box');
+    const isOpen = $toggle.attr('aria-expanded') === 'true';
+    $toggle.attr('aria-expanded', !isOpen);
+    $box.attr('aria-hidden', isOpen);
+    $box.toggleClass('hidden', isOpen);
+    if (!isOpen) {
+      populateCourseMultiselect();
+      populateUserMultiselect(); // lazy-fetches full user list if needed
+    }
+  });
+
+  // ── Course column expand/collapse ────────────────────────────────────────────
+  $table.on('click', '.bys-course-toggle', function (e) {
+    e.stopPropagation();
+    const idx = parseInt($(this).data('courseIdx'), 10);
+    const opening = expandedIdx !== idx;
+    resetAllCourses();
+    if (opening) {
+      expandCourse(idx);
+      expandedIdx = idx;
+      if (!courseQuizLoadedIdx.has(idx)) {
+        loadQuizDataForCourse(idx);
+      }
+    } else {
+      expandedIdx = null;
+    }
+  });
+  function resetAllCourses() {
+    $table.find('.course-col-header').removeClass('course-col-header--expanded').addClass('course-col-header--collapsed').removeClass('course-col--hidden').find('.bys-course-toggle').attr('aria-expanded', 'false');
+    $table.find('.course-cell--badge').removeClass('course-col--hidden');
+    $table.find('.course-sub-col, .course-sub-cell').addClass('course-sub-col--hidden');
+
+    // Re-apply course column filter after reset
+    applyColumnFilter();
+  }
+  function expandCourse(idx) {
+    const $header = $table.find(`.course-col-header[data-course-idx="${idx}"]`);
+    $header.removeClass('course-col-header--collapsed').addClass('course-col-header--expanded').find('.bys-course-toggle').attr('aria-expanded', 'true');
+    $table.find(`.course-sub-col[data-course-idx="${idx}"]`).removeClass('course-sub-col--hidden');
+    $table.find(`.course-sub-cell[data-course-idx="${idx}"]`).removeClass('course-sub-col--hidden');
+    $table.find(`.course-col-header:not([data-course-idx="${idx}"])`).addClass('course-col--hidden');
+    $table.find(`.course-cell--badge:not([data-course-idx="${idx}"])`).addClass('course-col--hidden');
+  }
+
+  // ── Row click to detail page ─────────────────────────────────────────────────
+  $table.on('click', '.reporting-table__row', function (e) {
+    if ($(e.target).closest('.bys-course-toggle').length) return;
+    if ($(e.target).closest('a').length) return;
+    const userId = $(this).data('userId');
+    if (userId) window.location.href = detailUrl + '?user_id=' + userId + '&group_id=' + currentGroupId;
+  });
+
+  // ── Tooltips ─────────────────────────────────────────────────────────────────
+  function createAndShowTooltip($trigger) {
+    const tipData = $trigger.data('tip');
+    if (!tipData) return;
+    $('.bys-tooltip-instance').remove();
+    let quizTitle = tipData;
+    let pointsFraction = '';
+    let percentage = '';
+    if (tipData.includes('|')) {
+      const parts = tipData.split('|');
+      quizTitle = parts[0] || '';
+      pointsFraction = parts[1] || '';
+      percentage = parts[2] || '';
+    }
+    const $tip = $('<div class="bys-tooltip-instance" role="tooltip"></div>');
+    if (pointsFraction || percentage) {
+      $tip.html(`
+        <div class="bys-tooltip__title">${escapeHtml(quizTitle)}</div>
+        <div class="bys-tooltip__content">
+          <div class="bys-tooltip__fraction">${escapeHtml(pointsFraction)}</div>
+          <div class="bys-tooltip__percentage">${escapeHtml(percentage)}</div>
+        </div>
+      `);
+    } else {
+      $tip.text(quizTitle);
+    }
+    $tip.appendTo('body');
+    const triggerRect = $trigger[0].getBoundingClientRect();
+    $tip.css({
+      position: 'fixed',
+      top: triggerRect.top + triggerRect.height + 6 + 'px',
+      left: triggerRect.left + 'px'
+    });
+  }
+  function destroyTooltip() {
+    $('.bys-tooltip-instance').remove();
+  }
+  $table.on('mouseenter', '.bys-quiz-icon[data-quiz-id]:not([data-tip-loaded])', async function () {
+    const $icon = $(this);
+    const quizId = parseInt($icon.data('quizId'));
+    const userId = parseInt($icon.data('userId'));
+    if (!userId || !quizId) {
+      createAndShowTooltip($icon);
+      return;
+    }
+    try {
+      const attempts = await _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.api.get(_shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.endpoints.userQuizAttemptsDetails(userId, quizId));
+      if (!Array.isArray(attempts) || attempts.length === 0) {
+        $icon.attr('data-tip-loaded', '1');
+        createAndShowTooltip($icon);
+        return;
+      }
+      const highest = attempts.reduce((best, a) => parseFloat(a.percentage || 0) >= parseFloat(best.percentage || 0) ? a : best, attempts[0]);
+      const pointsFraction = highest.points_scored != null && highest.points_total != null ? `${highest.points_scored}/${highest.points_total}` : 'N/A';
+      const tip = `${$icon.data('quizTitle')}|${pointsFraction}|${$icon.data('percent')}%`;
+      $icon.attr('data-tip', escapeHtml(tip)).attr('data-tip-loaded', '1');
+      createAndShowTooltip($icon);
+    } catch (err) {
+      console.error(`[group-reporting] Failed to fetch quiz attempts for user ${userId}, quiz ${quizId}:`, err);
+      $icon.attr('data-tip-loaded', '1');
+      createAndShowTooltip($icon);
+    }
+  });
+  $table.on('mouseenter', '.bys-quiz-icon[data-tip-loaded]', function () {
+    createAndShowTooltip($(this));
+  });
+  $table.on('mouseleave', '.bys-quiz-icon', function () {
+    destroyTooltip();
+  });
+  $table.on('mouseenter', '.status-badge__icon[data-tip]', function () {
+    createAndShowTooltip($(this));
+  });
+  $table.on('mouseleave', '.status-badge__icon', function () {
+    destroyTooltip();
+  });
+  $table.on('click', '[data-tip]', function (e) {
+    e.stopPropagation();
+    createAndShowTooltip($(this));
+  });
+  $(document).on('click', function () {
+    destroyTooltip();
+  });
+
+  // ── Group selection ───────────────────────────────────────────────────────────
+  let currentGroupId = null;
+  $(document).on('bys:groupSelected', async function (_, data) {
+    const groupId = data.groupId;
+    const baseUsersStats = data.baseUsersStats || {};
+    const courses = data.courses || [];
+    if (!groupId) return;
+    currentGroupId = groupId;
+
+    // Reset filter state on group change
+    selectedCourseIds = [];
+    selectedUserIds = [];
+    allGroupUserIds = data.baseUsersStats?.user_ids || [];
+    allGroupUsers = [];
+    allGroupUsersLoaded = false;
+    activeFilters = {
+      courseIds: [],
+      userIds: [],
+      courseStatus: '',
+      userStatus: '',
+      enrolmentDate: {
+        from: '',
+        to: ''
+      },
+      completionDate: {
+        from: '',
+        to: ''
+      }
+    };
+    userCourseProgressAll = {};
+    courseQuizStepsCache = {};
+    userQuizProgressCache = {};
+    loadedOffset = 0;
+    currentSort = 'first_name_asc';
+    sortedUsers = [];
+    displayedCount = 0;
+    $block.find('#sort-select').val('first_name_asc');
+    resetFilterFormUI();
+    updateCompletionSortVisibility();
+    await populateTableFromAPI(groupId, baseUsersStats, courses);
+  });
+
+  // ── Table population ──────────────────────────────────────────────────────────
+  async function populateTableFromAPI(groupId, baseUsersStats, courses) {
+    try {
+      const userIds = baseUsersStats.user_ids || [];
+      const firstTenUserIds = userIds.slice(0, 10);
+      rebuildTableHeader(courses);
+      showSkeletonRows(firstTenUserIds.length || PAGE_SIZE, courses.length);
+      if (!firstTenUserIds.length) {
+        rebuildTableBody(courses, [], {});
+        return;
+      }
+      const usersUrl = `/wp-json/bys-groups/v1/groups/${groupId}/users?user_ids=${firstTenUserIds.join(',')}`;
+      const usersResponse = await _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.api.get(usersUrl, true);
+      if (!usersResponse || !Array.isArray(usersResponse)) {
+        console.error('Invalid users response:', usersResponse);
+        return;
+      }
+      usersInView = usersResponse;
+      coursesInView = courses;
+      courseQuizLoadedIdx.clear();
+      const courseIds = courses.map(c => c.id).join(',');
+      if (courseIds) {
+        for (const user of usersResponse) {
+          const progressUrl = `/wp-json/bys-groups/v1/users/${user.id}/course-progress?course_ids=${courseIds}`;
+          try {
+            userCourseProgressAll[user.id] = await _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.api.get(progressUrl, true);
+          } catch (err) {
+            console.error(`Failed to fetch course progress for user ${user.id}:`, err);
+            userCourseProgressAll[user.id] = [];
+          }
+        }
+      } else {
+        usersResponse.forEach(user => {
+          userCourseProgressAll[user.id] = [];
+        });
+      }
+      rebuildTableHeader(courses);
+      rebuildTableBody(courses, usersResponse, userCourseProgressAll);
+      loadedOffset = firstTenUserIds.length;
+      updateShowMoreButton();
+    } catch (err) {
+      console.error('Failed to fetch group reporting data:', err);
+    }
+  }
+
+  // ── Filter application ────────────────────────────────────────────────────────
+
+  /**
+   * Apply all active filters to the current table state.
+   * Course filter → show/hide columns (no re-render).
+   * All other filters → show/hide rows.
+   */
+  function applyFilters() {
+    applyColumnFilter();
+    applyRowFilters();
+  }
+
+  /**
+   * Show/hide course columns based on activeFilters.courseIds.
+   * Works by toggling course-col--hidden on matching [data-course-idx] elements.
+   */
+  function applyColumnFilter() {
+    const filtered = activeFilters.courseIds.length > 0;
+    coursesInView.forEach((course, idx) => {
+      const visible = !filtered || activeFilters.courseIds.includes(course.id);
+
+      // Sub-columns only matter if this course is the expanded one — leave their
+      // own hidden state alone; just hide the whole group if column is filtered out.
+      if (!visible) {
+        $table.find(`[data-course-idx="${idx}"]`).addClass('course-col--hidden');
+      } else if (expandedIdx !== idx) {
+        // Visible but not expanded: clear course-col--hidden from everything for
+        // this course (the toggle button inside the header also receives it when
+        // hidden), then keep sub-cols hidden via their own class.
+        $table.find(`[data-course-idx="${idx}"]`).removeClass('course-col--hidden');
+        $table.find(`.course-sub-col[data-course-idx="${idx}"]`).addClass('course-sub-col--hidden');
+        $table.find(`.course-sub-cell[data-course-idx="${idx}"]`).addClass('course-sub-col--hidden');
+      }
+    });
+  }
+
+  /**
+   * Pure predicate: returns true if a user object passes all active row filters.
+   * Works against in-memory data — no DOM access.
+   */
+  function userPassesRowFilter(user) {
+    const {
+      userIds,
+      courseStatus,
+      userStatus,
+      enrolmentDate,
+      completionDate
+    } = activeFilters;
+    let visible = true;
+    if (userIds.length > 0) {
+      visible = userIds.includes(user.id);
+    }
+    if (visible && userStatus) {
+      visible = (user.status || 'never') === userStatus;
+    }
+    if (visible && courseStatus) {
+      const userProgress = userCourseProgressAll[user.id] || [];
+      const coursesToCheck = activeFilters.courseIds.length > 0 ? userProgress.filter(p => activeFilters.courseIds.includes(p.course_id)) : userProgress;
+      const progressStatus = courseStatus === 'inactive' ? 'not_started' : courseStatus;
+      visible = coursesToCheck.some(p => (p.progress_status || 'not_started') === progressStatus);
+    }
+    if (visible && (enrolmentDate.from || enrolmentDate.to)) {
+      const userProgress = userCourseProgressAll[user.id] || [];
+      const coursesToCheck = activeFilters.courseIds.length > 0 ? userProgress.filter(p => activeFilters.courseIds.includes(p.course_id)) : userProgress;
+      visible = coursesToCheck.some(p => {
+        if (!p.enrolled_at) return false;
+        const d = new Date(p.enrolled_at);
+        if (enrolmentDate.from && d < new Date(enrolmentDate.from)) return false;
+        if (enrolmentDate.to) {
+          const to = new Date(enrolmentDate.to);
+          to.setHours(23, 59, 59, 999);
+          if (d > to) return false;
+        }
+        return true;
+      });
+    }
+    if (visible && (completionDate.from || completionDate.to)) {
+      const userProgress = userCourseProgressAll[user.id] || [];
+      const coursesToCheck = activeFilters.courseIds.length > 0 ? userProgress.filter(p => activeFilters.courseIds.includes(p.course_id)) : userProgress;
+      visible = coursesToCheck.some(p => {
+        if (!p.date_completed) return false;
+        const d = new Date(p.date_completed);
+        if (completionDate.from && d < new Date(completionDate.from)) return false;
+        if (completionDate.to) {
+          const to = new Date(completionDate.to);
+          to.setHours(23, 59, 59, 999);
+          if (d > to) return false;
+        }
+        return true;
+      });
+    }
+    return visible;
+  }
+
+  /**
+   * Show/hide rows based on user search, status, enrolment date, completion date.
+   * All filtering is against in-memory data — no re-fetch.
+   */
+  function applyRowFilters() {
+    $table.find('tbody tr.reporting-table__row').each(function () {
+      const userId = parseInt($(this).data('userId'), 10);
+      const user = usersInView.find(u => u.id === userId);
+      if (!user) return;
+      const visible = userPassesRowFilter(user);
+      $(this).toggleClass('reporting-table__row--filtered', !visible);
+      $(this).css('display', visible ? '' : 'none');
+    });
+  }
+
+  // ── Course-dependent field enable/disable ────────────────────────────────────
+  function updateCourseDepFieldState() {
+    const singleCourse = selectedCourseIds.length === 1;
+    const $depFields = $block.find('.filters__field--course-dep');
+    $depFields.toggleClass('is-disabled', !singleCourse);
+    $depFields.find('select, input[type="date"], .date-range__trigger').prop('disabled', !singleCourse);
+    if (!singleCourse) {
+      $block.find('#filter-status').val('').addClass('is-placeholder');
+      resetDateRangeField('filter-enrolment-date-from', 'filter-enrolment-date-to', 'enrolment-date-range-text', 'enrolment-date-range-dropdown');
+      resetDateRangeField('filter-completion-date-from', 'filter-completion-date-to', 'completion-date-range-text', 'completion-date-range-dropdown');
+    }
+  }
+  function updateCompletionSortVisibility() {
+    const singleCourse = activeFilters.courseIds.length === 1;
+    const $opts = $block.find('.sort-option--completion');
+    $opts.toggleClass('hidden', !singleCourse);
+    // If a completion sort is active but the option is now hidden, fall back to default
+    if (!singleCourse && (currentSort === 'completion_date_asc' || currentSort === 'completion_date_desc')) {
+      currentSort = 'first_name_asc';
+      $block.find('#sort-select').val('first_name_asc');
+    }
+  }
+
+  // ── Filter form submit ────────────────────────────────────────────────────────
+  $block.find('.filters__form').on('submit', async function (e) {
+    e.preventDefault();
+    const singleCourse = selectedCourseIds.length === 1;
+    activeFilters.courseIds = selectedCourseIds.slice();
+    activeFilters.userIds = selectedUserIds.slice();
+    activeFilters.courseStatus = singleCourse ? $block.find('#filter-status').val() : '';
+    activeFilters.userStatus = $block.find('#filter-user-status').val();
+    activeFilters.enrolmentDate = singleCourse ? {
+      from: $block.find('#filter-enrolment-date-from').val(),
+      to: $block.find('#filter-enrolment-date-to').val()
+    } : {
+      from: '',
+      to: ''
+    };
+    activeFilters.completionDate = singleCourse ? {
+      from: $block.find('#filter-completion-date-from').val(),
+      to: $block.find('#filter-completion-date-to').val()
+    } : {
+      from: '',
+      to: ''
+    };
+    closeMultiselect($block.find('#bys-multiselect-course'));
+    closeMultiselect($block.find('#bys-multiselect-users'));
+
+    // Row filters may match users not yet loaded — drain remaining pages first
+    const hasRowFilter = activeFilters.userIds.length > 0 || activeFilters.courseStatus || activeFilters.userStatus || activeFilters.enrolmentDate.from || activeFilters.enrolmentDate.to || activeFilters.completionDate.from || activeFilters.completionDate.to;
+    if (hasRowFilter && loadedOffset < allGroupUserIds.length) {
+      const $btn = $block.find('.filters__submit');
+      $btn.prop('disabled', true).text('Loading…');
+      await loadAllRemainingUsers();
+      $btn.prop('disabled', false).text('Filter');
+    }
+    applyFilters();
+    updateCompletionSortVisibility();
+  });
+
+  // ── Filter reset ──────────────────────────────────────────────────────────────
+  $block.find('.filters__reset').on('click', function () {
+    selectedCourseIds = [];
+    selectedUserIds = [];
+    activeFilters = {
+      courseIds: [],
+      userIds: [],
+      courseStatus: '',
+      userStatus: '',
+      enrolmentDate: {
+        from: '',
+        to: ''
+      },
+      completionDate: {
+        from: '',
+        to: ''
+      }
+    };
+    resetFilterFormUI();
+    updateCourseDepFieldState();
+    updateCompletionSortVisibility();
+    closeMultiselect($block.find('#bys-multiselect-course'));
+    closeMultiselect($block.find('#bys-multiselect-users'));
+    populateCourseMultiselect();
+    populateUserMultiselect();
+
+    // Restore all rows and columns
+    $table.find('tbody tr').css('display', '').removeClass('reporting-table__row--filtered');
+    $table.find('[data-course-idx]').removeClass('course-col--hidden');
+    $table.find('.course-sub-col, .course-sub-cell').addClass('course-sub-col--hidden');
+    expandedIdx = null;
+  });
+  function resetDateRangeField(fromId, toId, textId, dropdownId) {
+    $block.find('#' + fromId).val('').removeAttr('min').removeAttr('max');
+    $block.find('#' + toId).val('').removeAttr('min').removeAttr('max');
+    $block.find('#' + textId).text('Select a date range');
+    $block.find('#' + dropdownId).addClass('hidden');
+  }
+  function validateDateRange(fromId, toId) {
+    const $from = $block.find('#' + fromId);
+    const $to = $block.find('#' + toId);
+    const dateFrom = $from.val();
+    const dateTo = $to.val();
+    if (dateFrom) $to.attr('min', dateFrom);else $to.removeAttr('min');
+    if (dateTo) $from.attr('max', dateTo);else $from.removeAttr('max');
+    if (dateFrom && dateTo && dateFrom > dateTo) $from.val(dateTo);
+  }
+  function updateDateRangeText(fromId, toId, textId) {
+    const dateFrom = $block.find('#' + fromId).val();
+    const dateTo = $block.find('#' + toId).val();
+    if (!dateFrom && !dateTo) $block.find('#' + textId).text('Select a date range');else if (dateFrom && dateTo) $block.find('#' + textId).text(`${dateFrom} – ${dateTo}`);else if (dateFrom) $block.find('#' + textId).text(`From ${dateFrom}`);else $block.find('#' + textId).text(`Until ${dateTo}`);
+  }
+  function resetFilterFormUI() {
+    $block.find('#filter-status').val('').addClass('is-placeholder');
+    $block.find('#filter-user-status').val('').addClass('is-placeholder');
+    resetDateRangeField('filter-enrolment-date-from', 'filter-enrolment-date-to', 'enrolment-date-range-text', 'enrolment-date-range-dropdown');
+    resetDateRangeField('filter-completion-date-from', 'filter-completion-date-to', 'completion-date-range-text', 'completion-date-range-dropdown');
+  }
+
+  // ── Table builders ────────────────────────────────────────────────────────────
+  function showSkeletonRows(count, courseCount = 0) {
+    const $tbody = $table.find('tbody');
+    $tbody.html('');
+    const rowTemplate = document.getElementById('skeleton-row-template');
+    for (let i = 0; i < count; i++) {
+      const row = rowTemplate.content.cloneNode(true);
+      const tr = row.querySelector('tr');
+      for (let c = 0; c < courseCount; c++) {
+        const td = document.createElement('td');
+        td.className = 'course-cell course-cell--badge';
+        const span = document.createElement('span');
+        span.style.width = '24px';
+        td.appendChild(span);
+        tr.appendChild(td);
+      }
+      $tbody.append(row);
+    }
+  }
+  function showSkeletonCourseHeaders(count) {
+    const headerRow = $table.find('thead .reporting-table__head')[0];
+    if (!headerRow) return;
+    // Remove any existing skeleton course headers
+    $(headerRow).find('.course-col-header--skeleton').remove();
+    const skeletonTemplate = document.getElementById('skeleton-course-header-template');
+    for (let i = 0; i < count; i++) {
+      headerRow.appendChild(skeletonTemplate.content.cloneNode(true));
+    }
+  }
+  function rebuildTableHeader(courses) {
+    const $thead = $table.find('thead');
+    $thead.html('');
+    const headerRow = document.createElement('tr');
+    headerRow.className = 'reporting-table__head';
+    const statusTh = document.createElement('th');
+    statusTh.className = 'col-status';
+    headerRow.appendChild(statusTh);
+    const nameTh = document.createElement('th');
+    nameTh.className = 'col-name';
+    nameTh.textContent = 'Name';
+    headerRow.appendChild(nameTh);
+    const emailTh = document.createElement('th');
+    emailTh.className = 'col-email';
+    emailTh.textContent = 'Email';
+    headerRow.appendChild(emailTh);
+    const courseHeaderTemplate = document.getElementById('course-header-template');
+    courses.forEach((course, idx) => {
+      const headerContent = courseHeaderTemplate.content.cloneNode(true);
+      const $headers = $(headerContent);
+      $headers.find('[data-course-idx]').attr('data-course-idx', idx);
+      const courseTitle = course.title?.rendered || course.title || '';
+      $headers.find('.bys-course-toggle').text(truncateTitle(courseTitle)).attr('title', courseTitle).attr('data-course-idx', idx);
+      if (course.required) {
+        $headers.find('.bys-required-badge').removeClass('hidden');
+      }
+      $headers.find('.bys-dl-link').attr('title', `Download ${escapeHtml(courseTitle)}`).attr('data-course-idx', idx);
+      $headers.children().each(function () {
+        headerRow.appendChild(this);
+      });
+    });
+    $thead.append(headerRow);
+  }
+  function buildQuizBars(quizData, userId, userQuizProgress) {
+    if (!quizData || quizData.length === 0) {
+      return '<span class="bys-quiz-empty">—</span>';
+    }
+    const barsMaxHeight = 24;
+    const bars = quizData.map(quiz => {
+      const quizId = quiz.step_id;
+      const quizTitle = quiz.step_title;
+      const summary = userQuizProgress[quizId];
+      if (!summary || summary.total_attempts === 0) {
+        const tip = `${quizTitle}|Not attempted`;
+        return `<span class="bys-quiz-icon bys-quiz-icon--neutral" data-tip="${escapeHtml(tip)}" data-quiz-id="${quizId}" data-quiz-title="${escapeHtml(quizTitle)}"></span>`;
+      }
+      const cls = summary.pass_highest ? 'bys-quiz-icon--pass' : 'bys-quiz-icon--fail';
+      const barHeight = barsMaxHeight * (summary.percent_highest * 0.01);
+      const tip = `${quizTitle}|Loading...|${Math.round(summary.percent_highest)}%`;
+      return `<span class="bys-quiz-icon ${cls}" data-tip="${escapeHtml(tip)}" data-quiz-id="${quizId}" data-user-id="${userId}" data-quiz-title="${escapeHtml(quizTitle)}" data-percent="${Math.round(summary.percent_highest)}" style="height: ${barHeight}px"></span>`;
+    });
+    return `<div class="bys-quiz-icons">${bars.join('')}</div>`;
+  }
+  function rebuildTableBody(courses, users, userCourseProgress) {
+    $table.find('tbody').html('');
+    appendTableRows(courses, users, userCourseProgress);
+  }
+  function appendTableRows(courses, users, userCourseProgress) {
+    const $tbody = $table.find('tbody');
+    const rowTemplate = document.getElementById('skeleton-row-template');
+    const cellTemplate = document.getElementById('course-cell-template');
+    users.forEach(user => {
+      const userProgress = userCourseProgress[user.id] || [];
+      const rowContent = rowTemplate.content.cloneNode(true);
+      const $row = $(rowContent);
+      $row.find('tr').attr('data-user-id', user.id).removeClass('reporting-table__row--loading');
+      const userStatus = user.status || 'never';
+      const statusClass = `status-badge--${userStatus}`;
+      let statusBadge = `<i class="fa-solid fa-circle"></i>`;
+      if (user.last_login) {
+        const readableDateTime = formatDate(user.last_login);
+        const unixTimestamp = user.last_login_unix || '';
+        const tooltipText = `Last login: ${readableDateTime} (${unixTimestamp})`;
+        statusBadge = `<span class="status-badge__icon" data-tip="${escapeHtml(tooltipText)}"><i class="fa-solid fa-circle"></i></span>`;
+      }
+      $row.find('.status-badge').attr('class', `status-badge ${statusClass}`).html(statusBadge);
+      const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.display_name || '';
+      $row.find('.col-name').html(`
+        <a href="${detailUrl}?group_id=${currentGroupId}&user_id=${user.id}" class="reporting-table__name-link" onclick="event.stopPropagation();">
+          ${escapeHtml(fullName)}
+        </a>
+      `);
+      $row.find('.col-email').html(escapeHtml(user.email));
+      courses.forEach((course, idx) => {
+        const courseData = userProgress.find(cp => cp.course_id === course.id);
+        const progressStatus = courseData?.progress_status || 'not_started';
+        let status = 'not-started';
+        if (progressStatus === 'completed') status = 'completed';else if (progressStatus === 'in_progress') status = 'in-progress';
+        const cellContent = cellTemplate.content.cloneNode(true);
+        const $cells = $(cellContent);
+        $cells.find('td').attr('data-course-idx', idx);
+        $cells.find('.course-cell--badge span').attr('class', `completion-badge completion-badge--${status}`);
+        const stepsCompleted = courseData?.steps_completed || 0;
+        const stepsTotal = courseData?.steps_total || 0;
+        const percentage = stepsTotal > 0 ? Math.round(stepsCompleted / stepsTotal * 100) : 0;
+        let percentageClass = percentage === 100 ? 'complete' : percentage === 0 ? 'not-started' : 'in-progress';
+        $cells.find('.course-sub-cell--progress').html(`
+          <div class="bys-progress-wrap"><div class="bys-progress-bar" style="width:${percentage}%;"></div></div>
+          <span class="bys-percent bys-percent--${percentageClass}">${percentage}%</span>
+        `);
+        $cells.find('.course-sub-cell--quizzing').html('<span class="bys-quiz-loading"><i class="fa-regular fa-spinner-third fa-spin"></i></span>');
+        const enrolledAt = courseData?.enrolled_at || '';
+        const dateCompleted = courseData?.date_completed || '';
+        $cells.find('.course-sub-cell--enrolment').html(`<span class="bys-date">${enrolledAt ? formatDate(enrolledAt) : 'Not started'}</span>`);
+        $cells.find('.course-sub-cell--completion').html(`<span class="bys-date">${dateCompleted ? formatDate(dateCompleted) : 'Not completed'}</span>`);
+
+        // Apply expanded-course visibility state at creation time so new rows
+        // are correct immediately, without depending on a post-append fixup pass.
+        if (expandedIdx !== null) {
+          if (idx !== expandedIdx) {
+            // Non-expanded course: hide badge, keep sub-cells hidden (template default)
+            $cells.find('.course-cell--badge').addClass('course-col--hidden');
+          } else {
+            // Expanded course: show sub-cells
+            $cells.find('.course-sub-cell').removeClass('course-sub-col--hidden');
+          }
+        }
+        $row.find('tr').append($cells);
+      });
+      $tbody.append($row);
+    });
+  }
+
+  // ── Quiz data lazy loader ─────────────────────────────────────────────────────
+  async function loadQuizDataForCourse(courseIdx) {
+    const course = coursesInView[courseIdx];
+    if (!course) return;
+    courseQuizLoadedIdx.add(courseIdx);
+    let quizSteps = [];
+    if (courseQuizStepsCache[course.id]) {
+      quizSteps = courseQuizStepsCache[course.id];
+    } else {
+      try {
+        quizSteps = (await _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.api.get(_shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.endpoints.courseQuizSteps(course.id))) || [];
+        courseQuizStepsCache[course.id] = quizSteps;
+      } catch (err) {
+        console.error(`[group-reporting] Failed to fetch quiz steps for course ${course.id}:`, err);
+      }
+    }
+    if (!userQuizProgressCache[course.id]) userQuizProgressCache[course.id] = {};
+    const userQuizProgressMap = {};
+    for (const user of usersInView) {
+      try {
+        const url = _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.endpoints.userQuizProgress(user.id) + `?group_id=${currentGroupId}&course_ids=${course.id}`;
+        const quizzes = await _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.api.get(url);
+        userQuizProgressMap[user.id] = {};
+        if (Array.isArray(quizzes)) {
+          quizzes.forEach(q => {
+            userQuizProgressMap[user.id][q.id] = q;
+          });
+        }
+        userQuizProgressCache[course.id][user.id] = userQuizProgressMap[user.id];
+      } catch (err) {
+        console.error(`[group-reporting] Failed to fetch quiz progress for user ${user.id}:`, err);
+        userQuizProgressMap[user.id] = {};
+        userQuizProgressCache[course.id][user.id] = {};
+      }
+    }
+    $table.find(`.course-sub-cell--quizzing[data-course-idx="${courseIdx}"]`).each(function () {
+      const userId = $(this).closest('tr').data('userId');
+      const userQuizProgress = userQuizProgressMap[userId] || {};
+      $(this).html(buildQuizBars(quizSteps, userId, userQuizProgress));
+    });
+  }
+
+  // ── Show More / lazy load ─────────────────────────────────────────────────────
+
+  function updateShowMoreButton() {
+    const $btn = $block.find('.bys-show-more');
+    const hasMore = sortedUsers.length > 0 ? displayedCount < sortedUsers.length : loadedOffset < allGroupUserIds.length;
+    $btn.toggleClass('hidden', !hasMore);
+  }
+  $block.on('click', '.bys-show-more', function () {
+    loadMoreUsers();
+  });
+
+  /**
+   * Core: fetch a specific batch of user IDs, get their progress, append rows.
+   * Returns the array of newly loaded users (or empty array on failure).
+   */
+  async function fetchAndAppendUsers(nextIds) {
+    const usersUrl = `/wp-json/bys-groups/v1/groups/${currentGroupId}/users?user_ids=${nextIds.join(',')}`;
+    const newUsers = await _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.api.get(usersUrl, true);
+    if (!newUsers || !Array.isArray(newUsers)) return [];
+    const courseIds = coursesInView.map(c => c.id).join(',');
+    if (courseIds) {
+      for (const user of newUsers) {
+        const progressUrl = `/wp-json/bys-groups/v1/users/${user.id}/course-progress?course_ids=${courseIds}`;
+        try {
+          userCourseProgressAll[user.id] = await _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.api.get(progressUrl, true);
+        } catch (err) {
+          console.error(`Failed to fetch course progress for user ${user.id}:`, err);
+          userCourseProgressAll[user.id] = [];
+        }
+      }
+    } else {
+      newUsers.forEach(u => {
+        userCourseProgressAll[u.id] = [];
+      });
+    }
+    usersInView = usersInView.concat(newUsers);
+    loadedOffset += newUsers.length;
+    appendTableRows(coursesInView, newUsers, userCourseProgressAll);
+    if (expandedIdx !== null && courseQuizLoadedIdx.has(expandedIdx)) {
+      await loadQuizDataForNewUsers(expandedIdx, newUsers);
+    }
+    return newUsers;
+  }
+  async function loadMoreUsers() {
+    const $btn = $block.find('.bys-show-more');
+
+    // Post-sort: data already in memory — just render the next page
+    if (sortedUsers.length > 0 && displayedCount < sortedUsers.length) {
+      const nextPage = sortedUsers.slice(displayedCount, displayedCount + PAGE_SIZE);
+      displayedCount += nextPage.length;
+      appendTableRows(coursesInView, nextPage, userCourseProgressAll);
+      if (expandedIdx !== null && courseQuizLoadedIdx.has(expandedIdx)) {
+        await loadQuizDataForNewUsers(expandedIdx, nextPage);
+      }
+      applyFilters();
+      if (expandedIdx !== null) expandCourse(expandedIdx);
+      updateShowMoreButton();
+      return;
+    }
+    const nextIds = allGroupUserIds.slice(loadedOffset, loadedOffset + PAGE_SIZE);
+    if (!nextIds.length) {
+      $btn.addClass('hidden');
+      return;
+    }
+    $btn.prop('disabled', true).text('Loading…');
+    try {
+      await fetchAndAppendUsers(nextIds);
+      applyFilters();
+      if (expandedIdx !== null) expandCourse(expandedIdx);
+      updateShowMoreButton();
+    } catch (err) {
+      console.error('[group-reporting] Failed to load more users:', err);
+    } finally {
+      $btn.prop('disabled', false).text('Show More Results');
+    }
+  }
+
+  /**
+   * Load all users not yet fetched, in PAGE_SIZE batches.
+   * Used when a filter is submitted that may match users beyond the current page.
+   */
+  async function loadAllRemainingUsers() {
+    while (loadedOffset < allGroupUserIds.length) {
+      const nextIds = allGroupUserIds.slice(loadedOffset, loadedOffset + PAGE_SIZE);
+      if (!nextIds.length) break;
+      try {
+        await fetchAndAppendUsers(nextIds);
+      } catch (err) {
+        console.error('[group-reporting] Failed to load remaining users for filter:', err);
+        break;
+      }
+    }
+    updateShowMoreButton();
+  }
+  async function loadQuizDataForNewUsers(courseIdx, newUsers) {
+    const course = coursesInView[courseIdx];
+    if (!course) return;
+    const quizSteps = courseQuizStepsCache[course.id] || [];
+    if (!quizSteps.length) return;
+    for (const user of newUsers) {
+      try {
+        const url = _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.endpoints.userQuizProgress(user.id) + `?group_id=${currentGroupId}&course_ids=${course.id}`;
+        const quizzes = await _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.api.get(url);
+        const userQuizProgress = {};
+        if (Array.isArray(quizzes)) {
+          quizzes.forEach(q => {
+            userQuizProgress[q.id] = q;
+          });
+        }
+        $table.find(`tr[data-user-id="${user.id}"] .course-sub-cell--quizzing[data-course-idx="${courseIdx}"]`).html(buildQuizBars(quizSteps, user.id, userQuizProgress));
+      } catch (err) {
+        console.error(`[group-reporting] Failed to fetch quiz progress for new user ${user.id}:`, err);
+      }
+    }
+  }
+
+  // ── Sort ──────────────────────────────────────────────────────────────────────
+
+  $block.on('change', '#sort-select', async function () {
+    currentSort = $(this).val();
+    const $select = $(this);
+    if (loadedOffset < allGroupUserIds.length) {
+      $select.prop('disabled', true);
+      await loadAllRemainingUsers();
+      $select.prop('disabled', false);
+    }
+    sortAndRebuildTable();
+  });
+  function getUserSortDate(user) {
+    const userProgress = userCourseProgressAll[user.id] || [];
+    const coursesToCheck = activeFilters.courseIds.length > 0 ? userProgress.filter(p => activeFilters.courseIds.includes(p.course_id)) : userProgress;
+    const dates = coursesToCheck.map(p => p.enrolled_at ? new Date(p.enrolled_at).getTime() : 0).filter(d => d > 0);
+    return dates.length ? Math.max(...dates) : 0;
+  }
+  function sortAndRebuildTable() {
+    sortedUsers = [...usersInView];
+    switch (currentSort) {
+      case 'first_name_asc':
+        sortedUsers.sort((a, b) => (a.first_name || a.display_name || '').toLowerCase().localeCompare((b.first_name || b.display_name || '').toLowerCase()));
+        break;
+      case 'first_name_desc':
+        sortedUsers.sort((a, b) => (b.first_name || b.display_name || '').toLowerCase().localeCompare((a.first_name || a.display_name || '').toLowerCase()));
+        break;
+      case 'last_name_asc':
+        sortedUsers.sort((a, b) => (a.last_name || a.display_name || '').toLowerCase().localeCompare((b.last_name || b.display_name || '').toLowerCase()));
+        break;
+      case 'last_name_desc':
+        sortedUsers.sort((a, b) => (b.last_name || b.display_name || '').toLowerCase().localeCompare((a.last_name || a.display_name || '').toLowerCase()));
+        break;
+      case 'date_asc':
+        sortedUsers.sort((a, b) => getUserSortDate(a) - getUserSortDate(b));
+        break;
+      case 'completion_date_asc':
+      case 'completion_date_desc':
+        {
+          const courseId = activeFilters.courseIds[0];
+          const getCompletionDate = user => {
+            const progress = (userCourseProgressAll[user.id] || []).find(p => p.course_id === courseId);
+            return progress?.date_completed ? new Date(progress.date_completed).getTime() : 0;
+          };
+          sortedUsers.sort((a, b) => {
+            const da = getCompletionDate(a);
+            const db = getCompletionDate(b);
+            // Users with no completion date always go to the bottom
+            if (!da && !db) return 0;
+            if (!da) return 1;
+            if (!db) return -1;
+            return currentSort === 'completion_date_asc' ? da - db : db - da;
+          });
+          break;
+        }
+      case 'date_desc':
+      default:
+        sortedUsers.sort((a, b) => getUserSortDate(b) - getUserSortDate(a));
+        break;
+    }
+    displayedCount = Math.min(PAGE_SIZE, sortedUsers.length);
+    const wasExpanded = expandedIdx;
+    rebuildTableBody(coursesInView, sortedUsers.slice(0, displayedCount), userCourseProgressAll);
+
+    // Restore expanded course state and quiz data from cache
+    if (wasExpanded !== null) {
+      expandCourse(wasExpanded);
+      applyColumnFilter();
+      const course = coursesInView[wasExpanded];
+      if (course && courseQuizLoadedIdx.has(wasExpanded) && userQuizProgressCache[course.id]) {
+        const quizSteps = courseQuizStepsCache[course.id] || [];
+        $table.find(`.course-sub-cell--quizzing[data-course-idx="${wasExpanded}"]`).each(function () {
+          const userId = $(this).closest('tr').data('userId');
+          const userQuizProgress = userQuizProgressCache[course.id][userId] || {};
+          $(this).html(buildQuizBars(quizSteps, userId, userQuizProgress));
+        });
+      }
+    }
+    updateShowMoreButton();
+    applyFilters();
+  }
+
+  // ── Course Multiselect ────────────────────────────────────────────────────────
+
+  function populateCourseMultiselect() {
+    const $ms = $block.find('#bys-multiselect-course');
+    const $list = $ms.find('.bys-multiselect__list');
+    $list.html('');
+    if (!coursesInView.length) {
+      $ms.find('.bys-multiselect__empty').removeClass('hidden');
+      return;
+    }
+    $ms.find('.bys-multiselect__empty').addClass('hidden');
+    coursesInView.forEach(course => {
+      const id = course.id;
+      const title = course.title?.rendered || course.title || '';
+      const isChecked = selectedCourseIds.includes(id);
+      const requiredMark = course.required ? ' <span class="bys-required-badge" aria-hidden="true">*</span>' : '';
+      $list.append(`
+        <li class="bys-multiselect__option" role="option" aria-selected="${isChecked}" data-course-id="${id}">
+          <label>
+            <input type="checkbox" value="${id}" ${isChecked ? 'checked' : ''} />
+            <span>${escapeHtml(title)}${requiredMark}</span>
+          </label>
+        </li>
+      `);
+    });
+    syncPills($ms);
+  }
+  function syncPills($ms) {
+    const $pills = $ms.find('.bys-multiselect__pills');
+    $pills.html('');
+    if (!selectedCourseIds.length) {
+      $pills.html('<span class="bys-multiselect__placeholder">All courses</span>');
+      return;
+    }
+    selectedCourseIds.forEach(id => {
+      const course = coursesInView.find(c => c.id === id);
+      if (!course) return;
+      const title = course.title?.rendered || course.title || '';
+      $pills.append(`
+        <span class="bys-multiselect__pill" data-course-id="${id}">
+          ${escapeHtml(title)}
+          <button class="bys-multiselect__pill-remove btn-unstyled" type="button" aria-label="Remove ${escapeHtml(title)}" data-course-id="${id}">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </span>
+      `);
+    });
+  }
+
+  // Open/close toggle
+  $block.on('click', '#bys-multiselect-course .bys-multiselect__toggle', function (e) {
+    e.stopPropagation();
+    toggleMultiselect($block.find('#bys-multiselect-course'));
+  });
+  $block.on('click', '#bys-multiselect-course .bys-multiselect__control', function (e) {
+    if ($(e.target).closest('.bys-multiselect__pill-remove').length) return;
+    toggleMultiselect($block.find('#bys-multiselect-course'));
+  });
+  function toggleMultiselect($ms) {
+    const isOpen = $ms.attr('aria-expanded') === 'true';
+    $ms.attr('aria-expanded', isOpen ? 'false' : 'true');
+    $ms.find('.bys-multiselect__dropdown').toggleClass('hidden', isOpen);
+    if (!isOpen) $ms.find('.bys-multiselect__search').val('').trigger('input').focus();
+  }
+  function closeMultiselect($ms) {
+    $ms.attr('aria-expanded', 'false');
+    $ms.find('.bys-multiselect__dropdown').addClass('hidden');
+  }
+  $(document).on('click', function (e) {
+    if (!$(e.target).closest('#bys-multiselect-course').length) {
+      closeMultiselect($block.find('#bys-multiselect-course'));
+    }
+    if (!$(e.target).closest('#bys-multiselect-users').length) {
+      closeMultiselect($block.find('#bys-multiselect-users'));
+    }
+  });
+
+  // Checkbox toggle — courses
+  $block.on('change', '#bys-multiselect-course-dropdown input[type="checkbox"]', function () {
+    const id = parseInt($(this).val(), 10);
+    if ($(this).is(':checked')) {
+      if (!selectedCourseIds.includes(id)) selectedCourseIds.push(id);
+      $(this).closest('li').attr('aria-selected', 'true');
+    } else {
+      selectedCourseIds = selectedCourseIds.filter(x => x !== id);
+      $(this).closest('li').attr('aria-selected', 'false');
+    }
+    syncPills($block.find('#bys-multiselect-course'));
+    updateCourseDepFieldState();
+  });
+
+  // Pill remove
+  $block.on('click', '.bys-multiselect__pill-remove', function (e) {
+    e.stopPropagation();
+    const id = parseInt($(this).data('courseId'), 10);
+    selectedCourseIds = selectedCourseIds.filter(x => x !== id);
+    $block.find(`#bys-multiselect-course-dropdown input[value="${id}"]`).prop('checked', false).closest('li').attr('aria-selected', 'false');
+    syncPills($block.find('#bys-multiselect-course'));
+    updateCourseDepFieldState();
+  });
+
+  // Search within course dropdown
+  $block.on('input', '#bys-multiselect-course .bys-multiselect__search', function () {
+    const q = $(this).val().toLowerCase().trim();
+    const $options = $block.find('#bys-multiselect-course-dropdown .bys-multiselect__option');
+    let visibleCount = 0;
+    $options.each(function () {
+      const label = $(this).find('span').first().text().toLowerCase();
+      const match = !q || label.includes(q);
+      $(this).toggleClass('hidden', !match);
+      if (match) visibleCount++;
+    });
+    $block.find('#bys-multiselect-course .bys-multiselect__empty').toggleClass('hidden', visibleCount > 0);
+  });
+
+  // ── User Multiselect ──────────────────────────────────────────────────────────
+
+  /**
+   * Lazy-fetch all group users on first open, then populate the list.
+   * Uses the same /groups/{id}/users endpoint but passes all user IDs at once.
+   * Result is cached in allGroupUsers for the life of the group selection.
+   */
+  async function populateUserMultiselect() {
+    const $ms = $block.find('#bys-multiselect-users');
+    const $list = $ms.find('.bys-multiselect__list');
+    const $loading = $ms.find('.bys-multiselect__loading');
+    const $empty = $ms.find('.bys-multiselect__empty');
+    if (!allGroupUserIds.length) {
+      $list.html('');
+      $empty.removeClass('hidden');
+      return;
+    }
+
+    // If already loaded, just re-render (selection state may have changed)
+    if (allGroupUsersLoaded) {
+      renderUserOptions($ms, $list, $empty);
+      return;
+    }
+
+    // Show loading state while fetching
+    $list.html('');
+    $empty.addClass('hidden');
+    $loading.removeClass('hidden');
+    try {
+      const url = `/wp-json/bys-groups/v1/groups/${currentGroupId}/users?user_ids=${allGroupUserIds.join(',')}`;
+      const response = await _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.api.get(url, true);
+      allGroupUsers = Array.isArray(response) ? response : [];
+      // Sort alphabetically by first/last name
+      allGroupUsers.sort((a, b) => {
+        const nameA = [a.first_name || '', a.last_name || ''].filter(Boolean).join(' ') || a.display_name || '';
+        const nameB = [b.first_name || '', b.last_name || ''].filter(Boolean).join(' ') || b.display_name || '';
+        return nameA.localeCompare(nameB);
+      });
+      allGroupUsersLoaded = true;
+    } catch (err) {
+      console.error('[group-reporting] Failed to fetch all group users for filter:', err);
+      allGroupUsers = [];
+      allGroupUsersLoaded = true;
+    }
+    $loading.addClass('hidden');
+    renderUserOptions($ms, $list, $empty);
+  }
+  function renderUserOptions($ms, $list, $empty) {
+    $list.html('');
+    if (!allGroupUsers.length) {
+      $empty.removeClass('hidden');
+      syncUserPills($ms);
+      return;
+    }
+    $empty.addClass('hidden');
+    allGroupUsers.forEach(user => {
+      const id = user.id;
+      const email = user.email || '';
+      const firstName = user.first_name || '';
+      const lastName = user.last_name || '';
+      const name = [firstName, lastName].filter(Boolean).join(' ');
+      const isChecked = selectedUserIds.includes(id);
+      const label = name ? `${escapeHtml(name)} (${escapeHtml(email)})` : escapeHtml(email);
+      $list.append(`
+        <li class="bys-multiselect__option" role="option" aria-selected="${isChecked}" data-user-id="${id}" data-name="${escapeHtml(name.toLowerCase())}" data-email="${escapeHtml(email.toLowerCase())}">
+          <label>
+            <input type="checkbox" value="${id}" ${isChecked ? 'checked' : ''} />
+            <span class="bys-multiselect__user-label">${label}</span>
+          </label>
+        </li>
+      `);
+    });
+    syncUserPills($ms);
+  }
+  function syncUserPills($ms) {
+    const $pills = $ms.find('.bys-multiselect__pills');
+    $pills.html('');
+    if (!selectedUserIds.length) {
+      $pills.html('<span class="bys-multiselect__placeholder">All users</span>');
+      return;
+    }
+    selectedUserIds.forEach(id => {
+      const user = allGroupUsers.find(u => u.id === id);
+      if (!user) return;
+      const email = user.email || '';
+      const name = [user.first_name || '', user.last_name || ''].filter(Boolean).join(' ');
+      const pillLabel = name ? `${escapeHtml(name)} (${escapeHtml(email)})` : escapeHtml(email);
+      $pills.append(`
+        <span class="bys-multiselect__pill" data-user-id="${id}">
+          ${pillLabel}
+          <button class="bys-multiselect__pill-remove btn-unstyled" type="button" aria-label="Remove ${escapeHtml(name || email)}" data-user-id="${id}">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </span>
+      `);
+    });
+  }
+
+  // Open/close — users
+  $block.on('click', '#bys-multiselect-users .bys-multiselect__toggle', function (e) {
+    e.stopPropagation();
+    toggleMultiselect($block.find('#bys-multiselect-users'));
+  });
+  $block.on('click', '#bys-multiselect-users .bys-multiselect__control', function (e) {
+    if ($(e.target).closest('.bys-multiselect__pill-remove').length) return;
+    toggleMultiselect($block.find('#bys-multiselect-users'));
+  });
+
+  // Checkbox toggle — users
+  $block.on('change', '#bys-multiselect-users-dropdown input[type="checkbox"]', function () {
+    const id = parseInt($(this).val(), 10);
+    if ($(this).is(':checked')) {
+      if (!selectedUserIds.includes(id)) selectedUserIds.push(id);
+      $(this).closest('li').attr('aria-selected', 'true');
+    } else {
+      selectedUserIds = selectedUserIds.filter(x => x !== id);
+      $(this).closest('li').attr('aria-selected', 'false');
+    }
+    syncUserPills($block.find('#bys-multiselect-users'));
+  });
+
+  // Pill remove — users
+  $block.on('click', '#bys-multiselect-users .bys-multiselect__pill-remove', function (e) {
+    e.stopPropagation();
+    const id = parseInt($(this).data('userId'), 10);
+    selectedUserIds = selectedUserIds.filter(x => x !== id);
+    $block.find(`#bys-multiselect-users-dropdown input[value="${id}"]`).prop('checked', false).closest('li').attr('aria-selected', 'false');
+    syncUserPills($block.find('#bys-multiselect-users'));
+  });
+
+  // Search within users dropdown
+  $block.on('input', '#bys-multiselect-users .bys-multiselect__search', function () {
+    const q = $(this).val().toLowerCase().trim();
+    const $options = $block.find('#bys-multiselect-users-dropdown .bys-multiselect__option');
+    let visibleCount = 0;
+    $options.each(function () {
+      const name = $(this).data('name') || '';
+      const email = $(this).data('email') || '';
+      const match = !q || name.includes(q) || email.includes(q);
+      $(this).toggleClass('hidden', !match);
+      if (match) visibleCount++;
+    });
+    $block.find('#bys-multiselect-users .bys-multiselect__empty').toggleClass('hidden', visibleCount > 0);
+  });
+
+  // ── Placeholder class for native select/date ─────────────────────────────────
+  $block.on('change', '#filter-status, #filter-user-status', function () {
+    $(this).toggleClass('is-placeholder', !$(this).val());
+  });
+
+  // ── Date range dropdowns ──────────────────────────────────────────────────────
+  $block.on('click', '#enrolment-date-range-trigger', function (e) {
+    e.preventDefault();
+    $block.find('#enrolment-date-range-dropdown').toggleClass('hidden');
+  });
+  $block.on('click', '#completion-date-range-trigger', function (e) {
+    e.preventDefault();
+    $block.find('#completion-date-range-dropdown').toggleClass('hidden');
+  });
+  $(document).on('click.bys-date-range', function (e) {
+    if (!$(e.target).closest('#filters__field--enrolment-date').length) {
+      $block.find('#enrolment-date-range-dropdown').addClass('hidden');
+    }
+    if (!$(e.target).closest('#filters__field--completion-date').length) {
+      $block.find('#completion-date-range-dropdown').addClass('hidden');
+    }
+  });
+  $block.on('change', '#filter-enrolment-date-from, #filter-enrolment-date-to', function () {
+    validateDateRange('filter-enrolment-date-from', 'filter-enrolment-date-to');
+    updateDateRangeText('filter-enrolment-date-from', 'filter-enrolment-date-to', 'enrolment-date-range-text');
+  });
+  $block.on('change', '#filter-completion-date-from, #filter-completion-date-to', function () {
+    validateDateRange('filter-completion-date-from', 'filter-completion-date-to');
+    updateDateRangeText('filter-completion-date-from', 'filter-completion-date-to', 'completion-date-range-text');
+  });
+
+  // ── Export ────────────────────────────────────────────────────────────────────
+
+  $block.on('click', '.table__actions__export a', async function (e) {
+    e.preventDefault();
+    if (!currentGroupId) return;
+    const $link = $(this);
+    $link.addClass('is-loading').text('Exporting…');
+    try {
+      await exportTableToCsv();
+    } finally {
+      $link.removeClass('is-loading').html('<i class="fa-regular fa-download"></i> Export Table');
+    }
+  });
+  $table.on('click', '.bys-dl-link', async function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!currentGroupId) return;
+    const courseIdx = parseInt($(this).data('courseIdx'), 10);
+    const course = coursesInView[courseIdx];
+    if (!course) return;
+    const $link = $(this);
+    $link.addClass('is-loading').html('<i class="fa-regular fa-spinner fa-spin"></i>');
+    try {
+      await exportCourseToCsv(course);
+    } finally {
+      $link.removeClass('is-loading').html('<i class="fa-regular fa-download"></i>');
+    }
+  });
+
+  /**
+   * Shared: get the filtered, ordered user list for any export.
+   * Loads all remaining users first if they haven't been fetched yet.
+   */
+  async function getExportUsers() {
+    if (loadedOffset < allGroupUserIds.length) {
+      await loadAllRemainingUsers();
+    }
+    const ordered = sortedUsers.length > 0 ? [...sortedUsers] : [...usersInView];
+    return ordered.filter(user => userPassesRowFilter(user));
+  }
+
+  /**
+   * Shared: serialize a 2-D array of strings to a UTF-8 CSV blob and trigger download.
+   */
+  function downloadCsv(rows, filename) {
+    const csv = rows.map(row => row.map(cell => {
+      const str = String(cell ?? '');
+      if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        return '"' + str.replace(/"/g, '""') + '"';
+      }
+      return str;
+    }).join(',')).join('\n');
+    const blob = new Blob(['\uFEFF' + csv], {
+      type: 'text/csv;charset=utf-8;'
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+  function courseProgressCells(courseData) {
+    const progressLabel = {
+      completed: 'Completed',
+      in_progress: 'In Progress',
+      not_started: 'Not Started'
+    };
+    const progressStatus = courseData?.progress_status || 'not_started';
+    const stepsCompleted = courseData?.steps_completed || 0;
+    const stepsTotal = courseData?.steps_total || 0;
+    const percentage = stepsTotal > 0 ? Math.round(stepsCompleted / stepsTotal * 100) : 0;
+    return [progressLabel[progressStatus] || progressStatus, `${percentage}%`, courseData?.enrolled_at ? formatDate(courseData.enrolled_at) : '', courseData?.date_completed ? formatDate(courseData.date_completed) : ''];
+  }
+
+  /**
+   * Ensure quiz steps + per-user progress are cached for a course.
+   * Uses a single batch endpoint so export never makes N per-user calls.
+   * Returns the array of quiz steps (may be empty if the course has none).
+   */
+  async function ensureQuizDataForCourse(course, users) {
+    // ── Step 1: quiz steps (cached per course) ──────────────────────────────
+    let quizSteps = courseQuizStepsCache[course.id];
+    if (!quizSteps) {
+      try {
+        quizSteps = (await _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.api.get(_shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.endpoints.courseQuizSteps(course.id))) || [];
+        courseQuizStepsCache[course.id] = quizSteps;
+      } catch (err) {
+        console.error(`[group-reporting] Failed to fetch quiz steps for course ${course.id}:`, err);
+        quizSteps = [];
+        courseQuizStepsCache[course.id] = quizSteps;
+      }
+    }
+    if (!quizSteps.length) return quizSteps;
+
+    // ── Step 2: batch-fetch progress for any users not yet cached ───────────
+    if (!userQuizProgressCache[course.id]) userQuizProgressCache[course.id] = {};
+    const uncached = users.filter(u => userQuizProgressCache[course.id][u.id] === undefined);
+    if (!uncached.length) return quizSteps;
+    try {
+      const userIds = uncached.map(u => u.id).join(',');
+      const url = _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.endpoints.courseQuizProgressBatch(course.id, userIds);
+      // forceRefresh=true so the cache key (which includes all user IDs) is always fresh
+      const batchResult = await _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.api.get(url, true);
+
+      // batchResult: { [userId]: { [quizId]: { total_attempts, percent_highest, pass_highest } } }
+      uncached.forEach(user => {
+        const userData = batchResult && batchResult[user.id] ? batchResult[user.id] : {};
+        // Re-key as integers to match buildQuizBars / quizProgressCell lookup by step_id
+        const map = {};
+        Object.keys(userData).forEach(qid => {
+          map[parseInt(qid, 10)] = userData[qid];
+        });
+        userQuizProgressCache[course.id][user.id] = map;
+      });
+    } catch (err) {
+      console.error(`[group-reporting] Batch quiz progress fetch failed for course ${course.id}:`, err);
+      uncached.forEach(user => {
+        userQuizProgressCache[course.id][user.id] = {};
+      });
+    }
+    return quizSteps;
+  }
+  function quizProgressCell(quizStep, userQuizProgress) {
+    const summary = userQuizProgress[quizStep.step_id];
+    if (!summary || summary.total_attempts === 0) return 'Not attempted';
+    const pct = Math.round(summary.percent_highest);
+    return summary.pass_highest ? `Pass (${pct}%)` : `Fail (${pct}%)`;
+  }
+  async function exportTableToCsv() {
+    const filteredUsers = await getExportUsers();
+
+    // Determine which courses to include (respect active course column filter)
+    const coursesToExport = activeFilters.courseIds.length > 0 ? coursesInView.filter(c => activeFilters.courseIds.includes(c.id)) : [...coursesInView];
+
+    // Pre-fetch all quiz data for exported courses
+    const quizStepsPerCourse = {};
+    for (const course of coursesToExport) {
+      quizStepsPerCourse[course.id] = await ensureQuizDataForCourse(course, filteredUsers);
+    }
+    const statusLabel = {
+      online: 'Online',
+      offline: 'Offline',
+      never: 'Never Logged In'
+    };
+    const headers = ['Status', 'Name', 'Email'];
+    coursesToExport.forEach(course => {
+      const title = course.shortname || course.title?.rendered || course.title || '';
+      const req = course.required ? ' (Required)' : '';
+      headers.push(`${title}${req} - Course Status`, `${title}${req} - Progress`, `${title}${req} - Enrolled`, `${title}${req} - Completed`);
+      (quizStepsPerCourse[course.id] || []).forEach(quiz => {
+        headers.push(`${title}${req} - ${quiz.step_title}`);
+      });
+    });
+    const rows = [headers];
+    filteredUsers.forEach(user => {
+      const userProgress = userCourseProgressAll[user.id] || [];
+      const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.display_name || '';
+      const row = [statusLabel[user.status] || 'Never Logged In', fullName, user.email || ''];
+      coursesToExport.forEach(course => {
+        row.push(...courseProgressCells(userProgress.find(cp => cp.course_id === course.id)));
+        const userQuizProgress = (userQuizProgressCache[course.id] || {})[user.id] || {};
+        (quizStepsPerCourse[course.id] || []).forEach(quiz => {
+          row.push(quizProgressCell(quiz, userQuizProgress));
+        });
+      });
+      rows.push(row);
+    });
+    const today = new Date().toISOString().split('T')[0];
+    downloadCsv(rows, `group-report-${currentGroupId}-${today}.csv`);
+  }
+  async function exportCourseToCsv(course) {
+    const filteredUsers = await getExportUsers();
+    const quizSteps = await ensureQuizDataForCourse(course, filteredUsers);
+    const title = course.shortname || course.title?.rendered || course.title || '';
+    const req = course.required ? ' (Required)' : '';
+    const headers = ['Name', 'Email', `${title}${req} - Course Status`, `${title}${req} - Progress`, `${title}${req} - Enrolled`, `${title}${req} - Completed`];
+    quizSteps.forEach(quiz => headers.push(`${title}${req} - ${quiz.step_title}`));
+    const rows = [headers];
+    filteredUsers.forEach(user => {
+      const userProgress = userCourseProgressAll[user.id] || [];
+      const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.display_name || '';
+      const userQuizProgress = (userQuizProgressCache[course.id] || {})[user.id] || {};
+      const quizCells = quizSteps.map(quiz => quizProgressCell(quiz, userQuizProgress));
+      rows.push([fullName, user.email || '', ...courseProgressCells(userProgress.find(cp => cp.course_id === course.id)), ...quizCells]);
+    });
+    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const today = new Date().toISOString().split('T')[0];
+    downloadCsv(rows, `course-report-${slug}-${today}.csv`);
+  }
+
+  // ── Utilities ─────────────────────────────────────────────────────────────────
+  function formatDate(dateString) {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+    } catch (e) {
+      return dateString;
+    }
+  }
+  function escapeHtml(text) {
+    if (!text || typeof text !== 'string') return '';
+    const map = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, m => map[m]);
+  }
+
+  // Truncate a column header title to at most maxChars at a word boundary, appending '…'
+  function truncateTitle(title, maxChars = 28) {
+    if (!title || title.length <= maxChars) return title;
+    const cut = title.lastIndexOf(' ', maxChars);
+    return (cut > 0 ? title.substring(0, cut) : title.substring(0, maxChars)) + '\u2026';
+  }
+});
+})();
+
+/******/ })()
+;
+//# sourceMappingURL=view.js.map
