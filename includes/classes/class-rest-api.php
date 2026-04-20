@@ -1644,8 +1644,8 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                     $text = method_exists($opt, 'getAnswer') ? $opt->getAnswer() : '';
                     if ($text !== '') {
                         $correct[] = array(
-                            'text'    => sanitize_text_field($text),
-                            'is_html' => false,
+                            'text'    => nl2br(esc_html($text)),
+                            'is_html' => true,
                         );
                     }
                 }
@@ -1660,7 +1660,7 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             if ($answer_type === 'essay' && $question_post_id) {
                 $answer_key = get_post_meta($question_post_id, 'essay_answer_key', true);
                 if ($answer_key) {
-                    return array(array('text' => wp_kses_post($answer_key), 'is_html' => true));
+                    return array(array('text' => wp_kses_post(nl2br($answer_key)), 'is_html' => true));
                 }
             }
 
