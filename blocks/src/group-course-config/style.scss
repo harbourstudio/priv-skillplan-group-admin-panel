@@ -1,0 +1,280 @@
+@keyframes bys-shimmer {
+    0%   { background-position: -400px 0; }
+    100% { background-position:  400px 0; }
+}
+
+@mixin shimmer {
+    background: linear-gradient(
+        90deg,
+        var(--wp--preset--color--gray-100) 25%,
+        var(--wp--preset--color--gray-200) 50%,
+        var(--wp--preset--color--gray-100) 75%
+    );
+    background-size: 800px 100%;
+    animation: bys-shimmer 1.4s infinite linear;
+}
+
+.wp-block-bys-groups-group-course-config {
+
+    .course-config__header {
+        margin-bottom: var(--wp--preset--spacing--5);
+    }
+
+    .course-config__subtitle {
+        font-size: var(--wp--preset--font-size--small);
+        color: var(--wp--preset--color--gray-500);
+        margin: 0;
+    }
+
+    // ── Add bar ───────────────────────────────────────────────────────────────
+
+    .course-config__add {
+        display: flex;
+        gap: var(--wp--preset--spacing--2);
+        margin-bottom: var(--wp--preset--spacing--3);
+        background: var(--wp--preset--color--gray-200);
+        border-radius: 0.75rem;
+        padding: var(--wp--preset--spacing--5);
+    }
+
+    .course-config__search-wrap {
+        position: relative;
+        flex: 1;
+    }
+
+    .course-config__search {
+        width: 100%;
+        padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--3);
+        border: 1px solid var(--wp--preset--color--gray-200);
+        border-radius: 0.375rem;
+        font-size: var(--wp--preset--font-size--small);
+        background: white;
+        color: var(--wp--preset--color--gray-900);
+        outline: none;
+
+        &:focus {
+            border-color: var(--wp--preset--color--primary);
+        }
+    }
+
+    .course-config__suggestions {
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid var(--wp--preset--color--gray-200);
+        border-radius: 0.375rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        list-style: none;
+        margin: 0;
+        padding: var(--wp--preset--spacing--1) 0 !important;
+        z-index: 100;
+        max-height: 220px;
+        overflow-y: auto;
+
+        &.hidden {
+            display: none;
+        }
+    }
+
+    .course-suggestion {
+        padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--3);
+        font-size: var(--wp--preset--font-size--small);
+        color: var(--wp--preset--color--gray-700);
+        list-style: none !important;
+        cursor: pointer;
+
+        &:hover {
+            background: var(--wp--preset--color--gray-50);
+        }
+
+        &--empty {
+            color: var(--wp--preset--color--gray-400);
+            font-style: italic;
+            cursor: default;
+
+            &:hover {
+                background: none;
+            }
+        }
+    }
+
+    .course-config__add-btn {
+        padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--4);
+        background: var(--wp--preset--color--primary);
+        color: white;
+        border-radius: 9999px;
+        font-size: var(--wp--preset--font-size--small);
+        font-weight: 500;
+        white-space: nowrap;
+        transition: opacity 0.15s;
+
+        &:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        &:not(:disabled):hover {
+            opacity: 0.88;
+        }
+    }
+
+    // ── Card ──────────────────────────────────────────────────────────────────
+
+    .course-config__card {
+        background: white;
+        border: 1px solid var(--wp--preset--color--gray-100);
+        border-radius: 0.5rem;
+        overflow: hidden;
+    }
+
+    // ── Course rows ───────────────────────────────────────────────────────────
+
+    .course-config__item {
+        display: flex;
+        align-items: center;
+        gap: var(--wp--preset--spacing--3);
+        padding: var(--wp--preset--spacing--3) var(--wp--preset--spacing--4);
+
+        &:not(:last-of-type) {
+            border-bottom: 1px solid var(--wp--preset--color--gray-100);
+        }
+    }
+
+    .course-config__name {
+        flex: 1;
+        font-size: var(--wp--preset--font-size--small);
+        font-weight: 500;
+        color: var(--wp--preset--color--gray-800);
+    }
+
+    .course-config__toggle-wrap {
+        display: flex;
+        align-items: center;
+        gap: var(--wp--preset--spacing--2);
+        flex-shrink: 0;
+    }
+
+    .course-config__toggle-label {
+        font-size: var(--wp--preset--font-size--small);
+        color: var(--wp--preset--color--gray-400);
+
+        &.is-required {
+            color: var(--wp--preset--color--primary);
+            font-weight: 500;
+        }
+    }
+
+    // CSS toggle switch
+    .course-config__toggle {
+        position: relative;
+        display: inline-block;
+        width: 2.25rem;
+        height: 1.25rem;
+        flex-shrink: 0;
+
+        input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+            position: absolute;
+        }
+    }
+
+    .course-config__slider {
+        position: absolute;
+        cursor: pointer;
+        inset: 0;
+        background: var(--wp--preset--color--gray-200);
+        border-radius: 9999px;
+        transition: background 0.2s;
+
+        &::before {
+            content: '';
+            position: absolute;
+            height: 0.875rem;
+            width: 0.875rem;
+            left: 0.1875rem;
+            bottom: 0.1875rem;
+            background: white;
+            border-radius: 9999px;
+            transition: transform 0.2s;
+        }
+    }
+
+    .course-config__toggle input:checked ~ .course-config__slider {
+        background: var(--wp--preset--color--primary);
+
+        &::before {
+            transform: translateX(1rem);
+        }
+    }
+
+    .course-config__remove {
+        flex-shrink: 0;
+        font-size: 0.875rem;
+        color: var(--wp--preset--color--gray-300);
+        line-height: 1;
+        transition: color 0.15s;
+
+        &:hover {
+            color: #ef4444;
+        }
+    }
+
+    .course-config__empty {
+        padding: var(--wp--preset--spacing--4);
+        text-align: center;
+        font-size: var(--wp--preset--font-size--small);
+        color: var(--wp--preset--color--gray-400);
+        margin: 0;
+    }
+
+    // ── Skeleton ──────────────────────────────────────────────────────────────
+
+    .course-config__skeleton {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .skeleton-course-row {
+        display: flex;
+        align-items: center;
+        gap: var(--wp--preset--spacing--3);
+        padding: var(--wp--preset--spacing--3) var(--wp--preset--spacing--4);
+
+        &:not(:last-of-type) {
+            border-bottom: 1px solid var(--wp--preset--color--gray-100);
+        }
+
+        .skeleton-text {
+            @include shimmer;
+            height: 0.875rem;
+            border-radius: 0.25rem;
+            flex-shrink: 0;
+        }
+    }
+
+    .skeleton-course-row__right {
+        display: flex;
+        align-items: center;
+        gap: var(--wp--preset--spacing--2);
+        flex-shrink: 0;
+        margin-left: auto;
+    }
+
+    .skeleton-toggle-pill {
+        @include shimmer;
+        width: 2.25rem;
+        height: 1.25rem;
+        border-radius: 9999px;
+    }
+
+    .skeleton-btn {
+        @include shimmer;
+        width: 1rem;
+        height: 1rem;
+        border-radius: 0.25rem;
+    }
+}

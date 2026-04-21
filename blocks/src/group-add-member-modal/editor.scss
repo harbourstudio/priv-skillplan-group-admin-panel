@@ -1,0 +1,22 @@
+// show a simple placeholder label in the editor since the block renders as a hidden overlay.
+.wp-block-bys-groups-group-add-member-modal {
+    .add-member-modal-editor-preview {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1rem;
+        background: var(--wp--preset--color--gray-100, #F3F4F6);
+        border: 1px dashed var(--wp--preset--color--gray-300, #D1D5DB);
+        border-radius: 0.5rem;
+        font-size: var(--wp--preset--font-size--small);
+        color: var(--wp--preset--color--gray-500, #6B7280);
+
+        i { font-size: 1rem; }
+
+        span {
+            margin-left: auto;
+            font-style: italic;
+            opacity: 0.7;
+        }
+    }
+}

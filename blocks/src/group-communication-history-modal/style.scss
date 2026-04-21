@@ -1,0 +1,225 @@
+.wp-block-bys-groups-group-communication-history-modal {
+
+    .comm-history-modal {
+        &.hs-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: var(--wp--preset--spacing--3);
+
+            &:not(.hidden) { display: flex; }
+        }
+
+        .modal-backdrop {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.4);
+            cursor: pointer;
+        }
+    }
+
+    .modal__inner {
+        display: flex;
+        flex-direction: column;
+        background: white;
+        border-radius: 1rem;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.14);
+        max-width: 44rem;
+        width: 100%;
+        max-height: 80vh;
+        overflow: hidden;
+        position: relative;
+        z-index: 10;
+    }
+
+    .modal__header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: var(--wp--preset--spacing--4);
+        padding: var(--wp--preset--spacing--4);
+        background: var(--wp--preset--color--primary);
+        flex-shrink: 0;
+
+        * { color: white; }
+    }
+
+    .modal__header-left {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--wp--preset--spacing--3);
+    }
+
+    .modal__back {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        border-radius: 50%;
+        opacity: 0.75;
+        font-size: 1rem;
+        transition: opacity 0.15s;
+        margin-top: 0.1rem;
+        flex-shrink: 0;
+
+        &:hover { opacity: 1; }
+    }
+
+    .modal__header-titles {
+        display: flex;
+        flex-direction: column;
+        gap: var(--wp--preset--spacing--1);
+    }
+
+    h4 {
+        font-size: var(--wp--preset--font-size--large);
+        font-weight: 600;
+        margin: 0 !important;
+        line-height: 1.2;
+    }
+
+    .modal__prompt-name {
+        font-size: var(--wp--preset--font-size--small);
+        opacity: 0.85;
+        margin: 0;
+    }
+
+    .modal__close {
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        border-radius: 50%;
+        opacity: 0.75;
+        font-size: 1.1rem;
+        transition: opacity 0.15s;
+        margin-top: 0.1rem;
+
+        &:hover { opacity: 1; }
+    }
+
+    .modal__body {
+        overflow-y: auto;
+        flex: 1;
+    }
+
+    // ── Screens ───────────────────────────────────────────────────────────────
+
+    .comm-screen {
+        height: 100%;
+    }
+
+    // ── Tables (screens 1 & 2) ────────────────────────────────────────────────
+
+    .comm-history-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: var(--wp--preset--font-size--small);
+
+        thead th {
+            padding: var(--wp--preset--spacing--3) var(--wp--preset--spacing--4);
+            font-weight: 600;
+            color: var(--wp--preset--color--gray-500);
+            text-align: left;
+            font-size: var(--wp--preset--font-size--x-small);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            border-bottom: 1px solid var(--wp--preset--color--gray-100);
+        }
+
+        tbody td {
+            padding: var(--wp--preset--spacing--3) var(--wp--preset--spacing--4);
+            color: var(--wp--preset--color--gray-700);
+        }
+
+        tbody tr:not(:last-of-type) td {
+            border-bottom: 1px solid var(--wp--preset--color--gray-100);
+        }
+    }
+
+    .comm-batch-row,
+    .comm-user-row {
+        cursor: pointer;
+        transition: background 0.1s;
+
+        &:hover td { background: var(--wp--preset--color--gray-50); }
+    }
+
+    .comm-email {
+        color: var(--wp--preset--color--gray-400) !important;
+        font-size: var(--wp--preset--font-size--x-small) !important;
+    }
+
+    // ── Status badges ─────────────────────────────────────────────────────────
+
+    .comm-status-badge {
+        display: inline-block;
+        padding: var(--wp--preset--spacing--1) var(--wp--preset--spacing--2);
+        border-radius: 0.25rem;
+        font-size: var(--wp--preset--font-size--x-small);
+        font-weight: 500;
+
+        &--delivered {
+            background: var(--wp--preset--color--green-100);
+            color: var(--wp--preset--color--green-700);
+        }
+
+        &--failed {
+            background: var(--wp--preset--color--red-100);
+            color: var(--wp--preset--color--red-700);
+        }
+    }
+
+    // ── Screen 3: message detail ──────────────────────────────────────────────
+
+    .comm-message-detail {
+        display: flex;
+        flex-direction: column;
+        gap: var(--wp--preset--spacing--4);
+        padding: var(--wp--preset--spacing--4);
+    }
+
+    .comm-message-meta {
+        display: flex;
+        flex-direction: column;
+        gap: var(--wp--preset--spacing--2);
+        padding-bottom: var(--wp--preset--spacing--4);
+        border-bottom: 1px solid var(--wp--preset--color--gray-100);
+    }
+
+    .comm-message-meta-row {
+        display: flex;
+        gap: var(--wp--preset--spacing--3);
+        font-size: var(--wp--preset--font-size--small);
+        align-items: center;
+    }
+
+    .comm-meta-label {
+        font-weight: 600;
+        color: var(--wp--preset--color--gray-500);
+        min-width: 4.5rem;
+        font-size: var(--wp--preset--font-size--x-small);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .comm-meta-value {
+        color: var(--wp--preset--color--gray-700);
+    }
+
+    .comm-message-body {
+        font-size: var(--wp--preset--font-size--small);
+        color: var(--wp--preset--color--gray-700);
+        line-height: 1.6;
+        white-space: pre-wrap;
+        background: var(--wp--preset--color--gray-50);
+        border-radius: 0.5rem;
+        padding: var(--wp--preset--spacing--4);
+    }
+}

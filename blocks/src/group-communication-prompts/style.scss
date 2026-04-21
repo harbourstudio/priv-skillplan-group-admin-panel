@@ -1,0 +1,109 @@
+.wp-block-bys-groups-group-communication-prompts {
+
+    .comm-prompts__header {
+        margin-bottom: var(--wp--preset--spacing--3);
+    }
+
+    .comm-prompts__subtitle {
+        margin: 0;
+        font-size: var(--wp--preset--font-size--small);
+        color: var(--wp--preset--color--gray-500);
+    }
+
+    // ── Card ──────────────────────────────────────────────────────────────────
+
+    .comm-prompts__card {
+        background: white;
+        border: 1px solid var(--wp--preset--color--gray-100);
+        border-radius: 0.75rem;
+        overflow: hidden;
+    }
+
+    // ── Prompt row ────────────────────────────────────────────────────────────
+
+    .comm-prompts__item {
+        display: flex;
+        align-items: center;
+        gap: var(--wp--preset--spacing--4);
+        padding: var(--wp--preset--spacing--4) var(--wp--preset--spacing--5);
+
+        &:not(:last-of-type) {
+            border-bottom: 1px solid var(--wp--preset--color--gray-100);
+        }
+    }
+
+    // ── Icon ──────────────────────────────────────────────────────────────────
+
+    .comm-prompts__icon {
+        width: 2.75rem;
+        height: 2.75rem;
+        border-radius: 50%;
+        background: var(--wp--preset--color--blue-100);
+        color: var(--wp--preset--color--primary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+        flex-shrink: 0;
+    }
+
+    // ── Text ──────────────────────────────────────────────────────────────────
+
+    .comm-prompts__info {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: var(--wp--preset--spacing--1);
+        min-width: 0;
+    }
+
+    .comm-prompts__name {
+        font-size: var(--wp--preset--font-size--small);
+        font-weight: 600;
+        color: var(--wp--preset--color--gray-900);
+    }
+
+    .comm-prompts__desc {
+        font-size: var(--wp--preset--font-size--small);
+        color: var(--wp--preset--color--gray-500);
+    }
+
+    // ── Buttons ───────────────────────────────────────────────────────────────
+
+    .comm-prompts__actions {
+        display: flex;
+        align-items: center;
+        gap: var(--wp--preset--spacing--2);
+        flex-shrink: 0;
+    }
+
+    .comm-prompts__history-btn {
+        padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--4);
+        border: 1.5px solid var(--wp--preset--color--primary);
+        border-radius: 9999px;
+        font-size: var(--wp--preset--font-size--small);
+        font-weight: 500;
+        color: var(--wp--preset--color--primary);
+        white-space: nowrap;
+        transition: background 0.15s, color 0.15s;
+        background-color: var(--wp--preset--color--blue-50);
+
+        &:hover {
+            background: var(--wp--preset--color--primary);
+            color: white;
+        }
+    }
+
+    .comm-prompts__proceed-btn {
+        padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--4);
+        background: var(--wp--preset--color--primary);
+        border-radius: 9999px;
+        font-size: var(--wp--preset--font-size--small);
+        font-weight: 500;
+        color: white;
+        white-space: nowrap;
+        transition: opacity 0.15s;
+
+        &:hover { opacity: 0.88; }
+    }
+}

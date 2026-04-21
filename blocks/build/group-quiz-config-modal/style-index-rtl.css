@@ -1,0 +1,176 @@
+/*!***********************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ./node_modules/css-loader/dist/cjs.js??ruleSet[1].rules[4].use[1]!./node_modules/postcss-loader/dist/cjs.js??ruleSet[1].rules[4].use[2]!./node_modules/@wordpress/scripts/node_modules/sass-loader/dist/cjs.js??ruleSet[1].rules[4].use[3]!./src/group-quiz-config-modal/style.scss ***!
+  \***********************************************************************************************************************************************************************************************************************************************************************************************/
+.wp-block-bys-groups-group-quiz-config-modal .quiz-attempts-modal.hs-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: var(--wp--preset--spacing--3);
+}
+.wp-block-bys-groups-group-quiz-config-modal .quiz-attempts-modal.hs-overlay:not(.hidden) {
+  display: flex;
+}
+.wp-block-bys-groups-group-quiz-config-modal .quiz-attempts-modal .modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+}
+.wp-block-bys-groups-group-quiz-config-modal .modal__inner {
+  display: flex;
+  flex-direction: column;
+  background: white;
+  border-radius: 1rem;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.14);
+  max-width: 44rem;
+  width: 100%;
+  max-height: 80vh;
+  overflow: hidden;
+  position: relative;
+  z-index: 10;
+}
+.wp-block-bys-groups-group-quiz-config-modal .modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--wp--preset--spacing--4);
+  padding: var(--wp--preset--spacing--4);
+  background: var(--wp--preset--color--primary);
+  flex-shrink: 0;
+}
+.wp-block-bys-groups-group-quiz-config-modal .modal__header * {
+  color: white;
+}
+.wp-block-bys-groups-group-quiz-config-modal .modal__header-titles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wp--preset--spacing--1);
+}
+.wp-block-bys-groups-group-quiz-config-modal .quiz-title {
+  font-size: var(--wp--preset--font-size--large);
+  font-weight: 600;
+  margin: 0 !important;
+  line-height: 1.2;
+}
+.wp-block-bys-groups-group-quiz-config-modal .quiz-meta {
+  font-size: var(--wp--preset--font-size--small);
+  opacity: 0.85;
+  margin: 0;
+}
+.wp-block-bys-groups-group-quiz-config-modal .modal__close {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  opacity: 0.75;
+  font-size: 1.1rem;
+  transition: opacity 0.15s;
+  margin-top: 0.1rem;
+}
+.wp-block-bys-groups-group-quiz-config-modal .modal__close:hover {
+  opacity: 1;
+}
+.wp-block-bys-groups-group-quiz-config-modal .modal__body {
+  overflow-y: auto;
+  flex: 1;
+}
+.wp-block-bys-groups-group-quiz-config-modal .quiz-user-row {
+  display: flex;
+  align-items: center;
+  gap: var(--wp--preset--spacing--3);
+  padding: var(--wp--preset--spacing--3) var(--wp--preset--spacing--4);
+}
+.wp-block-bys-groups-group-quiz-config-modal .quiz-user-row:not(:last-of-type) {
+  border-bottom: 1px solid var(--wp--preset--color--gray-100);
+}
+.wp-block-bys-groups-group-quiz-config-modal .quiz-user-avatar {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background: var(--wp--preset--color--gray-200);
+  color: var(--wp--preset--color--gray-600);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--wp--preset--font-size--small);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.wp-block-bys-groups-group-quiz-config-modal .quiz-user-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.wp-block-bys-groups-group-quiz-config-modal .quiz-user-name {
+  font-size: var(--wp--preset--font-size--small);
+  font-weight: 500;
+  color: var(--wp--preset--color--gray-800);
+}
+.wp-block-bys-groups-group-quiz-config-modal .quiz-user-email {
+  font-size: var(--wp--preset--font-size--x-small);
+  color: var(--wp--preset--color--gray-500);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wp-block-bys-groups-group-quiz-config-modal .quiz-status-badge {
+  display: inline-block;
+  padding: var(--wp--preset--spacing--1) var(--wp--preset--spacing--3);
+  border-radius: 0.25rem;
+  font-size: var(--wp--preset--font-size--x-small);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+.wp-block-bys-groups-group-quiz-config-modal .quiz-status-badge--completed {
+  background: var(--wp--preset--color--green-100);
+  color: var(--wp--preset--color--green-700);
+}
+.wp-block-bys-groups-group-quiz-config-modal .quiz-status-badge--not_attempted {
+  background: var(--wp--preset--color--gray-100);
+  color: var(--wp--preset--color--gray-500);
+}
+@keyframes bys-shimmer {
+  0% {
+    background-position: right -400px top 0;
+  }
+  100% {
+    background-position: right 400px top 0;
+  }
+}
+.wp-block-bys-groups-group-quiz-config-modal .skeleton-text {
+  background: linear-gradient(-90deg, var(--wp--preset--color--gray-100) 25%, #e8e8e8 50%, var(--wp--preset--color--gray-100) 75%);
+  background-size: 800px 100%;
+  animation: bys-shimmer 1.4s infinite linear;
+  border-radius: 0.25rem;
+  display: block;
+  height: 0.75rem;
+}
+.wp-block-bys-groups-group-quiz-config-modal .skeleton-btn {
+  background: linear-gradient(-90deg, var(--wp--preset--color--gray-100) 25%, #e8e8e8 50%, var(--wp--preset--color--gray-100) 75%);
+  background-size: 800px 100%;
+  animation: bys-shimmer 1.4s infinite linear;
+  border-radius: 0.25rem;
+  display: inline-block;
+  height: 1.5rem;
+}
+.wp-block-bys-groups-group-quiz-config-modal .quiz-user-avatar--skeleton {
+  background: linear-gradient(-90deg, var(--wp--preset--color--gray-100) 25%, #e8e8e8 50%, var(--wp--preset--color--gray-100) 75%);
+  background-size: 800px 100%;
+  animation: bys-shimmer 1.4s infinite linear;
+  border-radius: 0.25rem;
+  border-radius: 50%;
+}
+.wp-block-bys-groups-group-quiz-config-modal .quiz-modal-empty {
+  padding: var(--wp--preset--spacing--5);
+  font-size: var(--wp--preset--font-size--small);
+  color: var(--wp--preset--color--gray-400);
+  text-align: center;
+  margin: 0;
+}

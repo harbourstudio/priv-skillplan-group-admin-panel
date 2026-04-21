@@ -45,6 +45,11 @@ $tabs = [
         'label' => __( 'Grading', 'bys' ),
         'url'   => home_url( '/administrator-dashboard/grading/' ),
     ],
+    [
+        'id'    => 'settings',
+        'label' => __( 'Settings', 'bys' ),
+        'url'   => home_url( '/administrator-dashboard/settings/' ),
+    ],
 ];
 ?>
 

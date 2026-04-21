@@ -1,0 +1,21 @@
+.wp-block-bys-groups-group-quiz-config-modal {
+    .quiz-attempts-modal-editor-preview {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1rem;
+        background: var(--wp--preset--color--gray-100);
+        border: 1px dashed var(--wp--preset--color--gray-300);
+        border-radius: 0.5rem;
+        font-size: var(--wp--preset--font-size--small);
+        color: var(--wp--preset--color--gray-500);
+
+        i { font-size: 1rem; }
+
+        span {
+            margin-left: auto;
+            font-style: italic;
+            opacity: 0.7;
+        }
+    }
+}

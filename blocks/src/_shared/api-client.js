@@ -35,6 +35,18 @@ export const endpoints = {
   userCourseActivity: (userId, courseId) => `/wp-json/bys-groups/v1/users/${userId}/activity?course_id=${courseId}`,
   userCourseStepsProgress: (userId, courseId) => `/wp-json/bys-groups/v1/users/${userId}/course-progress-steps/${courseId}`,
   trackTopicVisit: (userId) => `/wp-json/bys-groups/v1/users/${userId}/track-topic-visit`,
+  groupLeaders: (groupId) => `/wp-json/bys-groups/v1/groups/${groupId}/leaders`,
+  allCourses: () => '/wp-json/bys-groups/v1/all-courses',
+  addGroupCourse: (groupId, courseId) => `/wp-json/bys-groups/v1/groups/${groupId}/courses/${courseId}/add`,
+  removeGroupCourse: (groupId, courseId) => `/wp-json/bys-groups/v1/groups/${groupId}/courses/${courseId}/remove`,
+  toggleRequiredCourse: (groupId, courseId) => `/wp-json/bys-groups/v1/groups/${groupId}/courses/${courseId}/toggle-required`,
+  removeGroupUser: (groupId, userId) => `/wp-json/bys-groups/v1/groups/${groupId}/users/${userId}/remove`,
+  archiveGroup: (groupId) => `/wp-json/bys-groups/v1/groups/${groupId}/archive`,
+  unarchiveGroup: (groupId) => `/wp-json/bys-groups/v1/groups/${groupId}/unarchive`,
+  archivedGroups: () => {
+    const userId = window.bysGroupsAuth?.userId ?? '';
+    return `/wp-json/bys-groups/v1/me/archived-groups${userId ? `?user_id=${userId}` : ''}`;
+  },
 };
 
 export const api = {
@@ -60,6 +72,11 @@ export const api = {
     const authHeader = getAuthorizationHeader();
     if (authHeader) {
       headers['Authorization'] = authHeader;
+    }
+    // Always include the WP REST nonce so cookie-based auth works and
+    // get_current_user_id() resolves to the actual logged-in user.
+    if (window.bysGroupsAuth?.nonce) {
+      headers['X-WP-Nonce'] = window.bysGroupsAuth.nonce;
     }
 
     const promise = jQuery
@@ -101,6 +118,7 @@ export const api = {
     const headers = { 'Content-Type': 'application/json' };
     const authHeader = getAuthorizationHeader();
     if (authHeader) headers['Authorization'] = authHeader;
+    if (window.bysGroupsAuth?.nonce) headers['X-WP-Nonce'] = window.bysGroupsAuth.nonce;
 
     return jQuery.ajax({
       url,

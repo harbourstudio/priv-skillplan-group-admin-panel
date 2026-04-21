@@ -1,0 +1,91 @@
+.wp-block-bys-groups-group-unarchive {
+    
+    .archived-groups__header {
+        margin-bottom: var(--wp--preset--spacing--5);
+    }
+
+    .archived-groups__description {
+        font-size: var(--wp--preset--font-size--small);
+        color: var(--wp--preset--color--gray-500);
+        margin: 0;
+    }
+
+    .archived-groups__card {
+        background: var(--wp--preset--color--white);
+        border: 1px solid var(--wp--preset--color--gray-100);
+        border-radius: 0.75rem;
+        overflow: hidden;
+    }
+
+    .archived-groups__item {
+        display: flex;
+        align-items: center;
+        gap: var(--wp--preset--spacing--4);
+        padding: var(--wp--preset--spacing--5) var(--wp--preset--spacing--5);
+
+        & + & {
+            border-top: 1px solid var(--wp--preset--color--gray-100);
+        }
+    }
+
+    .archived-groups__icon {
+        flex-shrink: 0;
+        width: 3rem;
+        height: 3rem;
+        border-radius: 9999px;
+        background: var(--wp--preset--color--blue-50);
+        color: var(--wp--preset--color--primary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .archived-groups__info {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: var(--wp--preset--spacing--1);
+    }
+
+    .archived-groups__name {
+        font-size: var(--wp--preset--font-size--base);
+        font-weight: 600;
+        color: var(--wp--preset--color--gray-900);
+    }
+
+    .archived-groups__date {
+        font-size: var(--wp--preset--font-size--small);
+        color: var(--wp--preset--color--gray-500);
+    }
+
+    .archived-groups__button {
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        padding: var(--wp--preset--spacing--3) var(--wp--preset--spacing--5);
+        font-size: var(--wp--preset--font-size--small);
+        font-weight: 500;
+        color: var(--wp--preset--color--white);
+        background: var(--wp--preset--color--primary);
+        border: none;
+        border-radius: 9999px;
+        cursor: pointer;
+        transition: background 0.15s;
+
+        &:hover:not(:disabled) {
+            background: var(--wp--preset--color--blue-600);
+        }
+
+        &:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+    }
+
+    .archived-groups__loading,
+    .archived-groups__empty {
+        font-size: var(--wp--preset--font-size--small);
+        color: var(--wp--preset--color--gray-500);
+        margin: 0 !important
+    }
+}

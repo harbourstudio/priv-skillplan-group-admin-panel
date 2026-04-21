@@ -1,0 +1,10 @@
+.wp-block-bys-groups-group-quiz-config {
+    .quiz-config__datetime {
+        pointer-events: none;
+    }
+
+    .quiz-config__badge {
+        pointer-events: none;
+        cursor: default;
+    }
+}

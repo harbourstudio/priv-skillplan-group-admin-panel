@@ -1,0 +1,226 @@
+.wp-block-bys-groups-group-quiz-config {
+
+    .quiz-config__header {
+        margin-bottom: var(--wp--preset--spacing--5);
+    }
+
+    .quiz-config__subtitle {
+        font-size: var(--wp--preset--font-size--small);
+        color: var(--wp--preset--color--gray-500);
+        margin: 0;
+    }
+
+    // ── Card ──────────────────────────────────────────────────────────────────
+
+    .quiz-config__card {
+        background: white;
+        border: 1px solid var(--wp--preset--color--gray-100);
+        border-radius: 0.5rem;
+        overflow: hidden;
+    }
+
+    // ── Course section ────────────────────────────────────────────────────────
+
+    .quiz-config__course-section {
+        &:not(:last-of-type) {
+            border-bottom: 1px solid var(--wp--preset--color--gray-100);
+        }
+    }
+
+    .quiz-config__course-header {
+        display: flex;
+        justify-content: space-between;
+        width: 100%;
+    }
+
+    .quiz-config__course-name {
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: var(--wp--preset--color--gray-500);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        text-align: right;
+    }
+
+    // ── Quiz row ──────────────────────────────────────────────────────────────
+
+    .quiz-config__item {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: var(--wp--preset--spacing--3);
+        padding: var(--wp--preset--spacing--4) var(--wp--preset--spacing--5);
+
+        &:not(:last-of-type) {
+            border-bottom: 1px solid var(--wp--preset--color--gray-100);
+        }
+    }
+
+    .quiz-config__quiz-name {
+        flex: 1;
+        min-width: 160px;
+        font-size: var(--wp--preset--font-size--small);
+        font-weight: 500;
+        color: var(--wp--preset--color--gray-800);
+    }
+
+    // ── Time fields ───────────────────────────────────────────────────────────
+
+    .quiz-config-date-row {
+        display: flex;
+        flex-direction: column;
+        gap: var(--wp--preset--spacing--3);
+        width: 100%;
+    }
+
+    .quiz-config-date-field {
+        display: flex;
+        align-items: center;
+        gap: var(--wp--preset--spacing--2);
+        background: var(--wp--preset--color--gray-50);
+        border-radius: 0.5rem;
+        padding: var(--wp--preset--spacing--3);
+    }
+
+    .quiz-config-date-icon {
+        font-size: 0.6rem;
+        color: var(--wp--preset--color--gray-400);
+        flex-shrink: 0;
+    }
+
+    .quiz-config-datetime {
+        flex: 1;
+        border: none;
+        background: transparent;
+        font-size: var(--wp--preset--font-size--small);
+        color: var(--wp--preset--color--gray-700);
+        outline: none;
+        min-width: 0;
+
+        &::-webkit-calendar-picker-indicator {
+            opacity: 0;
+            width: 0;
+        }
+    }
+
+    // ── Completion badges ─────────────────────────────────────────────────────
+
+    .quiz-config__badges {
+        display: flex;
+        gap: var(--wp--preset--spacing--2);
+        flex-shrink: 0;
+    }
+
+    .quiz-config__badge {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--wp--preset--spacing--1);
+        padding: var(--wp--preset--spacing--1) var(--wp--preset--spacing--3);
+        border-radius: 0.25rem;
+        font-size: var(--wp--preset--font-size--x-small);
+        font-weight: 500;
+        cursor: pointer;
+        transition: opacity 0.15s;
+
+        &:hover {
+            opacity: 0.8;
+        }
+
+        &--completed {
+            background: var(--wp--preset--color--blue-100);
+            color: var(--wp--preset--color--primary);
+        }
+
+        &--pending {
+            background: var(--wp--preset--color--gray-100);
+            color: var(--wp--preset--color--gray-600);
+        }
+    }
+
+    .quiz-config__badge-count {
+        font-weight: 700;
+    }
+
+    // ── Skeleton ──────────────────────────────────────────────────────────────
+
+    @keyframes bys-shimmer {
+        0%   { background-position: -400px 0; }
+        100% { background-position:  400px 0; }
+    }
+
+    @mixin shimmer {
+        background: linear-gradient(90deg, var(--wp--preset--color--gray-100) 25%, #e8e8e8 50%, var(--wp--preset--color--gray-100) 75%);
+        background-size: 800px 100%;
+        animation: bys-shimmer 1.4s infinite linear;
+        border-radius: 0.25rem;
+    }
+
+    .skeleton-text {
+        @include shimmer;
+        display: inline-block;
+        height: 0.75rem;
+    }
+
+    .skeleton-btn {
+        @include shimmer;
+        display: inline-block;
+        width: 70px;
+        height: 1.5rem;
+        border-radius: 0.25rem;
+    }
+
+    .skeleton-quiz-row {
+        display: flex;
+        flex-direction: column;
+        gap: var(--wp--preset--spacing--3);
+        padding: var(--wp--preset--spacing--4) var(--wp--preset--spacing--5);
+
+        &:not(:last-of-type) {
+            border-bottom: 1px solid var(--wp--preset--color--gray-100);
+        }
+    }
+
+    .skeleton-quiz-row__header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+    }
+
+    .skeleton-icon {
+        @include shimmer;
+        width: 0.5rem;
+        height: 0.5rem;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+
+    .skeleton-quiz-row__badges {
+        display: flex;
+        gap: var(--wp--preset--spacing--2);
+    }
+
+    .quiz-config__show-more {
+        width: 100%;
+        padding: var(--wp--preset--spacing--3) var(--wp--preset--spacing--4);
+        background: var(--wp--preset--color--blue-50);
+        border-top: 1px solid var(--wp--preset--color--gray-100);
+        color: var(--wp--preset--color--primary);
+        font-size: var(--wp--preset--font-size--small);
+        font-weight: 600;
+        text-align: center;
+        cursor: pointer;
+        transition: background 0.15s;
+
+        &:hover {
+            background: var(--wp--preset--color--blue-100);
+        }
+    }
+
+    .quiz-config__empty {
+        padding: var(--wp--preset--spacing--5);
+        font-size: var(--wp--preset--font-size--small);
+        color: var(--wp--preset--color--gray-400);
+        text-align: center;
+    }
+}

@@ -72,6 +72,13 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'permission_callback' => array($this, 'check_user_permission'),
             ));
 
+            // removeGroupUser - remove a member from a group
+            register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/users/(?P<user_id>\d+)/remove', array(
+                'methods'             => 'POST',
+                'callback'            => array($this, 'remove_group_user'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
+
             // groupCourses
             register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/courses', array(
                 'methods'             => 'GET',
@@ -190,6 +197,83 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'callback'            => array($this, 'track_topic_visit'),
                 'permission_callback' => array($this, 'check_user_permission'),
             ));
+
+            // archiveGroup - set a group post status to draft
+            register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/archive', array(
+                'methods'             => 'POST',
+                'callback'            => array($this, 'archive_group'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
+
+            // unarchiveGroup - restore a group post status to publish
+            register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/unarchive', array(
+                'methods'             => 'POST',
+                'callback'            => array($this, 'unarchive_group'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
+
+            // currentUserArchivedGroups - draft-status groups the current user leads
+            register_rest_route($this->namespace, '/me/archived-groups', array(
+                'methods'             => 'GET',
+                'callback'            => array($this, 'get_current_user_archived_groups'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
+
+            // allCourses - search all published LD courses (for add-course autocomplete)
+            register_rest_route($this->namespace, '/all-courses', array(
+                'methods'             => 'GET',
+                'callback'            => array($this, 'get_all_courses'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
+
+            // addGroupCourse - add a course to a group
+            register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/courses/(?P<course_id>\d+)/add', array(
+                'methods'             => 'POST',
+                'callback'            => array($this, 'add_group_course'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
+
+            // removeGroupCourse - remove a course from a group
+            register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/courses/(?P<course_id>\d+)/remove', array(
+                'methods'             => 'POST',
+                'callback'            => array($this, 'remove_group_course'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
+
+            // toggleRequiredCourse - toggle required status for a course in a group
+            register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/courses/(?P<course_id>\d+)/toggle-required', array(
+                'methods'             => 'POST',
+                'callback'            => array($this, 'toggle_required_course'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
+
+            // groupLeaders - all leaders assigned to a group
+            register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/leaders', array(
+                'methods'             => 'GET',
+                'callback'            => array($this, 'get_group_leaders'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
+
+            // inviteMember - add existing user or create pending invite
+            register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/invite', array(
+                'methods'             => 'POST',
+                'callback'            => array($this, 'invite_member'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
+
+            // getPendingInvites - list pending invites for a group
+            register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/pending-invites', array(
+                'methods'             => 'GET',
+                'callback'            => array($this, 'get_pending_invites'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
+
+            // cancelInvite - cancel a pending invite
+            register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/invites/(?P<invite_id>\d+)/cancel', array(
+                'methods'             => 'POST',
+                'callback'            => array($this, 'cancel_invite'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
         }
 
         public function check_user_permission($request) {
@@ -261,11 +345,11 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 return new \WP_REST_Response(array('groups' => array()), 200);
             }
 
-            // build response with group post data
+            // build response with group post data — only published groups
             $user_groups = array();
             foreach ($led_group_ids as $group_id) {
                 $group = get_post($group_id);
-                if ($group && $group->post_type === 'groups') {
+                if ($group && $group->post_type === 'groups' && $group->post_status === 'publish') {
                     $user_groups[] = array(
                         'id'    => $group->ID,
                         'title' => $group->post_title
@@ -397,12 +481,16 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                         }
                     }
 
+                    $enrolled_at_raw = get_user_meta($user_id, "learndash_group_{$group_id}_enrolled_at", true);
+
                     $users[] = array(
                         'id'           => $user->ID,
                         'first_name'   => get_user_meta($user_id, 'first_name', true) ?: '',
                         'last_name'    => get_user_meta($user_id, 'last_name', true) ?: '',
                         'display_name' => $user->display_name,
                         'email'        => $user->user_email,
+                        'avatar'       => get_avatar_url($user_id, array('size' => 64)),
+                        'enrolled_at'  => $enrolled_at_raw ? wp_date('c', (int) $enrolled_at_raw) : null,
                         'last_login'   => $last_login_timestamp ? wp_date('c', $last_login_timestamp) : null,
                         'status'       => $status,
                     );
@@ -469,6 +557,28 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             );
 
             return new \WP_REST_Response($user_data, 200);
+        }
+
+        /**
+         * Remove a user from a LearnDash group.
+         * Uses ld_update_group_access() which handles all LD-side cleanup.
+         */
+        public function remove_group_user($request) {
+            $group_id = intval($request['group_id']);
+            $user_id  = intval($request['user_id']);
+
+            if (!$group_id || !$user_id) {
+                return new \WP_REST_Response(array('error' => 'Invalid group ID or user ID'), 400);
+            }
+
+            $group = get_post($group_id);
+            if (!$group || $group->post_type !== 'groups') {
+                return new \WP_REST_Response(array('error' => 'Group not found'), 404);
+            }
+
+            ld_update_group_access($user_id, $group_id, true);
+
+            return new \WP_REST_Response(array('success' => true, 'user_id' => $user_id), 200);
         }
 
         public function get_group_courses($request) {
@@ -1771,11 +1881,13 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             $user_placeholders = implode(',', array_fill(0, count($user_ids), '%d'));
             $quiz_placeholders = implode(',', array_fill(0, count($quiz_ids), '%d'));
 
-            // ── Total submissions + last submission per quiz ───────────────────
+            // ── Submissions + unique members who have submitted per quiz ─────────
+            // attempted_users = distinct members who submitted at least once (activity_completed > 0).
             $rows = $wpdb->get_results(
                 $wpdb->prepare(
                     "SELECT post_id AS quiz_id,
                             COUNT(*) AS total_submissions,
+                            COUNT(DISTINCT CASE WHEN activity_completed > 0 THEN user_id END) AS attempted_users,
                             MAX(activity_completed) AS last_submission_ts
                      FROM {$ld_table}
                      WHERE activity_type = 'quiz'
@@ -1792,6 +1904,7 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             foreach ($rows as $row) {
                 $stats_map[intval($row['quiz_id'])] = array(
                     'total_submissions'   => intval($row['total_submissions']),
+                    'attempted_users'     => intval($row['attempted_users']),
                     'ungraded_count'      => 0,
                     'last_submission_gmt' => $row['last_submission_ts']
                         ? gmdate('Y-m-d\TH:i:s', intval($row['last_submission_ts']))
@@ -1843,6 +1956,7 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 $result[] = array(
                     'quiz_id'             => $qid,
                     'total_submissions'   => $stats_map[$qid]['total_submissions'] ?? 0,
+                    'attempted_users'     => $stats_map[$qid]['attempted_users'] ?? 0,
                     'ungraded_count'      => $stats_map[$qid]['ungraded_count'] ?? 0,
                     'last_submission_gmt' => $stats_map[$qid]['last_submission_gmt'] ?? null,
                 );
@@ -1863,20 +1977,22 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             }
 
             // Check transient cache
-            $cache_key = "bys_quiz_steps_v2_{$course_id}";
+            $cache_key = "bys_quiz_steps_v4_{$course_id}";
             $cached = get_transient($cache_key);
             if ($cached !== false) {
                 return new \WP_REST_Response($cached, 200);
             }
 
-            // Query for quiz steps in this course
+            // Only return quizzes where show_in_reporting = '1'
             global $wpdb;
             $steps = $wpdb->get_results($wpdb->prepare(
                 "SELECT p.ID as step_id, p.post_title as step_title
                  FROM {$wpdb->posts} p
-                 JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
+                 JOIN {$wpdb->postmeta} pm   ON p.ID = pm.post_id
+                 JOIN {$wpdb->postmeta} pm_r ON p.ID = pm_r.post_id
                  WHERE pm.meta_key = 'course_id' AND pm.meta_value = %d
                  AND p.post_type = 'sfwd-quiz' AND p.post_status = 'publish'
+                 AND pm_r.meta_key = 'show_in_reporting' AND pm_r.meta_value = '1'
                  ORDER BY p.menu_order ASC",
                 $course_id
             ));
@@ -1885,7 +2001,6 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 $steps = array();
             }
 
-            // Convert to array of objects with correct keys
             $result = array();
             foreach ($steps as $step) {
                 $result[] = array(
@@ -1894,7 +2009,6 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 );
             }
 
-            // Cache for 1 hour
             set_transient($cache_key, $result, HOUR_IN_SECONDS);
 
             return new \WP_REST_Response($result, 200);
@@ -3290,6 +3404,339 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             update_user_meta($user_id, $meta_key, $new_count);
 
             return new \WP_REST_Response(array('visits' => $new_count), 200);
+        }
+
+        /**
+         * Set a group's post status to draft (archive).
+         * Verifies the group exists and belongs to the 'groups' post type.
+         */
+        public function archive_group($request) {
+            $group_id = intval($request->get_param('group_id'));
+
+            $group = get_post($group_id);
+            if (!$group || $group->post_type !== 'groups') {
+                return new \WP_REST_Response(array('error' => 'Group not found'), 404);
+            }
+
+            $result = wp_update_post(array(
+                'ID'          => $group_id,
+                'post_status' => 'draft',
+            ), true);
+
+            if (is_wp_error($result)) {
+                return new \WP_REST_Response(array('error' => $result->get_error_message()), 500);
+            }
+
+            update_post_meta($group_id, '_bys_archived_date', time());
+
+            return new \WP_REST_Response(array('success' => true, 'group_id' => $group_id), 200);
+        }
+
+        /**
+         * Restore a group's post status to publish (unarchive).
+         */
+        public function unarchive_group($request) {
+            $group_id = intval($request->get_param('group_id'));
+
+            $group = get_post($group_id);
+            if (!$group || $group->post_type !== 'groups') {
+                return new \WP_REST_Response(array('error' => 'Group not found'), 404);
+            }
+
+            $result = wp_update_post(array(
+                'ID'          => $group_id,
+                'post_status' => 'publish',
+            ), true);
+
+            if (is_wp_error($result)) {
+                return new \WP_REST_Response(array('error' => $result->get_error_message()), 500);
+            }
+
+            delete_post_meta($group_id, '_bys_archived_date');
+
+            return new \WP_REST_Response(array('success' => true, 'group_id' => $group_id), 200);
+        }
+
+        /**
+         * Get all draft-status groups the current user leads.
+         * Returns id, title, and the timestamp stored when the group was archived.
+         * Falls back to post_modified if the meta was not set (pre-existing drafts).
+         */
+        public function get_current_user_archived_groups($request) {
+            $user_id = intval($request->get_param('user_id')) ?: get_current_user_id();
+
+            if (!$user_id) {
+                return new \WP_REST_Response(array('groups' => array()), 200);
+            }
+
+            $user_group_metas = get_user_meta($user_id);
+            $led_group_ids    = array();
+
+            foreach ($user_group_metas as $meta_key => $meta_values) {
+                if (strpos($meta_key, 'learndash_group_leaders_') === 0) {
+                    $group_id = intval(str_replace('learndash_group_leaders_', '', $meta_key));
+                    if ($group_id > 0) {
+                        $led_group_ids[] = $group_id;
+                    }
+                }
+            }
+
+            $archived_groups = array();
+
+            foreach ($led_group_ids as $group_id) {
+                $group = get_post($group_id);
+                if (!$group || $group->post_type !== 'groups' || $group->post_status !== 'draft') {
+                    continue;
+                }
+
+                $archived_date = get_post_meta($group_id, '_bys_archived_date', true);
+                if (!$archived_date) {
+                    $archived_date = get_post_modified_time('U', false, $group_id);
+                }
+
+                $archived_groups[] = array(
+                    'id'            => $group->ID,
+                    'title'         => $group->post_title,
+                    'archived_date' => (int) $archived_date,
+                );
+            }
+
+            return new \WP_REST_Response(array('groups' => $archived_groups), 200);
+        }
+
+        public function get_all_courses($request) {
+            $search = sanitize_text_field($request->get_param('search') ?? '');
+
+            $args = array(
+                'post_type'      => 'sfwd-courses',
+                'post_status'    => 'publish',
+                'posts_per_page' => 100,
+                'orderby'        => 'title',
+                'order'          => 'ASC',
+                'no_found_rows'  => true,
+            );
+            if ($search) {
+                $args['s'] = $search;
+            }
+
+            $result = array();
+            foreach (get_posts($args) as $course) {
+                $result[] = array(
+                    'id'    => $course->ID,
+                    'title' => $course->post_title,
+                );
+            }
+            return new \WP_REST_Response($result, 200);
+        }
+
+        public function add_group_course($request) {
+            $group_id  = intval($request['group_id']);
+            $course_id = intval($request['course_id']);
+
+            if (!$group_id || !$course_id) {
+                return new \WP_REST_Response(array('error' => 'Invalid IDs'), 400);
+            }
+
+            ld_update_course_group_access($course_id, $group_id, false);
+            return new \WP_REST_Response(array('success' => true), 200);
+        }
+
+        public function remove_group_course($request) {
+            $group_id  = intval($request['group_id']);
+            $course_id = intval($request['course_id']);
+
+            if (!$group_id || !$course_id) {
+                return new \WP_REST_Response(array('error' => 'Invalid IDs'), 400);
+            }
+
+            ld_update_course_group_access($course_id, $group_id, true);
+
+            // Also clean up the required status for this course
+            $ids = get_post_meta($group_id, '_bys_required_course_ids', true);
+            if (is_array($ids)) {
+                $ids = array_values(array_filter(array_map('intval', $ids), function ($id) use ($course_id) {
+                    return $id !== $course_id;
+                }));
+                update_post_meta($group_id, '_bys_required_course_ids', $ids);
+            }
+
+            return new \WP_REST_Response(array('success' => true), 200);
+        }
+
+        public function toggle_required_course($request) {
+            $group_id  = intval($request['group_id']);
+            $course_id = intval($request['course_id']);
+
+            if (!$group_id || !$course_id) {
+                return new \WP_REST_Response(array('error' => 'Invalid IDs'), 400);
+            }
+
+            $ids = get_post_meta($group_id, '_bys_required_course_ids', true);
+            $ids = is_array($ids) ? array_values(array_map('intval', array_filter($ids))) : array();
+
+            $idx = array_search($course_id, $ids, true);
+            if ($idx !== false) {
+                array_splice($ids, $idx, 1);
+                $required = false;
+            } else {
+                $ids[] = $course_id;
+                $required = true;
+            }
+
+            update_post_meta($group_id, '_bys_required_course_ids', $ids);
+            return new \WP_REST_Response(array('success' => true, 'required' => $required), 200);
+        }
+
+        public function get_group_leaders($request) {
+            $group_id = intval($request['group_id']);
+            if (!$group_id) {
+                return new \WP_REST_Response(array('error' => 'Invalid group ID'), 400);
+            }
+
+            $leaders = get_users(array(
+                'meta_key'   => 'learndash_group_leaders_' . $group_id,
+                'meta_value' => $group_id,
+            ));
+
+            $result = array();
+            foreach ($leaders as $leader) {
+                $result[] = array(
+                    'id'           => $leader->ID,
+                    'display_name' => $leader->display_name,
+                    'first_name'   => get_user_meta($leader->ID, 'first_name', true),
+                    'last_name'    => get_user_meta($leader->ID, 'last_name', true),
+                    'email'        => $leader->user_email,
+                    'avatar'       => get_avatar_url($leader->ID, array('size' => 64)),
+                );
+            }
+
+            return new \WP_REST_Response($result, 200);
+        }
+
+        // ── Invite endpoints ──────────────────────────────────────────────────
+
+        /**
+         * POST /groups/{group_id}/invite
+         * Body: { email, role, invited_by_user_id }
+         *
+         * If a WP user already exists with this email → enroll them immediately.
+         * Otherwise → insert a pending invite row and send the invitation email.
+         */
+        public function invite_member( $request ) {
+            $group_id = intval( $request['group_id'] );
+            $body     = json_decode( $request->get_body(), true );
+            $email    = sanitize_email( $body['email'] ?? '' );
+            $role     = in_array( $body['role'] ?? '', [ 'learner', 'leader' ], true )
+                        ? $body['role']
+                        : 'learner';
+            $invited_by = intval( $body['invited_by_user_id'] ?? 0 );
+
+            if ( ! $group_id || ! is_email( $email ) ) {
+                return new \WP_REST_Response( array( 'error' => 'Invalid group_id or email' ), 400 );
+            }
+
+            $group = get_post( $group_id );
+            if ( ! $group || $group->post_type !== 'groups' ) {
+                return new \WP_REST_Response( array( 'error' => 'Group not found' ), 404 );
+            }
+
+            // Case 1: user already exists → enroll directly
+            $existing_user = get_user_by( 'email', $email );
+            if ( $existing_user ) {
+                BYS_Groups_Invites::add_to_group( $existing_user->ID, $group_id, $role );
+                return new \WP_REST_Response( array(
+                    'status'  => 'enrolled',
+                    'user_id' => $existing_user->ID,
+                    'email'   => $email,
+                ), 200 );
+            }
+
+            // Case 2: no account → check for duplicate pending invite
+            global $wpdb;
+            $table = $wpdb->prefix . BYS_GROUPS_INVITES_TABLE;
+
+            $existing = $wpdb->get_var( $wpdb->prepare(
+                "SELECT id FROM {$table} WHERE group_id = %d AND email = %s AND status = 'pending'",
+                $group_id, $email
+            ) );
+
+            if ( $existing ) {
+                return new \WP_REST_Response( array( 'error' => 'A pending invite already exists for this email.' ), 409 );
+            }
+
+            // Insert invite row
+            $wpdb->insert( $table, array(
+                'group_id'   => $group_id,
+                'email'      => $email,
+                'role'       => $role,
+                'status'     => 'pending',
+                'invited_by' => $invited_by,
+                'invited_at' => current_time( 'mysql' ),
+            ), array( '%d', '%s', '%s', '%s', '%d', '%s' ) );
+
+            $invite_id = $wpdb->insert_id;
+
+            // Send invite email (non-fatal: log failure but still return success)
+            $mail_result = BYS_Groups_Invites::send_invite_email( $email, $group_id, $invited_by );
+            if ( is_wp_error( $mail_result ) ) {
+                error_log( '[bys-groups] Invite email failed for ' . $email . ': ' . $mail_result->get_error_message() );
+            }
+
+            return new \WP_REST_Response( array(
+                'status'    => 'invited',
+                'invite_id' => $invite_id,
+                'email'     => $email,
+            ), 201 );
+        }
+
+        /**
+         * GET /groups/{group_id}/pending-invites
+         * Returns all pending invite rows for the group.
+         */
+        public function get_pending_invites( $request ) {
+            $group_id = intval( $request['group_id'] );
+            if ( ! $group_id ) {
+                return new \WP_REST_Response( array( 'error' => 'Invalid group_id' ), 400 );
+            }
+
+            global $wpdb;
+            $table = $wpdb->prefix . BYS_GROUPS_INVITES_TABLE;
+
+            $rows = $wpdb->get_results( $wpdb->prepare(
+                "SELECT id, email, role, invited_at FROM {$table}
+                 WHERE group_id = %d AND status = 'pending'
+                 ORDER BY invited_at DESC",
+                $group_id
+            ), ARRAY_A );
+
+            return new \WP_REST_Response( $rows ?: array(), 200 );
+        }
+
+        /**
+         * POST /groups/{group_id}/invites/{invite_id}/cancel
+         * Marks the invite as cancelled (deletes the row).
+         */
+        public function cancel_invite( $request ) {
+            $group_id  = intval( $request['group_id'] );
+            $invite_id = intval( $request['invite_id'] );
+
+            if ( ! $group_id || ! $invite_id ) {
+                return new \WP_REST_Response( array( 'error' => 'Invalid IDs' ), 400 );
+            }
+
+            global $wpdb;
+            $table   = $wpdb->prefix . BYS_GROUPS_INVITES_TABLE;
+            $deleted = $wpdb->delete(
+                $table,
+                array( 'id' => $invite_id, 'group_id' => $group_id ),
+                array( '%d', '%d' )
+            );
+
+            if ( ! $deleted ) {
+                return new \WP_REST_Response( array( 'error' => 'Invite not found' ), 404 );
+            }
+
+            return new \WP_REST_Response( array( 'success' => true ), 200 );
         }
     }
 }

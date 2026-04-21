@@ -1,0 +1,10 @@
+.wp-block-bys-groups-group-user-quiz-config {
+    .uqc-input,
+    .uqc-select,
+    .uqc-datetime,
+    .uqc-btn-primary,
+    .uqc-btn-outline {
+        pointer-events: none;
+        background-image: none !important;
+    }
+}
