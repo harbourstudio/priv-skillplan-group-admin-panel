@@ -1,24 +1,14 @@
 import { __ } from '@wordpress/i18n';
-import { useEffect, useState } from 'react';
-import {
-	useBlockProps,
-	InspectorControls,
-	RichText,
-	useInnerBlocksProps,
-	MediaUpload,
-	MediaUploadCheck,
-	blockProps
-} from '@wordpress/block-editor';
-import {
-	Button,
-	PanelBody,
-	PanelRow,
-	SearchControl,
-	SelectControl,
-	__experimentalToggleGroupControl as ToggleGroupControl,
-	__experimentalToggleGroupControlOption as ToggleGroupControlOption,
-} from '@wordpress/components';
-import { gallery } from '@wordpress/icons';
+import { useEffect } from 'react';
+import { useBlockProps } from '@wordpress/block-editor';
+import './editor.scss';
+
+const TABS = [
+	{ label: __('Overview', 'bys'),      active: true },
+	{ label: __('Quiz Results', 'bys'),  active: false },
+	{ label: __('Activity', 'bys'),      active: false },
+	{ label: __('Progress', 'bys'),      active: false },
+];
 
 export default function Edit({ clientId, attributes, setAttributes }) {
 	const { blockId } = attributes;
@@ -28,17 +18,14 @@ export default function Edit({ clientId, attributes, setAttributes }) {
 	}, [clientId]);
 
 	return (
-		<>
-			<InspectorControls>
-				<PanelBody title={__('Block-specific Settings', 'bys')} initialOpen={true}>
-					<PanelRow>
-					</PanelRow>
-				</PanelBody>
-			</InspectorControls>
-
-			<div {...blockProps}>
-				Block will show on frontend
+		<div {...useBlockProps()}>
+			<div className="user-tabs-editor-preview">
+				{TABS.map(({ label, active }) => (
+					<span key={label} className={`user-tab-preview${active ? ' user-tab-preview--active' : ''}`}>
+						{label}
+					</span>
+				))}
 			</div>
-		</>
+		</div>
 	);
 }

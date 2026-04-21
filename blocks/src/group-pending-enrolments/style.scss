@@ -1,0 +1,134 @@
+.wp-block-bys-groups-group-pending-enrolments {
+    .pending-enrolments__card {
+        background: var(--wp--preset--color--white);
+        border: 1px solid var(--wp--preset--color--gray-100);
+        border-radius: 0.75rem;
+        overflow: hidden;
+        margin-top: var(--wp--preset--spacing--4);
+    }
+
+    .pending-enrolments__item {
+        display: flex;
+        align-items: center;
+        gap: var(--wp--preset--spacing--3);
+        padding: var(--wp--preset--spacing--3) var(--wp--preset--spacing--5);
+
+        &:not(:first-of-type) {
+            border-top: 1px solid var(--wp--preset--color--gray-100);
+        }
+    }
+
+    .pending-enrolments__email {
+        flex: 1;
+        min-width: 0;
+        font-size: var(--wp--preset--font-size--small);
+        color: var(--wp--preset--color--gray-700);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .pending-enrolments__badge {
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        padding: var(--wp--preset--spacing--1) var(--wp--preset--spacing--3);
+        background: var(--wp--preset--color--orange-100);
+        color: var(--wp--preset--color--orange-600);
+        border-radius: 0.25rem;
+        font-size: var(--wp--preset--font-size--x-small);
+        font-weight: 600;
+    }
+
+    .pending-enrolments__cancel {
+        flex-shrink: 0;
+        width: 1.5rem;
+        height: 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 9999px;
+        color: var(--wp--preset--color--gray-400);
+        font-size: var(--wp--preset--font-size--small);
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s;
+
+        &:hover:not(:disabled) {
+            background: var(--wp--preset--color--gray-100);
+            color: var(--wp--preset--color--gray-600);
+        }
+
+        &:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+    }
+
+    .pending-enrolments__show-more {
+        width: 100%;
+        padding: var(--wp--preset--spacing--3) var(--wp--preset--spacing--4);
+        background: var(--wp--preset--color--blue-50);
+        border-top: 1px solid var(--wp--preset--color--gray-100);
+        color: var(--wp--preset--color--primary);
+        font-size: var(--wp--preset--font-size--small);
+        font-weight: 600;
+        text-align: center;
+        cursor: pointer;
+        transition: background 0.15s;
+
+        &:hover {
+            background: var(--wp--preset--color--blue-100);
+        }
+    }
+
+    .pending-enrolments__date {
+        flex-shrink: 0;
+        font-size: var(--wp--preset--font-size--x-small);
+        color: var(--wp--preset--color--gray-400);
+    }
+
+    .pending-enrolments__empty {
+        padding: var(--wp--preset--spacing--5);
+        font-size: var(--wp--preset--font-size--small);
+        color: var(--wp--preset--color--gray-500);
+        margin: 0;
+        text-align: center;
+    }
+
+    // ── Skeleton ──────────────────────────────────────────────────────────────
+
+    @keyframes bys-shimmer {
+        0%   { background-position: -400px 0; }
+        100% { background-position:  400px 0; }
+    }
+
+    @mixin shimmer {
+        background: linear-gradient(90deg, var(--wp--preset--color--gray-100) 25%, #e8e8e8 50%, var(--wp--preset--color--gray-100) 75%);
+        background-size: 800px 100%;
+        animation: bys-shimmer 1.4s infinite linear;
+        border-radius: 0.25rem;
+    }
+
+    .skeleton-text {
+        @include shimmer;
+        display: inline-block;
+        height: 0.75rem;
+    }
+
+    .skeleton-btn {
+        @include shimmer;
+        display: inline-block;
+        height: 1.5rem;
+    }
+
+    .pending-enrolments__skeleton-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: var(--wp--preset--spacing--3) var(--wp--preset--spacing--5);
+
+        &:not(:last-of-type) {
+            border-bottom: 1px solid var(--wp--preset--color--gray-100);
+        }
+    }
+}

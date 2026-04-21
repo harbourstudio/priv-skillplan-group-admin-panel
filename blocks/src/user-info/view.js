@@ -50,7 +50,7 @@ jQuery(document).ready(async ($) => {
 
     // Populate with data
     $block.find('.user-avatar')
-      .attr('src', `https://i.pravatar.cc/80?u=${encodeURIComponent(user.email)}`)
+      .attr('src', user.avatar_url || `https://i.pravatar.cc/80?u=${encodeURIComponent(user.email)}`)
       .attr('alt', fullName);
 
     $block.find('.user-name').text(fullName);

@@ -1,0 +1,7 @@
+// group-tabs: make the <span> elements visually match the frontend <a> elements
+// since anchors don't apply cursor: pointer in the editor by default.
+.wp-block-bys-groups-group-tabs {
+    .group-tab {
+        cursor: default;
+    }
+}

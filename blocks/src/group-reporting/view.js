@@ -15,7 +15,7 @@ jQuery(document).ready(function($) {
   let courseQuizStepsCache    = {}; // { [courseId]: [...steps] }
   let userQuizProgressCache   = {}; // { [courseId]: { [userId]: { [quizId]: quizData } } }
   let loadedOffset = 0;             // how many users have been loaded into the table
-  let currentSort  = 'name_asc';
+  let currentSort  = 'first_name_asc';
   const PAGE_SIZE  = 10;
   let sortedUsers  = [];            // sorted order after an explicit sort; empty = use lazy-load order
   let displayedCount = 0;           // how many of sortedUsers are currently rendered
@@ -32,8 +32,8 @@ jQuery(document).ready(function($) {
     userIds:        [],         // array of user IDs (empty = all)
     courseStatus:   '',         // course-level: completed | in_progress | inactive
     userStatus:     '',         // user-level: online | offline | never
-    enrolmentDate:  '',
-    completionDate: '',
+    enrolmentDate:  { from: '', to: '' },
+    completionDate: { from: '', to: '' },
   };
 
   // ── Filter panel toggle ──────────────────────────────────────────────────────
@@ -227,16 +227,17 @@ jQuery(document).ready(function($) {
     allGroupUserIds   = data.baseUsersStats?.user_ids || [];
     allGroupUsers     = [];
     allGroupUsersLoaded = false;
-    activeFilters = { courseIds: [], userIds: [], courseStatus: '', userStatus: '', enrolmentDate: '', completionDate: '' };
+    activeFilters = { courseIds: [], userIds: [], courseStatus: '', userStatus: '', enrolmentDate: { from: '', to: '' }, completionDate: { from: '', to: '' } };
     userCourseProgressAll = {};
     courseQuizStepsCache  = {};
     userQuizProgressCache = {};
     loadedOffset  = 0;
-    currentSort   = 'name_asc';
+    currentSort   = 'first_name_asc';
     sortedUsers   = [];
     displayedCount = 0;
-    $block.find('#sort-select').val('name_asc');
+    $block.find('#sort-select').val('first_name_asc');
     resetFilterFormUI();
+    updateCompletionSortVisibility();
 
     await populateTableFromAPI(groupId, baseUsersStats, courses);
   });
@@ -248,7 +249,7 @@ jQuery(document).ready(function($) {
       const firstTenUserIds = userIds.slice(0, 10);
 
       rebuildTableHeader(courses);
-      showSkeletonRows(firstTenUserIds.length || PAGE_SIZE);
+      showSkeletonRows(firstTenUserIds.length || PAGE_SIZE, courses.length);
 
       if (!firstTenUserIds.length) {
         rebuildTableBody(courses, [], {});
@@ -357,22 +358,40 @@ jQuery(document).ready(function($) {
       visible = coursesToCheck.some(p => (p.progress_status || 'not_started') === progressStatus);
     }
 
-    if (visible && enrolmentDate) {
-      const filterDate = new Date(enrolmentDate);
+    if (visible && (enrolmentDate.from || enrolmentDate.to)) {
       const userProgress = userCourseProgressAll[user.id] || [];
       const coursesToCheck = activeFilters.courseIds.length > 0
         ? userProgress.filter(p => activeFilters.courseIds.includes(p.course_id))
         : userProgress;
-      visible = coursesToCheck.some(p => p.enrolled_at && new Date(p.enrolled_at) >= filterDate);
+      visible = coursesToCheck.some(p => {
+        if (!p.enrolled_at) return false;
+        const d = new Date(p.enrolled_at);
+        if (enrolmentDate.from && d < new Date(enrolmentDate.from)) return false;
+        if (enrolmentDate.to) {
+          const to = new Date(enrolmentDate.to);
+          to.setHours(23, 59, 59, 999);
+          if (d > to) return false;
+        }
+        return true;
+      });
     }
 
-    if (visible && completionDate) {
-      const filterDate = new Date(completionDate);
+    if (visible && (completionDate.from || completionDate.to)) {
       const userProgress = userCourseProgressAll[user.id] || [];
       const coursesToCheck = activeFilters.courseIds.length > 0
         ? userProgress.filter(p => activeFilters.courseIds.includes(p.course_id))
         : userProgress;
-      visible = coursesToCheck.some(p => p.date_completed && new Date(p.date_completed) >= filterDate);
+      visible = coursesToCheck.some(p => {
+        if (!p.date_completed) return false;
+        const d = new Date(p.date_completed);
+        if (completionDate.from && d < new Date(completionDate.from)) return false;
+        if (completionDate.to) {
+          const to = new Date(completionDate.to);
+          to.setHours(23, 59, 59, 999);
+          if (d > to) return false;
+        }
+        return true;
+      });
     }
 
     return visible;
@@ -398,12 +417,23 @@ jQuery(document).ready(function($) {
     const singleCourse = selectedCourseIds.length === 1;
     const $depFields = $block.find('.filters__field--course-dep');
     $depFields.toggleClass('is-disabled', !singleCourse);
-    $depFields.find('select, input[type="date"]').prop('disabled', !singleCourse);
+    $depFields.find('select, input[type="date"], .date-range__trigger').prop('disabled', !singleCourse);
 
     if (!singleCourse) {
       $block.find('#filter-status').val('').addClass('is-placeholder');
-      $block.find('#filter-enrolment-date').val('').addClass('is-placeholder');
-      $block.find('#filter-completion-date').val('').addClass('is-placeholder');
+      resetDateRangeField('filter-enrolment-date-from', 'filter-enrolment-date-to', 'enrolment-date-range-text', 'enrolment-date-range-dropdown');
+      resetDateRangeField('filter-completion-date-from', 'filter-completion-date-to', 'completion-date-range-text', 'completion-date-range-dropdown');
+    }
+  }
+
+  function updateCompletionSortVisibility() {
+    const singleCourse = activeFilters.courseIds.length === 1;
+    const $opts = $block.find('.sort-option--completion');
+    $opts.toggleClass('hidden', !singleCourse);
+    // If a completion sort is active but the option is now hidden, fall back to default
+    if (!singleCourse && (currentSort === 'completion_date_asc' || currentSort === 'completion_date_desc')) {
+      currentSort = 'first_name_asc';
+      $block.find('#sort-select').val('first_name_asc');
     }
   }
 
@@ -417,8 +447,8 @@ jQuery(document).ready(function($) {
     activeFilters.userIds        = selectedUserIds.slice();
     activeFilters.courseStatus   = singleCourse ? $block.find('#filter-status').val() : '';
     activeFilters.userStatus     = $block.find('#filter-user-status').val();
-    activeFilters.enrolmentDate  = singleCourse ? $block.find('#filter-enrolment-date').val() : '';
-    activeFilters.completionDate = singleCourse ? $block.find('#filter-completion-date').val() : '';
+    activeFilters.enrolmentDate  = singleCourse ? { from: $block.find('#filter-enrolment-date-from').val(), to: $block.find('#filter-enrolment-date-to').val() } : { from: '', to: '' };
+    activeFilters.completionDate = singleCourse ? { from: $block.find('#filter-completion-date-from').val(), to: $block.find('#filter-completion-date-to').val() } : { from: '', to: '' };
 
     closeMultiselect($block.find('#bys-multiselect-course'));
     closeMultiselect($block.find('#bys-multiselect-users'));
@@ -426,7 +456,8 @@ jQuery(document).ready(function($) {
     // Row filters may match users not yet loaded — drain remaining pages first
     const hasRowFilter = activeFilters.userIds.length > 0 ||
       activeFilters.courseStatus || activeFilters.userStatus ||
-      activeFilters.enrolmentDate || activeFilters.completionDate;
+      activeFilters.enrolmentDate.from || activeFilters.enrolmentDate.to ||
+      activeFilters.completionDate.from || activeFilters.completionDate.to;
 
     if (hasRowFilter && loadedOffset < allGroupUserIds.length) {
       const $btn = $block.find('.filters__submit');
@@ -436,16 +467,18 @@ jQuery(document).ready(function($) {
     }
 
     applyFilters();
+    updateCompletionSortVisibility();
   });
 
   // ── Filter reset ──────────────────────────────────────────────────────────────
   $block.find('.filters__reset').on('click', function() {
     selectedCourseIds = [];
     selectedUserIds   = [];
-    activeFilters = { courseIds: [], userIds: [], courseStatus: '', userStatus: '', enrolmentDate: '', completionDate: '' };
+    activeFilters = { courseIds: [], userIds: [], courseStatus: '', userStatus: '', enrolmentDate: { from: '', to: '' }, completionDate: { from: '', to: '' } };
 
     resetFilterFormUI();
     updateCourseDepFieldState();
+    updateCompletionSortVisibility();
     closeMultiselect($block.find('#bys-multiselect-course'));
     closeMultiselect($block.find('#bys-multiselect-users'));
     populateCourseMultiselect();
@@ -458,20 +491,67 @@ jQuery(document).ready(function($) {
     expandedIdx = null;
   });
 
+  function resetDateRangeField(fromId, toId, textId, dropdownId) {
+    $block.find('#' + fromId).val('').removeAttr('min').removeAttr('max');
+    $block.find('#' + toId).val('').removeAttr('min').removeAttr('max');
+    $block.find('#' + textId).text('Select a date range');
+    $block.find('#' + dropdownId).addClass('hidden');
+  }
+
+  function validateDateRange(fromId, toId) {
+    const $from = $block.find('#' + fromId);
+    const $to   = $block.find('#' + toId);
+    const dateFrom = $from.val();
+    const dateTo   = $to.val();
+    if (dateFrom) $to.attr('min', dateFrom); else $to.removeAttr('min');
+    if (dateTo)   $from.attr('max', dateTo); else $from.removeAttr('max');
+    if (dateFrom && dateTo && dateFrom > dateTo) $from.val(dateTo);
+  }
+
+  function updateDateRangeText(fromId, toId, textId) {
+    const dateFrom = $block.find('#' + fromId).val();
+    const dateTo   = $block.find('#' + toId).val();
+    if (!dateFrom && !dateTo)     $block.find('#' + textId).text('Select a date range');
+    else if (dateFrom && dateTo)  $block.find('#' + textId).text(`${dateFrom} – ${dateTo}`);
+    else if (dateFrom)            $block.find('#' + textId).text(`From ${dateFrom}`);
+    else                          $block.find('#' + textId).text(`Until ${dateTo}`);
+  }
+
   function resetFilterFormUI() {
     $block.find('#filter-status').val('').addClass('is-placeholder');
     $block.find('#filter-user-status').val('').addClass('is-placeholder');
-    $block.find('#filter-enrolment-date').val('').addClass('is-placeholder');
-    $block.find('#filter-completion-date').val('').addClass('is-placeholder');
+    resetDateRangeField('filter-enrolment-date-from', 'filter-enrolment-date-to', 'enrolment-date-range-text', 'enrolment-date-range-dropdown');
+    resetDateRangeField('filter-completion-date-from', 'filter-completion-date-to', 'completion-date-range-text', 'completion-date-range-dropdown');
   }
 
   // ── Table builders ────────────────────────────────────────────────────────────
-  function showSkeletonRows(count) {
+  function showSkeletonRows(count, courseCount = 0) {
     const $tbody = $table.find('tbody');
     $tbody.html('');
     const rowTemplate = document.getElementById('skeleton-row-template');
     for (let i = 0; i < count; i++) {
-      $tbody.append(rowTemplate.content.cloneNode(true));
+      const row = rowTemplate.content.cloneNode(true);
+      const tr = row.querySelector('tr');
+      for (let c = 0; c < courseCount; c++) {
+        const td = document.createElement('td');
+        td.className = 'course-cell course-cell--badge';
+        const span = document.createElement('span');
+        span.style.width = '24px';
+        td.appendChild(span);
+        tr.appendChild(td);
+      }
+      $tbody.append(row);
+    }
+  }
+
+  function showSkeletonCourseHeaders(count) {
+    const headerRow = $table.find('thead .reporting-table__head')[0];
+    if (!headerRow) return;
+    // Remove any existing skeleton course headers
+    $(headerRow).find('.course-col-header--skeleton').remove();
+    const skeletonTemplate = document.getElementById('skeleton-course-header-template');
+    for (let i = 0; i < count; i++) {
+      headerRow.appendChild(skeletonTemplate.content.cloneNode(true));
     }
   }
 
@@ -503,11 +583,14 @@ jQuery(document).ready(function($) {
 
       $headers.find('[data-course-idx]').attr('data-course-idx', idx);
 
-      const courseTitle = course.shortname || course.title?.rendered || course.title || '';
-      const requiredBadge = course.required
-        ? ' <span class="bys-required-badge" aria-label="Required" title="Required">*</span>'
-        : '';
-      $headers.find('.bys-course-toggle').html(escapeHtml(courseTitle) + requiredBadge).attr('data-course-idx', idx);
+      const courseTitle = course.title?.rendered || course.title || '';
+      $headers.find('.bys-course-toggle')
+        .text(truncateTitle(courseTitle))
+        .attr('title', courseTitle)
+        .attr('data-course-idx', idx);
+      if (course.required) {
+        $headers.find('.bys-required-badge').removeClass('hidden');
+      }
       $headers.find('.bys-dl-link').attr('title', `Download ${escapeHtml(courseTitle)}`).attr('data-course-idx', idx);
 
       $headers.children().each(function() {
@@ -607,12 +690,24 @@ jQuery(document).ready(function($) {
           <span class="bys-percent bys-percent--${percentageClass}">${percentage}%</span>
         `);
 
-        $cells.find('.course-sub-cell--quizzing').html('<span class="bys-quiz-loading">—</span>');
+        $cells.find('.course-sub-cell--quizzing').html('<span class="bys-quiz-loading"><i class="fa-regular fa-spinner-third fa-spin"></i></span>');
 
         const enrolledAt = courseData?.enrolled_at || '';
         const dateCompleted = courseData?.date_completed || '';
         $cells.find('.course-sub-cell--enrolment').html(`<span class="bys-date">${enrolledAt ? formatDate(enrolledAt) : 'Not started'}</span>`);
         $cells.find('.course-sub-cell--completion').html(`<span class="bys-date">${dateCompleted ? formatDate(dateCompleted) : 'Not completed'}</span>`);
+
+        // Apply expanded-course visibility state at creation time so new rows
+        // are correct immediately, without depending on a post-append fixup pass.
+        if (expandedIdx !== null) {
+          if (idx !== expandedIdx) {
+            // Non-expanded course: hide badge, keep sub-cells hidden (template default)
+            $cells.find('.course-cell--badge').addClass('course-col--hidden');
+          } else {
+            // Expanded course: show sub-cells
+            $cells.find('.course-sub-cell').removeClass('course-sub-col--hidden');
+          }
+        }
 
         $row.find('tr').append($cells);
       });
@@ -727,6 +822,7 @@ jQuery(document).ready(function($) {
         await loadQuizDataForNewUsers(expandedIdx, nextPage);
       }
       applyFilters();
+      if (expandedIdx !== null) expandCourse(expandedIdx);
       updateShowMoreButton();
       return;
     }
@@ -738,6 +834,7 @@ jQuery(document).ready(function($) {
     try {
       await fetchAndAppendUsers(nextIds);
       applyFilters();
+      if (expandedIdx !== null) expandCourse(expandedIdx);
       updateShowMoreButton();
     } catch (err) {
       console.error('[group-reporting] Failed to load more users:', err);
@@ -817,23 +914,39 @@ jQuery(document).ready(function($) {
     sortedUsers = [...usersInView];
 
     switch (currentSort) {
-      case 'name_asc':
-        sortedUsers.sort((a, b) => {
-          const na = ([a.first_name, a.last_name].filter(Boolean).join(' ') || a.display_name || '').toLowerCase();
-          const nb = ([b.first_name, b.last_name].filter(Boolean).join(' ') || b.display_name || '').toLowerCase();
-          return na.localeCompare(nb);
-        });
+      case 'first_name_asc':
+        sortedUsers.sort((a, b) => (a.first_name || a.display_name || '').toLowerCase().localeCompare((b.first_name || b.display_name || '').toLowerCase()));
         break;
-      case 'name_desc':
-        sortedUsers.sort((a, b) => {
-          const na = ([a.first_name, a.last_name].filter(Boolean).join(' ') || a.display_name || '').toLowerCase();
-          const nb = ([b.first_name, b.last_name].filter(Boolean).join(' ') || b.display_name || '').toLowerCase();
-          return nb.localeCompare(na);
-        });
+      case 'first_name_desc':
+        sortedUsers.sort((a, b) => (b.first_name || b.display_name || '').toLowerCase().localeCompare((a.first_name || a.display_name || '').toLowerCase()));
+        break;
+      case 'last_name_asc':
+        sortedUsers.sort((a, b) => (a.last_name || a.display_name || '').toLowerCase().localeCompare((b.last_name || b.display_name || '').toLowerCase()));
+        break;
+      case 'last_name_desc':
+        sortedUsers.sort((a, b) => (b.last_name || b.display_name || '').toLowerCase().localeCompare((a.last_name || a.display_name || '').toLowerCase()));
         break;
       case 'date_asc':
         sortedUsers.sort((a, b) => getUserSortDate(a) - getUserSortDate(b));
         break;
+      case 'completion_date_asc':
+      case 'completion_date_desc': {
+        const courseId = activeFilters.courseIds[0];
+        const getCompletionDate = (user) => {
+          const progress = (userCourseProgressAll[user.id] || []).find(p => p.course_id === courseId);
+          return progress?.date_completed ? new Date(progress.date_completed).getTime() : 0;
+        };
+        sortedUsers.sort((a, b) => {
+          const da = getCompletionDate(a);
+          const db = getCompletionDate(b);
+          // Users with no completion date always go to the bottom
+          if (!da && !db) return 0;
+          if (!da) return 1;
+          if (!db) return -1;
+          return currentSort === 'completion_date_asc' ? da - db : db - da;
+        });
+        break;
+      }
       case 'date_desc':
       default:
         sortedUsers.sort((a, b) => getUserSortDate(b) - getUserSortDate(a));
@@ -1025,8 +1138,12 @@ jQuery(document).ready(function($) {
       const url = `/wp-json/bys-groups/v1/groups/${currentGroupId}/users?user_ids=${allGroupUserIds.join(',')}`;
       const response = await api.get(url, true);
       allGroupUsers = Array.isArray(response) ? response : [];
-      // Sort alphabetically by display_name
-      allGroupUsers.sort((a, b) => (a.display_name || '').localeCompare(b.display_name || ''));
+      // Sort alphabetically by first/last name
+      allGroupUsers.sort((a, b) => {
+        const nameA = [a.first_name || '', a.last_name || ''].filter(Boolean).join(' ') || a.display_name || '';
+        const nameB = [b.first_name || '', b.last_name || ''].filter(Boolean).join(' ') || b.display_name || '';
+        return nameA.localeCompare(nameB);
+      });
       allGroupUsersLoaded = true;
     } catch (err) {
       console.error('[group-reporting] Failed to fetch all group users for filter:', err);
@@ -1051,12 +1168,16 @@ jQuery(document).ready(function($) {
     allGroupUsers.forEach(user => {
       const id = user.id;
       const email = user.email || '';
+      const firstName = user.first_name || '';
+      const lastName = user.last_name || '';
+      const name = [firstName, lastName].filter(Boolean).join(' ');
       const isChecked = selectedUserIds.includes(id);
+      const label = name ? `${escapeHtml(name)} (${escapeHtml(email)})` : escapeHtml(email);
       $list.append(`
-        <li class="bys-multiselect__option" role="option" aria-selected="${isChecked}" data-user-id="${id}">
+        <li class="bys-multiselect__option" role="option" aria-selected="${isChecked}" data-user-id="${id}" data-name="${escapeHtml(name.toLowerCase())}" data-email="${escapeHtml(email.toLowerCase())}">
           <label>
             <input type="checkbox" value="${id}" ${isChecked ? 'checked' : ''} />
-            <span class="bys-multiselect__user-email">${escapeHtml(email)}</span>
+            <span class="bys-multiselect__user-label">${label}</span>
           </label>
         </li>
       `);
@@ -1078,10 +1199,12 @@ jQuery(document).ready(function($) {
       const user = allGroupUsers.find(u => u.id === id);
       if (!user) return;
       const email = user.email || '';
+      const name = [user.first_name || '', user.last_name || ''].filter(Boolean).join(' ');
+      const pillLabel = name ? `${escapeHtml(name)} (${escapeHtml(email)})` : escapeHtml(email);
       $pills.append(`
         <span class="bys-multiselect__pill" data-user-id="${id}">
-          ${escapeHtml(email)}
-          <button class="bys-multiselect__pill-remove btn-unstyled" type="button" aria-label="Remove ${escapeHtml(email)}" data-user-id="${id}">
+          ${pillLabel}
+          <button class="bys-multiselect__pill-remove btn-unstyled" type="button" aria-label="Remove ${escapeHtml(name || email)}" data-user-id="${id}">
             <i class="fa-solid fa-xmark"></i>
           </button>
         </span>
@@ -1129,8 +1252,9 @@ jQuery(document).ready(function($) {
     const $options = $block.find('#bys-multiselect-users-dropdown .bys-multiselect__option');
     let visibleCount = 0;
     $options.each(function() {
-      const email = $(this).find('.bys-multiselect__user-email').text().toLowerCase();
-      const match = !q || email.includes(q);
+      const name = $(this).data('name') || '';
+      const email = $(this).data('email') || '';
+      const match = !q || name.includes(q) || email.includes(q);
       $(this).toggleClass('hidden', !match);
       if (match) visibleCount++;
     });
@@ -1142,8 +1266,34 @@ jQuery(document).ready(function($) {
     $(this).toggleClass('is-placeholder', !$(this).val());
   });
 
-  $block.on('change', '#filter-enrolment-date, #filter-completion-date', function() {
-    $(this).toggleClass('is-placeholder', !$(this).val());
+  // ── Date range dropdowns ──────────────────────────────────────────────────────
+  $block.on('click', '#enrolment-date-range-trigger', function(e) {
+    e.preventDefault();
+    $block.find('#enrolment-date-range-dropdown').toggleClass('hidden');
+  });
+
+  $block.on('click', '#completion-date-range-trigger', function(e) {
+    e.preventDefault();
+    $block.find('#completion-date-range-dropdown').toggleClass('hidden');
+  });
+
+  $(document).on('click.bys-date-range', function(e) {
+    if (!$(e.target).closest('#filters__field--enrolment-date').length) {
+      $block.find('#enrolment-date-range-dropdown').addClass('hidden');
+    }
+    if (!$(e.target).closest('#filters__field--completion-date').length) {
+      $block.find('#completion-date-range-dropdown').addClass('hidden');
+    }
+  });
+
+  $block.on('change', '#filter-enrolment-date-from, #filter-enrolment-date-to', function() {
+    validateDateRange('filter-enrolment-date-from', 'filter-enrolment-date-to');
+    updateDateRangeText('filter-enrolment-date-from', 'filter-enrolment-date-to', 'enrolment-date-range-text');
+  });
+
+  $block.on('change', '#filter-completion-date-from, #filter-completion-date-to', function() {
+    validateDateRange('filter-completion-date-from', 'filter-completion-date-to');
+    updateDateRangeText('filter-completion-date-from', 'filter-completion-date-to', 'completion-date-range-text');
   });
 
   // ── Export ────────────────────────────────────────────────────────────────────
@@ -1232,6 +1382,62 @@ jQuery(document).ready(function($) {
     ];
   }
 
+  /**
+   * Ensure quiz steps + per-user progress are cached for a course.
+   * Uses a single batch endpoint so export never makes N per-user calls.
+   * Returns the array of quiz steps (may be empty if the course has none).
+   */
+  async function ensureQuizDataForCourse(course, users) {
+    // ── Step 1: quiz steps (cached per course) ──────────────────────────────
+    let quizSteps = courseQuizStepsCache[course.id];
+    if (!quizSteps) {
+      try {
+        quizSteps = await api.get(endpoints.courseQuizSteps(course.id)) || [];
+        courseQuizStepsCache[course.id] = quizSteps;
+      } catch (err) {
+        console.error(`[group-reporting] Failed to fetch quiz steps for course ${course.id}:`, err);
+        quizSteps = [];
+        courseQuizStepsCache[course.id] = quizSteps;
+      }
+    }
+
+    if (!quizSteps.length) return quizSteps;
+
+    // ── Step 2: batch-fetch progress for any users not yet cached ───────────
+    if (!userQuizProgressCache[course.id]) userQuizProgressCache[course.id] = {};
+
+    const uncached = users.filter(u => userQuizProgressCache[course.id][u.id] === undefined);
+    if (!uncached.length) return quizSteps;
+
+    try {
+      const userIds = uncached.map(u => u.id).join(',');
+      const url = endpoints.courseQuizProgressBatch(course.id, userIds);
+      // forceRefresh=true so the cache key (which includes all user IDs) is always fresh
+      const batchResult = await api.get(url, true);
+
+      // batchResult: { [userId]: { [quizId]: { total_attempts, percent_highest, pass_highest } } }
+      uncached.forEach(user => {
+        const userData = (batchResult && batchResult[user.id]) ? batchResult[user.id] : {};
+        // Re-key as integers to match buildQuizBars / quizProgressCell lookup by step_id
+        const map = {};
+        Object.keys(userData).forEach(qid => { map[parseInt(qid, 10)] = userData[qid]; });
+        userQuizProgressCache[course.id][user.id] = map;
+      });
+    } catch (err) {
+      console.error(`[group-reporting] Batch quiz progress fetch failed for course ${course.id}:`, err);
+      uncached.forEach(user => { userQuizProgressCache[course.id][user.id] = {}; });
+    }
+
+    return quizSteps;
+  }
+
+  function quizProgressCell(quizStep, userQuizProgress) {
+    const summary = userQuizProgress[quizStep.step_id];
+    if (!summary || summary.total_attempts === 0) return 'Not attempted';
+    const pct = Math.round(summary.percent_highest);
+    return summary.pass_highest ? `Pass (${pct}%)` : `Fail (${pct}%)`;
+  }
+
   async function exportTableToCsv() {
     const filteredUsers = await getExportUsers();
 
@@ -1240,6 +1446,12 @@ jQuery(document).ready(function($) {
       ? coursesInView.filter(c => activeFilters.courseIds.includes(c.id))
       : [...coursesInView];
 
+    // Pre-fetch all quiz data for exported courses
+    const quizStepsPerCourse = {};
+    for (const course of coursesToExport) {
+      quizStepsPerCourse[course.id] = await ensureQuizDataForCourse(course, filteredUsers);
+    }
+
     const statusLabel = { online: 'Online', offline: 'Offline', never: 'Never Logged In' };
 
     const headers = ['Status', 'Name', 'Email'];
@@ -1247,6 +1459,9 @@ jQuery(document).ready(function($) {
       const title = course.shortname || course.title?.rendered || course.title || '';
       const req = course.required ? ' (Required)' : '';
       headers.push(`${title}${req} - Course Status`, `${title}${req} - Progress`, `${title}${req} - Enrolled`, `${title}${req} - Completed`);
+      (quizStepsPerCourse[course.id] || []).forEach(quiz => {
+        headers.push(`${title}${req} - ${quiz.step_title}`);
+      });
     });
 
     const rows = [headers];
@@ -1256,6 +1471,10 @@ jQuery(document).ready(function($) {
       const row = [statusLabel[user.status] || 'Never Logged In', fullName, user.email || ''];
       coursesToExport.forEach(course => {
         row.push(...courseProgressCells(userProgress.find(cp => cp.course_id === course.id)));
+        const userQuizProgress = (userQuizProgressCache[course.id] || {})[user.id] || {};
+        (quizStepsPerCourse[course.id] || []).forEach(quiz => {
+          row.push(quizProgressCell(quiz, userQuizProgress));
+        });
       });
       rows.push(row);
     });
@@ -1266,17 +1485,21 @@ jQuery(document).ready(function($) {
 
   async function exportCourseToCsv(course) {
     const filteredUsers = await getExportUsers();
+    const quizSteps = await ensureQuizDataForCourse(course, filteredUsers);
 
     const title = course.shortname || course.title?.rendered || course.title || '';
     const req = course.required ? ' (Required)' : '';
 
     const headers = ['Name', 'Email', `${title}${req} - Course Status`, `${title}${req} - Progress`, `${title}${req} - Enrolled`, `${title}${req} - Completed`];
+    quizSteps.forEach(quiz => headers.push(`${title}${req} - ${quiz.step_title}`));
 
     const rows = [headers];
     filteredUsers.forEach(user => {
       const userProgress = userCourseProgressAll[user.id] || [];
       const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.display_name || '';
-      rows.push([fullName, user.email || '', ...courseProgressCells(userProgress.find(cp => cp.course_id === course.id))]);
+      const userQuizProgress = (userQuizProgressCache[course.id] || {})[user.id] || {};
+      const quizCells = quizSteps.map(quiz => quizProgressCell(quiz, userQuizProgress));
+      rows.push([fullName, user.email || '', ...courseProgressCells(userProgress.find(cp => cp.course_id === course.id)), ...quizCells]);
     });
 
     const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -1302,5 +1525,12 @@ jQuery(document).ready(function($) {
     if (!text || typeof text !== 'string') return '';
     const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
     return text.replace(/[&<>"']/g, m => map[m]);
+  }
+
+  // Truncate a column header title to at most maxChars at a word boundary, appending '…'
+  function truncateTitle(title, maxChars = 28) {
+    if (!title || title.length <= maxChars) return title;
+    const cut = title.lastIndexOf(' ', maxChars);
+    return (cut > 0 ? title.substring(0, cut) : title.substring(0, maxChars)) + '\u2026';
   }
 });

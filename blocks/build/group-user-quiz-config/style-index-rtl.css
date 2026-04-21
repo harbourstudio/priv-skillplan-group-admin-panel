@@ -1,0 +1,173 @@
+/*!**********************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ./node_modules/css-loader/dist/cjs.js??ruleSet[1].rules[4].use[1]!./node_modules/postcss-loader/dist/cjs.js??ruleSet[1].rules[4].use[2]!./node_modules/@wordpress/scripts/node_modules/sass-loader/dist/cjs.js??ruleSet[1].rules[4].use[3]!./src/group-user-quiz-config/style.scss ***!
+  \**********************************************************************************************************************************************************************************************************************************************************************************************/
+.wp-block-bys-groups-group-user-quiz-config .uqc-card {
+  background: white;
+  border: 1px solid var(--wp--preset--color--gray-200);
+  border-radius: 0.75rem;
+  padding: var(--wp--preset--spacing--5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--wp--preset--spacing--4);
+}
+.wp-block-bys-groups-group-user-quiz-config .uqc-card__header {
+  margin-bottom: var(--wp--preset--spacing--4);
+}
+.wp-block-bys-groups-group-user-quiz-config .uqc-card__subtitle {
+  margin: 0;
+  font-size: var(--wp--preset--font-size--small);
+  color: var(--wp--preset--color--gray-500);
+}
+.wp-block-bys-groups-group-user-quiz-config .uqc-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--wp--preset--spacing--4);
+}
+.wp-block-bys-groups-group-user-quiz-config .uqc-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wp--preset--spacing--2);
+}
+.wp-block-bys-groups-group-user-quiz-config .uqc-label {
+  font-size: var(--wp--preset--font-size--small);
+  font-weight: 600;
+  color: var(--wp--preset--color--gray-700);
+  margin: 0;
+}
+.wp-block-bys-groups-group-user-quiz-config .uqc-input {
+  width: 100%;
+  padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--3);
+  border: 1px solid var(--wp--preset--color--gray-200);
+  border-radius: 0.5rem;
+  font-size: var(--wp--preset--font-size--small);
+  color: var(--wp--preset--color--gray-900);
+  background: white;
+  outline: none;
+}
+.wp-block-bys-groups-group-user-quiz-config .uqc-input::-moz-placeholder {
+  color: var(--wp--preset--color--gray-400);
+}
+.wp-block-bys-groups-group-user-quiz-config .uqc-input::placeholder {
+  color: var(--wp--preset--color--gray-400);
+}
+.wp-block-bys-groups-group-user-quiz-config .uqc-input:focus {
+  border-color: var(--wp--preset--color--primary);
+}
+.wp-block-bys-groups-group-user-quiz-config .uqc-combobox-wrap {
+  position: relative;
+}
+.wp-block-bys-groups-group-user-quiz-config .uqc-suggestions {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: 0;
+  background: white;
+  border: 1px solid var(--wp--preset--color--gray-200);
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  margin-top: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 0 !important;
+  list-style: none !important;
+}
+.wp-block-bys-groups-group-user-quiz-config .uqc-suggestions.hidden {
+  display: none;
+}
+.wp-block-bys-groups-group-user-quiz-config .uqc-suggestion {
+  padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--3);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.wp-block-bys-groups-group-user-quiz-config .uqc-suggestion:hover {
+  background: var(--wp--preset--color--gray-50);
+}
+.wp-block-bys-groups-group-user-quiz-config .uqc-suggestion--empty {
+  color: var(--wp--preset--color--gray-400);
+  cursor: default;
+  font-size: var(--wp--preset--font-size--small);
+}
+.wp-block-bys-groups-group-user-quiz-config .uqc-suggestion--empty:hover {
+  background: transparent;
+}
+.wp-block-bys-groups-group-user-quiz-config .uqc-suggestion__name {
+  font-size: var(--wp--preset--font-size--small);
+  color: var(--wp--preset--color--gray-800);
+  font-weight: 500;
+}
+.wp-block-bys-groups-group-user-quiz-config .uqc-suggestion__meta {
+  font-size: var(--wp--preset--font-size--x-small);
+  color: var(--wp--preset--color--gray-400);
+}
+.wp-block-bys-groups-group-user-quiz-config .uqc-date-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wp--preset--spacing--3);
+}
+.wp-block-bys-groups-group-user-quiz-config .uqc-date-field {
+  display: flex;
+  align-items: center;
+  gap: var(--wp--preset--spacing--2);
+  background: var(--wp--preset--color--gray-50);
+  border-radius: 0.5rem;
+  padding: var(--wp--preset--spacing--3);
+}
+.wp-block-bys-groups-group-user-quiz-config .uqc-date-icon {
+  font-size: 0.6rem;
+  color: var(--wp--preset--color--gray-400);
+  flex-shrink: 0;
+}
+.wp-block-bys-groups-group-user-quiz-config .uqc-datetime {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: var(--wp--preset--font-size--small);
+  color: var(--wp--preset--color--gray-700);
+  outline: none;
+  min-width: 0;
+}
+.wp-block-bys-groups-group-user-quiz-config .uqc-datetime::-webkit-calendar-picker-indicator {
+  opacity: 0;
+  width: 0;
+}
+.wp-block-bys-groups-group-user-quiz-config .uqc-actions {
+  display: flex;
+  gap: var(--wp--preset--spacing--3);
+}
+.wp-block-bys-groups-group-user-quiz-config .uqc-btn-primary {
+  padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--5);
+  background: var(--wp--preset--color--primary);
+  color: white;
+  border-radius: 9999px;
+  font-size: var(--wp--preset--font-size--small);
+  font-weight: 500;
+  transition: opacity 0.15s;
+}
+.wp-block-bys-groups-group-user-quiz-config .uqc-btn-primary:hover:not(:disabled) {
+  opacity: 0.88;
+}
+.wp-block-bys-groups-group-user-quiz-config .uqc-btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.wp-block-bys-groups-group-user-quiz-config .uqc-btn-outline {
+  padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--5);
+  background: var(--wp--preset--color--blue-50);
+  color: var(--wp--preset--color--primary);
+  border: 1.5px solid var(--wp--preset--color--primary);
+  border-radius: 9999px;
+  font-size: var(--wp--preset--font-size--small);
+  font-weight: 500;
+  transition: background 0.15s, color 0.15s;
+}
+.wp-block-bys-groups-group-user-quiz-config .uqc-btn-outline:hover:not(:disabled) {
+  background: var(--wp--preset--color--primary);
+  color: white;
+}
+.wp-block-bys-groups-group-user-quiz-config .uqc-btn-outline:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

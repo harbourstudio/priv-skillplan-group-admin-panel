@@ -1,0 +1,120 @@
+/*!************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ./node_modules/css-loader/dist/cjs.js??ruleSet[1].rules[4].use[1]!./node_modules/postcss-loader/dist/cjs.js??ruleSet[1].rules[4].use[2]!./node_modules/@wordpress/scripts/node_modules/sass-loader/dist/cjs.js??ruleSet[1].rules[4].use[3]!./src/group-pending-enrolments/style.scss ***!
+  \************************************************************************************************************************************************************************************************************************************************************************************************/
+.wp-block-bys-groups-group-pending-enrolments .pending-enrolments__card {
+  background: var(--wp--preset--color--white);
+  border: 1px solid var(--wp--preset--color--gray-100);
+  border-radius: 0.75rem;
+  overflow: hidden;
+  margin-top: var(--wp--preset--spacing--4);
+}
+.wp-block-bys-groups-group-pending-enrolments .pending-enrolments__item {
+  display: flex;
+  align-items: center;
+  gap: var(--wp--preset--spacing--3);
+  padding: var(--wp--preset--spacing--3) var(--wp--preset--spacing--5);
+}
+.wp-block-bys-groups-group-pending-enrolments .pending-enrolments__item:not(:first-of-type) {
+  border-top: 1px solid var(--wp--preset--color--gray-100);
+}
+.wp-block-bys-groups-group-pending-enrolments .pending-enrolments__email {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--wp--preset--font-size--small);
+  color: var(--wp--preset--color--gray-700);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wp-block-bys-groups-group-pending-enrolments .pending-enrolments__badge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: var(--wp--preset--spacing--1) var(--wp--preset--spacing--3);
+  background: var(--wp--preset--color--orange-100);
+  color: var(--wp--preset--color--orange-600);
+  border-radius: 0.25rem;
+  font-size: var(--wp--preset--font-size--x-small);
+  font-weight: 600;
+}
+.wp-block-bys-groups-group-pending-enrolments .pending-enrolments__cancel {
+  flex-shrink: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  color: var(--wp--preset--color--gray-400);
+  font-size: var(--wp--preset--font-size--small);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.wp-block-bys-groups-group-pending-enrolments .pending-enrolments__cancel:hover:not(:disabled) {
+  background: var(--wp--preset--color--gray-100);
+  color: var(--wp--preset--color--gray-600);
+}
+.wp-block-bys-groups-group-pending-enrolments .pending-enrolments__cancel:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.wp-block-bys-groups-group-pending-enrolments .pending-enrolments__show-more {
+  width: 100%;
+  padding: var(--wp--preset--spacing--3) var(--wp--preset--spacing--4);
+  background: var(--wp--preset--color--blue-50);
+  border-top: 1px solid var(--wp--preset--color--gray-100);
+  color: var(--wp--preset--color--primary);
+  font-size: var(--wp--preset--font-size--small);
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.wp-block-bys-groups-group-pending-enrolments .pending-enrolments__show-more:hover {
+  background: var(--wp--preset--color--blue-100);
+}
+.wp-block-bys-groups-group-pending-enrolments .pending-enrolments__date {
+  flex-shrink: 0;
+  font-size: var(--wp--preset--font-size--x-small);
+  color: var(--wp--preset--color--gray-400);
+}
+.wp-block-bys-groups-group-pending-enrolments .pending-enrolments__empty {
+  padding: var(--wp--preset--spacing--5);
+  font-size: var(--wp--preset--font-size--small);
+  color: var(--wp--preset--color--gray-500);
+  margin: 0;
+  text-align: center;
+}
+@keyframes bys-shimmer {
+  0% {
+    background-position: right -400px top 0;
+  }
+  100% {
+    background-position: right 400px top 0;
+  }
+}
+.wp-block-bys-groups-group-pending-enrolments .skeleton-text {
+  background: linear-gradient(-90deg, var(--wp--preset--color--gray-100) 25%, #e8e8e8 50%, var(--wp--preset--color--gray-100) 75%);
+  background-size: 800px 100%;
+  animation: bys-shimmer 1.4s infinite linear;
+  border-radius: 0.25rem;
+  display: inline-block;
+  height: 0.75rem;
+}
+.wp-block-bys-groups-group-pending-enrolments .skeleton-btn {
+  background: linear-gradient(-90deg, var(--wp--preset--color--gray-100) 25%, #e8e8e8 50%, var(--wp--preset--color--gray-100) 75%);
+  background-size: 800px 100%;
+  animation: bys-shimmer 1.4s infinite linear;
+  border-radius: 0.25rem;
+  display: inline-block;
+  height: 1.5rem;
+}
+.wp-block-bys-groups-group-pending-enrolments .pending-enrolments__skeleton-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--wp--preset--spacing--3) var(--wp--preset--spacing--5);
+}
+.wp-block-bys-groups-group-pending-enrolments .pending-enrolments__skeleton-row:not(:last-of-type) {
+  border-bottom: 1px solid var(--wp--preset--color--gray-100);
+}

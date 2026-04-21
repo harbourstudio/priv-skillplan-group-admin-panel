@@ -1,0 +1,34 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "bys-groups/group-archive",
+  "version": "0.2.0",
+  "title": "BYS - Group Archive",
+  "category": "custom-blocks",
+  "icon": "welcome-write-blog",
+  "description": "Custom block for Build Your Skills group administrator dashboard.",
+  "textdomain": "bys",
+  "supports": {
+    "anchor": true,
+    "html": false,
+    "spacing": {
+      "margin": true
+    }
+  },
+  "keywords": [
+    "group",
+    "learndash",
+    "progress",
+    "dashboard"
+  ],
+  "attributes": {
+    "blockId": {
+      "type": "string",
+      "default": ""
+    }
+  },
+  "editorScript": "file:./index.js",
+  "render": "file:./render.php",
+  "style": "file:./style-index.css",
+  "viewScript": "file:./view.js"
+}

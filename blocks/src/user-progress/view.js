@@ -1,6 +1,6 @@
 import { api, endpoints } from '../_shared/api-client.js';
 import { LOADING } from '../_shared/loading.js';
-import { formatDateTime } from '../_shared/helpers.js';
+import { formatDateTime, formatDuration } from '../_shared/helpers.js';
 import { createTooltip, destroyTooltip } from '../_shared/tooltip.js';
 
 // Status label mapping (reusable)
@@ -38,8 +38,17 @@ jQuery(document).ready(async ($) => {
   // Track completed topics across all opened courses for user-stats coordination
   let topicsCompletedCount = 0;
 
+  // Show skeleton accordions while courses load
+  const skeletonTemplate = document.getElementById('user-progress-skeleton-template');
+  const SKELETON_COUNT = 5;
+  for (let i = 0; i < SKELETON_COUNT; i++) {
+    $coursesList.append(skeletonTemplate.content.cloneNode(true));
+  }
+
   try {
     const courses = await api.get(endpoints.groupCourses(groupId));
+
+    $coursesList.find('.hs-accordion--skeleton').remove();
 
     if (!Array.isArray(courses) || courses.length === 0) {
       console.log('[user-progress] No courses found for group:', groupId);
@@ -181,6 +190,17 @@ jQuery(document).ready(async ($) => {
                 if (topicData?.post_type === 'sfwd-topic' && topicStatus === 'completed') {
                   topicsCompletedCount++;
                 }
+
+                // Populate activity columns from augmented step data
+                $topic.find('.topic-visits').text(
+                  topicData?.visits != null ? topicData.visits : '—'
+                );
+                $topic.find('.topic-timespent').text(
+                  formatDuration(topicData?.time_spent_seconds)
+                );
+                $topic.find('.topic-last-accessed').text(
+                  topicData?.last_accessed_gmt ? formatDateTime(topicData.last_accessed_gmt) : '—'
+                );
 
                 $tbody.append($topic);
               }

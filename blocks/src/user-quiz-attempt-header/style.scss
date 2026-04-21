@@ -1,0 +1,162 @@
+@keyframes bys-shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+.wp-block-bys-groups-user-quiz-attempt-header {
+    margin-block-start: 0 !important;
+    border-bottom: 1px solid var(--wp--preset--color--gray-200);
+    padding-bottom: var(--wp--preset--spacing--5);
+
+    .attempt-header__content {
+        &.hidden { display: none; }
+    }
+
+    .attempt-header__loading,
+    .attempt-header__error {
+        &.hidden { display: none; }
+    }
+
+    // ── Skeleton loader ───────────────────────────────────────────────────────
+
+    .skel {
+        border-radius: 0.3rem;
+        background: linear-gradient(
+            90deg,
+            #EAECF0 25%,
+            #F3F4F6 50%,
+            #EAECF0 75%
+        );
+        background-size: 200% 100%;
+        animation: bys-shimmer 1.4s ease-in-out infinite;
+
+        // Title bar — matches h1 height
+        &--title {
+            height: 2.25rem;
+            width: 18rem;
+            max-width: 100%;
+        }
+
+        // Pass/fail badge pill
+        &--badge {
+            height: 1.625rem;
+            width: 3.5rem;
+            border-radius: 0.25rem;
+
+            &-wide { width: 5rem; }
+        }
+
+        // Meta row items (icon + label)
+        &--meta {
+            height: 1rem;
+            width: 7rem;
+            border-radius: 0.25rem;
+
+            &-short { width: 5rem; }
+        }
+    }
+
+    // ── Row 1: title · badge · score ─────────────────────────────────────────
+
+    .attempt-header__row--primary {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: var(--wp--preset--spacing--5);
+        margin-bottom: var(--wp--preset--spacing--4);
+
+        .attempt-header__quiz-title {
+            margin: 0;
+        }
+
+        .attempt-header__badges{
+            display: flex;
+            align-items: center;
+            gap: var(--wp--preset--spacing--2);
+
+            & > span{
+                font-size: var(--wp--preset--font-size--small);
+                padding: var(--wp--preset--spacing--1) var(--wp--preset--spacing--2);
+                border-radius: 0.25rem;
+                font-weight: 500;
+            }
+
+            .attempt-header__badge {
+                &.status-badge--pass {
+                    color: var(--wp--preset--color--green-700);
+                    background: var(--wp--preset--color--green-100);
+                }
+                &.status-badge--fail {
+                    color: var(--wp--preset--color--red-700);
+                    background: var(--wp--preset--color--red-100);
+                }
+                &.status-badge--ungraded {
+                    color: var(--wp--preset--color--yellow-700);
+                    background: var(--wp--preset--color--yellow-100);
+                }
+            }
+
+            .attempt-header__score {
+                color: var(--wp--preset--color--gray-500);
+                background: var(--wp--preset--color--gray-100);
+            }
+
+        }
+    }
+
+    // ── Nav row ───────────────────────────────────────────────────────────────
+
+    .attempt-header__nav {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: var(--wp--preset--spacing--4);
+        margin-bottom: var(--wp--preset--spacing--5);
+    }
+
+    .attempt-header__nav-link {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--wp--preset--spacing--2);
+        font-size: var(--wp--preset--font-size--small);
+        color: var(--wp--preset--color--gray-500);
+        text-decoration: none;
+        cursor: pointer;
+        transition: color 0.15s ease;
+
+        &:hover {
+            color: var(--wp--preset--color--gray-800);
+            text-decoration: none;
+        }
+
+        &.is-disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        i { font-size: 0.85em; }
+    }
+
+    // ── Row 2: meta details ───────────────────────────────────────────────────
+
+    .attempt-header__row--meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--wp--preset--spacing--5);
+    }
+
+    .attempt-header__meta-item {
+        display: flex;
+        align-items: center;
+        gap: var(--wp--preset--spacing--2);
+        font-size: var(--wp--preset--font-size--small);
+        color: var(--wp--preset--color--gray-600);
+
+        i {
+            color: var(--wp--preset--color--gray-400);
+            width: 1em;
+            text-align: center;
+        }
+    }
+
+}

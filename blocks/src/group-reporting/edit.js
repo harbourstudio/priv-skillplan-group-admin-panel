@@ -1,24 +1,12 @@
 import { __ } from '@wordpress/i18n';
-import { useEffect, useState } from 'react';
-import {
-	useBlockProps,
-	InspectorControls,
-	RichText,
-	useInnerBlocksProps,
-	MediaUpload,
-	MediaUploadCheck,
-	blockProps
-} from '@wordpress/block-editor';
-import {
-	Button,
-	PanelBody,
-	PanelRow,
-	SearchControl,
-	SelectControl,
-	__experimentalToggleGroupControl as ToggleGroupControl,
-	__experimentalToggleGroupControlOption as ToggleGroupControlOption,
-} from '@wordpress/components';
-import { gallery } from '@wordpress/icons';
+import { useEffect } from 'react';
+import { useBlockProps } from '@wordpress/block-editor';
+
+const ROWS = [
+	{ user: 'Adam Stephenson', activity: 'Quiz Completed',   resource: 'Module 1 Quiz',       date: 'Jan 14, 2026' },
+	{ user: 'Julia S.',        activity: 'Lesson Completed',  resource: 'Introduction',         date: 'Jan 13, 2026' },
+	{ user: 'Sam T.',          activity: 'Course Completed',  resource: 'Crane Safety',         date: 'Jan 12, 2026' },
+];
 
 export default function Edit({ clientId, attributes, setAttributes }) {
 	const { blockId } = attributes;
@@ -28,17 +16,29 @@ export default function Edit({ clientId, attributes, setAttributes }) {
 	}, [clientId]);
 
 	return (
-		<>
-			<InspectorControls>
-				<PanelBody title={__('Block-specific Settings', 'bys')} initialOpen={true}>
-					<PanelRow>
-					</PanelRow>
-				</PanelBody>
-			</InspectorControls>
-
-			<div {...blockProps}>
-				Block will show on frontend
+		<div {...useBlockProps()}>
+			<div className="table-wrapper table__results">
+				<table>
+					<thead>
+						<tr>
+							<th>{__('User', 'bys')}</th>
+							<th>{__('Activity', 'bys')}</th>
+							<th>{__('Resource', 'bys')}</th>
+							<th>{__('Date', 'bys')}</th>
+						</tr>
+					</thead>
+					<tbody>
+						{ROWS.map(({ user, activity, resource, date }) => (
+							<tr key={user + date}>
+								<td>{user}</td>
+								<td>{activity}</td>
+								<td>{resource}</td>
+								<td>{date}</td>
+							</tr>
+						))}
+					</tbody>
+				</table>
 			</div>
-		</>
+		</div>
 	);
 }

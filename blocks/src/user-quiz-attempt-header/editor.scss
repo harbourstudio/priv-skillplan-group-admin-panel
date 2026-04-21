@@ -1,0 +1,28 @@
+// user-quiz-attempt-header: editor-only layout for the static preview
+.wp-block-bys-groups-user-quiz-attempt-header {
+    .attempt-header__title-row {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .attempt-header__quiz-title {
+        margin: 0;
+    }
+
+    .attempt-header__meta {
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+        flex-wrap: wrap;
+    }
+
+    .attempt-header__meta-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.375rem;
+        font-size: var(--wp--preset--font-size--small);
+        color: var(--wp--preset--color--gray-500);
+    }
+}

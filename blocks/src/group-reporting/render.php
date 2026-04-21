@@ -51,14 +51,40 @@ $detail_url = home_url( '/administrator-dashboard/user-progress-detail/' );
                         </div>
                     </div>
                 </div>
-                <div class="filters__field filters__field--course-dep" id="filters__field--enrolment-date">
-                    <label for="filter-enrolment-date">Enrolment Date</label>
-                    <input type="date" id="filter-enrolment-date" name="enrolment_date" disabled />
+                <div class="filters__field filters__field--course-dep filters__field--date-range" id="filters__field--enrolment-date">
+                    <label>Enrolment Date</label>
+                    <button id="enrolment-date-range-trigger" type="button" class="date-range__trigger" disabled>
+                        <span id="enrolment-date-range-text">Select a date range</span>
+                        <i class="fa-regular fa-calendar"></i>
+                    </button>
+                    <div class="filters__date-range hidden" id="enrolment-date-range-dropdown">
+                        <div>
+                            <label for="filter-enrolment-date-from">From</label>
+                            <input type="date" id="filter-enrolment-date-from" name="enrolment_date_from" />
+                        </div>
+                        <div>
+                            <label for="filter-enrolment-date-to">To</label>
+                            <input type="date" id="filter-enrolment-date-to" name="enrolment_date_to" />
+                        </div>
+                    </div>
                     <span class="filters__field__hint">Select one course to enable</span>
                 </div>
-                <div class="filters__field filters__field--course-dep" id="filters__field--completion-date">
-                    <label for="filter-completion-date">Completion Date</label>
-                    <input type="date" id="filter-completion-date" name="completion_date" disabled />
+                <div class="filters__field filters__field--course-dep filters__field--date-range" id="filters__field--completion-date">
+                    <label>Completion Date</label>
+                    <button id="completion-date-range-trigger" type="button" class="date-range__trigger" disabled>
+                        <span id="completion-date-range-text">Select a date range</span>
+                        <i class="fa-regular fa-calendar"></i>
+                    </button>
+                    <div class="filters__date-range hidden" id="completion-date-range-dropdown">
+                        <div>
+                            <label for="filter-completion-date-from">From</label>
+                            <input type="date" id="filter-completion-date-from" name="completion_date_from" />
+                        </div>
+                        <div>
+                            <label for="filter-completion-date-to">To</label>
+                            <input type="date" id="filter-completion-date-to" name="completion_date_to" />
+                        </div>
+                    </div>
                     <span class="filters__field__hint">Select one course to enable</span>
                 </div>
                 <div class="filters__field filters__field--multiselect" id="filters__field--users">
@@ -120,10 +146,14 @@ $detail_url = home_url( '/administrator-dashboard/user-progress-detail/' );
         <div class="table__actions__sort">
             <label for="sort-select">Sort by</label>
             <select class="table__actions__sort__select" name="sort" id="sort-select">
-                <option value="name_asc">Name (A–Z)</option>
-                <option value="name_desc">Name (Z–A)</option>
+                <option value="first_name_asc">First Name (A–Z)</option>
+                <option value="first_name_desc">First Name (Z–A)</option>
+                <option value="last_name_asc">Last Name (A–Z)</option>
+                <option value="last_name_desc">Last Name (Z–A)</option>
                 <option value="date_desc">Date Enrolled (Descending)</option>
                 <option value="date_asc">Date Enrolled (Ascending)</option>
+                <option value="completion_date_desc" class="sort-option--completion hidden">Completion Date (Descending)</option>
+                <option value="completion_date_asc" class="sort-option--completion hidden">Completion Date (Ascending)</option>
             </select>
         </div>
         <div class="table__actions__export">
@@ -162,7 +192,20 @@ $detail_url = home_url( '/administrator-dashboard/user-progress-detail/' );
                     </td>
                     <td class="col-name"><span style="width: 120px;"></span></td>
                     <td class="col-email"><span style="width: 180px;"></span></td>
+                    <!-- Skeleton course cells injected by JS -->
                 </tr>
+            </template>
+
+            <!-- Skeleton course header template for cloning -->
+            <template id="skeleton-course-header-template">
+                <th class="course-col-header course-col-header--collapsed course-col-header--skeleton">
+                    <div class="course-col-header__inner">
+                        <span class="bys-course-toggle--skeleton"></span>
+                        <div class="course-col-header__meta">
+                            <span class="bys-dl-link--skeleton"></span>
+                        </div>
+                    </div>
+                </th>
             </template>
 
             <!-- Course header template for cloning -->
@@ -172,9 +215,12 @@ $detail_url = home_url( '/administrator-dashboard/user-progress-detail/' );
                         <button class="bys-course-toggle btn-unstyled" type="button" aria-expanded="false" data-course-idx="">
                             <!-- course title inserted here -->
                         </button>
-                        <a class="bys-dl-link" href="#" title="">
-                            <i class="fa-regular fa-download"></i>
-                        </a>
+                        <div class="course-col-header__meta">
+                            <span class="bys-required-badge hidden" aria-label="Required" title="Required"><i class="fa-regular fa-circle-exclamation"></i></span>
+                            <a class="bys-dl-link" href="#" title="">
+                                <i class="fa-regular fa-download"></i>
+                            </a>
+                        </div>
                     </div>
                 </th>
                 <th class="course-sub-col course-sub-col--progress course-sub-col--hidden" data-course-idx="">Completion Progress</th>

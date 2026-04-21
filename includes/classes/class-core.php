@@ -25,6 +25,7 @@ if (!class_exists('BYS_Groups_Core')) {
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-admin-settings.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-activity-logger.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-required-courses.php';
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-invites.php';
         }
 
         public function init() {
@@ -43,6 +44,7 @@ if (!class_exists('BYS_Groups_Core')) {
             new BYS_Groups_Blocks();
             new BYS_Groups_Activity_Logger();
             new BYS_Required_Courses();
+            new BYS_Groups_Invites();
 
             // Enqueue certificate tracking script on certificate pages
             add_action('wp_enqueue_scripts', array($this, 'enqueue_certificate_tracker'));
@@ -58,10 +60,14 @@ if (!class_exists('BYS_Groups_Core')) {
                 true
             );
 
-            // Localize user ID and auth header for JS access
+            // Localize user ID, auth header, and REST nonce for JS access.
+            // The nonce enables cookie-based REST auth so get_current_user_id() resolves
+            // correctly in GET requests (the Basic auth header is a service-account credential,
+            // not a WP Application Password, so it cannot resolve a user on its own).
             wp_localize_script('bys-certificate-link-tracker', 'bysGroupsAuth', array(
                 'userId' => get_current_user_id(),
                 'header' => BYS_Groups_Auth::get_auth_header(),
+                'nonce'  => wp_create_nonce('wp_rest'),
             ));
         }
 

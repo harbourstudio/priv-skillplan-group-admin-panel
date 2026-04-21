@@ -1,9 +1,24 @@
 /*!*************************************************************************************************************************************************************************************************************************************************************************************!*\
   !*** css ./node_modules/css-loader/dist/cjs.js??ruleSet[1].rules[4].use[1]!./node_modules/postcss-loader/dist/cjs.js??ruleSet[1].rules[4].use[2]!./node_modules/@wordpress/scripts/node_modules/sass-loader/dist/cjs.js??ruleSet[1].rules[4].use[3]!./src/user-progress/style.scss ***!
   \*************************************************************************************************************************************************************************************************************************************************************************************/
+@keyframes up-shimmer {
+  0% {
+    background-position: -100% 0;
+  }
+  100% {
+    background-position: 300% 0;
+  }
+}
+.wp-block-bys-groups-user-progress .hs-accordion--skeleton .accordion-toggle__progress--skeleton, .wp-block-bys-groups-user-progress .hs-accordion--skeleton .accordion-toggle__badge--skeleton, .wp-block-bys-groups-user-progress .hs-accordion--skeleton .accordion-toggle__date--skeleton, .wp-block-bys-groups-user-progress .hs-accordion--skeleton .accordion-toggle__name--skeleton, .wp-block-bys-groups-user-progress .hs-accordion--skeleton .accordion-toggle__icon--skeleton {
+  display: inline-block;
+  border-radius: 4px;
+  background: linear-gradient(-90deg, #e8e8e8 25%, #f2f2f2 50%, #e8e8e8 75%);
+  background-size: 200% 100%;
+  animation: up-shimmer 1.4s infinite linear;
+}
 .wp-block-bys-groups-user-progress {
   display: grid;
-  grid-template-columns: 1fr 21.25rem;
+  grid-template-columns: 2fr 1fr;
   gap: var(--wp--preset--spacing--6);
   align-items: start;
 }
@@ -168,13 +183,45 @@
   background-position: center;
 }
 .wp-block-bys-groups-user-progress .completion-badge--completed::before {
-  content: url("data:image/svg+xml;utf8,<svg width=\"17\" height=\"16\" viewBox=\"0 0 17 16\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M8.375 16C5.5 16 2.875 14.5 1.4375 12C0 9.53125 0 6.5 1.4375 4C2.875 1.53125 5.5 0 8.375 0C11.2188 0 13.8438 1.53125 15.2812 4C16.7188 6.5 16.7188 9.53125 15.2812 12C13.8438 14.5 11.2188 16 8.375 16Z\" fill=\"%2303C571\"/></svg>");
+  content: url("data:image/svg+xml,%3Csvg width=%2719%27 height=%2718%27 viewBox=%270 0 19 18%27 fill=%27none%27 xmlns=%27http://www.w3.org/2000/svg%27%3E%3Cpath d=%27M9.42188 1.6875C6.78516 1.6875 4.39453 3.09375 3.05859 5.34375C1.75781 7.62891 1.75781 10.4062 3.05859 12.6562C4.39453 14.9414 6.78516 16.3125 9.42188 16.3125C12.0234 16.3125 14.4141 14.9414 15.75 12.6562C17.0508 10.4062 17.0508 7.62891 15.75 5.34375C14.4141 3.09375 12.0234 1.6875 9.42188 1.6875ZM9.42188 18C6.1875 18 3.23438 16.3125 1.61719 13.5C0 10.7227 0 7.3125 1.61719 4.5C3.23438 1.72266 6.1875 0 9.42188 0C12.6211 0 15.5742 1.72266 17.1914 4.5C18.8086 7.3125 18.8086 10.7227 17.1914 13.5C15.5742 16.3125 12.6211 18 9.42188 18ZM13.3945 7.34766L8.89453 11.8477C8.54297 12.1992 8.01562 12.1992 7.69922 11.8477L5.44922 9.59766C5.09766 9.28125 5.09766 8.75391 5.44922 8.4375C5.76562 8.08594 6.29297 8.08594 6.64453 8.4375L8.29688 10.0898L12.1992 6.1875C12.5156 5.83594 13.043 5.83594 13.3945 6.1875C13.7109 6.50391 13.7109 7.03125 13.3945 7.34766Z%27 fill=%27%2303C571%27/%3E%3C/svg%3E%0A");
 }
 .wp-block-bys-groups-user-progress .completion-badge--in_progress::before {
   content: url("data:image/svg+xml;utf8,<svg width=\"16\" height=\"17\" viewBox=\"0 0 16 17\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M14.5 8.34375C14.5 4.78125 11.5625 1.84375 8 1.84375V14.8438C11.5625 14.8438 14.5 11.9375 14.5 8.34375ZM0 8.34375C0 5.5 1.5 2.875 4 1.4375C6.46875 0 9.5 0 12 1.4375C14.4688 2.875 16 5.5 16 8.34375C16 11.2188 14.4688 13.8438 12 15.2812C9.5 16.7188 6.46875 16.7188 4 15.2812C1.5 13.8438 0 11.2188 0 8.34375Z\" fill=\"%23FC9344\"/></svg>");
 }
 .wp-block-bys-groups-user-progress .completion-badge--not_started::before {
   content: url("data:image/svg+xml,%3Csvg width=%2718%27 height=%2719%27 viewBox=%270 0 18 19%27 fill=%27none%27 xmlns=%27http://www.w3.org/2000/svg%27%3E%3Cpath d=%27M16.3125 9.38672C16.3125 6.78516 14.9062 4.39453 12.6562 3.05859C10.3711 1.75781 7.59375 1.75781 5.34375 3.05859C3.05859 4.39453 1.6875 6.78516 1.6875 9.38672C1.6875 12.0234 3.05859 14.4141 5.34375 15.75C7.59375 17.0508 10.3711 17.0508 12.6562 15.75C14.9062 14.4141 16.3125 12.0234 16.3125 9.38672ZM0 9.38672C0 6.1875 1.6875 3.23438 4.5 1.61719C7.27734 0 10.6875 0 13.5 1.61719C16.2773 3.23438 18 6.1875 18 9.38672C18 12.6211 16.2773 15.5742 13.5 17.1914C10.6875 18.8086 7.27734 18.8086 4.5 17.1914C1.6875 15.5742 0 12.6211 0 9.38672Z%27 fill=%27%23BBC3CF%27/%3E%3C/svg%3E%0A");
+}
+.wp-block-bys-groups-user-progress .hs-accordion--skeleton .hs-accordion-toggle--skeleton {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--wp--preset--spacing--3);
+  padding: var(--wp--preset--spacing--4) var(--wp--preset--spacing--5);
+  cursor: default;
+}
+.wp-block-bys-groups-user-progress .hs-accordion--skeleton .accordion-toggle__icon--skeleton {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.wp-block-bys-groups-user-progress .hs-accordion--skeleton .accordion-toggle__name--skeleton {
+  width: 10rem;
+  height: 1em;
+}
+.wp-block-bys-groups-user-progress .hs-accordion--skeleton .accordion-toggle__date--skeleton {
+  width: 6rem;
+  height: 1em;
+}
+.wp-block-bys-groups-user-progress .hs-accordion--skeleton .accordion-toggle__badge--skeleton {
+  width: 5rem;
+  height: 1.5em;
+  border-radius: 999px;
+}
+.wp-block-bys-groups-user-progress .hs-accordion--skeleton .accordion-toggle__progress--skeleton {
+  width: 4rem;
+  height: 1.5em;
+  border-radius: 999px;
 }
 @media (max-width: 768px) {
   .wp-block-bys-groups-user-progress .user-progress__header {
@@ -195,4 +242,22 @@
   .wp-block-bys-groups-user-progress {
     grid-template-columns: 1fr;
   }
+}
+.wp-block-bys-groups-user-progress .user-progress-achievements__list .gamipress-achievements-container {
+  background: white;
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+.wp-block-bys-groups-user-progress .user-progress-achievements__list .gamipress-achievements-container .gamipress-achievement:not(:last-of-type) {
+  border-bottom: 1px solid var(--wp--preset--color--gray-200) !important;
+}
+.wp-block-bys-groups-user-progress .user-progress-achievements__list .gamipress-achievements-container .gamipress-achievement-attached {
+  display: none !important;
+}
+.wp-block-bys-groups-user-progress .user-progress-achievements__list .gamipress-load-more-button {
+  background: none;
+  border: 0;
+  color: var(--wp--preset--color--primary);
+  padding: 0;
+  margin-top: var(--wp--preset--spacing--4);
 }

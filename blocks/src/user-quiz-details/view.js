@@ -359,7 +359,7 @@ jQuery(document).ready(($) => {
 
         $row.find('.cell_quiz_title').html(quiz.title);
         const $lastActivity = $row.find('.cell_last_activity');
-        $lastActivity.text(formatDate(quiz.latest_timestamp)).attr('data-tooltip', quiz.latest_timestamp_gmt ? formatDateTime(quiz.latest_timestamp_gmt) : '—');
+        $lastActivity.text(formatDate(quiz.latest_timestamp)).attr('data-tooltip', quiz.latest_timestamp ? formatDateTime(quiz.latest_timestamp) : '—');
         $row.find('.cell_parent_course').html(quiz.parent_course_title);
         $row.find('.attemps-count').text(quiz.total_attempts);
 
@@ -377,11 +377,13 @@ jQuery(document).ready(($) => {
         $attempsCell.on('click', function(e) {
             e.preventDefault();
             e.stopPropagation();
+            const cachedCourse = (window.bysGroupsCache?.courses || []).find(c => c.id === quiz.parent_course_id);
             $(window).trigger('bysQuizAttemptsOpen', [{
+                groupId: groupId,
                 userId: userId,
                 quizId: quiz.id,
                 quizTitle: quiz.title,
-                parentCourse: quiz.parent_course_title
+                parentCourse: cachedCourse?.shortname || quiz.parent_course_title
             }]);
         });
 

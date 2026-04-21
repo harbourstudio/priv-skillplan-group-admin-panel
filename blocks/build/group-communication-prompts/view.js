@@ -1,0 +1,1 @@
+jQuery(document).ready(o=>{const n=o(".wp-block-bys-groups-group-communication-prompts").first();n.length&&n.on("click","[data-opens-modal]",function(){const n=o(this).data("opensModal"),s=o(n);s.length&&(s.removeClass("hidden"),o("html").css("overflow","hidden"))})});

@@ -16,6 +16,8 @@ foreach ($attrs as $a) {
 
 $wrapper_attributes = get_block_wrapper_attributes();
 
+$user_id = isset( $_GET['user_id'] ) ? intval( $_GET['user_id'] ) : 0;
+
 // Get validated auth header for client-side API requests
 require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-auth.php';
 $auth_header = BYS_Groups_Auth::get_auth_header();
@@ -35,6 +37,23 @@ $auth_header = BYS_Groups_Auth::get_auth_header();
 
         <!-- Mount target: JS will populate with courses -->
         <div class="hs-accordion-group" id="user-progress-courses-list"></div>
+
+        <!-- Skeleton accordion item template -->
+        <template id="user-progress-skeleton-template">
+            <div class="hs-accordion hs-accordion--skeleton">
+                <div class="hs-accordion-toggle hs-accordion-toggle--skeleton" aria-hidden="true">
+                    <div class="accordion-toggle__left-wrapper">
+                        <span class="accordion-toggle__icon--skeleton"></span>
+                        <span class="accordion-toggle__name--skeleton"></span>
+                    </div>
+                    <div class="accordion-toggle__right-wrapper">
+                        <span class="accordion-toggle__date--skeleton"></span>
+                        <span class="accordion-toggle__badge--skeleton"></span>
+                        <span class="accordion-toggle__progress--skeleton"></span>
+                    </div>
+                </div>
+            </div>
+        </template>
 
         <!-- Template: Course accordion item -->
         <template id="user-progress-course-template">
@@ -107,6 +126,10 @@ $auth_header = BYS_Groups_Auth::get_auth_header();
 
     <div class="user-progress-achievements">
         <h6 class="user-progress__section-title">Achievements</h6>
-        <div class="user-progress-achievements__list"></div>
+        <div class="user-progress-achievements__list">
+            <?php if ( $user_id ) : ?>
+                <?php echo do_shortcode( '[gamipress_achievements type="all" filter="no" search="no" limit="5" orderby="menu_order" order="ASC" user_id="' . $user_id . '"]' ); ?>
+            <?php endif; ?>
+        </div>
     </div>
 </div>

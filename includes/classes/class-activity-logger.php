@@ -23,6 +23,8 @@ if (!class_exists('BYS_Groups_Activity_Logger')) {
             add_action('learndash_course_completed', [$this, 'on_certificate_earned'], 10, 1);
             add_action('template_redirect', [$this, 'on_page_view'], 10);
             add_action('learndash_update_course_access', [$this, 'on_course_access_update'], 10, 4);
+
+            // (visit counter is now incremented directly in on_page_view)
         }
 
 
@@ -223,11 +225,20 @@ if (!class_exists('BYS_Groups_Activity_Logger')) {
             }
 
             global $post;
-            $user_id = get_current_user_id();
-            $post_id = intval($post->ID);
+            $user_id  = get_current_user_id();
+            $post_id  = intval($post->ID);
             $post_type = $post->post_type;
 
-            // Check transient to prevent duplicate logs
+            // Increment per-topic visit counter on every page load.
+            // Done before the transient check so every navigation to this topic
+            // is counted, even within the 30-minute activity-dedup window.
+            if ($post_type === 'sfwd-topic') {
+                $meta_key = 'bys_topic_visits_' . $post_id;
+                $current  = intval(get_user_meta($user_id, $meta_key, true));
+                update_user_meta($user_id, $meta_key, $current + 1);
+            }
+
+            // Check transient to prevent duplicate activity-log entries
             $transient_key = 'bys_page_view_' . $user_id . '_' . $post_id;
             if (get_transient($transient_key)) {
                 return; // Already logged a visit for this within transient window
@@ -299,7 +310,6 @@ if (!class_exists('BYS_Groups_Activity_Logger')) {
             // Set transient for 30 mins
             set_transient($transient_key, true, 30 * MINUTE_IN_SECONDS);
         }
-
 
     }
 }
