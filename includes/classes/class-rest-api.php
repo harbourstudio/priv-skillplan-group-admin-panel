@@ -16,6 +16,7 @@ if (!class_exists('BYS_Groups_Rest_API')) {
 
         public function __construct() {
             $this->init();
+            $this->setup_cache_invalidation();
         }
 
         /**
@@ -23,6 +24,34 @@ if (!class_exists('BYS_Groups_Rest_API')) {
          */
         private function init() {
             add_action('rest_api_init', array($this, 'register_routes'));
+        }
+
+        /**
+         * Setup cache invalidation hooks for quiz-related data
+         */
+        private function setup_cache_invalidation() {
+            // Clear quiz steps cache when a quiz post is saved via ACF (e.g., show_in_reporting toggle)
+            add_action('acf/save_post', array($this, 'invalidate_quiz_cache_on_save'), 20);
+        }
+
+        /**
+         * Invalidate quiz steps cache when sfwd-quiz post is saved
+         * Ensures show_in_reporting changes are immediately reflected in REST responses
+         */
+        public function invalidate_quiz_cache_on_save($post_id) {
+            $post = get_post($post_id);
+
+            // Only care about sfwd-quiz posts
+            if (!$post || $post->post_type !== 'sfwd-quiz') {
+                return;
+            }
+
+            // Clear the course quiz steps cache for this quiz's course
+            $course_id = get_post_meta($post_id, 'course_id', true);
+            if ($course_id) {
+                $cache_key = "bys_quiz_steps_v4_{$course_id}";
+                delete_transient($cache_key);
+            }
         }
 
         /**
@@ -281,7 +310,6 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'callback' => array($this, 'group_quiz_access'),
                 'permission_callback' => array($this, 'check_user_permission')
             ));
-
         }
 
         public function check_user_permission($request) {
@@ -3754,7 +3782,7 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 return new \WP_REST_Response(array('error' => 'Invalid group_id'), 400 );
             }
 
-            // GET rest method: returns all quiz access dates set for a sfwd-group 
+            // GET rest method: returns all quiz access dates set for a sfwd-group
             if ('GET' === $request->get_method()) {
                 $access_dates = BYS_Groups_Quiz_Access::get_group_quiz_access_dates($group_id);
                 return new \WP_REST_Response($access_dates, 200);
@@ -3763,19 +3791,19 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             // POST rest method: saves quiz access dates for a sfwd-group
             if ('POST' === $request->get_method()) {
                 $quiz_id = intval($request->get_json_params()['quiz_id'] ?? 0);
-                
+
                 if (!$quiz_id) {
                     return new \WP_REST_Response(array('error' => 'Invalid quiz_id', 400));
                 }
 
                 $start = sanitize_text_field($request->get_json_params()['start'] ?? '');
-                $end = sanitize_text_field($request->get_json_params()['end'] ?? ''); 
+                $end = sanitize_text_field($request->get_json_params()['end'] ?? '');
 
                 BYS_Groups_Quiz_Access::save_group_quiz_access_dates($group_id, $quiz_id, $start, $end);
 
                 return new \WP_REST_Response(array('success' => true), 200);
             }
-            
+
             return new \WP_REST_Response(array('error' => 'Error executing this request.'), 405);
         }
     }
