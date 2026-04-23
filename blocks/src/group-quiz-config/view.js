@@ -241,6 +241,11 @@ jQuery(document).ready(($) => {
             await Promise.all(saveRequests);
 
             changedAccessDates.clear();
+
+            // Invalidate cached quiz-related data since quiz configuration changed
+            api.invalidate('quiz-submission-stats');
+            api.invalidate('quiz-attempts');
+
             $saveBtn.prop('disabled', true).text('Changes saved!');
             setTimeout(() => {
                 $saveBtn.text('Save Changes');
@@ -273,6 +278,16 @@ jQuery(document).ready(($) => {
         currentGroupId = groupId;
         memberCount    = baseUsersStats?.total_members || 0;
         loadQuizData($block, groupId, Array.isArray(courses) ? courses : []);
+    });
+
+    // Refresh data when page becomes visible (user returns from another tab/window)
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && currentGroupId && memberCount > 0) {
+            api.invalidate('quiz-steps');
+            api.invalidate('quiz-submission-stats');
+            api.invalidate('quiz-attempts');
+            loadQuizData($block, currentGroupId, window.bysGroupData?.courses || []);
+        }
     });
 
     if (window.bysGroupData?.courses) {
