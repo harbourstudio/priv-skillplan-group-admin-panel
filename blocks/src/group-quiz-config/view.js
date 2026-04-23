@@ -5,6 +5,49 @@ const QUIZ_PAGE_SIZE = 3;
 let currentGroupId = null;
 let memberCount    = 0;
 let showingAllQuizzes = false;
+let quizAccessDatesMap = {}; // quiz_id -> { start, end } (stored in UTC)
+let changedAccessDates = new Set(); // track which quizzes have been modified
+let tzData = { timezone: 'UTC', utc_offset_hours: 0 };
+
+// Initialize timezone data from server
+function initTimezoneData() {
+    const tzDataEl = document.getElementById('bys-quiz-config-tz-data');
+    tzData = tzDataEl ? JSON.parse(tzDataEl.textContent) : { timezone: 'UTC', utc_offset_hours: 0 };
+}
+
+// Convert UTC ISO 8601 string to browser-local datetime-local value for display
+function convertFromUTC(utcDatetimeValue) {
+    if (!utcDatetimeValue) return '';
+
+    // Parse ISO 8601 UTC datetime (e.g., "2025-09-01T13:00:00Z")
+    const dt = new Date(utcDatetimeValue);
+    if (isNaN(dt.getTime())) return '';
+
+    // Convert to browser-local time
+    const year = dt.getFullYear();
+    const month = String(dt.getMonth() + 1).padStart(2, '0');
+    const day = String(dt.getDate()).padStart(2, '0');
+    const hours = String(dt.getHours()).padStart(2, '0');
+    const minutes = String(dt.getMinutes()).padStart(2, '0');
+
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+// Convert browser-local datetime-local value to UTC ISO 8601 string for storage
+function convertToUTC(localDatetimeValue) {
+    if (!localDatetimeValue) return '';
+
+    // Parse the datetime-local value (format: YYYY-MM-DDTHH:mm)
+    const [datePart, timePart] = localDatetimeValue.split('T');
+    const [year, month, day] = datePart.split('-').map(Number);
+    const [hours, minutes] = timePart.split(':').map(Number);
+
+    // Create a Date in browser-local time
+    const localDate = new Date(year, month - 1, day, hours, minutes, 0);
+
+    // Convert to ISO 8601 UTC string
+    return localDate.toISOString();
+}
 
 function courseTitle(course) {
     return typeof course.title === 'string'
@@ -15,6 +58,11 @@ function courseTitle(course) {
 function buildQuizRow(quiz, courseName, stat) {
     const completed   = stat.attempted_users || 0;
     const outstanding = Math.max(0, memberCount - completed);
+    const accessDates = quizAccessDatesMap[quiz.step_id] || {};
+
+    // Convert stored UTC times to browser local for display in inputs
+    const startValue = convertFromUTC(accessDates.start || '');
+    const endValue = convertFromUTC(accessDates.end || '');
 
     return jQuery(`
         <div class="quiz-config__item" data-quiz-id="${quiz.step_id}">
@@ -26,11 +74,11 @@ function buildQuizRow(quiz, courseName, stat) {
             <div class="quiz-config-date-row">
                 <div class="quiz-config-date-field">
                     <i class="fa-solid fa-play quiz-config-date-icon" aria-hidden="true"></i>
-                    <input type="datetime-local" class="quiz-config-datetime" aria-label="Start date" />
+                    <input type="datetime-local" class="quiz-config-datetime quiz-config-datetime--start" aria-label="Start date" value="${startValue}" />
                 </div>
                 <div class="quiz-config-date-field">
                     <i class="fa-solid fa-flag quiz-config-date-icon" aria-hidden="true"></i>
-                    <input type="datetime-local" class="quiz-config-datetime" aria-label="End date" />
+                    <input type="datetime-local" class="quiz-config-datetime quiz-config-datetime--end" aria-label="End date" value="${endValue}" />
                 </div>
             </div>
 
@@ -84,7 +132,7 @@ async function loadQuizData($block, groupId, courses) {
     const $empty    = $block.find('.quiz-config__empty');
     const $showMore = $block.find('.quiz-config__show-more');
 
-    showingAllQuizzes = false;
+    changedAccessDates.clear();
     $skeleton.show();
     $list.empty();
     $empty.hide();
@@ -110,7 +158,13 @@ async function loadQuizData($block, groupId, courses) {
             return;
         }
 
-        const stats    = await api.get(endpoints.groupQuizSubmissionStats(groupId, allQuizIds));
+        // Fetch quiz accessDates and submission stats in parallel
+        const [accessDates, stats] = await Promise.all([
+            api.get(endpoints.groupQuizAccess(groupId)).catch(() => ({})),
+            api.get(endpoints.groupQuizSubmissionStats(groupId, allQuizIds))
+        ]);
+
+        quizAccessDatesMap = accessDates || {};
         const statsMap = {};
         (Array.isArray(stats) ? stats : []).forEach((s) => { statsMap[s.quiz_id] = s; });
 
@@ -139,8 +193,64 @@ async function loadQuizData($block, groupId, courses) {
 }
 
 jQuery(document).ready(($) => {
+    // Initialize timezone data first
+    initTimezoneData();
+
     const $block = $('.wp-block-bys-groups-group-quiz-config').first();
     if (!$block.length) return;
+
+    const $saveBtn = $block.find('.quiz-config__actions button[type="button"]');
+
+    // Track datetime changes
+    $block.on('change', '.quiz-config-datetime', function() {
+        const $item = $(this).closest('.quiz-config__item');
+        const quizId = $item.data('quizId');
+        if (quizId) {
+            changedAccessDates.add(quizId);
+            $saveBtn.prop('disabled', false);
+        }
+    });
+
+    // Save button handler
+    $saveBtn.on('click', async function() {
+        if (changedAccessDates.size === 0 || !currentGroupId) return;
+
+        $saveBtn.prop('disabled', true).text('Saving...');
+
+        try {
+            // Collect all changes and send in parallel
+            const saveRequests = Array.from(changedAccessDates).map((quizId) => {
+                const $item = $block.find(`.quiz-config__item[data-quiz-id="${quizId}"]`);
+                const startValue = $item.find('.quiz-config-datetime--start').val() || '';
+                const endValue = $item.find('.quiz-config-datetime--end').val() || '';
+
+                // Convert browser-local to UTC before sending and caching
+                const start = convertToUTC(startValue);
+                const end = convertToUTC(endValue);
+
+                // Update local cache
+                quizAccessDatesMap[quizId] = { start, end };
+
+                // Send to server
+                return api.post(
+                    endpoints.groupQuizAccess(currentGroupId),
+                    { quiz_id: quizId, start, end }
+                );
+            });
+
+            await Promise.all(saveRequests);
+
+            changedAccessDates.clear();
+            $saveBtn.prop('disabled', true).text('Changes saved!');
+            setTimeout(() => {
+                $saveBtn.text('Save Changes');
+            }, 2000);
+        } catch (err) {
+            console.error('[quiz-config] Failed to save changes:', err);
+            $saveBtn.prop('disabled', false).text('Save Changes');
+            alert('Failed to save changes. Please try again.');
+        }
+    });
 
     $block.on('click', '.quiz-config__show-more', function () {
         showingAllQuizzes = !showingAllQuizzes;
