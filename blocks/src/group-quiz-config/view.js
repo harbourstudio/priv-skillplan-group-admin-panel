@@ -64,51 +64,42 @@ function buildQuizRow(quiz, courseName, stat) {
     const startValue = convertFromUTC(accessDates.start || '');
     const endValue = convertFromUTC(accessDates.end || '');
 
-    return jQuery(`
-        <div class="quiz-config__item" data-quiz-id="${quiz.step_id}">
-            <div class="quiz-config__course-header">
-                <span class="quiz-config__quiz-name">${jQuery('<span>').text(quiz.step_title).html()}</span>
-                <span class="quiz-config__course-name">${jQuery('<span>').text(courseName).html()}</span>
-            </div>
+    // Clone template
+    const templateEl = document.getElementById('gqc__row-template');
+    if (!templateEl) {
+        console.error('[gqc] Template #gqc__row-template not found');
+        return jQuery('<div></div>');
+    }
 
-            <div class="quiz-config-date-row">
-                <div class="quiz-config-date-field">
-                    <i class="fa-solid fa-play quiz-config-date-icon" aria-hidden="true"></i>
-                    <input type="datetime-local" class="quiz-config-datetime quiz-config-datetime--start" aria-label="Start date" value="${startValue}" />
-                </div>
-                <div class="quiz-config-date-field">
-                    <i class="fa-solid fa-flag quiz-config-date-icon" aria-hidden="true"></i>
-                    <input type="datetime-local" class="quiz-config-datetime quiz-config-datetime--end" aria-label="End date" value="${endValue}" />
-                </div>
-            </div>
+    const clonedFragment = templateEl.content.cloneNode(true);
+    const $row = jQuery(clonedFragment).find('.gqc__item').first();
 
-            <div class="quiz-config__badges">
-                <button
-                    class="quiz-config__badge quiz-config__badge--completed btn-unstyled"
-                    type="button"
-                    data-opens-modal="#quiz-attempts-modal"
-                    data-quiz-id="${quiz.step_id}"
-                    data-quiz-name="${jQuery('<span>').text(quiz.step_title).html()}"
-                >
-                    <span class="quiz-config__badge-count">${completed}</span> Completed
-                </button>
-                <button
-                    class="quiz-config__badge quiz-config__badge--pending btn-unstyled"
-                    type="button"
-                    data-opens-modal="#quiz-attempts-modal"
-                    data-quiz-id="${quiz.step_id}"
-                    data-quiz-name="${jQuery('<span>').text(quiz.step_title).html()}"
-                >
-                    <span class="quiz-config__badge-count">${outstanding}</span> Outstanding
-                </button>
-            </div>
-        </div>
-    `);
+    // Populate data
+    $row.attr('data-quiz-id', quiz.step_id);
+    $row.find('.gqc__quiz-name').text(quiz.step_title);
+    $row.find('.gqc__course-name').text(courseName);
+    $row.find('.gqc__datetime--start').val(startValue);
+    $row.find('.gqc__datetime--end').val(endValue);
+
+    // Set badge attributes and counts
+    $row.find('.gqc__badge--completed')
+        .attr('data-quiz-id', quiz.step_id)
+        .attr('data-quiz-name', quiz.step_title)
+        .find('.gqc__badge-count')
+        .text(completed);
+
+    $row.find('.gqc__badge--pending')
+        .attr('data-quiz-id', quiz.step_id)
+        .attr('data-quiz-name', quiz.step_title)
+        .find('.gqc__badge-count')
+        .text(outstanding);
+
+    return $row;
 }
 
 function applyQuizLimit($block) {
-    const $showMore = $block.find('.quiz-config__show-more');
-    const $items    = $block.find('.quiz-config__item');
+    const $showMore = $block.find('.gqc__show-more');
+    const $items    = $block.find('.gqc__item');
     const total     = $items.length;
 
     if (total <= QUIZ_PAGE_SIZE) {
@@ -127,10 +118,10 @@ function applyQuizLimit($block) {
 }
 
 async function loadQuizData($block, groupId, courses) {
-    const $skeleton = $block.find('.quiz-config__skeleton');
-    const $list     = $block.find('.quiz-config__list');
-    const $empty    = $block.find('.quiz-config__empty');
-    const $showMore = $block.find('.quiz-config__show-more');
+    const $skeleton = $block.find('.gqc__skeleton');
+    const $list     = $block.find('.gqc__list');
+    const $empty    = $block.find('.gqc__empty');
+    const $showMore = $block.find('.gqc__show-more');
 
     changedAccessDates.clear();
     $skeleton.show();
@@ -173,7 +164,7 @@ async function loadQuizData($block, groupId, courses) {
         courseQuizData.forEach(({ course, steps }) => {
             if (!steps.length) return;
             const title    = courseTitle(course);
-            const $section = jQuery('<div class="quiz-config__course-section"></div>');
+            const $section = jQuery('<div class="gqc__course-section"></div>');
             steps.forEach((quiz) => {
                 $section.append(buildQuizRow(quiz, title, statsMap[quiz.step_id] || {}));
             });
@@ -199,12 +190,36 @@ jQuery(document).ready(($) => {
     const $block = $('.wp-block-bys-groups-group-quiz-config').first();
     if (!$block.length) return;
 
-    const $saveBtn = $block.find('.quiz-config__actions button[type="button"]');
+    const $saveBtn = $block.find('.gqc__save');
 
-    // Track datetime changes
-    $block.on('change', '.quiz-config-datetime', function() {
-        const $item = $(this).closest('.quiz-config__item');
-        const quizId = $item.data('quizId');
+    // Disable save button on load (enable only when changes are made)
+    $saveBtn.prop('disabled', true);
+
+    // Track datetime changes and enforce start/end date restrictions
+    $block.on('change', '.gqc__datetime', function() {
+        const $item = $(this).closest('.gqc__item');
+        const quizId = $item.data('quiz-id');
+        const $startField = $item.find('.gqc__datetime--start');
+        const $endField = $item.find('.gqc__datetime--end');
+        const startVal = $startField.val();
+        const endVal = $endField.val();
+
+        // If both dates are set, enforce start <= end
+        if (startVal && endVal) {
+            const startTime = new Date(startVal).getTime();
+            const endTime = new Date(endVal).getTime();
+
+            if (startTime > endTime) {
+                // Start date is after end date - clear the field that was just changed
+                if ($(this).hasClass('gqc__datetime--start')) {
+                    $startField.val('');
+                } else {
+                    $endField.val('');
+                }
+                return;
+            }
+        }
+
         if (quizId) {
             changedAccessDates.add(quizId);
             $saveBtn.prop('disabled', false);
@@ -220,9 +235,9 @@ jQuery(document).ready(($) => {
         try {
             // Collect all changes and send in parallel
             const saveRequests = Array.from(changedAccessDates).map((quizId) => {
-                const $item = $block.find(`.quiz-config__item[data-quiz-id="${quizId}"]`);
-                const startValue = $item.find('.quiz-config-datetime--start').val() || '';
-                const endValue = $item.find('.quiz-config-datetime--end').val() || '';
+                const $item = $block.find(`.gqc__item[data-quiz-id="${quizId}"]`);
+                const startValue = $item.find('.gqc__datetime--start').val() || '';
+                const endValue = $item.find('.gqc__datetime--end').val() || '';
 
                 // Convert browser-local to UTC before sending and caching
                 const start = convertToUTC(startValue);
@@ -257,7 +272,7 @@ jQuery(document).ready(($) => {
         }
     });
 
-    $block.on('click', '.quiz-config__show-more', function () {
+    $block.on('click', '.gqc__show-more', function () {
         showingAllQuizzes = !showingAllQuizzes;
         applyQuizLimit($block);
     });

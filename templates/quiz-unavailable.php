@@ -26,6 +26,15 @@ $status_badges = [
 ];
 ?>
 
+<style>
+/* Temp style rules to override Uncanny Owl styles */
+.course-sidebar .ultp-lazy-course-navigation {
+	.ld-status-icon.ld-status-waiting {
+		display: none;
+	}
+}
+</style>
+
 <div class="row !w-full !ml-0">
 	<?php get_template_part('template-parts/content/course-sidebar'); ?>
 
