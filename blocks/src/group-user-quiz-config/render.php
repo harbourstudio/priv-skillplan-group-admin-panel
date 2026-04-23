@@ -15,7 +15,20 @@ foreach ($attrs as $a) {
 }
 
 $wrapper_attributes = get_block_wrapper_attributes();
+
+// Localize WordPress timezone info for the frontend datetime handling
+$tz = wp_timezone();
+$now = new DateTime('now', $tz);
+$tz_offset_seconds = $tz->getOffset($now);
+$tz_offset_hours = $tz_offset_seconds / 3600;
 ?>
+
+<script type="application/json" id="bys-user-quiz-config-tz-data">
+<?php echo wp_json_encode([
+    'timezone' => $tz->getName(),
+    'utc_offset_hours' => $tz_offset_hours,
+]); ?>
+</script>
 
 <div <?= $wrapper_attributes; ?>>
     <div class="uqc-card">

@@ -310,6 +310,14 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'callback' => array($this, 'group_quiz_access'),
                 'permission_callback' => array($this, 'check_user_permission')
             ));
+
+            // group-user quiz access (overrides group settings)
+            register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/users/(?P<user_id>\d+)/quiz-access', array(
+                'methods' => 'GET, POST',
+                'callback' => array($this, 'user_quiz_access'),
+                'permission_callback' => array($this, 'check_user_permission')
+            ));
+
         }
 
         public function check_user_permission($request) {
@@ -3800,6 +3808,39 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 $end = sanitize_text_field($request->get_json_params()['end'] ?? '');
 
                 BYS_Groups_Quiz_Access::save_group_quiz_access_dates($group_id, $quiz_id, $start, $end);
+
+                return new \WP_REST_Response(array('success' => true), 200);
+            }
+
+            return new \WP_REST_Response(array('error' => 'Error executing this request.'), 405);
+        }
+
+        public function user_quiz_access($request) {
+            $group_id = intval($request['group_id']);
+            $user_id = intval($request['user_id']);
+
+            if (!$group_id || !$user_id) {
+                return new \WP_REST_Response(array('error' => 'Invalid group_id or user_id'), 400);
+            }
+
+            // GET rest method: returns all quiz access date overrides for a user in a group
+            if ('GET' === $request->get_method()) {
+                $access_dates = BYS_Groups_Quiz_Access::get_user_quiz_access_dates($user_id, $group_id);
+                return new \WP_REST_Response($access_dates, 200);
+            }
+
+            // POST rest method: saves quiz access date override for a user in a group
+            if ('POST' === $request->get_method()) {
+                $quiz_id = intval($request->get_json_params()['quiz_id'] ?? 0);
+
+                if (!$quiz_id) {
+                    return new \WP_REST_Response(array('error' => 'Invalid quiz_id'), 400);
+                }
+
+                $start = sanitize_text_field($request->get_json_params()['start'] ?? '');
+                $end = sanitize_text_field($request->get_json_params()['end'] ?? '');
+
+                BYS_Groups_Quiz_Access::save_user_quiz_access_dates($user_id, $group_id, $quiz_id, $start, $end);
 
                 return new \WP_REST_Response(array('success' => true), 200);
             }

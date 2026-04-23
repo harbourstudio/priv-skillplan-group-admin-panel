@@ -368,5 +368,33 @@ if (!class_exists('BYS_Groups_Quiz_Access')) {
 
             update_post_meta($group_id, self::GROUP_QUIZ_ACCESS_META, $access_date);
         }
+
+        /**
+         * Get a user's quiz access dates override for a specific group
+         */
+        public static function get_user_quiz_access_dates($user_id, $group_id) {
+            $access_dates = get_user_meta($user_id, self::GROUP_USER_QUIZ_ACCESS_META . $group_id, true);
+            return is_array($access_dates) ? $access_dates : array();
+        }
+
+        /**
+         * Save a user's quiz access dates override for a specific group
+         */
+        public static function save_user_quiz_access_dates($user_id, $group_id, $quiz_id, $start = '', $end = '') {
+            $access_dates = self::get_user_quiz_access_dates($user_id, $group_id);
+
+            if (empty($start) && empty($end)) {
+                // remove date if both are empty
+                unset($access_dates[$quiz_id]);
+            } else {
+                // save dates
+                $access_dates[$quiz_id] = array(
+                    'start' => $start,
+                    'end'   => $end,
+                );
+            }
+
+            update_user_meta($user_id, self::GROUP_USER_QUIZ_ACCESS_META . $group_id, $access_dates);
+        }
     }
 }

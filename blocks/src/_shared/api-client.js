@@ -47,7 +47,8 @@ export const endpoints = {
     const userId = window.bysGroupsAuth?.userId ?? '';
     return `/wp-json/bys-groups/v1/me/archived-groups${userId ? `?user_id=${userId}` : ''}`;
   },
-  groupQuizAccess: (groupId) => `/wp-json/bys-groups/v1/groups/${groupId}/quiz-access`
+  groupQuizAccess: (groupId) => `/wp-json/bys-groups/v1/groups/${groupId}/quiz-access`,
+  userQuizAccess: (groupId, userId) => `/wp-json/bys-groups/v1/groups/${groupId}/users/${userId}/quiz-access`
 };
 
 export const api = {
