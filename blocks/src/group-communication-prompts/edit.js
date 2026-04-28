@@ -20,21 +20,21 @@ export default function Edit({ clientId, attributes, setAttributes }) {
     return (
         <div {...useBlockProps()}>
             <h5>Learner prompts</h5>
-            <p className="comm-prompts__subtitle">Pre-configured nudges defined by SkillPlan. Select a template, choose recipients, and send.</p>
+            <p className="gcp__subtitle">Pre-configured nudges defined by SkillPlan. Select a template, choose recipients, and send.</p>
 
-            <div className="comm-prompts__card">
+            <div className="gcp__card">
                 {PROMPTS.map((prompt) => (
-                    <div key={prompt.title} className="comm-prompts__item">
-                        <div className="comm-prompts__icon" aria-hidden="true">
+                    <div key={prompt.title} className="gcp__item">
+                        <div className="gcp__icon" aria-hidden="true">
                             <i className="fa-regular fa-envelope"></i>
                         </div>
-                        <div className="comm-prompts__info">
-                            <span className="comm-prompts__name">{prompt.title}</span>
-                            <span className="comm-prompts__desc">{prompt.desc}</span>
+                        <div className="gcp__info">
+                            <span className="gcp__name">{prompt.title}</span>
+                            <span className="gcp__desc">{prompt.desc}</span>
                         </div>
-                        <div className="comm-prompts__actions">
-                            <span className="comm-prompts__history-btn">Prompt History</span>
-                            <span className="comm-prompts__proceed-btn">Proceed</span>
+                        <div className="gcp__actions">
+                            <span className="gcp__history">Prompt History</span>
+                            <span className="gcp__proceed">Proceed</span>
                         </div>
                     </div>
                 ))}
