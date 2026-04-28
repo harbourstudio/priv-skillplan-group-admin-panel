@@ -68,6 +68,16 @@ if (!class_exists('BYS_Groups_Admin_Settings')) {
                     echo '<div class="notice notice-success is-dismissible"><p>API credentials cleared.</p></div>';
                 });
             }
+
+            if (isset($_POST['action']) && $_POST['action'] === 'save_postmark_token') {
+                $token = sanitize_text_field($_POST['postmark_token'] ?? '');
+                if (!empty($token)) {
+                    update_option('bys_postmark_token', $token);
+                    add_action('admin_notices', function() {
+                        echo '<div class="notice notice-success is-dismissible"><p>Postmark token saved successfully!</p></div>';
+                    });
+                }
+            }
         }
 
         /**
@@ -114,7 +124,7 @@ if (!class_exists('BYS_Groups_Admin_Settings')) {
                 </form>
 
                 <?php if ($is_configured) : ?>
-                    <h3>Credentials Status</h3>
+                    <h2>Credentials Status</h2>
                     <p>API credentials are configured and ready to use.</p>
                     <form method="POST">
                         <?php wp_nonce_field('bys_groups_settings', 'bys_groups_settings_nonce'); ?>
@@ -122,6 +132,29 @@ if (!class_exists('BYS_Groups_Admin_Settings')) {
                         <?php submit_button('Clear Credentials', 'delete'); ?>
                     </form>
                 <?php endif; ?>
+
+                <hr>
+
+                <h2>Postmark API Token</h2>
+                <p>Enter your Postmark Server API Token to enable the communication log.</p>
+
+                <form method="POST" style="max-width: 500px;">
+                    <?php wp_nonce_field('bys_groups_settings', 'bys_groups_settings_nonce'); ?>
+                    <input type="hidden" name="action" value="save_postmark_token">
+                    <label for="postmark_token">
+                        Server API Token
+                        <input type="password" id="postmark_token" name="postmark_token" class="regular-text" placeholder="Enter token to update"
+                        />
+                    </label>
+                    <p class="description">
+                        <?php if (get_option('bys_postmark_token')) : ?>
+                            Token is configured.
+                        <?php else : ?>
+                            No token saved yet.
+                        <?php endif; ?>
+                    </p>
+                    <?php submit_button('Save Postmark Token'); ?>
+                </form>
             </div>
             <?php
         }
