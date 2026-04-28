@@ -318,6 +318,13 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'permission_callback' => array($this, 'check_user_permission')
             ));
 
+            // get email template preview
+            register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/template/(?P<prompt_type>[\w-]+)', array(
+                'methods' => 'GET',
+                'callback' => array($this, 'get_email_template'),
+                'permission_callback' => array($this, 'check_user_permission')
+            ));
+
         }
 
         public function check_user_permission($request) {
@@ -3846,6 +3853,49 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             }
 
             return new \WP_REST_Response(array('error' => 'Error executing this request.'), 405);
+        }
+
+        /**
+         * Get communication prompt template preview
+         */
+        public function get_email_template($request) {
+            $group_id = intval($request['group_id']);
+            $prompt_type = sanitize_text_field($request['prompt_type']);
+
+            if (!$group_id || !$prompt_type) {
+                return new \WP_REST_Response(array('error' => 'Missing group_id or prompt_type'), 400);
+            }
+
+            // Get group info
+            $group = get_post($group_id);
+            if (!$group || $group->post_type !== 'groups') {
+                return new \WP_REST_Response(array('error' => 'Invalid group ID'), 404);
+            }
+
+            // Get group name for template
+            $group_name = $group->post_title;
+            $site_name = get_bloginfo('name');
+            $site_url = home_url();
+
+            // Get email template
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/emails/group-comms.php';
+
+            $email = bys_get_comm_email($prompt_type, array(
+                'group_name' => $group_name,
+                'site_name' => $site_name,
+                'site_url' => $site_url,
+                'sender_email' => get_bloginfo('admin_email'),
+            ));
+
+            if (empty($email['subject']) || empty($email['html'])) {
+                return new \WP_REST_Response(array('error' => 'Template not found'), 404);
+            }
+
+            return new \WP_REST_Response(array(
+                'subject' => $email['subject'],
+                'html' => $email['html'],
+                'plain' => $email['plain'],
+            ), 200);
         }
     }
 }

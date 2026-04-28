@@ -1,3 +1,5 @@
+import { api, endpoints } from '../_shared/api-client.js';
+
 jQuery(document).ready(function($) {
     const $block = $('.wp-block-bys-groups-group-communication-send-modal').first();
     if (!$block.length) return;
@@ -27,7 +29,6 @@ jQuery(document).ready(function($) {
 
     $modal.find('.csm__modal-close').on('click', closeModal);
     $backdrop.on('click', closeModal);
-
 
     // Recipient type toggle
     $radios.on('change', function () {
@@ -67,8 +68,9 @@ jQuery(document).ready(function($) {
         } else {
             $subject.prop('disabled', true);
             $subject.addClass('csm__input--disabled');
+            // Load and display prompt template preview
+            await loadPromptTemplate(promptType, currentGroupId);
         }
-
     }
 
     // Listen for jQuery custom event
@@ -80,6 +82,36 @@ jQuery(document).ready(function($) {
     document.addEventListener('comm:open-send-modal', async function (e) {
         await handleOpenSendModal(e.detail.promptType, e.detail.promptTitle);
     });
+
+    /**
+     * Load and display prompt template preview from REST API
+     */
+    async function loadPromptTemplate(promptType, groupId) {
+        try {
+            const url = `/wp-json/bys-groups/v1/groups/${groupId}/template/${promptType}`;
+            const response = await api.get(url);
+
+            if (response && response.subject && response.html) {
+                // Set subject field
+                $subject.val(response.subject);
+
+                // Hide textarea and show preview
+                $message.hide();
+                $preview.show();
+                $preview.html(response.html);
+            } else {
+                console.error('[group-communication-send-modal] Invalid response:', response);
+                $preview.hide();
+                $message.show();
+                $message.val('Template preview unavailable.');
+            }
+        } catch (err) {
+            console.error('[group-communication-send-modal] Error:', err);
+            $preview.hide();
+            $message.show();
+            $message.val('Error loading template preview.');
+        }
+    }
 
     // MutationObserver for scroll lock
     new MutationObserver(() => {
