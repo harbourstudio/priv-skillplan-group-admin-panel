@@ -21,7 +21,9 @@ jQuery(document).ready(function($) {
     let currentGroupId = null;
     let isSubmitting = false;
 
-    // Modal management
+    /**
+     * Modal management
+     */
     function closeModal() {
         $modal.addClass('hidden');
         $('html').css('overflow', '');
@@ -37,7 +39,9 @@ jQuery(document).ready(function($) {
         $condition.toggle(val === 'condition');
     });
 
-    // Handle 'open modal' event from group-communication-prompts block
+    /**
+     * Handle 'open modal' event from group-communication-prompts block
+     */
     async function handleOpenSendModal(promptType, promptTitle) {
         currentPromptType = promptType;
         currentGroupId = window.bysGroupData?.groupId;
@@ -71,6 +75,9 @@ jQuery(document).ready(function($) {
             // Load and display prompt template preview
             await loadPromptTemplate(promptType, currentGroupId);
         }
+
+        // Populate group users in 'individual' recipient
+        await populateGroupUsers(currentGroupId);
     }
 
     // Listen for jQuery custom event
@@ -111,6 +118,53 @@ jQuery(document).ready(function($) {
             $message.show();
             $message.val('Error loading template preview.');
         }
+    }
+
+    /**
+     * Populate group-users select for 'individual' sending
+     */
+    async function populateGroupUsers(groupId) {
+        const $select = $modal.find('#csm__bulk-recipient');
+
+        try {
+            // First, get base user stats to get all user IDs
+            const baseStats = await api.get(endpoints.groupBaseUsersStats(groupId));
+
+            if (!baseStats || !Array.isArray(baseStats.user_ids) || baseStats.user_ids.length === 0) {
+                console.warn('[group-communication-send-modal] No group members found');
+                $select.html('<option disabled>No members in group</option>');
+                return;
+            }
+
+            // Fetch user details using user IDs
+            const userIds = baseStats.user_ids;
+            const users = await api.get(endpoints.groupUsers(groupId, userIds.join(',')));
+
+            if (!Array.isArray(users)) {
+                console.error('[group-communication-send-modal] Invalid response');
+                return;
+            }
+
+            $select.html('');
+            users.forEach(user => {
+                const name = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.display_name || user.email;
+                $select.append(
+                    `<option value="${user.id}">${escapeHtml(name)} (${escapeHtml(user.email)})</option>`
+                );
+            });
+        } catch (err) {
+            console.error('[group-communication-send-modal] Error:', err);
+            $select.html('<option disabled>Error loading members</option>');
+        }
+    }
+
+    /**
+     * Escape HTML to prevent HTML injection/XSS
+     */
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     // MutationObserver for scroll lock
