@@ -244,7 +244,7 @@
         // ── Submit ────────────────────────────────────────────────────────────────
     
         &__form-actions {
-            padding-top: var(--wp--preset--spacing--2);
+            padding-top: var(--wp--preset--spacing--4);
             border-top: 1px solid var(--wp--preset--color--gray-100);
         }
     
@@ -258,6 +258,26 @@
             transition: opacity 0.15s;
     
             &:hover { opacity: 0.88; }
+        }
+
+        &__feedback {
+            padding: var(--wp--preset--spacing--4);
+            border: 1px solid var(--wp--preset--color--gray-100);
+            border-radius: 0.25rem;
+            margin-bottom: var(--wp--preset--spacing--4);
+            font-size: var(--wp--preset--font-size--small);
+            
+            &--success {
+                border-color: var(--wp--preset--color--green-500);
+                background-color: var(--wp--preset--color--green-50);
+                color: var(--wp--preset--color--green-800);
+            }
+
+            &--error {
+                border-color: var(--wp--preset--color--red-500);
+                background-color: var(--wp--preset--color--red-50);
+                color: var(--wp--preset--color--red-800);
+            }
         }
     }
 }

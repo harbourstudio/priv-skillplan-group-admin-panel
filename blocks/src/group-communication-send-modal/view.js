@@ -16,6 +16,7 @@ jQuery(document).ready(function($) {
     const $messageGroup = $message.closest('.csm__form-group');
     const $submitBtn = $modal.find('.csm__form-submit');
     const $promptName = $modal.find('.csm__modal-prompt');
+    const $feedback = $modal.find('.csm__feedback');
 
     let currentPromptType = null;
     let currentGroupId = null;
@@ -62,6 +63,7 @@ jQuery(document).ready(function($) {
         // Show/hide subject field based on prompt type
         const $subjectGroup = $subject.closest('.csm__form-group');
         $subjectGroup.show();
+        $feedback.hide();
 
         if (promptType === 'custom') {
             $subject.prop('disabled', false);
@@ -148,9 +150,9 @@ jQuery(document).ready(function($) {
             $select.html('');
             users.forEach(user => {
                 const name = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.display_name || user.email;
-                $select.append(
-                    `<option value="${user.id}">${escapeHtml(name)} (${escapeHtml(user.email)})</option>`
-                );
+                const $option = $(`<option value="${user.id}"></option>`);
+                $option.text(`${name} (${user.email})`);
+                $select.append($option);
             });
         } catch (err) {
             console.error('[group-communication-send-modal] Error:', err);
@@ -159,12 +161,64 @@ jQuery(document).ready(function($) {
     }
 
     /**
-     * Escape HTML to prevent HTML injection/XSS
+     * Form submit handler
      */
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+    $form.on('submit', async function (e) {
+        e.preventDefault();
+
+        if (isSubmitting || !currentPromptType || !currentGroupId) {
+            return;
+        }
+
+        isSubmitting = true;
+        $submitBtn.prop('disabled', true).text('Sending...');
+
+        try {
+            const recipientType = $form.find('input[name="recipient"]:checked').val();
+            const customSubject = $subject.val();
+            const customMessage = currentPromptType === 'custom' ? $message.val() : '';
+
+            // Get selected recipient IDs for individual type
+            let recipientIds = [];
+            if (recipientType === 'individual') {
+                recipientIds = Array.from($modal.find('#csm__bulk-recipient').val() || []).map(v => parseInt(v, 10));
+            }
+
+            // POST to REST endpoint
+            const url = `/wp-json/bys-groups/v1/groups/${currentGroupId}/send-communication`;
+            const response = await api.post(url, {
+                prompt_type: currentPromptType,
+                recipient_type: recipientType,
+                recipient_ids: recipientIds,
+                custom_subject: customSubject,
+                custom_message: customMessage,
+            });
+
+            if (response && response.success) {
+                showFeedback(`Email sent to ${response.sent_count} recipient(s)`, 'success');
+                // Close modal after delay to let user see success message
+                setTimeout(() => closeModal(), 5000);
+            } else {
+                const errors = (response && response.errors) ? response.errors.join(', ') : 'Unknown error';
+                showFeedback(`Failed to send: ${errors}`, 'error');
+            }
+        } catch (err) {
+            console.error('[group-communication-send-modal] Submit error:', err);
+            showFeedback(`Error: ${err.message}`, 'error');
+        } finally {
+            isSubmitting = false;
+            $submitBtn.prop('disabled', false).text('Send Prompt');
+        }
+    });
+
+    /**
+     * Show feedback message (success or error)
+     */
+    function showFeedback(message, variant = 'success') {
+        $feedback.text(message);
+        $feedback.removeClass('csm__feedback--success csm__feedback--error');
+        $feedback.addClass(`csm__feedback--${variant}`);
+        $feedback.show();
     }
 
     // MutationObserver for scroll lock

@@ -318,7 +318,14 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'permission_callback' => array($this, 'check_user_permission')
             ));
 
-            // get email template preview
+            // send group communication (emails)
+            register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/send-communication', array(
+                'methods' => 'POST',
+                'callback' => array($this, 'send_group_communication'),
+                'permission_callback' => array($this, 'check_user_permission')
+            ));
+
+            // get communication prompt template preview
             register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/template/(?P<prompt_type>[\w-]+)', array(
                 'methods' => 'GET',
                 'callback' => array($this, 'get_email_template'),
@@ -3856,7 +3863,64 @@ if (!class_exists('BYS_Groups_Rest_API')) {
         }
 
         /**
-         * Get communication prompt template preview
+         * Send group communication (emails via prompts or custom messages)
+         *
+         * @param WP_REST_Request $request Request object with group_id and JSON body
+         * @return WP_REST_Response Response with success/error and sent_count
+         */
+        public function send_group_communication($request) {
+            $group_id = intval($request['group_id']);
+
+            if (!$group_id) {
+                return new \WP_REST_Response(array('error' => 'Invalid group ID'), 400);
+            }
+
+            // Verify current user is logged in (mailer will check group leader permission)
+            if (!get_current_user_id()) {
+                return new \WP_REST_Response(array('error' => 'Not logged in'), 401);
+            }
+
+            // Parse request body
+            $body = $request->get_json_params();
+            $prompt_type = sanitize_text_field($body['prompt_type'] ?? '');
+            $recipient_type = sanitize_text_field($body['recipient_type'] ?? '');
+            $recipient_ids = isset($body['recipient_ids']) && is_array($body['recipient_ids']) ? array_map('intval', $body['recipient_ids']) : array();
+            $custom_subject = sanitize_text_field($body['custom_subject'] ?? '');
+            $custom_message = wp_kses_post($body['custom_message'] ?? '');
+
+            if (!$prompt_type || !$recipient_type) {
+                return new \WP_REST_Response(array('error' => 'Missing prompt_type or recipient_type'), 400);
+            }
+
+            // For custom prompts, require both subject and message
+            if ($prompt_type === 'custom' && (empty($custom_subject) || empty($custom_message))) {
+                return new \WP_REST_Response(array('error' => 'Custom prompts require both subject and message'), 400);
+            }
+
+            // error_log("[send_group_communication] group_id={$group_id}, prompt_type={$prompt_type}, recipient_type={$recipient_type}");
+
+            // Use mailer class to send (includes leader and group validation)
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-mailer.php';
+            $mailer = new BYS_Groups_Mailer();
+
+            $result = $mailer->send_group_communication(
+                $group_id,
+                $prompt_type,
+                $recipient_type,
+                $recipient_ids,
+                $custom_subject,
+                $custom_message
+            );
+
+            $status_code = $result['success'] ? 200 : 400;
+            return new \WP_REST_Response($result, $status_code);
+        }
+
+        /**
+         * Get prompt-based email template for preview in send modal
+         *
+         * @param WP_REST_Request $request Request with group_id and prompt_type
+         * @return WP_REST_Response Response with subject, html, and plain template
          */
         public function get_email_template($request) {
             $group_id = intval($request['group_id']);
@@ -3866,24 +3930,19 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 return new \WP_REST_Response(array('error' => 'Missing group_id or prompt_type'), 400);
             }
 
-            // Get group info
+            // Validate group exists
             $group = get_post($group_id);
             if (!$group || $group->post_type !== 'groups') {
                 return new \WP_REST_Response(array('error' => 'Invalid group ID'), 404);
             }
 
-            // Get group name for template
-            $group_name = $group->post_title;
-            $site_name = get_bloginfo('name');
-            $site_url = home_url();
-
-            // Get email template
+            // Load template with group context
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/emails/group-comms.php';
 
             $email = bys_get_comm_email($prompt_type, array(
-                'group_name' => $group_name,
-                'site_name' => $site_name,
-                'site_url' => $site_url,
+                'group_name' => $group->post_title,
+                'site_name' => get_bloginfo('name'),
+                'site_url' => home_url(),
                 'sender_email' => get_bloginfo('admin_email'),
             ));
 

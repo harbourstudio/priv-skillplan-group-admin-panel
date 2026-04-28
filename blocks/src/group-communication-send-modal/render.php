@@ -129,6 +129,7 @@ $wrapper_attributes = get_block_wrapper_attributes();
                     </div>
 
                     <div class="csm__form-actions">
+                        <div class="csm__feedback" style="display: none;"></div>
                         <button class="csm__form-submit btn-unstyled" type="submit">
                             <?php esc_html_e('Send Prompt', 'bys'); ?>
                         </button>
