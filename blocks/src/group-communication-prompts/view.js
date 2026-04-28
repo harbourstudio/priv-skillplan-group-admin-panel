@@ -12,8 +12,8 @@ jQuery(document).ready(($) => {
 
         // If this is the send modal, emit a custom event with prompt data
         if (targetId === '#communication-send-modal') {
-            const promptType = $(this).data('promptType');
-            const promptTitle = $(this).data('promptTitle');
+            const promptType = $(this).data('prompt-type');
+            const promptTitle = $(this).data('prompt-title');
 
             // Create jQuery custom event
             if ($(document).trigger) {

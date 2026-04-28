@@ -12,7 +12,7 @@ export default function Edit({ clientId, attributes, setAttributes }) {
 
 	return (
 		<div {...useBlockProps()}>
-			<div className="quiz-attempts-modal-editor-preview">
+			<div className="modal-editor-preview">
 				<i className="fa-light fa-rectangle-history" />
 				{__('Message Send Modal ', 'bys')}
 				<span>{__('(opens as overlay)', 'bys')}</span>
