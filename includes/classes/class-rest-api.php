@@ -325,6 +325,13 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'permission_callback' => array($this, 'check_user_permission')
             ));
 
+            // get group communication log from Postmark
+            register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/communication-log', array(
+                'methods' => 'GET',
+                'callback' => array($this, 'get_group_communication_log'),
+                'permission_callback' => array($this, 'check_user_permission')
+            ));
+
             // get communication prompt template preview
             register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/template/(?P<prompt_type>[\w-]+)', array(
                 'methods' => 'GET',
@@ -3954,6 +3961,101 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'subject' => $email['subject'],
                 'html' => $email['html'],
                 'plain' => $email['plain'],
+            ), 200);
+        }
+
+        /**
+         * Fetch outbound email log from Postmark API.
+         * Route: GET /bys-groups/v1/groups/{group_id}/communication-log
+         *
+         * @param WP_REST_Request $request
+         * @return WP_REST_Response
+         */
+        public function get_group_communication_log($request) {
+
+            // Validate group
+            $group_id = intval($request['group_id']);
+            if (!$group_id) {
+                return new \WP_REST_Response(array('error' => 'Invalid group ID'), 400);
+            }
+            $group = get_post($group_id);
+            if (!$group || $group->post_type !== 'groups') {
+                return new \WP_REST_Response(array('error' => 'Group not found'), 404);
+            }
+
+            // Verify current user and if user is a group leader
+            $user_id = get_current_user_id();
+            if (!$user_id) {
+                return new \WP_REST_Response(array('error' => 'Not logged in'), 401);
+            }
+            $is_leader = get_user_meta($user_id, 'learndash_group_leaders_' . $group_id, true);
+            if (empty($is_leader)) {
+                return new \WP_REST_Response(array('error' => 'Forbidden'), 403);
+            }
+
+            // Read Postmark token
+            $token = get_option('bys_postmark_token', '');
+            if (empty($token)) {
+                return new \WP_REST_Response(array('error' => 'Postmark token not configured'), 500);
+            }
+
+            // Parse pagination params
+            $count = 25;
+            $offset = max(0, intval($request->get_param('offset') ?: 0));
+
+            // Call Postmark Messages/Outbound API (WIP non-filtered for now)
+            $postmark_url = add_query_arg(
+                array('count' => $count, 'offset' => $offset),
+                'https://api.postmarkapp.com/messages/outbound'
+            );
+
+            $response = wp_remote_get($postmark_url, array(
+                'headers' => array(
+                    'X-Postmark-Server-Token' => $token,
+                    'Accept' => 'application/json',
+                ),
+                'timeout' => 15,
+                'sslverify' => true,
+            ));
+
+            // Handle errors
+            if (is_wp_error($response)) {
+                return new \WP_REST_Response(
+                    array('error' => 'Postmark API error: ' . $response->get_error_message()),
+                    500
+                );
+            }
+
+            $status = wp_remote_retrieve_response_code($response);
+            $body = json_decode(wp_remote_retrieve_body($response), true);
+
+            if ($status !== 200) {
+                $pm_error = isset($body['Message']) ? $body['Message'] : 'Unknown Postmark error';
+                return new \WP_REST_Response(
+                    array('error' => 'Postmark returned ' . $status . ': ' . $pm_error),
+                    502
+                );
+            }
+
+            // Map Postmark response to simplified format
+            $messages = array();
+            foreach ((array) ($body['Messages'] ?? array()) as $msg) {
+                $messages[] = array(
+                    'message_id' => $msg['MessageID'] ?? '',
+                    'from' => $msg['From'] ?? '',
+                    'to' => $msg['To'] ?? '',
+                    'subject' => $msg['Subject'] ?? '',
+                    'status' => $msg['Status'] ?? '',
+                    'sent_at' => $msg['ReceivedAt'] ?? '',
+                );
+            }
+
+            // Return response
+            return new \WP_REST_Response(array(
+                'total' => intval($body['TotalCount'] ?? 0),
+                'messages' => $messages,
+                'offset' => $offset,
+                'count' => $count,
             ), 200);
         }
     }

@@ -35,8 +35,9 @@ if (!class_exists('BYS_Groups_Mailer')) {
 
             $args = wp_parse_args($args, $defaults);
 
-            // Set content type to HTML
-            add_filter('wp_mail_content_type', array($this, 'set_html_content_type'));
+            // Hook into Fluent SMTP's phpMailer to set content type to HTML
+            // This ensures Postmark receives HtmlBody instead of TextBody
+            add_action('phpmailer_init', array($this, 'set_phpmailer_html_type'), 10);
 
             // Build headers
             $headers = $args['headers'];
@@ -62,10 +63,20 @@ if (!class_exists('BYS_Groups_Mailer')) {
                 $result = false;
             }
 
-            // Remove filter
-            remove_filter('wp_mail_content_type', array($this, 'set_html_content_type'));
+            // Clean up
+            remove_action('phpmailer_init', array($this, 'set_phpmailer_html_type'), 10);
 
             return $result;
+        }
+
+        /**
+         * Set phpMailer to send as HTML (called via phpmailer_init hook)
+         *
+         * @param PHPMailer $phpmailer PHPMailer object
+         * @return void
+         */
+        public function set_phpmailer_html_type($phpmailer) {
+            $phpmailer->isHTML(true);
         }
 
         /**

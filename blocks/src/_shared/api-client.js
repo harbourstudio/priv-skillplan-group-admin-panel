@@ -48,7 +48,9 @@ export const endpoints = {
     return `/wp-json/bys-groups/v1/me/archived-groups${userId ? `?user_id=${userId}` : ''}`;
   },
   groupQuizAccess: (groupId) => `/wp-json/bys-groups/v1/groups/${groupId}/quiz-access`,
-  userQuizAccess: (groupId, userId) => `/wp-json/bys-groups/v1/groups/${groupId}/users/${userId}/quiz-access`
+  userQuizAccess: (groupId, userId) => `/wp-json/bys-groups/v1/groups/${groupId}/users/${userId}/quiz-access`,
+  groupCommunicationLog: (groupId, count = 25, offset = 0) =>
+    `/wp-json/bys-groups/v1/groups/${groupId}/communication-log?count=${count}&offset=${offset}`
 };
 
 export const api = {
