@@ -21,19 +21,19 @@ export default function Edit({ clientId, attributes, setAttributes }) {
 	return (
 		<div {...useBlockProps()}>
 			<h5>{__('Sent message log', 'bys')}</h5>
-			<div className="comm-log">
-				<div className="comm-log__list">
+			<div className="gcl">
+				<div className="gcl__list">
 					{PREVIEW_ENTRIES.map((entry, i) => (
-						<div key={i} className="comm-log__row">
-							<span className="comm-log__date">{entry.date}</span>
-							<span className="comm-log__label">{entry.label}</span>
-							<span className={`comm-log__badge comm-log__badge--${entry.type}`}>
+						<div key={i} className="gcl__item">
+							<span className="gcl__date">{entry.date}</span>
+							<span className="gcl__label">{entry.label}</span>
+							<span className={`gcl__badge gcl__badge--${entry.type}`}>
 								{entry.type.charAt(0).toUpperCase() + entry.type.slice(1)}
 							</span>
 						</div>
 					))}
 				</div>
-				<div className="comm-log__show-more">{__('Show more', 'bys')}</div>
+				<div className="gcl__show-more">{__('Show more', 'bys')}</div>
 			</div>
 		</div>
 	);
