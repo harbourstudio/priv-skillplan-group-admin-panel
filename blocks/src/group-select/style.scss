@@ -1,8 +1,13 @@
-.wp-block-bys-groups-group-select {    
+.wp-block-bys-groups-group-select {
 	.group-selector{
         display: flex;
         gap: var(--wp--preset--spacing--4);
         align-items: center;
+
+        &__wrapper {
+            position: relative;
+            display: inline-block;
+        }
 
         &__select{
             font-family: var(--wp--preset--font-family--primary);
@@ -15,5 +20,36 @@
             padding: var(--wp--preset--spacing--3);
             min-height: 3.25rem;
         }
+
+        &__spinner-wrapper {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: white;
+            border-radius: 0.25rem;
+            border: 1px solid var(--wp--preset--color--gray-300);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        &__spinner {
+            display: inline-block;
+            width: 1.25rem;
+            height: 1.25rem;
+            border: 2px solid var(--wp--preset--color--gray-200);
+            border-top-color: var(--wp--preset--color--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+    }
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
     }
 }
