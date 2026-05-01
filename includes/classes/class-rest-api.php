@@ -290,6 +290,13 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'permission_callback' => array($this, 'check_user_permission'),
             ));
 
+            // bulk add/invite users to the group
+            register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/invite-bulk', array(
+                'methods'             => 'POST',
+                'callback'            => array($this, 'bulk_user_addition'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
+
             // getPendingInvites - list pending invites for a group
             register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/pending-invites', array(
                 'methods'             => 'GET',
@@ -3752,6 +3759,127 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'invite_id' => $invite_id,
                 'email'     => $email,
             ), 201 );
+        }
+
+        /**
+         * POST /groups/{group_id}/invite-bulk
+         * Bulk add/invite multiple users in one request.
+         *
+         * Request body:
+         * {
+         *   "emails": ["a@example.com", "b@example.com"],
+         *   "role": "learner",
+         *   "dry_run": false
+         * }
+         *
+         * Response:
+         * {
+         *   "enrolled": [{ "email": "a@example.com", "user_id": 5 }],
+         *   "invited":  [{ "email": "b@example.com", "invite_id": 12 }],
+         *   "failed":   [{ "email": "c@example.com", "reason": "..." }]
+         * }
+         */
+        public function bulk_user_addition( $request ) {
+            $group_id = intval( $request['group_id'] );
+            $body     = json_decode( $request->get_body(), true );
+            $emails   = isset( $body['emails'] ) && is_array( $body['emails'] ) ? $body['emails'] : array();
+            $role     = in_array( $body['role'] ?? '', [ 'learner', 'leader' ], true ) ? $body['role'] : 'learner';
+            $dry_run  = isset( $body['dry_run'] ) ? (bool) $body['dry_run'] : false;
+            $invited_by = get_current_user_id();
+
+            if ( ! $group_id ) {
+                return new \WP_REST_Response( array( 'error' => 'Invalid group_id' ), 400 );
+            }
+
+            if ( empty( $emails ) ) {
+                return new \WP_REST_Response( array( 'error' => 'No emails provided' ), 400 );
+            }
+
+            $group = get_post( $group_id );
+            if ( ! $group || $group->post_type !== 'groups' ) {
+                return new \WP_REST_Response( array( 'error' => 'Group not found' ), 404 );
+            }
+
+            global $wpdb;
+            $table = $wpdb->prefix . BYS_GROUPS_INVITES_TABLE;
+
+            $enrolled = array();
+            $invited  = array();
+            $failed   = array();
+
+            // Sanitize and deduplicate emails
+            $emails = array_unique( array_map( 'sanitize_email', $emails ) );
+
+            foreach ( $emails as $email ) {
+                // Validate email format
+                if ( ! is_email( $email ) ) {
+                    $failed[] = array(
+                        'email'  => $email,
+                        'reason' => 'Invalid email format',
+                    );
+                    continue;
+                }
+
+                // Case 1: user already exists → enroll directly
+                $existing_user = get_user_by( 'email', $email );
+                if ( $existing_user ) {
+                    if ( ! $dry_run ) {
+                        BYS_Groups_Invites::add_to_group( $existing_user->ID, $group_id, $role );
+                    }
+                    $enrolled[] = array(
+                        'email'   => $email,
+                        'user_id' => $existing_user->ID,
+                    );
+                    continue;
+                }
+
+                // Case 2: no account → check for duplicate pending invite
+                $existing = $wpdb->get_var( $wpdb->prepare(
+                    "SELECT id FROM {$table} WHERE group_id = %d AND email = %s AND status = 'pending'",
+                    $group_id, $email
+                ) );
+
+                if ( $existing ) {
+                    $failed[] = array(
+                        'email'  => $email,
+                        'reason' => 'Pending invite already exists',
+                    );
+                    continue;
+                }
+
+                // Insert invite row (or skip if dry_run)
+                if ( ! $dry_run ) {
+                    $wpdb->insert( $table, array(
+                        'group_id'   => $group_id,
+                        'email'      => $email,
+                        'role'       => $role,
+                        'status'     => 'pending',
+                        'invited_by' => $invited_by,
+                        'invited_at' => current_time( 'mysql' ),
+                    ), array( '%d', '%s', '%s', '%s', '%d', '%s' ) );
+
+                    $invite_id = $wpdb->insert_id;
+
+                    // Send invite email (non-fatal)
+                    $mail_result = BYS_Groups_Invites::send_invite_email( $email, $group_id, $invited_by );
+                    if ( is_wp_error( $mail_result ) ) {
+                        error_log( '[bys-groups] Invite email failed for ' . $email . ': ' . $mail_result->get_error_message() );
+                    }
+                } else {
+                    $invite_id = 0; // Placeholder for dry_run
+                }
+
+                $invited[] = array(
+                    'email'     => $email,
+                    'invite_id' => $invite_id,
+                );
+            }
+
+            return new \WP_REST_Response( array(
+                'enrolled' => $enrolled,
+                'invited'  => $invited,
+                'failed'   => $failed,
+            ), 200 );
         }
 
         /**
