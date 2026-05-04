@@ -25,6 +25,7 @@ define( 'BYS_GROUPS_PLUGIN_URL', plugin_dir_url( __FILE__ ));
 define( 'BYS_GROUPS_PLUGIN_BASENAME', plugin_basename( __FILE__ ));
 define( 'BYS_GROUPS_USER_ACTIVITY_TABLE', 'bys_groups_user_activity' );
 define( 'BYS_GROUPS_INVITES_TABLE', 'bys_group_invites' );
+define( 'BYS_GROUPS_COMMS_TABLE', 'bys_group_communication_log' );
 
 // File includes
 require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-core.php';
