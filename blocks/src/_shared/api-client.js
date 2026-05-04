@@ -131,8 +131,11 @@ export const api = {
       headers,
       data: JSON.stringify(body),
       dataType: 'json',
+    }).then((data) => {
+      return data;
     }).catch((jqXHR) => {
       console.error(`POST failed for ${url}:`, jqXHR.status, jqXHR.responseText?.substring(0, 200));
+      throw new Error(`POST failed: ${jqXHR.status} ${jqXHR.responseText?.substring(0, 100)}`);
     });
   },
 

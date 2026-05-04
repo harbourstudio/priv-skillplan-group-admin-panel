@@ -120,6 +120,7 @@ $sample_message = [
                             <?php endforeach; ?>
                         </tbody>
                     </table>
+                    <button class="show-more btn-unstyled">Show more</button>
                 </div>
 
                 <?php // Screen 2: User list within a batch ?>
@@ -172,6 +173,7 @@ $sample_message = [
                             <?php echo nl2br( esc_html( $sample_message['body'] ) ); ?>
                         </div>
                     </div>
+                    
                 </div>
 
             </div>

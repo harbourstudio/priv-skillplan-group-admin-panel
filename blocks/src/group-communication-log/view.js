@@ -57,7 +57,19 @@ jQuery(document).ready(($) => {
             const $button = $(template.content.cloneNode(true));
             $button.find('.gcl__date').text(dateStr);
             $button.find('.gcl__label').text(batchLabel);
-            $button.find('.gcl__item').attr('data-batch-date', batchDate).attr('data-batch-label', batchLabel);
+            $button.find('.gcl__item').attr('data-batch-date', batchDate).attr('data-batch-label', batchLabel).attr('data-prompt-type', msg.prompt_type);
+
+            // Set badge class and text based on badge_type
+            const badgeType = msg.badge_type || 'prompt';
+            const badgeLabel = badgeType === 'custom' ? 'Custom' : 'Prompt';
+            $button.find('.gcl__badge')
+                .addClass(`gcl__badge--${badgeType}`)
+                .text(badgeLabel);
+
+            // Set delivery status attribute if present
+            if (msg.delivery_status) {
+                $button.find('.gcl__item').attr('data-delivery-status', msg.delivery_status);
+            }
 
             // Add hidden class for items beyond the 5th visible item
             if (startIndex + i >= 5) {

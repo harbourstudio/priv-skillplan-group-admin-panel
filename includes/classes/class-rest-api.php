@@ -329,7 +329,29 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/send-communication', array(
                 'methods' => 'POST',
                 'callback' => array($this, 'send_group_communication'),
-                'permission_callback' => array($this, 'check_user_permission')
+                'permission_callback' => array($this, 'check_user_permission'),
+                'args' => array(
+                    'prompt_type' => array(
+                        'type' => 'string',
+                        'required' => true,
+                    ),
+                    'recipient_type' => array(
+                        'type' => 'string',
+                        'required' => true,
+                    ),
+                    'recipient_ids' => array(
+                        'type' => 'array',
+                        'required' => false,
+                    ),
+                    'custom_subject' => array(
+                        'type' => 'string',
+                        'required' => false,
+                    ),
+                    'custom_message' => array(
+                        'type' => 'string',
+                        'required' => false,
+                    ),
+                )
             ));
 
             // get group communication log from Postmark
@@ -344,6 +366,13 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'methods' => 'GET',
                 'callback' => array($this, 'get_email_template'),
                 'permission_callback' => array($this, 'check_user_permission')
+            ));
+
+            // Postmark webhook endpoint (no authentication required — Postmark calls this)
+            register_rest_route($this->namespace, '/webhooks/postmark', array(
+                'methods' => 'POST',
+                'callback' => array($this, 'handle_postmark_webhook'),
+                'permission_callback' => '__return_true',
             ));
 
         }
@@ -4015,8 +4044,19 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 return new \WP_REST_Response(array('error' => 'Not logged in'), 401);
             }
 
-            // Parse request body
+            // Parse request body — try get_json_params first, fall back to get_param
             $body = $request->get_json_params();
+            if (empty($body) || !is_array($body)) {
+                // Fallback for malformed JSON: attempt to parse individual params
+                $body = array(
+                    'prompt_type' => $request->get_param('prompt_type'),
+                    'recipient_type' => $request->get_param('recipient_type'),
+                    'recipient_ids' => $request->get_param('recipient_ids'),
+                    'custom_subject' => $request->get_param('custom_subject'),
+                    'custom_message' => $request->get_param('custom_message'),
+                );
+            }
+
             $prompt_type = sanitize_text_field($body['prompt_type'] ?? '');
             $recipient_type = sanitize_text_field($body['recipient_type'] ?? '');
             $recipient_ids = isset($body['recipient_ids']) && is_array($body['recipient_ids']) ? array_map('intval', $body['recipient_ids']) : array();
@@ -4031,8 +4071,6 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             if ($prompt_type === 'custom' && (empty($custom_subject) || empty($custom_message))) {
                 return new \WP_REST_Response(array('error' => 'Custom prompts require both subject and message'), 400);
             }
-
-            // error_log("[send_group_communication] group_id={$group_id}, prompt_type={$prompt_type}, recipient_type={$recipient_type}");
 
             // Use mailer class to send (includes leader and group validation)
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-mailer.php';
@@ -4165,26 +4203,143 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 );
             }
 
-            // Map Postmark response to simplified format
+            // Extract MessageIDs for filtering by group and sender
+            $postmark_ids = array_column($body['Messages'] ?? [], 'MessageID');
+
+            if (empty($postmark_ids)) {
+                return new \WP_REST_Response(
+                    array('total' => 0, 'messages' => array(), 'offset' => $offset, 'count' => $count),
+                    200
+                );
+            }
+
+            // Query bys_group_communication_log for this group + sender only
+            global $wpdb;
+            $placeholders = implode(',', array_fill(0, count($postmark_ids), '%s'));
+            $log_rows = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT message_id, prompt_type, delivery_status, bounce_type FROM {$wpdb->prefix}" . BYS_GROUPS_COMMS_TABLE . "
+                     WHERE message_id IN ($placeholders)
+                     AND group_id = %d AND sender_user_id = %d",
+                    array_merge($postmark_ids, array($group_id, $user_id))
+                ),
+                ARRAY_A
+            );
+
+            // Index by message_id for O(1) lookup
+            $log_index = array_column($log_rows, null, 'message_id');
+
+            // Map Postmark response, filtering to only messages in this group/sender's log
             $messages = array();
             foreach ((array) ($body['Messages'] ?? array()) as $msg) {
+                $mid = $msg['MessageID'] ?? '';
+                if (!isset($log_index[$mid])) {
+                    continue;  // Skip if not in this leader's/group's log
+                }
+
+                $log_entry = $log_index[$mid];
+                $prompt_type = $log_entry['prompt_type'];
+                $delivery_status = $log_entry['delivery_status'] ?? 'pending';
+
                 $messages[] = array(
-                    'message_id' => $msg['MessageID'] ?? '',
-                    'from' => $msg['From'] ?? '',
+                    'message_id' => $mid,
                     'to' => $msg['To'] ?? '',
                     'subject' => $msg['Subject'] ?? '',
                     'status' => $msg['Status'] ?? '',
                     'sent_at' => $msg['ReceivedAt'] ?? '',
+                    'prompt_type' => $prompt_type,
+                    'badge_type' => $prompt_type === 'custom' ? 'custom' : 'prompt',
+                    'delivery_status' => $delivery_status,
+                    'bounce_type' => $log_entry['bounce_type'] ?? null,
                 );
             }
 
-            // Return response
+            // Return response with filtered count
             return new \WP_REST_Response(array(
-                'total' => intval($body['TotalCount'] ?? 0),
+                'total' => count($messages),
                 'messages' => $messages,
                 'offset' => $offset,
                 'count' => $count,
             ), 200);
+        }
+
+        /**
+         * Handle Postmark webhook events (Delivery, Bounce, SpamComplaint)
+         *
+         * @param WP_REST_Request $request
+         * @return WP_REST_Response Always returns 200 (Postmark expects this for any response)
+         */
+        public function handle_postmark_webhook($request) {
+            // Validate Postmark token in header
+            $postmark_token = get_option('bys_postmark_token', '');
+            if (empty($postmark_token)) {
+                // No token configured, but still return 200 so Postmark doesn't retry
+                return new \WP_REST_Response(array('ok' => false, 'reason' => 'token_not_configured'), 200);
+            }
+
+            $request_token = $request->get_header('X-Postmark-Server-Token');
+            if ($request_token !== $postmark_token) {
+                // Invalid token, but still return 200 (security: don't reveal token mismatch)
+                return new \WP_REST_Response(array('ok' => false, 'reason' => 'invalid_token'), 200);
+            }
+
+            // Parse webhook body
+            $body = $request->get_json_params();
+            if (empty($body)) {
+                return new \WP_REST_Response(array('ok' => true), 200);
+            }
+
+            $record_type = $body['RecordType'] ?? '';
+            $message_id = $body['MessageID'] ?? '';
+
+            if (empty($record_type) || empty($message_id)) {
+                return new \WP_REST_Response(array('ok' => true), 200);
+            }
+
+            global $wpdb;
+            $update_data = array();
+            $update_format = array();
+
+            // Map Postmark events to delivery status
+            switch ($record_type) {
+                case 'Delivery':
+                    $update_data['delivery_status'] = 'delivered';
+                    $update_data['delivered_at'] = current_time('mysql');
+                    $update_format = array('%s', '%s');
+                    break;
+
+                case 'Bounce':
+                    $update_data['delivery_status'] = 'bounced';
+                    $bounce_type = $body['Details']['BounceType'] ?? 'unknown';
+                    $update_data['bounce_type'] = $bounce_type;
+                    $update_data['delivered_at'] = current_time('mysql');
+                    $update_format = array('%s', '%s', '%s');
+                    break;
+
+                case 'SpamComplaint':
+                    $update_data['delivery_status'] = 'spam';
+                    $update_data['delivered_at'] = current_time('mysql');
+                    $update_format = array('%s', '%s');
+                    break;
+
+                default:
+                    // Unknown record type, acknowledge but don't process
+                    return new \WP_REST_Response(array('ok' => true), 200);
+            }
+
+            // Update the communication log
+            if (!empty($update_data)) {
+                $wpdb->update(
+                    $wpdb->prefix . BYS_GROUPS_COMMS_TABLE,
+                    $update_data,
+                    array('message_id' => $message_id),
+                    $update_format,
+                    array('%s')
+                );
+            }
+
+            // Always return 200 so Postmark knows we got the webhook
+            return new \WP_REST_Response(array('ok' => true), 200);
         }
     }
 }
