@@ -120,6 +120,15 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.wp-block-bys-groups-group-quiz-config-modal .quiz-attempts-count {
+  font-size: var(--wp--preset--font-size--x-small);
+  color: var(--wp--preset--color--gray-500);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.wp-block-bys-groups-group-quiz-config-modal .quiz-attempts-count--none {
+  color: var(--wp--preset--color--gray-300);
+}
 .wp-block-bys-groups-group-quiz-config-modal .quiz-status-badge {
   display: inline-block;
   padding: var(--wp--preset--spacing--1) var(--wp--preset--spacing--3);

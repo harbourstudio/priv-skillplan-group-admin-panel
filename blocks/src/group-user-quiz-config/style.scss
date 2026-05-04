@@ -1,3 +1,5 @@
+@use '../_shared/flatpickr';
+
 .wp-block-bys-groups-group-user-quiz-config {
     .guqc {
         // ── Card container ────────────────────────────────────────────────────────
@@ -157,6 +159,20 @@
             background: var(--wp--preset--color--gray-50);
             border-radius: 0.5rem;
             padding: var(--wp--preset--spacing--3);
+            cursor: pointer;
+
+            .flatpickr-alt-input {
+                flex: 1;
+                border: none;
+                background: transparent;
+                font-size: var(--wp--preset--font-size--small);
+                color: var(--wp--preset--color--gray-700);
+                outline: none;
+                min-width: 0;
+                cursor: pointer;
+
+                &::placeholder { color: var(--wp--preset--color--gray-400); }
+            }
         }
 
         &__date-icon {
@@ -165,19 +181,14 @@
             flex-shrink: 0;
         }
 
-        &__datetime {
-            flex: 1;
-            border: none;
-            background: transparent;
-            font-size: var(--wp--preset--font-size--small);
-            color: var(--wp--preset--color--gray-700);
-            outline: none;
-            min-width: 0;
+        &__calendar-icon {
+            font-size: 0.75rem;
+            color: var(--wp--preset--color--gray-400);
+            flex-shrink: 0;
+        }
 
-            &::-webkit-calendar-picker-indicator {
-                opacity: 0;
-                width: 0;
-            }
+        &__datetime {
+            display: none;
         }
 
         // ── Actions (Buttons) ──────────────────────────────────────────────────────

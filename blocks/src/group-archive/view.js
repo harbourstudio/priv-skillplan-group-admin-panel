@@ -5,11 +5,18 @@ jQuery(document).ready(($) => {
     if (!$block.length) return;
 
     const $button = $block.find('.group-archive__button');
+    const $notice = $block.find('.group-archive__notice');
     let currentGroupId = null;
 
-    $(document).on('bys:groupSelected', (_, { groupId }) => {
+    $(document).on('bys:groupSelected', (_, { groupId, isOrgAdmin, isGrader }) => {
         currentGroupId = groupId;
-        $button.prop('disabled', false);
+        if (isOrgAdmin && !isGrader) {
+            $button.prop('disabled', false).show();
+            $notice.hide();
+        } else {
+            $button.prop('disabled', true).hide();
+            $notice.show();
+        }
     });
 
     $button.on('click', async function () {

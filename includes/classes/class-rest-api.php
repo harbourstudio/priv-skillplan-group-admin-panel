@@ -46,17 +46,43 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 return;
             }
 
-            // Clear the course quiz steps cache for this quiz's course
+            // Clear all quiz steps cache variants for this quiz's course
             $course_id = get_post_meta($post_id, 'course_id', true);
             if ($course_id) {
-                $cache_key = "bys_quiz_steps_v4_{$course_id}";
-                delete_transient($cache_key);
+                delete_transient("bys_quiz_steps_v4__{$course_id}");
+                delete_transient("bys_quiz_steps_v4_grading_{$course_id}");
             }
         }
 
         /**
          * Get validated auth header for LD API requests
          */
+        /**
+         * Determine a user's online status.
+         * Returns 'online'  — user has at least one active (non-expired) WordPress session.
+         * Returns 'offline' — no active session but has a recorded login timestamp.
+         * Returns 'never'   — no active session and no recorded login timestamp.
+         */
+        private function get_user_online_status($user_id) {
+            // Primary check: active WordPress session token
+            $sessions = WP_Session_Tokens::get_instance($user_id)->get_all();
+            $now      = time();
+            foreach ($sessions as $session) {
+                if (!empty($session['expiration']) && $session['expiration'] > $now) {
+                    return 'online';
+                }
+            }
+
+            // Fallback: check last-login meta to distinguish offline vs never
+            $meta_values = array(
+                intval(get_user_meta($user_id, '_ld_notifications_last_login', true) ?: 0),
+                intval(get_user_meta($user_id, 'learndash-last-login',          true) ?: 0),
+                intval(get_user_meta($user_id, 'last_login',                    true) ?: 0),
+            );
+            $last_login = max($meta_values);
+            return $last_login > 0 ? 'offline' : 'never';
+        }
+
         private function get_validated_auth_header() {
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-auth.php';
             $auth_header = BYS_Groups_Auth::get_auth_header();
@@ -77,6 +103,24 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             register_rest_route($this->namespace, '/me/groups', array(
                 'methods'             => 'GET',
                 'callback'            => array($this, 'get_current_user_groups'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
+
+            register_rest_route($this->namespace, '/me/organizations', array(
+                'methods'             => 'GET',
+                'callback'            => array($this, 'get_current_user_organizations'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
+
+            register_rest_route($this->namespace, '/organizations', array(
+                'methods'             => 'POST',
+                'callback'            => array($this, 'create_organization'),
+                'permission_callback' => array($this, 'check_site_admin_permission'),
+            ));
+
+            register_rest_route($this->namespace, '/organizations/(?P<org_id>\d+)/groups', array(
+                'methods'             => 'POST',
+                'callback'            => array($this, 'create_organization_group'),
                 'permission_callback' => array($this, 'check_user_permission'),
             ));
 
@@ -185,7 +229,14 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'permission_callback' => array($this, 'check_user_permission'),
             ));
 
-            // userQuizProgress - user's summary of all quizzes in group courses
+            // userCourses - all courses a user is enrolled in (site-wide)
+            register_rest_route($this->namespace, '/users/(?P<user_id>\d+)/courses', array(
+                'methods'             => 'GET',
+                'callback'            => array($this, 'get_user_courses'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
+
+            // userQuizProgress - user's summary of all quizzes across enrolled courses
             register_rest_route($this->namespace, '/users/(?P<user_id>\d+)/quiz-progress', array(
                 'methods'             => 'GET',
                 'callback'            => array($this, 'get_user_quiz_progress_summary'),
@@ -283,6 +334,13 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'permission_callback' => array($this, 'check_user_permission'),
             ));
 
+            // removeGroupLeader - org/site admins only
+            register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/leaders/(?P<user_id>\d+)', array(
+                'methods'             => 'DELETE',
+                'callback'            => array($this, 'remove_group_leader'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
+
             // inviteMember - add existing user or create pending invite
             register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/invite', array(
                 'methods'             => 'POST',
@@ -377,6 +435,58 @@ if (!class_exists('BYS_Groups_Rest_API')) {
 
         }
 
+        private function is_grader_user() {
+            return in_array('grader', (array) wp_get_current_user()->roles, true);
+        }
+
+        /**
+         * Returns true if $user_id may act as a group leader for $group_id.
+         * Passes when the user is:
+         *   - a WordPress site admin (manage_options), OR
+         *   - a LearnDash group leader of the group, OR
+         *   - an org admin of any organization that contains the group.
+         */
+        private function is_authorized_for_group($user_id, $group_id) {
+            if (!$user_id || !$group_id) return false;
+
+            if (current_user_can('manage_options')) return true;
+
+            if (get_user_meta($user_id, "learndash_group_leaders_{$group_id}", true)) return true;
+
+            // Check if any org containing this group has the user as an admin
+            $orgs = get_posts(array(
+                'post_type'      => 'organization',
+                'post_status'    => 'publish',
+                'posts_per_page' => -1,
+            ));
+            foreach ($orgs as $org) {
+                $raw_groups = get_field('groups', $org->ID);
+                $group_ids  = array_map(function ($g) {
+                    return $g instanceof \WP_Post ? $g->ID : intval($g);
+                }, (array) $raw_groups);
+
+                if (!in_array($group_id, $group_ids, true)) continue;
+
+                $raw_admins = get_field('administrators', $org->ID);
+                $admin_ids  = array_map(function ($a) {
+                    return $a instanceof \WP_User ? $a->ID : intval($a);
+                }, (array) $raw_admins);
+
+                if (in_array($user_id, $admin_ids, true)) return true;
+            }
+
+            return false;
+        }
+
+        public function check_site_admin_permission($request) {
+            $auth_header = $request->get_header('Authorization');
+            if ($auth_header && strpos($auth_header, 'Basic ') === 0) {
+                $user = wp_get_current_user();
+                return $user->ID > 0 ? current_user_can('manage_options') : false;
+            }
+            return is_user_logged_in() && current_user_can('manage_options');
+        }
+
         public function check_user_permission($request) {
             // check for Authorization header (basic auth)
             $auth_header = $request->get_header('Authorization');
@@ -428,32 +538,79 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 return new \WP_REST_Response(array('error' => 'Not logged in'), 401);
             }
 
-            // extract all group IDs from user meta keys
-            $user_group_metas = get_user_meta($user_id);
-            $led_group_ids = array();
+            // Site admins and graders see every published group
+            $is_grader = $this->is_grader_user();
+            if (current_user_can('manage_options') || $is_grader) {
+                $all_groups = get_posts(array(
+                    'post_type'      => 'groups',
+                    'post_status'    => 'publish',
+                    'posts_per_page' => -1,
+                    'orderby'        => 'title',
+                    'order'          => 'ASC',
+                ));
+                $user_groups = array();
+                foreach ($all_groups as $group) {
+                    $user_groups[] = array(
+                        'id'           => $group->ID,
+                        'title'        => $group->post_title,
+                        'is_org_admin' => !$is_grader, // graders can't act as org admins
+                    );
+                }
+                return new \WP_REST_Response(array('groups' => $user_groups), 200);
+            }
 
-            foreach ($user_group_metas as $meta_key => $meta_values) {
-                // look for meta keys matching learndash_group_leaders_{group_id}
+            // Collect group IDs via LD group leader meta
+            $led_ids = array();
+            foreach (get_user_meta($user_id) as $meta_key => $meta_values) {
                 if (strpos($meta_key, 'learndash_group_leaders_') === 0) {
                     $group_id = intval(str_replace('learndash_group_leaders_', '', $meta_key));
                     if ($group_id > 0) {
-                        $led_group_ids[] = $group_id;
+                        $led_ids[] = $group_id;
                     }
                 }
             }
 
-            if (empty($led_group_ids)) {
+            // Collect group IDs from organizations where this user is an admin
+            $org_admin_ids = array();
+            $all_orgs = get_posts(array(
+                'post_type'      => 'organization',
+                'post_status'    => 'publish',
+                'posts_per_page' => -1,
+                'fields'         => 'ids',
+            ));
+            foreach ($all_orgs as $org_id) {
+                $raw_admins = get_field('administrators', $org_id);
+                $admin_ids  = array();
+                foreach ((array) $raw_admins as $admin) {
+                    $admin_ids[] = $admin instanceof \WP_User ? $admin->ID : intval($admin);
+                }
+                if (!in_array($user_id, $admin_ids, true)) continue;
+
+                $raw_groups = get_field('groups', $org_id);
+                foreach ((array) $raw_groups as $group) {
+                    $g_id = $group instanceof \WP_Post ? $group->ID : intval($group);
+                    if ($g_id > 0) {
+                        $org_admin_ids[] = $g_id;
+                    }
+                }
+            }
+
+            $org_admin_set  = array_flip(array_unique($org_admin_ids));
+            $accessible_ids = array_unique(array_merge($led_ids, $org_admin_ids));
+
+            if (empty($accessible_ids)) {
                 return new \WP_REST_Response(array('groups' => array()), 200);
             }
 
-            // build response with group post data — only published groups
+            // Build response — only published groups
             $user_groups = array();
-            foreach ($led_group_ids as $group_id) {
+            foreach ($accessible_ids as $group_id) {
                 $group = get_post($group_id);
                 if ($group && $group->post_type === 'groups' && $group->post_status === 'publish') {
                     $user_groups[] = array(
-                        'id'    => $group->ID,
-                        'title' => $group->post_title
+                        'id'           => $group->ID,
+                        'title'        => $group->post_title,
+                        'is_org_admin' => isset($org_admin_set[$group_id]),
                     );
                 }
             }
@@ -461,6 +618,229 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             return new \WP_REST_Response(array('groups' => $user_groups), 200);
         }
 
+        /**
+         * Get all organizations the current user is an admin of or leads a group in,
+         * plus any groups they lead that don't belong to any organization.
+         */
+        public function get_current_user_organizations($request) {
+            $user_id = get_current_user_id();
+            if (!$user_id) {
+                return new \WP_REST_Response(array('error' => 'Not logged in'), 401);
+            }
+
+            $is_site_admin = current_user_can('manage_options');
+            $is_grader     = $this->is_grader_user();
+            $sees_all      = $is_site_admin || $is_grader;
+
+            // Collect every group ID the current user leads (via LD group leader meta)
+            $all_led_ids = array();
+            if (!$sees_all) {
+                foreach (get_user_meta($user_id) as $meta_key => $meta_values) {
+                    if (strpos($meta_key, 'learndash_group_leaders_') === 0) {
+                        $g_id = intval(str_replace('learndash_group_leaders_', '', $meta_key));
+                        if ($g_id > 0) $all_led_ids[] = $g_id;
+                    }
+                }
+            }
+
+            $all_orgs = get_posts(array(
+                'post_type'      => 'organization',
+                'post_status'    => 'publish',
+                'posts_per_page' => -1,
+                'orderby'        => 'title',
+                'order'          => 'ASC',
+            ));
+
+            $organizations = array();
+            $claimed_ids   = array(); // group IDs that belong to at least one org
+
+            foreach ($all_orgs as $org) {
+                // Site admins are org admins; graders see everything but aren't org admins
+                if ($is_site_admin) {
+                    $is_admin = true;
+                } elseif ($is_grader) {
+                    $is_admin = false;
+                } else {
+                    $raw_admins = get_field('administrators', $org->ID);
+                    $admin_ids  = array();
+                    foreach ((array) $raw_admins as $admin) {
+                        $admin_ids[] = $admin instanceof \WP_User ? $admin->ID : intval($admin);
+                    }
+                    $is_admin = in_array($user_id, $admin_ids, true);
+                }
+
+                // Resolve group IDs — ACF may return WP_Post objects or raw IDs
+                $raw_groups         = get_field('groups', $org->ID);
+                $groups             = array();
+                $archived_groups    = array();
+                $user_leads_a_group = false;
+
+                foreach ((array) $raw_groups as $group) {
+                    if ($group instanceof \WP_Post) {
+                        $g_id     = $group->ID;
+                        $g_title  = $group->post_title;
+                        $g_status = $group->post_status;
+                    } else {
+                        $g_id    = intval($group);
+                        $g_post  = get_post($g_id);
+                        $g_title  = $g_post ? $g_post->post_title  : '';
+                        $g_status = $g_post ? $g_post->post_status : '';
+                    }
+
+                    if (!$g_id || !$g_title) continue;
+
+                    $claimed_ids[] = $g_id;
+
+                    if (!$user_leads_a_group && in_array($g_id, $all_led_ids, true)) {
+                        $user_leads_a_group = true;
+                    }
+
+                    if ($g_status === 'publish') {
+                        $groups[] = array('id' => $g_id, 'name' => $g_title);
+                    } elseif ($g_status === 'draft' && $is_admin) {
+                        $archived_date = get_post_meta($g_id, '_bys_archived_date', true)
+                            ?: get_post_modified_time('U', false, $g_id);
+                        $archived_groups[] = array(
+                            'id'            => $g_id,
+                            'name'          => $g_title,
+                            'archived_date' => (int) $archived_date,
+                        );
+                    }
+                }
+
+                if (!$sees_all && !$is_admin && !$user_leads_a_group) continue;
+
+                $organizations[] = array(
+                    'id'              => $org->ID,
+                    'name'            => $org->post_title,
+                    'is_admin'        => $is_admin,
+                    'groups'          => $groups,
+                    'archived_groups' => $archived_groups,
+                );
+            }
+
+            // Groups not belonging to any organization
+            $ungrouped = array();
+            if ($sees_all) {
+                // Site admins and graders see all published groups not claimed by an org
+                $all_groups = get_posts(array(
+                    'post_type'      => 'groups',
+                    'post_status'    => 'publish',
+                    'posts_per_page' => -1,
+                    'fields'         => 'ids',
+                ));
+                foreach (array_diff($all_groups, $claimed_ids) as $g_id) {
+                    $g_post = get_post($g_id);
+                    if ($g_post) {
+                        $ungrouped[] = array('id' => $g_id, 'name' => $g_post->post_title);
+                    }
+                }
+            } else {
+                foreach (array_diff($all_led_ids, $claimed_ids) as $g_id) {
+                    $g_post = get_post($g_id);
+                    if ($g_post && $g_post->post_type === 'groups' && $g_post->post_status === 'publish') {
+                        $ungrouped[] = array('id' => $g_id, 'name' => $g_post->post_title);
+                    }
+                }
+            }
+
+            return new \WP_REST_Response(array(
+                'organizations'    => $organizations,
+                'ungrouped_groups' => $ungrouped,
+            ), 200);
+        }
+
+        /**
+         * Create a new organization post (site admins only).
+         */
+        public function create_organization($request) {
+            $name = sanitize_text_field($request->get_param('name'));
+            if (empty($name)) {
+                return new \WP_REST_Response(array('error' => 'Organization name is required'), 400);
+            }
+
+            $org_id = wp_insert_post(array(
+                'post_type'   => 'organization',
+                'post_status' => 'publish',
+                'post_title'  => $name,
+                'post_author' => get_current_user_id(),
+            ), true);
+
+            if (is_wp_error($org_id)) {
+                return new \WP_REST_Response(array('error' => $org_id->get_error_message()), 500);
+            }
+
+            return new \WP_REST_Response(array(
+                'id'              => $org_id,
+                'name'            => get_the_title($org_id),
+                'is_admin'        => true,
+                'groups'          => array(),
+                'archived_groups' => array(),
+            ), 201);
+        }
+
+        /**
+         * Create a new LearnDash group and attach it to an organization.
+         * Only callable by a user who is an administrator of that organization.
+         */
+        public function create_organization_group($request) {
+            $user_id = get_current_user_id();
+            if (!$user_id) {
+                return new \WP_REST_Response(array('error' => 'Not logged in'), 401);
+            }
+
+            $org_id = intval($request['org_id']);
+            $org    = get_post($org_id);
+            if (!$org || $org->post_type !== 'organization' || $org->post_status !== 'publish') {
+                return new \WP_REST_Response(array('error' => 'Organization not found'), 404);
+            }
+
+            // Verify the current user is a site admin or an admin of this org
+            if (!current_user_can('manage_options')) {
+                $raw_admins = get_field('administrators', $org_id);
+                $admin_ids  = array();
+                foreach ((array) $raw_admins as $admin) {
+                    $admin_ids[] = $admin instanceof \WP_User ? $admin->ID : intval($admin);
+                }
+                if (!in_array($user_id, $admin_ids, true)) {
+                    return new \WP_REST_Response(array('error' => 'Forbidden'), 403);
+                }
+            }
+
+            $name = sanitize_text_field($request->get_param('name'));
+            if (empty($name)) {
+                return new \WP_REST_Response(array('error' => 'Group name is required'), 400);
+            }
+
+            // Create the LearnDash group post
+            $group_id = wp_insert_post(array(
+                'post_type'   => 'groups',
+                'post_status' => 'publish',
+                'post_title'  => $name,
+                'post_author' => $user_id,
+            ), true);
+
+            if (is_wp_error($group_id)) {
+                return new \WP_REST_Response(array('error' => $group_id->get_error_message()), 500);
+            }
+
+            // Also make the creating user a group leader in LearnDash
+            ld_update_leader_group_access($user_id, $group_id, false);
+
+            // Append the new group to the org's ACF groups field
+            $existing = get_field('groups', $org_id);
+            $existing_ids = array();
+            foreach ((array) $existing as $g) {
+                $existing_ids[] = $g instanceof \WP_Post ? $g->ID : intval($g);
+            }
+            $existing_ids[] = $group_id;
+            update_field('groups', $existing_ids, $org_id);
+
+            return new \WP_REST_Response(array(
+                'id'   => $group_id,
+                'name' => get_the_title($group_id),
+            ), 201);
+        }
 
         public function get_group_base_users_stats($request) {
             $group_id = intval($request['group_id']);
@@ -519,8 +899,12 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             foreach ($group_users as $user_data) {
                 $user_id = intval($user_data['id']);
                 $user_ids[] = $user_id;
-                $last_login = get_user_meta($user_id, 'learndash_last_login', true);
-                if (empty($last_login)) {
+                $login_meta = array(
+                    intval(get_user_meta($user_id, '_ld_notifications_last_login', true) ?: 0),
+                    intval(get_user_meta($user_id, 'learndash-last-login',          true) ?: 0),
+                    intval(get_user_meta($user_id, 'last_login',                    true) ?: 0),
+                );
+                if (max($login_meta) === 0) {
                     $inactive_members++;
                 }
             }
@@ -555,32 +939,20 @@ if (!class_exists('BYS_Groups_Rest_API')) {
 
             // Fetch user data from WordPress
             $users = array();
-            $current_time = current_time('timestamp');
             foreach ($user_ids as $user_id) {
                 $user = get_user_by('ID', $user_id);
                 if ($user) {
                     // Check multiple login meta keys and use the most recent one
                     $meta_values = array(
-                        '_ld_notifications_last_login' => intval(get_user_meta($user_id, '_ld_notifications_last_login', true) ?: 0),
-                        'learndash-last-login' => intval(get_user_meta($user_id, 'learndash-last-login', true) ?: 0),
-                        'last_login' => intval(get_user_meta($user_id, 'last_login', true) ?: 0),
+                        intval(get_user_meta($user_id, '_ld_notifications_last_login', true) ?: 0),
+                        intval(get_user_meta($user_id, 'learndash-last-login',          true) ?: 0),
+                        intval(get_user_meta($user_id, 'last_login',                    true) ?: 0),
                     );
 
-                    // Find the most recent login timestamp (highest value)
                     $last_login_timestamp = max($meta_values);
                     $last_login_timestamp = $last_login_timestamp > 0 ? $last_login_timestamp : null;
 
-                    // Calculate status based on last_login
-                    $status = 'never'; // default: never logged in
-                    if ($last_login_timestamp) {
-                        $time_diff = $current_time - $last_login_timestamp;
-                        $hours_ago = $time_diff / 3600;
-                        if ($hours_ago <= 24) {
-                            $status = 'online';
-                        } else {
-                            $status = 'offline';
-                        }
-                    }
+                    $status = $this->get_user_online_status($user_id);
 
                     $enrolled_at_raw = get_user_meta($user_id, "learndash_group_{$group_id}_enrolled_at", true);
 
@@ -623,27 +995,15 @@ if (!class_exists('BYS_Groups_Rest_API')) {
 
             // Check multiple login meta keys and use the most recent one
             $meta_values = array(
-                '_ld_notifications_last_login' => intval(get_user_meta($user_id, '_ld_notifications_last_login', true) ?: 0),
-                'learndash-last-login' => intval(get_user_meta($user_id, 'learndash-last-login', true) ?: 0),
-                'last_login' => intval(get_user_meta($user_id, 'last_login', true) ?: 0),
+                intval(get_user_meta($user_id, '_ld_notifications_last_login', true) ?: 0),
+                intval(get_user_meta($user_id, 'learndash-last-login',          true) ?: 0),
+                intval(get_user_meta($user_id, 'last_login',                    true) ?: 0),
             );
 
-            // Find the most recent login timestamp (highest value)
             $last_login_timestamp = max($meta_values);
             $last_login_timestamp = $last_login_timestamp > 0 ? $last_login_timestamp : null;
 
-            // Calculate status based on last_login (same logic as reporting block)
-            $current_time = current_time('timestamp');
-            $status = 'never'; // default: never logged in
-            if ($last_login_timestamp) {
-                $time_diff = $current_time - $last_login_timestamp;
-                $hours_ago = $time_diff / 3600;
-                if ($hours_ago <= 24) {
-                    $status = 'online';
-                } else {
-                    $status = 'offline';
-                }
-            }
+            $status = $this->get_user_online_status($user_id);
 
             $user_data = array(
                 'id'                   => $user->ID,
@@ -734,6 +1094,30 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             }
 
             return new \WP_REST_Response($formatted_courses, 200);
+        }
+
+        /**
+         * Get all courses a user is enrolled in across the whole site.
+         */
+        public function get_user_courses($request) {
+            $user_id = intval($request['user_id']);
+            if (!$user_id) {
+                return new \WP_REST_Response(array('error' => 'Invalid user ID'), 400);
+            }
+
+            $course_ids = learndash_user_get_enrolled_courses($user_id);
+            $result = array();
+            foreach ($course_ids as $course_id) {
+                $post = get_post($course_id);
+                if (!$post || $post->post_status !== 'publish') continue;
+                $shortname = get_post_meta($course_id, 'shortname', true);
+                $result[] = array(
+                    'id'        => $course_id,
+                    'title'     => $post->post_title,
+                    'shortname' => $shortname ?: null,
+                );
+            }
+            return new \WP_REST_Response($result, 200);
         }
 
         /**
@@ -2077,14 +2461,17 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 return new \WP_REST_Response(array('error' => 'Invalid course ID'), 400);
             }
 
-            // Check transient cache
-            $cache_key = "bys_quiz_steps_v4_{$course_id}";
+            // 'grading' filter uses show_test_grading_config; default uses show_in_reporting
+            $filter   = sanitize_key($request->get_param('filter') ?? '');
+            $meta_key = ($filter === 'grading') ? 'show_test_grading_config' : 'show_in_reporting';
+
+            // Check transient cache (keyed by filter so the two sets don't collide)
+            $cache_key = "bys_quiz_steps_v4_{$filter}_{$course_id}";
             $cached = get_transient($cache_key);
             if ($cached !== false) {
                 return new \WP_REST_Response($cached, 200);
             }
 
-            // Only return quizzes where show_in_reporting = '1'
             global $wpdb;
             $steps = $wpdb->get_results($wpdb->prepare(
                 "SELECT p.ID as step_id, p.post_title as step_title
@@ -2093,9 +2480,10 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                  JOIN {$wpdb->postmeta} pm_r ON p.ID = pm_r.post_id
                  WHERE pm.meta_key = 'course_id' AND pm.meta_value = %d
                  AND p.post_type = 'sfwd-quiz' AND p.post_status = 'publish'
-                 AND pm_r.meta_key = 'show_in_reporting' AND pm_r.meta_value = '1'
+                 AND pm_r.meta_key = %s AND pm_r.meta_value = '1'
                  ORDER BY p.menu_order ASC",
-                $course_id
+                $course_id,
+                $meta_key
             ));
 
             if (!$steps) {
@@ -2208,136 +2596,55 @@ if (!class_exists('BYS_Groups_Rest_API')) {
         }
 
         /**
-         * Get quiz progress summary for all quizzes in group courses
-         * Optional: Pass course_ids to avoid server-side fetch
-         * Format: ?course_ids=1,2,3 (comma-separated course IDs)
+         * Get quiz progress summary for all quizzes a user has ever attempted.
+         * Drives from wp_learndash_user_activity so no custom-field filtering
+         * is applied and quizzes from courses the user is no longer enrolled in
+         * are still returned.
          */
         public function get_user_quiz_progress_summary($request) {
             $user_id = intval($request['user_id']);
-            $group_id = intval($request->get_param('group_id'));
-            $course_ids_param = $request->get_param('course_ids');
 
-            if (!$user_id || !$group_id) {
-                return new \WP_REST_Response(array('error' => 'user_id and group_id parameters required'), 400);
+            if (!$user_id) {
+                return new \WP_REST_Response(array('error' => 'user_id parameter required'), 400);
             }
 
-            // Get validated auth header for LD API
             $auth_result = $this->get_validated_auth_header();
             if (is_a($auth_result, 'WP_REST_Response')) {
                 return $auth_result;
             }
             $auth_header = $auth_result;
 
-            // If course_ids provided, use them directly; otherwise fetch from server
-            if (!empty($course_ids_param)) {
-                $course_ids = array_map('intval', array_filter(explode(',', $course_ids_param)));
-                if (empty($course_ids)) {
-                    return new \WP_REST_Response(array('error' => 'Invalid course_ids parameter'), 400);
-                }
-            } else {
-                // Fetch group courses via internal call
-                $group_courses = $this->get_group_courses_internal($group_id, $auth_header);
-                if (is_a($group_courses, 'WP_REST_Response')) {
-                    return $group_courses;
-                }
+            // Get every quiz the user has attempted, with the associated course,
+            // straight from the activity table — no enrollment or meta filtering.
+            global $wpdb;
+            $rows = $wpdb->get_results($wpdb->prepare(
+                "SELECT DISTINCT post_id AS quiz_id, course_id
+                 FROM {$wpdb->prefix}learndash_user_activity
+                 WHERE user_id = %d AND activity_type = 'quiz'",
+                $user_id
+            ), ARRAY_A);
 
-                if (empty($group_courses)) {
-                    return new \WP_REST_Response(array(), 200);
-                }
-
-                $course_ids = array_map(function($course) { return intval($course['id']); }, $group_courses);
-            }
-
-            // Build course ID -> title map for later lookup (fetch titles if needed)
-            $course_map = array();
-
-            // If course_ids were provided, we still need titles from LD API
-            if (!empty($course_ids_param)) {
-                // Fetch course titles from LD API
-                $ld_api_url = get_home_url() . "/wp-json/ldlms/v2/groups/{$group_id}/courses?_fields=id,title";
-                $response = wp_remote_get($ld_api_url, array(
-                    'headers' => array('Authorization' => $auth_header),
-                    'timeout'   => 30,
-                    'sslverify' => false,
-                ));
-
-                if (!is_wp_error($response) && wp_remote_retrieve_response_code($response) === 200) {
-                    $courses = json_decode(wp_remote_retrieve_body($response), true);
-                    if (is_array($courses)) {
-                        foreach ($courses as $course) {
-                            $title = $course['title'];
-                            if (is_array($title) && isset($title['rendered'])) {
-                                $title = $title['rendered'];
-                            }
-                            $course_map[intval($course['id'])] = $title;
-                        }
-                    }
-                }
-            } else {
-                // Build map from already-fetched courses
-                foreach ($group_courses as $course) {
-                    $course_map[$course['id']] = $course['title'];
-                }
-            }
-
-            // Collect all quiz IDs from all courses
-            $all_quiz_ids = array();
-            $quiz_course_map = array(); // quiz_id -> course_id (for parent course reference)
-
-            foreach ($course_ids as $course_id) {
-
-                // Fetch course steps to get quiz IDs
-                $ld_api_url = get_home_url() . "/wp-json/ldlms/v2/sfwd-courses/{$course_id}/steps?_fields=h,t";
-
-                $response = wp_remote_get($ld_api_url, array(
-                    'headers' => array(
-                        'Authorization' => $auth_header,
-                    ),
-                    'timeout'   => 60,
-                    'sslverify' => false,
-                ));
-
-                if (is_wp_error($response)) {
-                    error_log('[BYS Groups] Course steps fetch failed for course ' . $course_id . ': ' . $response->get_error_message());
-                    continue;
-                }
-
-                $status = wp_remote_retrieve_response_code($response);
-                if ($status !== 200) {
-                    error_log('[BYS Groups] Course steps API returned status ' . $status . ' for course ' . $course_id);
-                    continue;
-                }
-
-                $body = wp_remote_retrieve_body($response);
-                $steps_data = json_decode($body, true);
-
-                // Extract quiz IDs from type-list format (t.sfwd-quiz)
-                $quiz_ids = $steps_data['t']['sfwd-quiz'] ?? array();
-                foreach ($quiz_ids as $quiz_id) {
-                    $quiz_id = intval($quiz_id);
-                    if ($quiz_id > 0) {
-                        $all_quiz_ids[$quiz_id] = true;
-                        // Map quiz to course (for parent course reference)
-                        if (!isset($quiz_course_map[$quiz_id])) {
-                            $quiz_course_map[$quiz_id] = $course_id;
-                        }
-                    }
-                }
-            }
-
-            if (empty($all_quiz_ids)) {
+            if (empty($rows)) {
                 return new \WP_REST_Response(array(), 200);
             }
 
-            // Fetch quiz attempts for each quiz ID
+            // Build quiz_id -> course_id map (keep first-seen course per quiz)
+            $quiz_course_map = array();
+            foreach ($rows as $row) {
+                $quiz_id   = intval($row['quiz_id']);
+                $course_id = intval($row['course_id']);
+                if ($quiz_id > 0 && !isset($quiz_course_map[$quiz_id])) {
+                    $quiz_course_map[$quiz_id] = $course_id;
+                }
+            }
+
+            // Fetch attempt details for each quiz from LD API
             $result = array();
-            foreach (array_keys($all_quiz_ids) as $quiz_id) {
+            foreach ($quiz_course_map as $quiz_id => $course_id) {
                 $ld_api_url = get_home_url() . "/wp-json/ldlms/v2/users/{$user_id}/quiz-progress?quiz={$quiz_id}";
 
                 $response = wp_remote_get($ld_api_url, array(
-                    'headers' => array(
-                        'Authorization' => $auth_header,
-                    ),
+                    'headers'   => array('Authorization' => $auth_header),
                     'timeout'   => 60,
                     'sslverify' => false,
                 ));
@@ -2353,35 +2660,26 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                     continue;
                 }
 
-                $body = wp_remote_retrieve_body($response);
-                $attempts = json_decode($body, true);
-
+                $attempts = json_decode(wp_remote_retrieve_body($response), true);
                 if (!is_array($attempts) || empty($attempts)) {
                     continue;
                 }
 
-                // Get quiz title
-                $quiz = get_post($quiz_id);
+                $quiz  = get_post($quiz_id);
                 $title = $quiz ? $quiz->post_title : 'Quiz #' . $quiz_id;
 
-                // Get parent course ID and title
-                $parent_course_id = $quiz_course_map[$quiz_id] ?? 0;
-                $parent_course_title = $course_map[$parent_course_id] ?? 'Course #' . $parent_course_id;
+                $course_post  = $course_id ? get_post($course_id) : null;
+                $course_title = $course_post ? $course_post->post_title : ($course_id ? 'Course #' . $course_id : '');
 
-                // Sort by completed timestamp descending to get latest
+                // Sort descending by completion time to isolate latest attempt
                 usort($attempts, function ($a, $b) {
-                    $ts_a = strtotime($a['completed'] ?? 0);
-                    $ts_b = strtotime($b['completed'] ?? 0);
-                    return $ts_b - $ts_a;
+                    return strtotime($b['completed'] ?? 0) - strtotime($a['completed'] ?? 0);
                 });
 
-                $latest_attempt = $attempts[0];
-
-                // Find highest percentage
+                $latest_attempt  = $attempts[0];
                 $highest_attempt = $attempts[0];
                 foreach ($attempts as $attempt) {
-                    $percentage = floatval($attempt['percentage'] ?? 0);
-                    if ($percentage > floatval($highest_attempt['percentage'] ?? 0)) {
+                    if (floatval($attempt['percentage'] ?? 0) > floatval($highest_attempt['percentage'] ?? 0)) {
                         $highest_attempt = $attempt;
                     }
                 }
@@ -2390,8 +2688,8 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                     'id'                      => $quiz_id,
                     'quiz_id'                 => $quiz_id,
                     'title'                   => $title,
-                    'parent_course_id'        => $parent_course_id,
-                    'parent_course_title'     => $parent_course_title,
+                    'parent_course_id'        => $course_id,
+                    'parent_course_title'     => $course_title,
                     'total_attempts'          => count($attempts),
                     'percent_highest'         => floatval($highest_attempt['percentage'] ?? 0),
                     'percent_latest'          => floatval($latest_attempt['percentage'] ?? 0),
@@ -2405,11 +2703,8 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 );
             }
 
-            // Sort by latest_timestamp descending (most recent first)
             usort($result, function ($a, $b) {
-                $ts_a = strtotime($a['latest_timestamp'] ?? 0);
-                $ts_b = strtotime($b['latest_timestamp'] ?? 0);
-                return $ts_b - $ts_a;
+                return strtotime($b['latest_timestamp'] ?? 0) - strtotime($a['latest_timestamp'] ?? 0);
             });
 
             return new \WP_REST_Response($result, 200);
@@ -3714,6 +4009,37 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             return new \WP_REST_Response($result, 200);
         }
 
+        public function remove_group_leader($request) {
+            $group_id  = intval($request['group_id']);
+            $target_id = intval($request['user_id']);
+
+            if (!$group_id || !$target_id) {
+                return new \WP_REST_Response(array('error' => 'Invalid parameters'), 400);
+            }
+
+            $caller_id = get_current_user_id();
+            if (!current_user_can('manage_options') && !$this->is_org_admin_of_group($caller_id, $group_id)) {
+                return new \WP_REST_Response(array('error' => 'Forbidden'), 403);
+            }
+
+            ld_update_leader_group_access($target_id, $group_id, false);
+
+            return new \WP_REST_Response(array('success' => true), 200);
+        }
+
+        private function is_org_admin_of_group($user_id, $group_id) {
+            $orgs = get_posts(array('post_type' => 'organization', 'post_status' => 'publish', 'posts_per_page' => -1));
+            foreach ($orgs as $org) {
+                $raw_groups = get_field('groups', $org->ID);
+                $group_ids  = array_map(fn($g) => $g instanceof \WP_Post ? $g->ID : intval($g), (array) $raw_groups);
+                if (!in_array($group_id, $group_ids, true)) continue;
+                $raw_admins = get_field('administrators', $org->ID);
+                $admin_ids  = array_map(fn($a) => $a instanceof \WP_User ? $a->ID : intval($a), (array) $raw_admins);
+                if (in_array($user_id, $admin_ids, true)) return true;
+            }
+            return false;
+        }
+
         // ── Invite endpoints ──────────────────────────────────────────────────
 
         /**
@@ -4154,8 +4480,7 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             if (!$user_id) {
                 return new \WP_REST_Response(array('error' => 'Not logged in'), 401);
             }
-            $is_leader = get_user_meta($user_id, 'learndash_group_leaders_' . $group_id, true);
-            if (empty($is_leader)) {
+            if (!$this->is_authorized_for_group($user_id, $group_id)) {
                 return new \WP_REST_Response(array('error' => 'Forbidden'), 403);
             }
 

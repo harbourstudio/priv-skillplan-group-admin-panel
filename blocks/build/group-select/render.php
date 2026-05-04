@@ -39,27 +39,37 @@ $auth_header = BYS_Groups_Auth::get_auth_header();
 	<?php if ($auth_header): ?>
 		<script>
 			window.bysGroupsAuth = {
-				header: '<?php echo esc_js($auth_header); ?>'
+				header: '<?php echo esc_js($auth_header); ?>',
+				isGrader: <?php echo json_encode( in_array( 'grader', (array) wp_get_current_user()->roles, true ) ); ?>,
+				isSiteEditor: <?php echo json_encode( in_array( 'editor', (array) wp_get_current_user()->roles, true ) ); ?>,
 			};
 		</script>
 	<?php endif; ?>
 
 	<div class="group-selector">
-		<select id="group-select" class="group-selector__select" name="group">
-			<?php if ($groups > 0) : ?>
-				<?php foreach ($groups as $idx => $group): ?>
-					<option
-						class="group-option"
-						value="<?php echo $group['id']; ?>"
-						<?php echo $idx === 0 ? 'selected' : ''; ?>
-					>
-						<?php echo $group['title']; ?>
-					</option>
-				<?php endforeach; ?>
-			<?php else: ?>
-				<option><?php echo esc_html__('No Groups available', 'bys'); ?></option>
-			<?php endif; ?>
-		</select>
+		<div class="group-selector__wrapper">
+			<select id="group-select" class="group-selector__select" name="group">
+				<option value="" selected></option>
+				<?php if ($groups > 0) : ?>
+					<?php foreach ($groups as $group): ?>
+						<option
+							class="group-option"
+							value="<?php echo $group['id']; ?>"
+							data-is-org-admin="<?php echo !empty($group['is_org_admin']) ? '1' : '0'; ?>"
+						>
+							<?php echo $group['title']; ?>
+						</option>
+					<?php endforeach; ?>
+				<?php else: ?>
+					<option><?php echo esc_html__('No Groups available', 'bys'); ?></option>
+				<?php endif; ?>
+			</select>
+
+			<!-- Loading spinner overlay -->
+			<div class="group-selector__spinner-wrapper" style="display: none;">
+				<span class="group-selector__spinner"></span>
+			</div>
+		</div>
 		<button class="group-selector__button" type="button">Show Group</button>
 	</div>
 </div>

@@ -22,7 +22,7 @@ jQuery(document).ready(($) => {
     const quizStepsByCourse = {};
     await Promise.all(courses.map(async (course) => {
       try {
-        const steps = await api.get(endpoints.courseQuizSteps(course.id));
+        const steps = await api.get(endpoints.courseQuizStepsGrading(course.id));
         quizStepsByCourse[course.id] = Array.isArray(steps) ? steps : [];
       } catch (err) {
         console.error(`[group-quizzing] Failed to fetch quiz steps for course ${course.id}:`, err);

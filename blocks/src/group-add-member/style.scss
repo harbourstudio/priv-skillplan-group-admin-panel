@@ -54,6 +54,10 @@
         gap: var(--wp--preset--spacing--5);
     }
 
+    .add-member__radio--leader {
+        &.is-hidden { display: none; }
+    }
+
     .add-member__radio {
         display: flex;
         align-items: center;

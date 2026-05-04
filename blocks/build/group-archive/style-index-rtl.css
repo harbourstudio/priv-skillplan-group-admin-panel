@@ -12,6 +12,12 @@
   color: var(--wp--preset--color--gray-500);
   margin: 0 0 var(--wp--preset--spacing--5) 0;
 }
+.wp-block-bys-groups-group-archive .group-archive__notice {
+  font-size: var(--wp--preset--font-size--small);
+  color: var(--wp--preset--color--gray-400);
+  font-style: italic;
+  margin: 0;
+}
 .wp-block-bys-groups-group-archive .group-archive__button {
   display: inline-flex;
   align-items: center;

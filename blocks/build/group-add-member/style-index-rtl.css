@@ -51,6 +51,9 @@
   display: flex;
   gap: var(--wp--preset--spacing--5);
 }
+.wp-block-bys-groups-group-add-member .add-member__radio--leader.is-hidden {
+  display: none;
+}
 .wp-block-bys-groups-group-add-member .add-member__radio {
   display: flex;
   align-items: center;

@@ -108,8 +108,9 @@
             color: white;
             white-space: nowrap;
             transition: opacity 0.15s;
-    
-            &:hover { opacity: 0.88; }
+
+            &:hover:not(:disabled) { opacity: 0.88; }
+            &:disabled { opacity: 0.5; cursor: not-allowed; }
         }
     }
 }

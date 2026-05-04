@@ -24,5 +24,8 @@ $wrapper_attributes = get_block_wrapper_attributes();
         <button class="group-archive__button" type="button" disabled>
             <?php esc_html_e( 'Archive Group', 'bys' ); ?>
         </button>
+        <p class="group-archive__notice" style="display:none;">
+            <?php esc_html_e( 'Only organization admins can archive a group.', 'bys' ); ?>
+        </p>
     </div>
 </div>

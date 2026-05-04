@@ -78,11 +78,13 @@ $tz_offset_hours = $tz_offset_seconds / 3600;
                 <div class="gqc__date-row">
                     <div class="gqc__date-field">
                         <i class="fa-solid fa-play gqc__date-icon" aria-hidden="true"></i>
-                        <input type="datetime-local" class="gqc__datetime gqc__datetime--start" aria-label="<?php esc_attr_e('Start date', 'bys'); ?>" data-field-type="start" />
+                        <input type="text" class="gqc__datetime gqc__datetime--start" aria-label="<?php esc_attr_e('Start date', 'bys'); ?>" data-field-type="start" readonly />
+                        <i class="fa-regular fa-calendar gqc__calendar-icon" aria-hidden="true"></i>
                     </div>
                     <div class="gqc__date-field">
                         <i class="fa-solid fa-flag gqc__date-icon" aria-hidden="true"></i>
-                        <input type="datetime-local" class="gqc__datetime gqc__datetime--end" aria-label="<?php esc_attr_e('End date', 'bys'); ?>" data-field-type="end" />
+                        <input type="text" class="gqc__datetime gqc__datetime--end" aria-label="<?php esc_attr_e('End date', 'bys'); ?>" data-field-type="end" readonly />
+                        <i class="fa-regular fa-calendar gqc__calendar-icon" aria-hidden="true"></i>
                     </div>
                 </div>
 
@@ -103,6 +105,9 @@ $tz_offset_hours = $tz_offset_seconds / 3600;
                         data-quiz-name="">
                         <span class="gqc__badge-count"></span> <?php esc_html_e('Outstanding', 'bys'); ?>
                     </button>
+                    <button class="gqc__save-row btn-unstyled" type="button" disabled>
+                        <?php esc_html_e( 'Save', 'bys' ); ?>
+                    </button>
                 </div>
             </div>
         </template>
@@ -112,11 +117,5 @@ $tz_offset_hours = $tz_offset_seconds / 3600;
         <button class="gqc__show-more btn-unstyled" style="display:none;" type="button">
             <?php esc_html_e( 'Show More', 'bys' ); ?>
         </button>
-
-        <div class="gqc__actions">
-            <button class="gqc__save btn-unstyled" type="button">
-                <?php esc_html_e('Save Changes', 'bys'); ?>
-            </button>
-        </div>
     </div>
 </div>

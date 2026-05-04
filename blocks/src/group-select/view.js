@@ -46,11 +46,19 @@ jQuery(document).ready(($) => {
       const baseUsersStats = await api.get(endpoints.groupBaseUsersStats(groupId), true); // Force refresh
       const courses = await api.get(endpoints.groupCourses(groupId), true); // Force refresh
 
+      // Read org-admin flag from the selected <option> data attribute
+      const isOrgAdmin    = $select.find(`option[value="${groupId}"]`).data('is-org-admin') === 1;
+      const isGrader      = window.bysGroupsAuth?.isGrader      === true;
+      const isSiteEditor  = window.bysGroupsAuth?.isSiteEditor  === true;
+
       // store globally for blocks to reference
       window.bysGroupData = {
         groupId: parseInt(groupId),
         baseUsersStats: baseUsersStats,
         courses: courses,
+        isOrgAdmin: isOrgAdmin,
+        isGrader: isGrader,
+        isSiteEditor: isSiteEditor,
       };
 
       // trigger event with all shared data
@@ -58,6 +66,9 @@ jQuery(document).ready(($) => {
         groupId: parseInt(groupId),
         baseUsersStats: baseUsersStats,
         courses: courses,
+        isOrgAdmin: isOrgAdmin,
+        isGrader: isGrader,
+        isSiteEditor: isSiteEditor,
       })
 
       $spinnerWrapper.hide();

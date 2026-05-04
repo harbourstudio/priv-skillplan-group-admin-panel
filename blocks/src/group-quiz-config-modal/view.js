@@ -32,11 +32,14 @@ jQuery(document).ready(($) => {
         return (parts[0]?.[0] || '?').toUpperCase();
     }
 
-    function buildUserRow(displayName, email, status) {
+    function buildUserRow(displayName, email, status, attemptCount) {
         const labelMap = {
             completed:    'Completed',
             not_attempted: 'Not Attempted',
         };
+        const attemptsHtml = attemptCount > 0
+            ? `<span class="quiz-attempts-count">${attemptCount} ${attemptCount === 1 ? 'attempt' : 'attempts'}</span>`
+            : `<span class="quiz-attempts-count quiz-attempts-count--none">—</span>`;
         return `
             <div class="quiz-user-row">
                 <div class="quiz-user-avatar" aria-hidden="true">${esc(initials(displayName))}</div>
@@ -44,6 +47,7 @@ jQuery(document).ready(($) => {
                     <span class="quiz-user-name">${esc(displayName)}</span>
                     <span class="quiz-user-email">${esc(email)}</span>
                 </div>
+                ${attemptsHtml}
                 <span class="quiz-status-badge quiz-status-badge--${status}">${labelMap[status] || status}</span>
             </div>
         `;
@@ -74,9 +78,11 @@ jQuery(document).ready(($) => {
         try {
             const attempts = await api.get(endpoints.groupQuizAttempts(groupId, quizId));
 
-            // Best (most recent) attempt per user — endpoint returns desc by completed
-            const bestByUser = {};
+            // Count and deduplicate attempts per user — endpoint returns desc by completed
+            const bestByUser   = {};
+            const countByUser  = {};
             (Array.isArray(attempts) ? attempts : []).forEach((a) => {
+                countByUser[a.user_id] = (countByUser[a.user_id] || 0) + 1;
                 if (!bestByUser[a.user_id]) bestByUser[a.user_id] = a;
             });
 
@@ -88,6 +94,7 @@ jQuery(document).ready(($) => {
                     display_name: a.display_name || `${a.first_name} ${a.last_name}`.trim(),
                     email:        a.email || '',
                     status:       'completed',
+                    attempts:     countByUser[a.user_id] || 1,
                 }));
 
             // Find members with no attempts at all
@@ -103,12 +110,14 @@ jQuery(document).ready(($) => {
                         display_name: u.display_name || `${u.first_name} ${u.last_name}`.trim(),
                         email:        u.email || '',
                         status:       'not_attempted',
+                        attempts:     0,
                     }));
                 } catch {
                     notAttempted = notAttemptIds.map((id) => ({
                         display_name: `Member #${id}`,
                         email:        '',
                         status:       'not_attempted',
+                        attempts:     0,
                     }));
                 }
             }
@@ -129,7 +138,7 @@ jQuery(document).ready(($) => {
                 return;
             }
 
-            $body.html(sorted.map((u) => buildUserRow(u.display_name, u.email, u.status)).join(''));
+            $body.html(sorted.map((u) => buildUserRow(u.display_name, u.email, u.status, u.attempts)).join(''));
         } catch (err) {
             console.error('[quiz-config-modal] Failed to load quiz attempts', err);
             $body.html('<p class="quiz-modal-empty">Failed to load data. Please try again.</p>');

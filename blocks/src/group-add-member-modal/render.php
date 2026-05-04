@@ -15,6 +15,8 @@ foreach ($attrs as $a) {
 }
 
 $wrapper_attributes = get_block_wrapper_attributes();
+$is_site_editor = in_array( 'editor', (array) wp_get_current_user()->roles, true );
+if ( $is_site_editor ) return;
 ?>
 
 <div <?= $wrapper_attributes; ?>>

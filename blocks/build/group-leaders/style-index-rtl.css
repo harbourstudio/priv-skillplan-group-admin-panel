@@ -61,6 +61,29 @@
   font-weight: 600;
   color: var(--wp--preset--color--gray-600);
 }
+.wp-block-bys-groups-group-leaders .group-leaders__remove {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  margin-right: 0.125rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  line-height: 1;
+  color: var(--wp--preset--color--gray-400);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.wp-block-bys-groups-group-leaders .group-leaders__remove:hover:not(:disabled) {
+  background: #fee2e2;
+  color: #dc2626;
+}
+.wp-block-bys-groups-group-leaders .group-leaders__remove:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 .wp-block-bys-groups-group-leaders .group-leaders__name {
   font-size: var(--wp--preset--font-size--small);
   font-weight: 500;

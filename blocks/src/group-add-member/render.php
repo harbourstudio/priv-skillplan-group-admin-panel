@@ -15,6 +15,8 @@ foreach ($attrs as $a) {
 }
 
 $wrapper_attributes = get_block_wrapper_attributes();
+$is_site_editor = in_array( 'editor', (array) wp_get_current_user()->roles, true );
+if ( $is_site_editor ) return;
 ?>
 
 <div <?= $wrapper_attributes; ?>>
@@ -32,7 +34,7 @@ $wrapper_attributes = get_block_wrapper_attributes();
                 <input type="radio" name="add-member-role" value="learner" checked />
                 <span><?php esc_html_e( 'Learner', 'bys' ); ?></span>
             </label>
-            <label class="add-member__radio">
+            <label class="add-member__radio add-member__radio--leader">
                 <input type="radio" name="add-member-role" value="leader" />
                 <span><?php esc_html_e( 'Group leader', 'bys' ); ?></span>
             </label>

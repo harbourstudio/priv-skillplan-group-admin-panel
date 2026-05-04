@@ -82,7 +82,6 @@
 .wp-block-bys-groups-user-progress .accordion-toggle__course-name {
   font-weight: 500;
   font-size: var(--wp--preset--font-size--base);
-  white-space: nowrap;
   min-width: 10rem;
 }
 .wp-block-bys-groups-user-progress .accordion-toggle__completion .completion-badge {
@@ -93,6 +92,7 @@
   border-radius: 999px;
   padding: var(--wp--preset--spacing--1) var(--wp--preset--spacing--3);
   font-weight: 500;
+  white-space: nowrap;
 }
 .wp-block-bys-groups-user-progress .accordion-toggle__completion .completion-badge::before {
   display: inline-flex;
@@ -115,6 +115,7 @@
   border-radius: 999px;
   font-size: var(--wp--preset--font-size--x-small);
   padding: var(--wp--preset--spacing--1) var(--wp--preset--spacing--2);
+  white-space: nowrap;
 }
 .wp-block-bys-groups-user-progress .accordion-content__inner {
   padding: var(--wp--preset--spacing--5) var(--wp--preset--spacing--5) var(--wp--preset--spacing--5);

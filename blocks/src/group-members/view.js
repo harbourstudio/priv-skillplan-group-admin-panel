@@ -1,8 +1,9 @@
 import { api, endpoints } from '../_shared/api-client.js';
+import { bysConfirm } from '../_shared/confirm.js';
 
 const PAGE_SIZE = 5;
 
-function buildMemberRow(member, groupId, onRemove) {
+function buildMemberRow(member, groupId, onRemove, canModify = true) {
     const name = `${member.first_name} ${member.last_name}`.trim() || member.display_name || member.email;
     const avatarHtml = member.avatar
         ? `<img src="${member.avatar}" alt="${name}" />`
@@ -15,13 +16,13 @@ function buildMemberRow(member, groupId, onRemove) {
                 <span class="group-members__name">${name}</span>
                 <span class="group-members__email">${member.email}</span>
             </div>
-            <button class="group-members__remove btn-unstyled" type="button" aria-label="Remove ${name}">&#x2715;</button>
+            ${canModify ? `<button class="group-members__remove btn-unstyled" type="button" aria-label="Remove ${name}">&#x2715;</button>` : ''}
         </div>
     `);
 
     $row.find('.group-members__remove').on('click', async function () {
         const $btn = jQuery(this);
-        if (!window.confirm(`Remove ${name} from this group?`)) return;
+        if (!await bysConfirm(`Remove ${name} from this group?`, 'Remove')) return;
 
         $btn.prop('disabled', true);
         try {
@@ -48,6 +49,7 @@ jQuery(document).ready(async ($) => {
     let allMembers     = [];
     let currentGroupId = null;
     let showAll        = false;
+    let canModify      = true;
 
     function countLabel(n) {
         return `${n} member${n !== 1 ? 's' : ''} - sorted by date added`;
@@ -60,7 +62,7 @@ jQuery(document).ready(async ($) => {
     function renderList() {
         $list.empty();
         const visible = showAll ? allMembers : allMembers.slice(0, PAGE_SIZE);
-        visible.forEach((member) => $list.append(buildMemberRow(member, currentGroupId, onRemove)));
+        visible.forEach((member) => $list.append(buildMemberRow(member, currentGroupId, onRemove, canModify)));
 
         const remaining = allMembers.length - PAGE_SIZE;
         if (!showAll && remaining > 0) {
@@ -93,9 +95,10 @@ jQuery(document).ready(async ($) => {
         renderList();
     });
 
-    $(document).on('bys:groupSelected', async (_, { groupId, baseUsersStats }) => {
+    $(document).on('bys:groupSelected', async (_, { groupId, baseUsersStats, isSiteEditor }) => {
         currentGroupId = groupId;
         showAll        = false;
+        canModify      = !isSiteEditor;
         const userIds  = baseUsersStats?.user_ids ?? [];
 
         $skeleton.show();

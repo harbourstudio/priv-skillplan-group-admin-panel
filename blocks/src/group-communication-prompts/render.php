@@ -15,6 +15,7 @@ foreach ($attrs as $a) {
 }
 
 $wrapper_attributes = get_block_wrapper_attributes();
+$is_site_editor = in_array( 'editor', (array) wp_get_current_user()->roles, true );
 
 $prompts = [
     [
@@ -82,6 +83,7 @@ $prompts = [
                     data-opens-modal="#communication-send-modal"
                     data-prompt-type="<?php echo esc_attr( $prompt['type'] ); ?>"
                     data-prompt-title="<?php echo esc_attr( $prompt['title'] ); ?>"
+                    <?php if ( $is_site_editor ) : ?>disabled<?php endif; ?>
                 >
                     <?php esc_html_e( 'Proceed', 'bys' ); ?>
                 </button>

@@ -154,6 +154,22 @@
   background: var(--wp--preset--color--red-100);
   color: var(--wp--preset--color--red-700);
 }
+.wp-block-bys-groups-group-communication-history-modal .show-more {
+  display: block;
+  width: 100%;
+  padding: var(--wp--preset--spacing--3) var(--wp--preset--spacing--5);
+  text-align: center;
+  font-size: var(--wp--preset--font-size--small);
+  font-weight: 600;
+  color: var(--wp--preset--color--gray-700);
+  background: var(--wp--preset--color--blue-50);
+  border-top: 1px solid var(--wp--preset--color--gray-100);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.wp-block-bys-groups-group-communication-history-modal .show-more:hover {
+  background: var(--wp--preset--color--blue-100);
+}
 .wp-block-bys-groups-group-communication-history-modal .comm-message-detail {
   display: flex;
   flex-direction: column;

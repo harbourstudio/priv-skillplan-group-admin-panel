@@ -87,20 +87,24 @@ $tz_offset_hours = $tz_offset_seconds / 3600;
             <div class="guqc__date-field">
                 <i class="fa-solid fa-play guqc__date-icon" aria-hidden="true"></i>
                 <input
-                    type="datetime-local"
+                    type="text"
                     class="guqc__datetime"
                     aria-label="<?php esc_attr_e( 'Start date', 'bys' ); ?>"
                     data-field-type="start"
+                    readonly
                 />
+                <i class="fa-regular fa-calendar guqc__calendar-icon" aria-hidden="true"></i>
             </div>
             <div class="guqc__date-field">
                 <i class="fa-solid fa-flag guqc__date-icon" aria-hidden="true"></i>
                 <input
-                    type="datetime-local"
+                    type="text"
                     class="guqc__datetime"
                     aria-label="<?php esc_attr_e( 'End date', 'bys' ); ?>"
                     data-field-type="end"
+                    readonly
                 />
+                <i class="fa-regular fa-calendar guqc__calendar-icon" aria-hidden="true"></i>
             </div>
         </div>
 

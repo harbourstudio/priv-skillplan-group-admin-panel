@@ -24,8 +24,8 @@ jQuery(document).ready(async ($) => {
   const groupId = params.get('group_id');
   const userId = params.get('user_id');
 
-  if (!groupId || !userId) {
-    console.error('[user-progress] Missing group_id or user_Id URL parameter');
+  if (!userId) {
+    console.error('[user-progress] Missing user_id URL parameter');
     return;
   }
 
@@ -46,12 +46,12 @@ jQuery(document).ready(async ($) => {
   }
 
   try {
-    const courses = await api.get(endpoints.groupCourses(groupId));
+    const courses = await api.get(endpoints.userCourses(userId));
 
     $coursesList.find('.hs-accordion--skeleton').remove();
 
     if (!Array.isArray(courses) || courses.length === 0) {
-      console.log('[user-progress] No courses found for group:', groupId);
+      console.log('[user-progress] No enrolled courses found for user:', userId);
       return;
     }
 
