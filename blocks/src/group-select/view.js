@@ -6,7 +6,31 @@ jQuery(document).ready(($) => {
 
   const $select = $block.find('#group-select');
   const $button = $block.find('.group-selector__button');
+  const $spinnerWrapper = $block.find('.group-selector__spinner-wrapper');
   if (!$select.length || !$button.length) return;
+
+  // Determine which group to select: stored > first valid > nothing
+  const storedGroupId = sessionStorage.getItem('bys_selected_group_id');
+  const $validOptions = $select.find('option.group-option');
+  const $emptyOption = $select.find('option[value=""]');
+  const storedGroupExists = storedGroupId && $select.find(`option[value="${storedGroupId}"]`).length > 0;
+
+  let groupIdToSelect = null;
+
+  if (storedGroupExists) {
+    groupIdToSelect = storedGroupId;
+  } else if ($validOptions.length > 0) {
+    groupIdToSelect = $validOptions.first().val();
+  }
+
+  if (groupIdToSelect) {
+    $select.val(groupIdToSelect);
+    // Remove the empty option now that we've selected a real group
+    $emptyOption.remove();
+  }
+
+  // Show loading state on page load
+  $spinnerWrapper.show();
 
   /**
    * fetch group data and trigger bys:groupSelected event
@@ -35,8 +59,12 @@ jQuery(document).ready(($) => {
         baseUsersStats: baseUsersStats,
         courses: courses,
       })
+
+      $spinnerWrapper.hide();
     } catch(err) {
       console.error('[group-select] Failed to fetch group data', err)
+      // Hide spinner even on error so user can retry
+      $spinnerWrapper.hide();
     }
   };
 
@@ -44,12 +72,14 @@ jQuery(document).ready(($) => {
   $button.on('click', async function(e) {
     e.preventDefault();
     const groupId = $select.val();
+    // Store the selected group to sessionStorage
+    sessionStorage.setItem('bys_selected_group_id', groupId);
     await fetchAndTriggerGroup(groupId);
   });
 
-  // auto-trigger for the default-selected group on page load
-  const defaultGroupId = $select.val();
-  if (defaultGroupId) {
-    fetchAndTriggerGroup(defaultGroupId);
+  // Auto-trigger the selected group on page load
+  const groupIdToTrigger = $select.val();
+  if (groupIdToTrigger) {
+    fetchAndTriggerGroup(groupIdToTrigger);
   }
 });

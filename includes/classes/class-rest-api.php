@@ -16,6 +16,7 @@ if (!class_exists('BYS_Groups_Rest_API')) {
 
         public function __construct() {
             $this->init();
+            $this->setup_cache_invalidation();
         }
 
         /**
@@ -23,6 +24,34 @@ if (!class_exists('BYS_Groups_Rest_API')) {
          */
         private function init() {
             add_action('rest_api_init', array($this, 'register_routes'));
+        }
+
+        /**
+         * Setup cache invalidation hooks for quiz-related data
+         */
+        private function setup_cache_invalidation() {
+            // Clear quiz steps cache when a quiz post is saved via ACF (e.g., show_in_reporting toggle)
+            add_action('acf/save_post', array($this, 'invalidate_quiz_cache_on_save'), 20);
+        }
+
+        /**
+         * Invalidate quiz steps cache when sfwd-quiz post is saved
+         * Ensures show_in_reporting changes are immediately reflected in REST responses
+         */
+        public function invalidate_quiz_cache_on_save($post_id) {
+            $post = get_post($post_id);
+
+            // Only care about sfwd-quiz posts
+            if (!$post || $post->post_type !== 'sfwd-quiz') {
+                return;
+            }
+
+            // Clear the course quiz steps cache for this quiz's course
+            $course_id = get_post_meta($post_id, 'course_id', true);
+            if ($course_id) {
+                $cache_key = "bys_quiz_steps_v4_{$course_id}";
+                delete_transient($cache_key);
+            }
         }
 
         /**
@@ -261,6 +290,13 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'permission_callback' => array($this, 'check_user_permission'),
             ));
 
+            // bulk add/invite users to the group
+            register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/invite-bulk', array(
+                'methods'             => 'POST',
+                'callback'            => array($this, 'bulk_user_addition'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
+
             // getPendingInvites - list pending invites for a group
             register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/pending-invites', array(
                 'methods'             => 'GET',
@@ -274,6 +310,71 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'callback'            => array($this, 'cancel_invite'),
                 'permission_callback' => array($this, 'check_user_permission'),
             ));
+
+            // group quiz access (group-based start/end access date for sfwd-quiz)
+            register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/quiz-access', array(
+                'methods' => 'GET, POST',
+                'callback' => array($this, 'group_quiz_access'),
+                'permission_callback' => array($this, 'check_user_permission')
+            ));
+
+            // group-user quiz access (overrides group settings)
+            register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/users/(?P<user_id>\d+)/quiz-access', array(
+                'methods' => 'GET, POST',
+                'callback' => array($this, 'user_quiz_access'),
+                'permission_callback' => array($this, 'check_user_permission')
+            ));
+
+            // send group communication (emails)
+            register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/send-communication', array(
+                'methods' => 'POST',
+                'callback' => array($this, 'send_group_communication'),
+                'permission_callback' => array($this, 'check_user_permission'),
+                'args' => array(
+                    'prompt_type' => array(
+                        'type' => 'string',
+                        'required' => true,
+                    ),
+                    'recipient_type' => array(
+                        'type' => 'string',
+                        'required' => true,
+                    ),
+                    'recipient_ids' => array(
+                        'type' => 'array',
+                        'required' => false,
+                    ),
+                    'custom_subject' => array(
+                        'type' => 'string',
+                        'required' => false,
+                    ),
+                    'custom_message' => array(
+                        'type' => 'string',
+                        'required' => false,
+                    ),
+                )
+            ));
+
+            // get group communication log from Postmark
+            register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/communication-log', array(
+                'methods' => 'GET',
+                'callback' => array($this, 'get_group_communication_log'),
+                'permission_callback' => array($this, 'check_user_permission')
+            ));
+
+            // get communication prompt template preview
+            register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/template/(?P<prompt_type>[\w-]+)', array(
+                'methods' => 'GET',
+                'callback' => array($this, 'get_email_template'),
+                'permission_callback' => array($this, 'check_user_permission')
+            ));
+
+            // Postmark webhook endpoint (no authentication required — Postmark calls this)
+            register_rest_route($this->namespace, '/webhooks/postmark', array(
+                'methods' => 'POST',
+                'callback' => array($this, 'handle_postmark_webhook'),
+                'permission_callback' => '__return_true',
+            ));
+
         }
 
         public function check_user_permission($request) {
@@ -3690,6 +3791,127 @@ if (!class_exists('BYS_Groups_Rest_API')) {
         }
 
         /**
+         * POST /groups/{group_id}/invite-bulk
+         * Bulk add/invite multiple users in one request.
+         *
+         * Request body:
+         * {
+         *   "emails": ["a@example.com", "b@example.com"],
+         *   "role": "learner",
+         *   "dry_run": false
+         * }
+         *
+         * Response:
+         * {
+         *   "enrolled": [{ "email": "a@example.com", "user_id": 5 }],
+         *   "invited":  [{ "email": "b@example.com", "invite_id": 12 }],
+         *   "failed":   [{ "email": "c@example.com", "reason": "..." }]
+         * }
+         */
+        public function bulk_user_addition( $request ) {
+            $group_id = intval( $request['group_id'] );
+            $body     = json_decode( $request->get_body(), true );
+            $emails   = isset( $body['emails'] ) && is_array( $body['emails'] ) ? $body['emails'] : array();
+            $role     = in_array( $body['role'] ?? '', [ 'learner', 'leader' ], true ) ? $body['role'] : 'learner';
+            $dry_run  = isset( $body['dry_run'] ) ? (bool) $body['dry_run'] : false;
+            $invited_by = get_current_user_id();
+
+            if ( ! $group_id ) {
+                return new \WP_REST_Response( array( 'error' => 'Invalid group_id' ), 400 );
+            }
+
+            if ( empty( $emails ) ) {
+                return new \WP_REST_Response( array( 'error' => 'No emails provided' ), 400 );
+            }
+
+            $group = get_post( $group_id );
+            if ( ! $group || $group->post_type !== 'groups' ) {
+                return new \WP_REST_Response( array( 'error' => 'Group not found' ), 404 );
+            }
+
+            global $wpdb;
+            $table = $wpdb->prefix . BYS_GROUPS_INVITES_TABLE;
+
+            $enrolled = array();
+            $invited  = array();
+            $failed   = array();
+
+            // Sanitize and deduplicate emails
+            $emails = array_unique( array_map( 'sanitize_email', $emails ) );
+
+            foreach ( $emails as $email ) {
+                // Validate email format
+                if ( ! is_email( $email ) ) {
+                    $failed[] = array(
+                        'email'  => $email,
+                        'reason' => 'Invalid email format',
+                    );
+                    continue;
+                }
+
+                // Case 1: user already exists → enroll directly
+                $existing_user = get_user_by( 'email', $email );
+                if ( $existing_user ) {
+                    if ( ! $dry_run ) {
+                        BYS_Groups_Invites::add_to_group( $existing_user->ID, $group_id, $role );
+                    }
+                    $enrolled[] = array(
+                        'email'   => $email,
+                        'user_id' => $existing_user->ID,
+                    );
+                    continue;
+                }
+
+                // Case 2: no account → check for duplicate pending invite
+                $existing = $wpdb->get_var( $wpdb->prepare(
+                    "SELECT id FROM {$table} WHERE group_id = %d AND email = %s AND status = 'pending'",
+                    $group_id, $email
+                ) );
+
+                if ( $existing ) {
+                    $failed[] = array(
+                        'email'  => $email,
+                        'reason' => 'Pending invite already exists',
+                    );
+                    continue;
+                }
+
+                // Insert invite row (or skip if dry_run)
+                if ( ! $dry_run ) {
+                    $wpdb->insert( $table, array(
+                        'group_id'   => $group_id,
+                        'email'      => $email,
+                        'role'       => $role,
+                        'status'     => 'pending',
+                        'invited_by' => $invited_by,
+                        'invited_at' => current_time( 'mysql' ),
+                    ), array( '%d', '%s', '%s', '%s', '%d', '%s' ) );
+
+                    $invite_id = $wpdb->insert_id;
+
+                    // Send invite email (non-fatal)
+                    $mail_result = BYS_Groups_Invites::send_invite_email( $email, $group_id, $invited_by );
+                    if ( is_wp_error( $mail_result ) ) {
+                        error_log( '[bys-groups] Invite email failed for ' . $email . ': ' . $mail_result->get_error_message() );
+                    }
+                } else {
+                    $invite_id = 0; // Placeholder for dry_run
+                }
+
+                $invited[] = array(
+                    'email'     => $email,
+                    'invite_id' => $invite_id,
+                );
+            }
+
+            return new \WP_REST_Response( array(
+                'enrolled' => $enrolled,
+                'invited'  => $invited,
+                'failed'   => $failed,
+            ), 200 );
+        }
+
+        /**
          * GET /groups/{group_id}/pending-invites
          * Returns all pending invite rows for the group.
          */
@@ -3737,6 +3959,387 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             }
 
             return new \WP_REST_Response( array( 'success' => true ), 200 );
+        }
+
+        public function group_quiz_access($request) {
+            $group_id = intval($request['group_id']);
+
+            if (!$group_id) {
+                return new \WP_REST_Response(array('error' => 'Invalid group_id'), 400 );
+            }
+
+            // GET rest method: returns all quiz access dates set for a sfwd-group
+            if ('GET' === $request->get_method()) {
+                $access_dates = BYS_Groups_Quiz_Access::get_group_quiz_access_dates($group_id);
+                return new \WP_REST_Response($access_dates, 200);
+            }
+
+            // POST rest method: saves quiz access dates for a sfwd-group
+            if ('POST' === $request->get_method()) {
+                $quiz_id = intval($request->get_json_params()['quiz_id'] ?? 0);
+
+                if (!$quiz_id) {
+                    return new \WP_REST_Response(array('error' => 'Invalid quiz_id', 400));
+                }
+
+                $start = sanitize_text_field($request->get_json_params()['start'] ?? '');
+                $end = sanitize_text_field($request->get_json_params()['end'] ?? '');
+
+                BYS_Groups_Quiz_Access::save_group_quiz_access_dates($group_id, $quiz_id, $start, $end);
+
+                return new \WP_REST_Response(array('success' => true), 200);
+            }
+
+            return new \WP_REST_Response(array('error' => 'Error executing this request.'), 405);
+        }
+
+        public function user_quiz_access($request) {
+            $group_id = intval($request['group_id']);
+            $user_id = intval($request['user_id']);
+
+            if (!$group_id || !$user_id) {
+                return new \WP_REST_Response(array('error' => 'Invalid group_id or user_id'), 400);
+            }
+
+            // GET rest method: returns all quiz access date overrides for a user in a group
+            if ('GET' === $request->get_method()) {
+                $access_dates = BYS_Groups_Quiz_Access::get_user_quiz_access_dates($user_id, $group_id);
+                return new \WP_REST_Response($access_dates, 200);
+            }
+
+            // POST rest method: saves quiz access date override for a user in a group
+            if ('POST' === $request->get_method()) {
+                $quiz_id = intval($request->get_json_params()['quiz_id'] ?? 0);
+
+                if (!$quiz_id) {
+                    return new \WP_REST_Response(array('error' => 'Invalid quiz_id'), 400);
+                }
+
+                $start = sanitize_text_field($request->get_json_params()['start'] ?? '');
+                $end = sanitize_text_field($request->get_json_params()['end'] ?? '');
+
+                BYS_Groups_Quiz_Access::save_user_quiz_access_dates($user_id, $group_id, $quiz_id, $start, $end);
+
+                return new \WP_REST_Response(array('success' => true), 200);
+            }
+
+            return new \WP_REST_Response(array('error' => 'Error executing this request.'), 405);
+        }
+
+        /**
+         * Send group communication (emails via prompts or custom messages)
+         *
+         * @param WP_REST_Request $request Request object with group_id and JSON body
+         * @return WP_REST_Response Response with success/error and sent_count
+         */
+        public function send_group_communication($request) {
+            $group_id = intval($request['group_id']);
+
+            if (!$group_id) {
+                return new \WP_REST_Response(array('error' => 'Invalid group ID'), 400);
+            }
+
+            // Verify current user is logged in (mailer will check group leader permission)
+            if (!get_current_user_id()) {
+                return new \WP_REST_Response(array('error' => 'Not logged in'), 401);
+            }
+
+            // Parse request body — try get_json_params first, fall back to get_param
+            $body = $request->get_json_params();
+            if (empty($body) || !is_array($body)) {
+                // Fallback for malformed JSON: attempt to parse individual params
+                $body = array(
+                    'prompt_type' => $request->get_param('prompt_type'),
+                    'recipient_type' => $request->get_param('recipient_type'),
+                    'recipient_ids' => $request->get_param('recipient_ids'),
+                    'custom_subject' => $request->get_param('custom_subject'),
+                    'custom_message' => $request->get_param('custom_message'),
+                );
+            }
+
+            $prompt_type = sanitize_text_field($body['prompt_type'] ?? '');
+            $recipient_type = sanitize_text_field($body['recipient_type'] ?? '');
+            $recipient_ids = isset($body['recipient_ids']) && is_array($body['recipient_ids']) ? array_map('intval', $body['recipient_ids']) : array();
+            $custom_subject = sanitize_text_field($body['custom_subject'] ?? '');
+            $custom_message = wp_kses_post($body['custom_message'] ?? '');
+
+            if (!$prompt_type || !$recipient_type) {
+                return new \WP_REST_Response(array('error' => 'Missing prompt_type or recipient_type'), 400);
+            }
+
+            // For custom prompts, require both subject and message
+            if ($prompt_type === 'custom' && (empty($custom_subject) || empty($custom_message))) {
+                return new \WP_REST_Response(array('error' => 'Custom prompts require both subject and message'), 400);
+            }
+
+            // Use mailer class to send (includes leader and group validation)
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-mailer.php';
+            $mailer = new BYS_Groups_Mailer();
+
+            $result = $mailer->send_group_communication(
+                $group_id,
+                $prompt_type,
+                $recipient_type,
+                $recipient_ids,
+                $custom_subject,
+                $custom_message
+            );
+
+            $status_code = $result['success'] ? 200 : 400;
+            return new \WP_REST_Response($result, $status_code);
+        }
+
+        /**
+         * Get prompt-based email template for preview in send modal
+         *
+         * @param WP_REST_Request $request Request with group_id and prompt_type
+         * @return WP_REST_Response Response with subject, html, and plain template
+         */
+        public function get_email_template($request) {
+            $group_id = intval($request['group_id']);
+            $prompt_type = sanitize_text_field($request['prompt_type']);
+
+            if (!$group_id || !$prompt_type) {
+                return new \WP_REST_Response(array('error' => 'Missing group_id or prompt_type'), 400);
+            }
+
+            // Validate group exists
+            $group = get_post($group_id);
+            if (!$group || $group->post_type !== 'groups') {
+                return new \WP_REST_Response(array('error' => 'Invalid group ID'), 404);
+            }
+
+            // Load template with group context
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/emails/group-comms.php';
+
+            $email = bys_get_comm_email($prompt_type, array(
+                'group_name' => $group->post_title,
+                'site_name' => get_bloginfo('name'),
+                'site_url' => home_url(),
+                'sender_email' => get_bloginfo('admin_email'),
+            ));
+
+            if (empty($email['subject']) || empty($email['html'])) {
+                return new \WP_REST_Response(array('error' => 'Template not found'), 404);
+            }
+
+            return new \WP_REST_Response(array(
+                'subject' => $email['subject'],
+                'html' => $email['html'],
+                'plain' => $email['plain'],
+            ), 200);
+        }
+
+        /**
+         * Fetch outbound email log from Postmark API.
+         * Route: GET /bys-groups/v1/groups/{group_id}/communication-log
+         *
+         * @param WP_REST_Request $request
+         * @return WP_REST_Response
+         */
+        public function get_group_communication_log($request) {
+
+            // Validate group
+            $group_id = intval($request['group_id']);
+            if (!$group_id) {
+                return new \WP_REST_Response(array('error' => 'Invalid group ID'), 400);
+            }
+            $group = get_post($group_id);
+            if (!$group || $group->post_type !== 'groups') {
+                return new \WP_REST_Response(array('error' => 'Group not found'), 404);
+            }
+
+            // Verify current user and if user is a group leader
+            $user_id = get_current_user_id();
+            if (!$user_id) {
+                return new \WP_REST_Response(array('error' => 'Not logged in'), 401);
+            }
+            $is_leader = get_user_meta($user_id, 'learndash_group_leaders_' . $group_id, true);
+            if (empty($is_leader)) {
+                return new \WP_REST_Response(array('error' => 'Forbidden'), 403);
+            }
+
+            // Read Postmark token
+            $token = get_option('bys_postmark_token', '');
+            if (empty($token)) {
+                return new \WP_REST_Response(array('error' => 'Postmark token not configured'), 500);
+            }
+
+            // Parse pagination params
+            $count = 25;
+            $offset = max(0, intval($request->get_param('offset') ?: 0));
+
+            // Call Postmark Messages/Outbound API (WIP non-filtered for now)
+            $postmark_url = add_query_arg(
+                array('count' => $count, 'offset' => $offset),
+                'https://api.postmarkapp.com/messages/outbound'
+            );
+
+            $response = wp_remote_get($postmark_url, array(
+                'headers' => array(
+                    'X-Postmark-Server-Token' => $token,
+                    'Accept' => 'application/json',
+                ),
+                'timeout' => 15,
+                'sslverify' => true,
+            ));
+
+            // Handle errors
+            if (is_wp_error($response)) {
+                return new \WP_REST_Response(
+                    array('error' => 'Postmark API error: ' . $response->get_error_message()),
+                    500
+                );
+            }
+
+            $status = wp_remote_retrieve_response_code($response);
+            $body = json_decode(wp_remote_retrieve_body($response), true);
+
+            if ($status !== 200) {
+                $pm_error = isset($body['Message']) ? $body['Message'] : 'Unknown Postmark error';
+                return new \WP_REST_Response(
+                    array('error' => 'Postmark returned ' . $status . ': ' . $pm_error),
+                    502
+                );
+            }
+
+            // Extract MessageIDs for filtering by group and sender
+            $postmark_ids = array_column($body['Messages'] ?? [], 'MessageID');
+
+            if (empty($postmark_ids)) {
+                return new \WP_REST_Response(
+                    array('total' => 0, 'messages' => array(), 'offset' => $offset, 'count' => $count),
+                    200
+                );
+            }
+
+            // Query bys_group_communication_log for this group + sender only
+            global $wpdb;
+            $placeholders = implode(',', array_fill(0, count($postmark_ids), '%s'));
+            $log_rows = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT message_id, prompt_type, delivery_status, bounce_type FROM {$wpdb->prefix}" . BYS_GROUPS_COMMS_TABLE . "
+                     WHERE message_id IN ($placeholders)
+                     AND group_id = %d AND sender_user_id = %d",
+                    array_merge($postmark_ids, array($group_id, $user_id))
+                ),
+                ARRAY_A
+            );
+
+            // Index by message_id for O(1) lookup
+            $log_index = array_column($log_rows, null, 'message_id');
+
+            // Map Postmark response, filtering to only messages in this group/sender's log
+            $messages = array();
+            foreach ((array) ($body['Messages'] ?? array()) as $msg) {
+                $mid = $msg['MessageID'] ?? '';
+                if (!isset($log_index[$mid])) {
+                    continue;  // Skip if not in this leader's/group's log
+                }
+
+                $log_entry = $log_index[$mid];
+                $prompt_type = $log_entry['prompt_type'];
+                $delivery_status = $log_entry['delivery_status'] ?? 'pending';
+
+                $messages[] = array(
+                    'message_id' => $mid,
+                    'to' => $msg['To'] ?? '',
+                    'subject' => $msg['Subject'] ?? '',
+                    'status' => $msg['Status'] ?? '',
+                    'sent_at' => $msg['ReceivedAt'] ?? '',
+                    'prompt_type' => $prompt_type,
+                    'badge_type' => $prompt_type === 'custom' ? 'custom' : 'prompt',
+                    'delivery_status' => $delivery_status,
+                    'bounce_type' => $log_entry['bounce_type'] ?? null,
+                );
+            }
+
+            // Return response with filtered count
+            return new \WP_REST_Response(array(
+                'total' => count($messages),
+                'messages' => $messages,
+                'offset' => $offset,
+                'count' => $count,
+            ), 200);
+        }
+
+        /**
+         * Handle Postmark webhook events (Delivery, Bounce, SpamComplaint)
+         *
+         * @param WP_REST_Request $request
+         * @return WP_REST_Response Always returns 200 (Postmark expects this for any response)
+         */
+        public function handle_postmark_webhook($request) {
+            // Validate Postmark token in header
+            $postmark_token = get_option('bys_postmark_token', '');
+            if (empty($postmark_token)) {
+                // No token configured, but still return 200 so Postmark doesn't retry
+                return new \WP_REST_Response(array('ok' => false, 'reason' => 'token_not_configured'), 200);
+            }
+
+            $request_token = $request->get_header('X-Postmark-Server-Token');
+            if ($request_token !== $postmark_token) {
+                // Invalid token, but still return 200 (security: don't reveal token mismatch)
+                return new \WP_REST_Response(array('ok' => false, 'reason' => 'invalid_token'), 200);
+            }
+
+            // Parse webhook body
+            $body = $request->get_json_params();
+            if (empty($body)) {
+                return new \WP_REST_Response(array('ok' => true), 200);
+            }
+
+            $record_type = $body['RecordType'] ?? '';
+            $message_id = $body['MessageID'] ?? '';
+
+            if (empty($record_type) || empty($message_id)) {
+                return new \WP_REST_Response(array('ok' => true), 200);
+            }
+
+            global $wpdb;
+            $update_data = array();
+            $update_format = array();
+
+            // Map Postmark events to delivery status
+            switch ($record_type) {
+                case 'Delivery':
+                    $update_data['delivery_status'] = 'delivered';
+                    $update_data['delivered_at'] = current_time('mysql');
+                    $update_format = array('%s', '%s');
+                    break;
+
+                case 'Bounce':
+                    $update_data['delivery_status'] = 'bounced';
+                    $bounce_type = $body['Details']['BounceType'] ?? 'unknown';
+                    $update_data['bounce_type'] = $bounce_type;
+                    $update_data['delivered_at'] = current_time('mysql');
+                    $update_format = array('%s', '%s', '%s');
+                    break;
+
+                case 'SpamComplaint':
+                    $update_data['delivery_status'] = 'spam';
+                    $update_data['delivered_at'] = current_time('mysql');
+                    $update_format = array('%s', '%s');
+                    break;
+
+                default:
+                    // Unknown record type, acknowledge but don't process
+                    return new \WP_REST_Response(array('ok' => true), 200);
+            }
+
+            // Update the communication log
+            if (!empty($update_data)) {
+                $wpdb->update(
+                    $wpdb->prefix . BYS_GROUPS_COMMS_TABLE,
+                    $update_data,
+                    array('message_id' => $message_id),
+                    $update_format,
+                    array('%s')
+                );
+            }
+
+            // Always return 200 so Postmark knows we got the webhook
+            return new \WP_REST_Response(array('ok' => true), 200);
         }
     }
 }

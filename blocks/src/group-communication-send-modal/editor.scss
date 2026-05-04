@@ -1,7 +1,5 @@
-// user-quiz-attempts-modal: show a simple placeholder label in the editor
-// since the block renders as a hidden overlay on the frontend.
 .wp-block-bys-groups-user-quiz-attempts-modal {
-    .quiz-attempts-modal-editor-preview {
+    .modal-editor-preview {
         display: flex;
         align-items: center;
         gap: 0.5rem;
