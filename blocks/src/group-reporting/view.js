@@ -270,21 +270,16 @@ jQuery(document).ready(function($) {
 
       const courseIds = courses.map(c => c.id).join(',');
 
-      if (courseIds) {
-        for (const user of usersResponse) {
-          const progressUrl = `/wp-json/bys-groups/v1/users/${user.id}/course-progress?course_ids=${courseIds}`;
-          try {
-            userCourseProgressAll[user.id] = await api.get(progressUrl, true);
-          } catch (err) {
-            console.error(`Failed to fetch course progress for user ${user.id}:`, err);
-            userCourseProgressAll[user.id] = [];
-          }
-        }
-      } else {
-        usersResponse.forEach(user => {
+      await Promise.all(usersResponse.map(async (user) => {
+        if (!courseIds) { userCourseProgressAll[user.id] = []; return; }
+        const progressUrl = `/wp-json/bys-groups/v1/users/${user.id}/course-progress?course_ids=${courseIds}`;
+        try {
+          userCourseProgressAll[user.id] = await api.get(progressUrl, true);
+        } catch (err) {
+          console.error(`Failed to fetch course progress for user ${user.id}:`, err);
           userCourseProgressAll[user.id] = [];
-        });
-      }
+        }
+      }));
 
       rebuildTableHeader(courses);
       rebuildTableBody(courses, usersResponse, userCourseProgressAll);
@@ -723,40 +718,11 @@ jQuery(document).ready(function($) {
 
     courseQuizLoadedIdx.add(courseIdx);
 
-    let quizSteps = [];
-    if (courseQuizStepsCache[course.id]) {
-      quizSteps = courseQuizStepsCache[course.id];
-    } else {
-      try {
-        quizSteps = await api.get(endpoints.courseQuizSteps(course.id)) || [];
-        courseQuizStepsCache[course.id] = quizSteps;
-      } catch (err) {
-        console.error(`[group-reporting] Failed to fetch quiz steps for course ${course.id}:`, err);
-      }
-    }
-
-    if (!userQuizProgressCache[course.id]) userQuizProgressCache[course.id] = {};
-
-    const userQuizProgressMap = {};
-    for (const user of usersInView) {
-      try {
-        const url = endpoints.userQuizProgress(user.id) + `?group_id=${currentGroupId}&course_ids=${course.id}`;
-        const quizzes = await api.get(url);
-        userQuizProgressMap[user.id] = {};
-        if (Array.isArray(quizzes)) {
-          quizzes.forEach(q => { userQuizProgressMap[user.id][q.id] = q; });
-        }
-        userQuizProgressCache[course.id][user.id] = userQuizProgressMap[user.id];
-      } catch (err) {
-        console.error(`[group-reporting] Failed to fetch quiz progress for user ${user.id}:`, err);
-        userQuizProgressMap[user.id] = {};
-        userQuizProgressCache[course.id][user.id] = {};
-      }
-    }
+    const quizSteps = await ensureQuizDataForCourse(course, usersInView);
 
     $table.find(`.course-sub-cell--quizzing[data-course-idx="${courseIdx}"]`).each(function() {
       const userId = $(this).closest('tr').data('userId');
-      const userQuizProgress = userQuizProgressMap[userId] || {};
+      const userQuizProgress = (userQuizProgressCache[course.id] || {})[userId] || {};
       $(this).html(buildQuizBars(quizSteps, userId, userQuizProgress));
     });
   }
@@ -785,19 +751,16 @@ jQuery(document).ready(function($) {
     if (!newUsers || !Array.isArray(newUsers)) return [];
 
     const courseIds = coursesInView.map(c => c.id).join(',');
-    if (courseIds) {
-      for (const user of newUsers) {
-        const progressUrl = `/wp-json/bys-groups/v1/users/${user.id}/course-progress?course_ids=${courseIds}`;
-        try {
-          userCourseProgressAll[user.id] = await api.get(progressUrl, true);
-        } catch (err) {
-          console.error(`Failed to fetch course progress for user ${user.id}:`, err);
-          userCourseProgressAll[user.id] = [];
-        }
+    await Promise.all(newUsers.map(async (user) => {
+      if (!courseIds) { userCourseProgressAll[user.id] = []; return; }
+      const progressUrl = `/wp-json/bys-groups/v1/users/${user.id}/course-progress?course_ids=${courseIds}`;
+      try {
+        userCourseProgressAll[user.id] = await api.get(progressUrl, true);
+      } catch (err) {
+        console.error(`Failed to fetch course progress for user ${user.id}:`, err);
+        userCourseProgressAll[user.id] = [];
       }
-    } else {
-      newUsers.forEach(u => { userCourseProgressAll[u.id] = []; });
-    }
+    }));
 
     usersInView = usersInView.concat(newUsers);
     loadedOffset += newUsers.length;
@@ -865,23 +828,14 @@ jQuery(document).ready(function($) {
     const course = coursesInView[courseIdx];
     if (!course) return;
 
-    const quizSteps = courseQuizStepsCache[course.id] || [];
+    const quizSteps = await ensureQuizDataForCourse(course, newUsers);
     if (!quizSteps.length) return;
 
-    for (const user of newUsers) {
-      try {
-        const url = endpoints.userQuizProgress(user.id) + `?group_id=${currentGroupId}&course_ids=${course.id}`;
-        const quizzes = await api.get(url);
-        const userQuizProgress = {};
-        if (Array.isArray(quizzes)) {
-          quizzes.forEach(q => { userQuizProgress[q.id] = q; });
-        }
-        $table.find(`tr[data-user-id="${user.id}"] .course-sub-cell--quizzing[data-course-idx="${courseIdx}"]`)
-          .html(buildQuizBars(quizSteps, user.id, userQuizProgress));
-      } catch (err) {
-        console.error(`[group-reporting] Failed to fetch quiz progress for new user ${user.id}:`, err);
-      }
-    }
+    newUsers.forEach(user => {
+      const userQuizProgress = (userQuizProgressCache[course.id] || {})[user.id] || {};
+      $table.find(`tr[data-user-id="${user.id}"] .course-sub-cell--quizzing[data-course-idx="${courseIdx}"]`)
+        .html(buildQuizBars(quizSteps, user.id, userQuizProgress));
+    });
   }
 
   // ── Sort ──────────────────────────────────────────────────────────────────────

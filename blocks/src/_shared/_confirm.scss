@@ -1,0 +1,71 @@
+// Custom confirm dialog — appended to <body>, so styles are top-level (not block-scoped)
+
+.bys-confirm-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+
+    &--open {
+        opacity: 1;
+        pointer-events: auto;
+
+        .bys-confirm__dialog {
+            transform: scale(1);
+        }
+    }
+}
+
+.bys-confirm__dialog {
+    background: white;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    width: 90%;
+    max-width: 360px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+    transform: scale(0.95);
+    transition: transform 0.15s ease;
+}
+
+.bys-confirm__message {
+    font-size: var(--wp--preset--font-size--small);
+    color: var(--wp--preset--color--gray-800);
+    margin: 0 0 1.25rem;
+    line-height: 1.5;
+}
+
+.bys-confirm__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.bys-confirm__cancel {
+    padding: 0.4rem 1.1rem;
+    border-radius: 9999px;
+    font-size: var(--wp--preset--font-size--small);
+    font-weight: 500;
+    color: var(--wp--preset--color--gray-600);
+    background: var(--wp--preset--color--gray-100);
+    transition: background 0.15s;
+
+    &:hover { background: var(--wp--preset--color--gray-200); }
+}
+
+.bys-confirm__ok {
+    padding: 0.4rem 1.1rem;
+    border-radius: 9999px;
+    font-size: var(--wp--preset--font-size--small);
+    font-weight: 500;
+    color: white;
+    background: #dc2626;
+    transition: opacity 0.15s;
+
+    &:hover { opacity: 0.85; }
+}

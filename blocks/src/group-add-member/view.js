@@ -29,6 +29,15 @@ jQuery(document).ready(($) => {
         $enrol.prop('disabled', !isValidEmail($(this).val()));
     });
 
+    const $leaderRadio = $block.find('.add-member__radio--leader');
+
+    $(document).on('bys:groupSelected', (_, { isOrgAdmin }) => {
+        $leaderRadio.toggleClass('is-hidden', !isOrgAdmin);
+        if (!isOrgAdmin) {
+            $block.find('input[name="add-member-role"][value="learner"]').prop('checked', true);
+        }
+    });
+
     $enrol.on('click', async function () {
         const email   = $input.val().trim();
         const role    = $block.find('input[name="add-member-role"]:checked').val() || 'learner';
@@ -50,13 +59,14 @@ jQuery(document).ready(($) => {
             );
 
             if (result.status === 'enrolled') {
-                showMessage(`${email} already has an account and has been enrolled in the group.`, 'success');
+                showMessage(`${email} has been enrolled in the group. Refreshing…`, 'success');
             } else {
-                showMessage(`Invitation sent to ${email}. They'll be enrolled automatically when they register.`, 'success');
+                showMessage(`Invitation sent to ${email}. Refreshing…`, 'success');
                 $(document).trigger('bys:inviteSent');
             }
 
             $input.val('');
+            setTimeout(() => window.location.reload(), 1500);
         } catch (err) {
             const msg = err.responseJSON?.error || 'Something went wrong. Please try again.';
             showMessage(msg, 'error');

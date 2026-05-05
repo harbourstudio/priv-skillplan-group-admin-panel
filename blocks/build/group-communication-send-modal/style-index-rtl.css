@@ -1,7 +1,7 @@
 /*!******************************************************************************************************************************************************************************************************************************************************************************************************!*\
   !*** css ./node_modules/css-loader/dist/cjs.js??ruleSet[1].rules[4].use[1]!./node_modules/postcss-loader/dist/cjs.js??ruleSet[1].rules[4].use[2]!./node_modules/@wordpress/scripts/node_modules/sass-loader/dist/cjs.js??ruleSet[1].rules[4].use[3]!./src/group-communication-send-modal/style.scss ***!
   \******************************************************************************************************************************************************************************************************************************************************************************************************/
-.wp-block-bys-groups-group-communication-send-modal .comm-send-modal.hs-overlay {
+.wp-block-bys-groups-group-communication-send-modal .csm.hs-overlay {
   display: none;
   position: fixed;
   inset: 0;
@@ -10,16 +10,16 @@
   z-index: 1000;
   padding: var(--wp--preset--spacing--3);
 }
-.wp-block-bys-groups-group-communication-send-modal .comm-send-modal.hs-overlay:not(.hidden) {
+.wp-block-bys-groups-group-communication-send-modal .csm.hs-overlay:not(.hidden) {
   display: flex;
 }
-.wp-block-bys-groups-group-communication-send-modal .comm-send-modal .modal-backdrop {
+.wp-block-bys-groups-group-communication-send-modal .csm__modal-backdrop {
   position: absolute;
   inset: 0;
   background: rgba(0, 0, 0, 0.4);
   cursor: pointer;
 }
-.wp-block-bys-groups-group-communication-send-modal .modal__inner {
+.wp-block-bys-groups-group-communication-send-modal .csm__modal-inner {
   display: flex;
   flex-direction: column;
   background: white;
@@ -32,7 +32,7 @@
   position: relative;
   z-index: 10;
 }
-.wp-block-bys-groups-group-communication-send-modal .modal__header {
+.wp-block-bys-groups-group-communication-send-modal .csm__modal-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -41,26 +41,30 @@
   background: var(--wp--preset--color--primary);
   flex-shrink: 0;
 }
-.wp-block-bys-groups-group-communication-send-modal .modal__header * {
+.wp-block-bys-groups-group-communication-send-modal .csm__modal-header * {
   color: white;
 }
-.wp-block-bys-groups-group-communication-send-modal .modal__header-titles {
+.wp-block-bys-groups-group-communication-send-modal .csm__modal-header-content {
   display: flex;
   flex-direction: column;
   gap: var(--wp--preset--spacing--1);
 }
-.wp-block-bys-groups-group-communication-send-modal h4 {
+.wp-block-bys-groups-group-communication-send-modal .csm h4 {
   font-size: var(--wp--preset--font-size--large);
   font-weight: 600;
   margin: 0 !important;
   line-height: 1.2;
 }
-.wp-block-bys-groups-group-communication-send-modal .modal__prompt-name {
+.wp-block-bys-groups-group-communication-send-modal .csm__modal-body {
+  overflow-y: auto;
+  flex: 1;
+}
+.wp-block-bys-groups-group-communication-send-modal .csm__modal-prompt {
   font-size: var(--wp--preset--font-size--small);
   opacity: 0.85;
   margin: 0;
 }
-.wp-block-bys-groups-group-communication-send-modal .modal__close {
+.wp-block-bys-groups-group-communication-send-modal .csm__modal-close {
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -73,41 +77,37 @@
   transition: opacity 0.15s;
   margin-top: 0.1rem;
 }
-.wp-block-bys-groups-group-communication-send-modal .modal__close:hover {
+.wp-block-bys-groups-group-communication-send-modal .csm__modal-close:hover {
   opacity: 1;
 }
-.wp-block-bys-groups-group-communication-send-modal .modal__body {
-  overflow-y: auto;
-  flex: 1;
-}
-.wp-block-bys-groups-group-communication-send-modal .comm-send-form {
+.wp-block-bys-groups-group-communication-send-modal .csm__form {
   display: flex;
   flex-direction: column;
   gap: var(--wp--preset--spacing--4);
   padding: var(--wp--preset--spacing--4);
 }
-.wp-block-bys-groups-group-communication-send-modal .comm-form-group {
+.wp-block-bys-groups-group-communication-send-modal .csm__form-group {
   display: flex;
   flex-direction: column;
   gap: var(--wp--preset--spacing--2);
 }
-.wp-block-bys-groups-group-communication-send-modal .comm-form-label {
+.wp-block-bys-groups-group-communication-send-modal .csm__form-label {
   font-size: var(--wp--preset--font-size--small);
   font-weight: 600;
   color: var(--wp--preset--color--gray-700);
   margin: 0;
 }
-.wp-block-bys-groups-group-communication-send-modal .comm-form-hint {
+.wp-block-bys-groups-group-communication-send-modal .csm__form-hint {
   font-size: var(--wp--preset--font-size--x-small);
   color: var(--wp--preset--color--gray-400);
   margin: 0;
 }
-.wp-block-bys-groups-group-communication-send-modal .comm-radios {
+.wp-block-bys-groups-group-communication-send-modal .csm__radios {
   display: flex;
   flex-wrap: wrap;
   gap: var(--wp--preset--spacing--4);
 }
-.wp-block-bys-groups-group-communication-send-modal .comm-radio {
+.wp-block-bys-groups-group-communication-send-modal .csm__radio {
   display: flex;
   align-items: center;
   gap: var(--wp--preset--spacing--2);
@@ -115,14 +115,14 @@
   color: var(--wp--preset--color--gray-700);
   cursor: pointer;
 }
-.wp-block-bys-groups-group-communication-send-modal .comm-radio input[type=radio] {
+.wp-block-bys-groups-group-communication-send-modal .csm__radio input[type=radio] {
   accent-color: var(--wp--preset--color--primary);
   width: 1rem;
   height: 1rem;
   cursor: pointer;
   margin: 0;
 }
-.wp-block-bys-groups-group-communication-send-modal .comm-select {
+.wp-block-bys-groups-group-communication-send-modal .csm select {
   padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--3);
   border: 1px solid var(--wp--preset--color--gray-200);
   border-radius: 0.5rem;
@@ -131,13 +131,13 @@
   background: white;
   outline: none;
 }
-.wp-block-bys-groups-group-communication-send-modal .comm-select:focus {
+.wp-block-bys-groups-group-communication-send-modal .csm select:focus {
   border-color: var(--wp--preset--color--primary);
 }
-.wp-block-bys-groups-group-communication-send-modal .comm-select--multi {
+.wp-block-bys-groups-group-communication-send-modal .csm select--multi {
   min-height: 8rem;
 }
-.wp-block-bys-groups-group-communication-send-modal .comm-input {
+.wp-block-bys-groups-group-communication-send-modal .csm__input {
   padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--3);
   border: 1px solid var(--wp--preset--color--gray-200);
   border-radius: 0.5rem;
@@ -147,12 +147,12 @@
   outline: none;
   width: 100%;
 }
-.wp-block-bys-groups-group-communication-send-modal .comm-input--disabled {
+.wp-block-bys-groups-group-communication-send-modal .csm__input--disabled {
   background: var(--wp--preset--color--gray-50);
   color: var(--wp--preset--color--gray-400);
   cursor: not-allowed;
 }
-.wp-block-bys-groups-group-communication-send-modal .comm-textarea {
+.wp-block-bys-groups-group-communication-send-modal .csm textarea {
   padding: var(--wp--preset--spacing--3);
   border: 1px solid var(--wp--preset--color--gray-200);
   border-radius: 0.5rem;
@@ -164,21 +164,38 @@
   font-family: inherit;
   line-height: 1.5;
 }
-.wp-block-bys-groups-group-communication-send-modal .comm-textarea::-moz-placeholder {
+.wp-block-bys-groups-group-communication-send-modal .csm textarea::-moz-placeholder {
   color: var(--wp--preset--color--gray-400);
 }
-.wp-block-bys-groups-group-communication-send-modal .comm-textarea::placeholder {
+.wp-block-bys-groups-group-communication-send-modal .csm textarea::placeholder {
   color: var(--wp--preset--color--gray-400);
 }
-.wp-block-bys-groups-group-communication-send-modal .comm-textarea:focus {
+.wp-block-bys-groups-group-communication-send-modal .csm textarea:focus {
   border-color: var(--wp--preset--color--primary);
 }
-.wp-block-bys-groups-group-communication-send-modal .comm-schedule {
+.wp-block-bys-groups-group-communication-send-modal .csm__preview {
+  border: 1px solid var(--wp--preset--color--gray-200);
+  border-radius: 0.5rem;
+  background: var(--wp--preset--color--gray-50);
+  padding: var(--wp--preset--spacing--3);
+  overflow: auto;
+  max-height: 24rem;
+}
+.wp-block-bys-groups-group-communication-send-modal .csm__preview iframe {
+  width: 100%;
+  border: none;
+  border-radius: 0.25rem;
+}
+.wp-block-bys-groups-group-communication-send-modal .csm__preview html, .wp-block-bys-groups-group-communication-send-modal .csm__preview body {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+}
+.wp-block-bys-groups-group-communication-send-modal .csm__form-schedule {
   display: flex;
   gap: var(--wp--preset--spacing--3);
 }
-.wp-block-bys-groups-group-communication-send-modal .comm-date,
-.wp-block-bys-groups-group-communication-send-modal .comm-time {
+.wp-block-bys-groups-group-communication-send-modal .csm__form-schedule-date, .wp-block-bys-groups-group-communication-send-modal .csm__form-schedule-time {
   padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--3);
   border: 1px solid var(--wp--preset--color--gray-200);
   border-radius: 0.5rem;
@@ -187,15 +204,14 @@
   background: white;
   outline: none;
 }
-.wp-block-bys-groups-group-communication-send-modal .comm-date:focus,
-.wp-block-bys-groups-group-communication-send-modal .comm-time:focus {
+.wp-block-bys-groups-group-communication-send-modal .csm__form-schedule-date:focus, .wp-block-bys-groups-group-communication-send-modal .csm__form-schedule-time:focus {
   border-color: var(--wp--preset--color--primary);
 }
-.wp-block-bys-groups-group-communication-send-modal .comm-form-actions {
-  padding-top: var(--wp--preset--spacing--2);
+.wp-block-bys-groups-group-communication-send-modal .csm__form-actions {
+  padding-top: var(--wp--preset--spacing--4);
   border-top: 1px solid var(--wp--preset--color--gray-100);
 }
-.wp-block-bys-groups-group-communication-send-modal .comm-submit-btn {
+.wp-block-bys-groups-group-communication-send-modal .csm__form-submit {
   padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--6);
   background: var(--wp--preset--color--primary);
   color: white;
@@ -204,6 +220,23 @@
   font-weight: 500;
   transition: opacity 0.15s;
 }
-.wp-block-bys-groups-group-communication-send-modal .comm-submit-btn:hover {
+.wp-block-bys-groups-group-communication-send-modal .csm__form-submit:hover {
   opacity: 0.88;
+}
+.wp-block-bys-groups-group-communication-send-modal .csm__feedback {
+  padding: var(--wp--preset--spacing--4);
+  border: 1px solid var(--wp--preset--color--gray-100);
+  border-radius: 0.25rem;
+  margin-bottom: var(--wp--preset--spacing--4);
+  font-size: var(--wp--preset--font-size--small);
+}
+.wp-block-bys-groups-group-communication-send-modal .csm__feedback--success {
+  border-color: var(--wp--preset--color--green-500);
+  background-color: var(--wp--preset--color--green-50);
+  color: var(--wp--preset--color--green-800);
+}
+.wp-block-bys-groups-group-communication-send-modal .csm__feedback--error {
+  border-color: var(--wp--preset--color--red-500);
+  background-color: var(--wp--preset--color--red-50);
+  color: var(--wp--preset--color--red-800);
 }

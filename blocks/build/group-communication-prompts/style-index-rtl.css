@@ -1,30 +1,30 @@
 /*!***************************************************************************************************************************************************************************************************************************************************************************************************!*\
   !*** css ./node_modules/css-loader/dist/cjs.js??ruleSet[1].rules[4].use[1]!./node_modules/postcss-loader/dist/cjs.js??ruleSet[1].rules[4].use[2]!./node_modules/@wordpress/scripts/node_modules/sass-loader/dist/cjs.js??ruleSet[1].rules[4].use[3]!./src/group-communication-prompts/style.scss ***!
   \***************************************************************************************************************************************************************************************************************************************************************************************************/
-.wp-block-bys-groups-group-communication-prompts .comm-prompts__header {
+.wp-block-bys-groups-group-communication-prompts .gcp__header {
   margin-bottom: var(--wp--preset--spacing--3);
 }
-.wp-block-bys-groups-group-communication-prompts .comm-prompts__subtitle {
+.wp-block-bys-groups-group-communication-prompts .gcp__subtitle {
   margin: 0;
   font-size: var(--wp--preset--font-size--small);
   color: var(--wp--preset--color--gray-500);
 }
-.wp-block-bys-groups-group-communication-prompts .comm-prompts__card {
+.wp-block-bys-groups-group-communication-prompts .gcp__card {
   background: white;
   border: 1px solid var(--wp--preset--color--gray-100);
   border-radius: 0.75rem;
   overflow: hidden;
 }
-.wp-block-bys-groups-group-communication-prompts .comm-prompts__item {
+.wp-block-bys-groups-group-communication-prompts .gcp__item {
   display: flex;
   align-items: center;
   gap: var(--wp--preset--spacing--4);
   padding: var(--wp--preset--spacing--4) var(--wp--preset--spacing--5);
 }
-.wp-block-bys-groups-group-communication-prompts .comm-prompts__item:not(:last-of-type) {
+.wp-block-bys-groups-group-communication-prompts .gcp__item:not(:last-of-type) {
   border-bottom: 1px solid var(--wp--preset--color--gray-100);
 }
-.wp-block-bys-groups-group-communication-prompts .comm-prompts__icon {
+.wp-block-bys-groups-group-communication-prompts .gcp__icon {
   width: 2.75rem;
   height: 2.75rem;
   border-radius: 50%;
@@ -36,29 +36,29 @@
   font-size: 1rem;
   flex-shrink: 0;
 }
-.wp-block-bys-groups-group-communication-prompts .comm-prompts__info {
+.wp-block-bys-groups-group-communication-prompts .gcp__info {
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: var(--wp--preset--spacing--1);
   min-width: 0;
 }
-.wp-block-bys-groups-group-communication-prompts .comm-prompts__name {
+.wp-block-bys-groups-group-communication-prompts .gcp__name {
   font-size: var(--wp--preset--font-size--small);
   font-weight: 600;
   color: var(--wp--preset--color--gray-900);
 }
-.wp-block-bys-groups-group-communication-prompts .comm-prompts__desc {
+.wp-block-bys-groups-group-communication-prompts .gcp__desc {
   font-size: var(--wp--preset--font-size--small);
   color: var(--wp--preset--color--gray-500);
 }
-.wp-block-bys-groups-group-communication-prompts .comm-prompts__actions {
+.wp-block-bys-groups-group-communication-prompts .gcp__actions {
   display: flex;
   align-items: center;
   gap: var(--wp--preset--spacing--2);
   flex-shrink: 0;
 }
-.wp-block-bys-groups-group-communication-prompts .comm-prompts__history-btn {
+.wp-block-bys-groups-group-communication-prompts .gcp__history {
   padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--4);
   border: 1.5px solid var(--wp--preset--color--primary);
   border-radius: 9999px;
@@ -69,11 +69,11 @@
   transition: background 0.15s, color 0.15s;
   background-color: var(--wp--preset--color--blue-50);
 }
-.wp-block-bys-groups-group-communication-prompts .comm-prompts__history-btn:hover {
+.wp-block-bys-groups-group-communication-prompts .gcp__history:hover {
   background: var(--wp--preset--color--primary);
   color: white;
 }
-.wp-block-bys-groups-group-communication-prompts .comm-prompts__proceed-btn {
+.wp-block-bys-groups-group-communication-prompts .gcp__proceed {
   padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--4);
   background: var(--wp--preset--color--primary);
   border-radius: 9999px;
@@ -83,6 +83,10 @@
   white-space: nowrap;
   transition: opacity 0.15s;
 }
-.wp-block-bys-groups-group-communication-prompts .comm-prompts__proceed-btn:hover {
+.wp-block-bys-groups-group-communication-prompts .gcp__proceed:hover:not(:disabled) {
   opacity: 0.88;
+}
+.wp-block-bys-groups-group-communication-prompts .gcp__proceed:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }

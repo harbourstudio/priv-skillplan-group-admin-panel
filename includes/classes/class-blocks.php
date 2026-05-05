@@ -34,6 +34,7 @@ if (!class_exists('BYS_Groups_Blocks')) {
             'group-unarchive',
             'group-ungraded-quiz-alert',
             'group-user-quiz-config',
+            'organization-groups',
             'user-activity',
             'user-info',
             'user-progress',

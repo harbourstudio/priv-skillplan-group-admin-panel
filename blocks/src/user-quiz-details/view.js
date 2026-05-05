@@ -8,8 +8,8 @@ jQuery(document).ready(($) => {
     const groupId = params.get('group_id');
     const userId = params.get('user_id');
 
-    if (!groupId || !userId) {
-        console.error('[user-quiz-details] Missing group_id or user_id URL parameter');
+    if (!userId) {
+        console.error('[user-quiz-details] Missing user_id URL parameter');
         return;
     }
 
@@ -240,8 +240,7 @@ jQuery(document).ready(($) => {
         $flatTableBody.html(`<tr>${loadingCells}</tr>`);
 
         try {
-            const courseIds = (window.bysGroupsCache?.courses || []).map(c => c.id).join(',');
-            const url = endpoints.userQuizProgress(userId) + `?group_id=${groupId}` + (courseIds ? `&course_ids=${courseIds}` : '');
+            const url = endpoints.userQuizProgress(userId);
             const quizzes = await api.get(url);
 
             if (!Array.isArray(quizzes) || quizzes.length === 0) {

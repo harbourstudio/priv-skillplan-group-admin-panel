@@ -89,7 +89,6 @@
         &__course-name {
             font-weight: 500;
             font-size: var(--wp--preset--font-size--base);
-            white-space: nowrap;
             min-width: 10rem;
         }
 
@@ -103,6 +102,7 @@
                 border-radius: 999px;
                 padding: var(--wp--preset--spacing--1) var(--wp--preset--spacing--3);
                 font-weight: 500;
+                white-space: nowrap;
 
                 &::before {
                     display: inline-flex;
@@ -129,6 +129,7 @@
             border-radius: 999px;
             font-size: var(--wp--preset--font-size--x-small);
             padding: var(--wp--preset--spacing--1) var(--wp--preset--spacing--2);
+            white-space: nowrap;
         }
 
     }

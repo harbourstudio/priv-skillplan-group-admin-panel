@@ -1,47 +1,38 @@
 import { api, endpoints } from '../_shared/api-client.js';
+import flatpickr from 'flatpickr';
+import 'flatpickr/dist/flatpickr.min.css';
 
-let allMembers = [];  // [{ id, display_name, first_name, last_name, email }]
-let allQuizzes = [];  // [{ step_id, step_title, course_name }]
-let userQuizAccessDatesMap = {}; // quiz_id -> { start, end } (stored in UTC)
+let allMembers             = [];
+let allQuizzes             = [];
+let userQuizAccessDatesMap = {};
 
 let currentGroupId = null;
 let selectedUserId = null;
 let selectedQuizId = null;
 
-let tzData = { timezone: 'UTC', utc_offset_hours: 0 };
+let startFp = null;
+let endFp   = null;
 
-// Initialize timezone data from server
-function initTimezoneData() {
-    const tzDataEl = document.getElementById('bys-user-quiz-config-tz-data');
-    tzData = tzDataEl ? JSON.parse(tzDataEl.textContent) : { timezone: 'UTC', utc_offset_hours: 0 };
-}
-
-// Convert UTC ISO 8601 string to browser-local datetime-local value for display
+// Convert UTC ISO 8601 string to local datetime string (Flatpickr dateFormat)
 function convertFromUTC(utcDatetimeValue) {
     if (!utcDatetimeValue) return '';
-
     const dt = new Date(utcDatetimeValue);
     if (isNaN(dt.getTime())) return '';
-
-    const year = dt.getFullYear();
-    const month = String(dt.getMonth() + 1).padStart(2, '0');
-    const day = String(dt.getDate()).padStart(2, '0');
-    const hours = String(dt.getHours()).padStart(2, '0');
-    const minutes = String(dt.getMinutes()).padStart(2, '0');
-
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
+    const Y = dt.getFullYear();
+    const m = String(dt.getMonth() + 1).padStart(2, '0');
+    const d = String(dt.getDate()).padStart(2, '0');
+    const H = String(dt.getHours()).padStart(2, '0');
+    const i = String(dt.getMinutes()).padStart(2, '0');
+    return `${Y}-${m}-${d}T${H}:${i}`;
 }
 
-// Convert browser-local datetime-local value to UTC ISO 8601 string for storage
+// Convert Flatpickr dateFormat string (YYYY-MM-DDTHH:mm, local) to UTC ISO 8601
 function convertToUTC(localDatetimeValue) {
     if (!localDatetimeValue) return '';
-
     const [datePart, timePart] = localDatetimeValue.split('T');
-    const [year, month, day] = datePart.split('-').map(Number);
-    const [hours, minutes] = timePart.split(':').map(Number);
-
-    const localDate = new Date(year, month - 1, day, hours, minutes, 0);
-    return localDate.toISOString();
+    const [year, month, day]   = datePart.split('-').map(Number);
+    const [hours, minutes]     = timePart.split(':').map(Number);
+    return new Date(year, month - 1, day, hours, minutes).toISOString();
 }
 
 function courseTitle(course) {
@@ -51,51 +42,113 @@ function courseTitle(course) {
 }
 
 jQuery(document).ready(($) => {
-    // Initialize timezone data first
-    initTimezoneData();
-
-    const $block      = $('.wp-block-bys-groups-group-user-quiz-config').first();
+    const $block = $('.wp-block-bys-groups-group-user-quiz-config').first();
     if (!$block.length) return;
 
     const $learnerInput = $block.find('#guqc__learner-search');
     const $learnerList  = $block.find('.guqc__suggestions--learner');
     const $quizInput    = $block.find('#guqc__quiz-search');
     const $quizList     = $block.find('.guqc__suggestions--quiz');
-    const $startInput   = $block.find('.guqc__datetime[aria-label="Start date"]');
-    const $endInput     = $block.find('.guqc__datetime[aria-label="End date"]');
     const $saveBtn      = $block.find('.guqc__save');
     const $notifyBtn    = $block.find('.guqc__notify');
+
+    // ── Flatpickr init ────────────────────────────────────────────────────────
+
+    const FP_SHARED = {
+        enableTime:     true,
+        dateFormat:     'Y-m-d\\TH:i',
+        altInput:       true,
+        altInputClass:  'flatpickr-input flatpickr-alt-input', // prevent inheriting original's classes
+        altFormat:      'j M Y, H:i',
+        time_24hr:      true,
+        disableMobile:  true,
+        allowInput:     false,
+        onReady(_, __, fp) {
+            fp.calendarContainer.classList.add('bys-fp');
+            if (fp.altInput && fp.config.placeholder) {
+                fp.altInput.placeholder = fp.config.placeholder;
+            }
+        },
+    };
+
+    startFp = flatpickr($block.find('.guqc__datetime[data-field-type="start"]')[0], {
+        ...FP_SHARED,
+        placeholder: 'No date restriction',
+        onChange(_, dateStr) {
+            endFp.set('minDate', dateStr || null);
+        },
+    });
+
+    endFp = flatpickr($block.find('.guqc__datetime[data-field-type="end"]')[0], {
+        ...FP_SHARED,
+        placeholder: 'No date restriction',
+        onChange(_, dateStr) {
+            startFp.set('maxDate', dateStr || null);
+        },
+    });
+
+    // Clicking anywhere in the date-field (icon, gap) opens the picker
+    $block.find('.guqc__datetime[data-field-type="start"]')
+        .closest('.guqc__date-field')
+        .on('click', (e) => { if (!e.target.classList.contains('flatpickr-alt-input')) startFp.open(); });
+    $block.find('.guqc__datetime[data-field-type="end"]')
+        .closest('.guqc__date-field')
+        .on('click', (e) => { if (!e.target.classList.contains('flatpickr-alt-input')) endFp.open(); });
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
     function updateActions() {
         $saveBtn.prop('disabled', !(selectedUserId && selectedQuizId));
         $notifyBtn.prop('disabled', !selectedUserId);
     }
 
-    // Load user quiz access dates when quiz is selected
+    function setDates(startUtc, endUtc) {
+        if (startUtc) {
+            startFp.setDate(convertFromUTC(startUtc), false);
+            endFp.set('minDate', convertFromUTC(startUtc));
+        } else {
+            startFp.clear();
+            endFp.set('minDate', null);
+        }
+        if (endUtc) {
+            endFp.setDate(convertFromUTC(endUtc), false);
+            startFp.set('maxDate', convertFromUTC(endUtc));
+        } else {
+            endFp.clear();
+            startFp.set('maxDate', null);
+        }
+    }
+
+    function clearDates() {
+        startFp.clear();
+        endFp.clear();
+        startFp.set('maxDate', null);
+        endFp.set('minDate', null);
+    }
+
+    // ── Quiz access date loading ───────────────────────────────────────────────
+
     async function loadQuizAccessDates() {
         if (!selectedUserId || !selectedQuizId || !currentGroupId) {
-            $startInput.val('');
-            $endInput.val('');
+            clearDates();
             return;
         }
 
         try {
             const accessDates = await api.get(endpoints.userQuizAccess(currentGroupId, selectedUserId));
-            const dates = accessDates[selectedQuizId] || {};
-            $startInput.val(convertFromUTC(dates.start || ''));
-            $endInput.val(convertFromUTC(dates.end || ''));
+            const dates       = accessDates[selectedQuizId] || {};
+            setDates(dates.start || '', dates.end || '');
             userQuizAccessDatesMap = accessDates;
         } catch (err) {
             console.error('[uqc] Failed to load quiz access dates:', err);
-            $startInput.val('');
-            $endInput.val('');
+            clearDates();
         }
     }
 
     // ── Learner suggestions ───────────────────────────────────────────────────
 
     function showLearnerSuggestions(query) {
-        const q = query.toLowerCase().trim();
+        const q       = query.toLowerCase().trim();
         const matches = (q
             ? allMembers.filter((m) =>
                 m.display_name.toLowerCase().includes(q) ||
@@ -124,14 +177,9 @@ jQuery(document).ready(($) => {
         $learnerList.removeClass('hidden');
     }
 
-    function hideLearnerSuggestions() {
-        $learnerList.addClass('hidden').empty();
-    }
+    function hideLearnerSuggestions() { $learnerList.addClass('hidden').empty(); }
 
-    $learnerInput.on('focus', function () {
-        showLearnerSuggestions($(this).val());
-    });
-
+    $learnerInput.on('focus', function () { showLearnerSuggestions($(this).val()); });
     $learnerInput.on('input', function () {
         selectedUserId = null;
         updateActions();
@@ -149,7 +197,7 @@ jQuery(document).ready(($) => {
     // ── Quiz suggestions ──────────────────────────────────────────────────────
 
     function showQuizSuggestions(query) {
-        const q = query.toLowerCase().trim();
+        const q       = query.toLowerCase().trim();
         const matches = (q
             ? allQuizzes.filter((qz) =>
                 qz.step_title.toLowerCase().includes(q) ||
@@ -176,14 +224,9 @@ jQuery(document).ready(($) => {
         $quizList.removeClass('hidden');
     }
 
-    function hideQuizSuggestions() {
-        $quizList.addClass('hidden').empty();
-    }
+    function hideQuizSuggestions() { $quizList.addClass('hidden').empty(); }
 
-    $quizInput.on('focus', function () {
-        showQuizSuggestions($(this).val());
-    });
-
+    $quizInput.on('focus', function () { showQuizSuggestions($(this).val()); });
     $quizInput.on('input', function () {
         selectedQuizId = null;
         updateActions();
@@ -199,7 +242,7 @@ jQuery(document).ready(($) => {
         loadQuizAccessDates();
     });
 
-    // ── Click outside to close ────────────────────────────────────────────────
+    // ── Click outside ─────────────────────────────────────────────────────────
 
     const $learnerWrap = $learnerInput.closest('.guqc__combobox-wrap');
     const $quizWrap    = $quizInput.closest('.guqc__combobox-wrap');
@@ -216,51 +259,25 @@ jQuery(document).ready(($) => {
         }
     });
 
-    // ── Datetime change handler with start/end date restrictions ────────────────
+    // ── Save ──────────────────────────────────────────────────────────────────
 
-    $block.on('change', '.guqc__datetime', function() {
-        const startVal = $startInput.val();
-        const endVal = $endInput.val();
-        const changedFieldType = $(this).data('field-type');
-
-        // If both dates are set, enforce start <= end
-        if (startVal && endVal) {
-            const startTime = new Date(startVal).getTime();
-            const endTime = new Date(endVal).getTime();
-
-            if (startTime > endTime) {
-                // Start date is after end date - clear the field that was just changed
-                if (changedFieldType === 'start') {
-                    $startInput.val('');
-                } else {
-                    $endInput.val('');
-                }
-            }
-        }
-    });
-
-    // ── Save button handler ───────────────────────────────────────────────────
-
-    $saveBtn.on('click', async function() {
+    $saveBtn.on('click', async function () {
         if (!selectedUserId || !selectedQuizId || !currentGroupId) return;
 
         $saveBtn.prop('disabled', true).text('Saving...');
 
         try {
-            const startValue = $startInput.val() || '';
-            const endValue = $endInput.val() || '';
+            // Read from the hidden inputs Flatpickr writes its dateFormat value to
+            const startValue = $block.find('.guqc__datetime[data-field-type="start"]').val() || '';
+            const endValue   = $block.find('.guqc__datetime[data-field-type="end"]').val()   || '';
+            const start      = convertToUTC(startValue);
+            const end        = convertToUTC(endValue);
 
-            // Convert browser-local to UTC before sending
-            const start = convertToUTC(startValue);
-            const end = convertToUTC(endValue);
-
-            // Send to server
             await api.post(
                 endpoints.userQuizAccess(currentGroupId, selectedUserId),
                 { quiz_id: selectedQuizId, start, end }
             );
 
-            // Update local cache
             userQuizAccessDatesMap[selectedQuizId] = { start, end };
 
             $saveBtn.prop('disabled', true).text('Changes saved!');
@@ -300,7 +317,7 @@ jQuery(document).ready(($) => {
             const results = await Promise.all(
                 courses.map(async (course) => {
                     try {
-                        const steps = await api.get(endpoints.courseQuizSteps(course.id));
+                        const steps = await api.get(endpoints.courseQuizStepsGrading(course.id));
                         const name  = courseTitle(course);
                         return (Array.isArray(steps) ? steps : []).map((s) => ({
                             step_id:     s.step_id,
@@ -326,17 +343,13 @@ jQuery(document).ready(($) => {
         userQuizAccessDatesMap = {};
         $learnerInput.val('');
         $quizInput.val('');
-        $startInput.val('');
-        $endInput.val('');
+        clearDates();
         hideLearnerSuggestions();
         hideQuizSuggestions();
         updateActions();
 
         const userIds = baseUsersStats?.user_ids || [];
-        await Promise.all([
-            loadMembers(groupId, userIds),
-            loadQuizzes(courses),
-        ]);
+        await Promise.all([loadMembers(groupId, userIds), loadQuizzes(courses)]);
     }
 
     $(document).on('bys:groupSelected', (_, { groupId, baseUsersStats, courses }) => {

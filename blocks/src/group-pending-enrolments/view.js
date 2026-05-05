@@ -21,13 +21,15 @@ jQuery(document).ready(($) => {
         return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
     }
 
+    const canModify = window.bysGroupsAuth?.isSiteEditor !== true;
+
     function buildRow(invite) {
         const $row = $(`
             <div class="pending-enrolments__item" data-invite-id="${invite.id}">
                 <span class="pending-enrolments__email">${$('<span>').text(invite.email).html()}</span>
                 <span class="pending-enrolments__date">${formatDate(invite.invited_at)}</span>
                 <span class="pending-enrolments__badge">Pending</span>
-                <button class="pending-enrolments__cancel btn-unstyled" type="button" aria-label="Cancel invitation">&#x2715;</button>
+                ${canModify ? `<button class="pending-enrolments__cancel btn-unstyled" type="button" aria-label="Cancel invitation">&#x2715;</button>` : ''}
             </div>
         `);
 

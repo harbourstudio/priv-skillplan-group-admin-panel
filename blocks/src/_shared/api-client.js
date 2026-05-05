@@ -15,6 +15,9 @@ function getAuthorizationHeader() {
 // custom API endpoint definitions
 export const endpoints = {
   currentUserGroups: () => '/wp-json/bys-groups/v1/me/groups',
+  currentUserOrganizations: () => '/wp-json/bys-groups/v1/me/organizations',
+  createOrganization: () => '/wp-json/bys-groups/v1/organizations',
+  createOrganizationGroup: (orgId) => `/wp-json/bys-groups/v1/organizations/${orgId}/groups`,
   groupBaseUsersStats: (groupId) => `/wp-json/bys-groups/v1/groups/${groupId}/base-user-stats`,
   groupUsers: (groupId, userIds) => `/wp-json/bys-groups/v1/groups/${groupId}/users?user_ids=${userIds}`,
   groupUserInfo: (groupId, userId ) => `/wp-json/bys-groups/v1/groups/${groupId}/users/${userId}`,
@@ -23,10 +26,12 @@ export const endpoints = {
   courseHierarchialBreakdown: (courseId) => `/wp-json/bys-groups/v1/courses/${courseId}/steps`,
   groupUserCourseProgress: (userId, courseIds) => `/wp-json/bys-groups/v1/users/${userId}/course-progress?course_ids=${courseIds}`,
   courseQuizSteps: (courseId) => `/wp-json/bys-groups/v1/courses/${courseId}/quiz-steps`,
+  courseQuizStepsGrading: (courseId) => `/wp-json/bys-groups/v1/courses/${courseId}/quiz-steps?filter=grading`,
   courseQuizProgressBatch: (courseId, userIds) => `/wp-json/bys-groups/v1/courses/${courseId}/quiz-progress-batch?user_ids=${userIds}`,
   groupQuizSubmissionStats: (groupId, quizIds) => `/wp-json/bys-groups/v1/groups/${groupId}/quiz-submission-stats?quiz_ids=${quizIds.join(',')}`,
   groupQuizAttempts: (groupId, quizId) => `/wp-json/bys-groups/v1/groups/${groupId}/quizzes/${quizId}/attempts`,
   userQuizAttempts: (userId, courseId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-attempts?course_id=${courseId}`,
+  userCourses: (userId) => `/wp-json/bys-groups/v1/users/${userId}/courses`,
   userQuizProgress: (userId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-progress`,
   userQuizAttemptsDetails: (userId, quizId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-attempts/${quizId}`,
   attemptDetail: (activityId) => `/wp-json/bys-groups/v1/attempts/${activityId}`,
@@ -36,6 +41,7 @@ export const endpoints = {
   userCourseStepsProgress: (userId, courseId) => `/wp-json/bys-groups/v1/users/${userId}/course-progress-steps/${courseId}`,
   trackTopicVisit: (userId) => `/wp-json/bys-groups/v1/users/${userId}/track-topic-visit`,
   groupLeaders: (groupId) => `/wp-json/bys-groups/v1/groups/${groupId}/leaders`,
+  removeGroupLeader: (groupId, userId) => `/wp-json/bys-groups/v1/groups/${groupId}/leaders/${userId}`,
   allCourses: () => '/wp-json/bys-groups/v1/all-courses',
   addGroupCourse: (groupId, courseId) => `/wp-json/bys-groups/v1/groups/${groupId}/courses/${courseId}/add`,
   removeGroupCourse: (groupId, courseId) => `/wp-json/bys-groups/v1/groups/${groupId}/courses/${courseId}/remove`,
@@ -136,6 +142,26 @@ export const api = {
     }).catch((jqXHR) => {
       console.error(`POST failed for ${url}:`, jqXHR.status, jqXHR.responseText?.substring(0, 200));
       throw new Error(`POST failed: ${jqXHR.status} ${jqXHR.responseText?.substring(0, 100)}`);
+    });
+  },
+
+  /**
+   * Fire-and-forget DELETE.
+   */
+  delete(url) {
+    const headers = {};
+    const authHeader = getAuthorizationHeader();
+    if (authHeader) headers['Authorization'] = authHeader;
+    if (window.bysGroupsAuth?.nonce) headers['X-WP-Nonce'] = window.bysGroupsAuth.nonce;
+
+    return jQuery.ajax({
+      url,
+      type: 'DELETE',
+      headers,
+      dataType: 'json',
+    }).then((data) => data).catch((jqXHR) => {
+      console.error(`DELETE failed for ${url}:`, jqXHR.status, jqXHR.responseText?.substring(0, 200));
+      throw new Error(`DELETE failed: ${jqXHR.status} ${jqXHR.responseText?.substring(0, 100)}`);
     });
   },
 

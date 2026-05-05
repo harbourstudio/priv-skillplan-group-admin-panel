@@ -1,4 +1,5 @@
 import { api, endpoints } from '../_shared/api-client.js';
+import { bysConfirm } from '../_shared/confirm.js';
 
 let currentGroupId = null;
 let groupCourses   = [];
@@ -53,7 +54,7 @@ function buildCourseRow(course) {
 
     $row.find('.course-config__remove').on('click', async function () {
         const $btn = jQuery(this);
-        if (!window.confirm(`Remove "${title}" from this group?`)) return;
+        if (!await bysConfirm(`Remove "${title}" from this group?`, 'Remove')) return;
         $btn.prop('disabled', true);
 
         try {
@@ -177,7 +178,7 @@ jQuery(document).ready(async ($) => {
 
     // ── Group selected ────────────────────────────────────────────────────────
 
-    $(document).on('bys:groupSelected', (_, { groupId, courses }) => {
+    $(document).on('bys:groupSelected', (_, { groupId, courses, isSiteEditor }) => {
         currentGroupId = groupId;
         selectedCourse = null;
         allCourses     = [];
@@ -186,6 +187,9 @@ jQuery(document).ready(async ($) => {
         $addBtn.prop('disabled', true);
         hideSuggestions();
 
+        // Show/hide the entire add-course form for site editors
+        $block.find('.course-config__add').toggle(!isSiteEditor);
+
         $skeleton.show();
         $list.empty();
         $empty.hide();
@@ -193,6 +197,11 @@ jQuery(document).ready(async ($) => {
         groupCourses = Array.isArray(courses) ? courses : [];
         $skeleton.hide();
         renderList();
+
+        // Hide per-row remove and required toggle for site editors
+        if (isSiteEditor) {
+            $list.find('.course-config__remove, .course-config__toggle').hide();
+        }
     });
 
     if (window.bysGroupData?.courses) {

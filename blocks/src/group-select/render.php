@@ -39,7 +39,9 @@ $auth_header = BYS_Groups_Auth::get_auth_header();
 	<?php if ($auth_header): ?>
 		<script>
 			window.bysGroupsAuth = {
-				header: '<?php echo esc_js($auth_header); ?>'
+				header: '<?php echo esc_js($auth_header); ?>',
+				isGrader: <?php echo json_encode( in_array( 'grader', (array) wp_get_current_user()->roles, true ) ); ?>,
+				isSiteEditor: <?php echo json_encode( in_array( 'editor', (array) wp_get_current_user()->roles, true ) ); ?>,
 			};
 		</script>
 	<?php endif; ?>
@@ -53,6 +55,7 @@ $auth_header = BYS_Groups_Auth::get_auth_header();
 						<option
 							class="group-option"
 							value="<?php echo $group['id']; ?>"
+							data-is-org-admin="<?php echo !empty($group['is_org_admin']) ? '1' : '0'; ?>"
 						>
 							<?php echo $group['title']; ?>
 						</option>
