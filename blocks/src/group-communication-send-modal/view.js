@@ -1,4 +1,28 @@
 import { api, endpoints } from '../_shared/api-client.js';
+import flatpickr from 'flatpickr';
+import 'flatpickr/dist/flatpickr.min.css';
+
+// Convert UTC ISO 8601 string to local datetime string (dateFormat for Flatpickr)
+function convertFromUTC(utcDatetimeValue) {
+    if (!utcDatetimeValue) return '';
+    const dt = new Date(utcDatetimeValue);
+    if (isNaN(dt.getTime())) return '';
+    const Y  = dt.getFullYear();
+    const m  = String(dt.getMonth() + 1).padStart(2, '0');
+    const d  = String(dt.getDate()).padStart(2, '0');
+    const H  = String(dt.getHours()).padStart(2, '0');
+    const i  = String(dt.getMinutes()).padStart(2, '0');
+    return `${Y}-${m}-${d}T${H}:${i}`;
+}
+
+// Convert Flatpickr dateFormat string (YYYY-MM-DDTHH:mm, local) to UTC ISO 8601
+function convertToUTC(localDatetimeValue) {
+    if (!localDatetimeValue) return '';
+    const [datePart, timePart] = localDatetimeValue.split('T');
+    const [year, month, day]   = datePart.split('-').map(Number);
+    const [hours, minutes]     = timePart.split(':').map(Number);
+    return new Date(year, month - 1, day, hours, minutes).toISOString();
+}
 
 jQuery(document).ready(function($) {
     const $block = $('.wp-block-bys-groups-group-communication-send-modal').first();
@@ -21,6 +45,38 @@ jQuery(document).ready(function($) {
     let currentPromptType = null;
     let currentGroupId = null;
     let isSubmitting = false;
+
+    // ── Flatpickr init ────────────────────────────────────────────────────────
+
+    const FP_SHARED = {
+        enableTime:     true,
+        dateFormat:     'Y-m-d\\TH:i',
+        altInput:       true,
+        altInputClass:  'flatpickr-input flatpickr-alt-input',
+        altFormat:      'j M Y, H:i',
+        time_24hr:      true,
+        disableMobile:  true,
+        static: true,
+        position: 'above right',
+        onReady(_, __, fp) {
+            fp.calendarContainer.classList.add('bys-fp');
+            if (fp.altInput && fp.config.placeholder) {
+                fp.altInput.placeholder = fp.config.placeholder;
+            }
+        },
+    };
+
+    const scheduleFp = flatpickr($modal.find('#csm__schedule-datetime')[0], {
+        ...FP_SHARED,
+        placeholder: 'No schedule',
+    });
+
+    // Clicking anywhere in the schedule field (icon, gap) opens the picker
+    $modal.find('#csm__schedule-datetime')
+        .closest('.csm__form-schedule')
+        .on('click', (e) => {
+            if (!e.target.classList.contains('flatpickr-alt-input')) scheduleFp.open();
+        });
 
     /**
      * Modal management
@@ -59,6 +115,9 @@ jQuery(document).ready(function($) {
         // Reset form and set default recipient type
         $form[0].reset();
         $modal.find('input[name="recipient"][value="group"]').prop('checked', true).trigger('change');
+
+        // Clear scheduled datetime
+        scheduleFp.clear();
 
         // Show/hide subject field based on prompt type
         const $subjectGroup = $subject.closest('.csm__form-group');
@@ -184,6 +243,10 @@ jQuery(document).ready(function($) {
                 recipientIds = Array.from($modal.find('#csm__bulk-recipient').val() || []).map(v => parseInt(v, 10));
             }
 
+            // Get scheduled datetime from flatpickr (convert to UTC if set)
+            const localDatetime = $modal.find('#csm__schedule-datetime').val() || '';
+            const scheduledAt = localDatetime ? convertToUTC(localDatetime) : '';
+
             // POST to REST endpoint
             const url = `/wp-json/bys-groups/v1/groups/${currentGroupId}/send-communication`;
             const response = await api.post(url, {
@@ -192,6 +255,7 @@ jQuery(document).ready(function($) {
                 recipient_ids: recipientIds,
                 custom_subject: customSubject,
                 custom_message: customMessage,
+                scheduled_at: scheduledAt,
             });
 
             if (response && response.success) {

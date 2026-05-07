@@ -106,6 +106,7 @@ $tz_offset_hours = $tz_offset_seconds / 3600;
                 />
                 <i class="fa-regular fa-calendar guqc__calendar-icon" aria-hidden="true"></i>
             </div>
+            
         </div>
 
         <div class="guqc__actions">

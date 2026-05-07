@@ -1,3 +1,5 @@
+@use '../_shared/flatpickr';
+
 .wp-block-bys-groups-group-communication-send-modal {
 
     .csm {
@@ -222,25 +224,43 @@
         }
     
         // ── Schedule ──────────────────────────────────────────────────────────────
-    
+
         &__form-schedule {
             display: flex;
-            gap: var(--wp--preset--spacing--3);
-        }
-    
-        &__form-schedule-date,
-        &__form-schedule-time {
-            padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--3);
-            border: 1px solid var(--wp--preset--color--gray-200);
+            align-items: center;
+            gap: var(--wp--preset--spacing--2);
+            background: var(--wp--preset--color--gray-50);
             border-radius: 0.5rem;
-            font-size: var(--wp--preset--font-size--small);
-            color: var(--wp--preset--color--gray-700);
-            background: white;
-            outline: none;
-    
-            &:focus { border-color: var(--wp--preset--color--primary); }
+            padding: var(--wp--preset--spacing--3);
+            cursor: pointer;
+            width: fit-content;
+
+            .flatpickr-alt-input {
+                flex: 1;
+                border: none;
+                padding: 0 !important;
+                background: transparent;
+                font-size: var(--wp--preset--font-size--small);
+                color: var(--wp--preset--color--gray-700);
+                outline: none;
+                min-width: 0;
+                cursor: pointer;
+
+                &::placeholder { color: var(--wp--preset--color--gray-400); }
+            }
         }
-    
+
+        &__schedule-input {
+            display: none;
+        }
+
+        &__schedule-icon,
+        &__calendar-icon {
+            font-size: 0.75rem;
+            color: var(--wp--preset--color--gray-400);
+            flex-shrink: 0;
+        }
+
         // ── Submit ────────────────────────────────────────────────────────────────
     
         &__form-actions {
@@ -281,3 +301,7 @@
         }
     }
 }
+
+// Static positioning for flatpickr in modal
+// With static: true, the calendar renders inline in the DOM, not floating
+// No need for position: fixed when using static mode

@@ -57,7 +57,11 @@ export const endpoints = {
   userQuizAccess: (groupId, userId) => `/wp-json/bys-groups/v1/groups/${groupId}/users/${userId}/quiz-access`,
   groupInviteBulk: (groupId) => `/wp-json/bys-groups/v1/groups/${groupId}/invite-bulk`,
   groupCommunicationLog: (groupId, count = 25, offset = 0) =>
-    `/wp-json/bys-groups/v1/groups/${groupId}/communication-log?count=${count}&offset=${offset}`
+    `/wp-json/bys-groups/v1/groups/${groupId}/communication-log?count=${count}&offset=${offset}`,
+  communicationRecipients: (batchId) =>
+    `/wp-json/bys-groups/v1/communications/batch/${batchId}/recipients`,
+  communicationDetail: (messageId) =>
+    `/wp-json/bys-groups/v1/communications/${messageId}/detail`
 };
 
 export const api = {

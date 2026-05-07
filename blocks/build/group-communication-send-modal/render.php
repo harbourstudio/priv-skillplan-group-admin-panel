@@ -122,8 +122,8 @@ $wrapper_attributes = get_block_wrapper_attributes();
                     <div class="csm__form-group">
                         <label class="csm__form-label"><?php esc_html_e('Schedule for', 'bys'); ?></label>
                         <div class="csm__form-schedule">
-                            <input type="date" class="csm__form-schedule-date" aria-label="<?php esc_attr_e('Send date', 'bys'); ?>" />
-                            <input type="time" class="csm__form-schedule-time" aria-label="<?php esc_attr_e('Send time', 'bys'); ?>" />
+                            <input type="text" id="csm__schedule-datetime" class="csm__schedule-input" aria-label="<?php esc_attr_e('Send date and time', 'bys'); ?>" />
+                            <i class="fa-regular fa-calendar csm__calendar-icon" aria-hidden="true"></i>
                         </div>
                         <p class="csm__form-hint"><?php esc_html_e('Leave blank to send immediately', 'bys'); ?></p>
                     </div>

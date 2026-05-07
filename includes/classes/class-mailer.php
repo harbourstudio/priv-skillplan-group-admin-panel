@@ -34,7 +34,8 @@ if (!class_exists('BYS_Groups_Mailer')) {
             $recipient_type,
             $recipient_ids = array(),
             $custom_subject = '',
-            $custom_message = ''
+            $custom_message = '',
+            $scheduled_at = ''
         ) {
             // Validate recipient type
             $valid_types = array('group', 'individual', 'condition');
@@ -94,6 +95,10 @@ if (!class_exists('BYS_Groups_Mailer')) {
             // Load email template functions
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/emails/group-comms.php';
 
+            // Generate batch ID for this send
+            $batch_id = wp_generate_uuid4();
+            error_log("[Mailer::send_group_communication] Generated batch_id: $batch_id");
+
             // Build Postmark batch payload
             $messages = array();
             foreach ($recipients_data as $recipient) {
@@ -130,6 +135,7 @@ if (!class_exists('BYS_Groups_Mailer')) {
                         'group_id' => (string)$group_id,
                         'sender_user_id' => (string)$user_id,
                         'prompt_type' => $prompt_type,
+                        'batch_id' => $batch_id,
                     ),
                 );
             }
@@ -139,6 +145,18 @@ if (!class_exists('BYS_Groups_Mailer')) {
                     'success' => false,
                     'sent_count' => 0,
                     'errors' => array('Failed to build email payloads'),
+                );
+            }
+
+            // If scheduled for later, queue the emails instead of sending immediately
+            if (!empty($scheduled_at)) {
+                return $this->queue_scheduled_emails(
+                    $messages,
+                    $group_id,
+                    $prompt_type,
+                    $user_id,
+                    $batch_id,
+                    $scheduled_at
                 );
             }
 
@@ -212,9 +230,11 @@ if (!class_exists('BYS_Groups_Mailer')) {
                                 'group_id' => $group_id,
                                 'sender_user_id' => $user_id,
                                 'prompt_type' => $prompt_type,
+                                'batch_id' => $batch_id,
+                                'delivery_status' => 'pending',
                                 'created_at' => current_time('mysql'),
                             ),
-                            array('%s', '%s', '%d', '%d', '%s', '%s')
+                            array('%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s')
                         );
                         if (!$wpdb->last_error) {
                             $sent_count++;
@@ -454,6 +474,88 @@ if (!class_exists('BYS_Groups_Mailer')) {
             // error_log("[BYS_Mailer::get_group_users_emails] Found " . count($unique_emails) . " unique group members");
 
             return $unique_emails;
+        }
+
+        /**
+         * Queue emails to be sent at a scheduled time
+         *
+         * @param array $messages Postmark messages to send
+         * @param int $group_id Group ID
+         * @param string $prompt_type Prompt type
+         * @param int $user_id Sender user ID
+         * @param string $batch_id Batch ID
+         * @param string $scheduled_at UTC ISO 8601 datetime when to send
+         * @return array Response array with success, sent_count, errors
+         */
+        private function queue_scheduled_emails($messages, $group_id, $prompt_type, $user_id, $batch_id, $scheduled_at) {
+            global $wpdb;
+
+            // Validate scheduled_at is a valid future datetime and convert to MySQL format
+            $scheduled_timestamp = strtotime($scheduled_at);
+            if (!$scheduled_timestamp || $scheduled_timestamp <= current_time('timestamp')) {
+                return array(
+                    'success' => false,
+                    'sent_count' => 0,
+                    'errors' => array('Scheduled time must be in the future'),
+                );
+            }
+
+            // Convert ISO 8601 string to MySQL UTC format (use gmdate, not wp_date, to stay in UTC)
+            $scheduled_mysql = gmdate('Y-m-d H:i:s', $scheduled_timestamp);
+
+            // Store emails in database with scheduled_at
+            // Note: message_id will be populated when the email is actually sent
+            $inserted_count = 0;
+            foreach ($messages as $message) {
+                $recipient_email = $message['To'];
+                $subject = $message['Subject'] ?? '';
+
+                $inserted = $wpdb->insert(
+                    $wpdb->prefix . BYS_GROUPS_COMMS_TABLE,
+                    array(
+                        'message_id' => null,
+                        'recipient_email' => $recipient_email,
+                        'group_id' => $group_id,
+                        'sender_user_id' => $user_id,
+                        'prompt_type' => $prompt_type,
+                        'batch_id' => $batch_id,
+                        'subject' => $subject,
+                        'delivery_status' => 'scheduled',
+                        'scheduled_at' => $scheduled_mysql,
+                        'created_at' => current_time('mysql'),
+                    ),
+                    array('%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s')
+                );
+
+                if ($inserted) {
+                    $inserted_count++;
+                }
+            }
+
+            // Schedule via Action Scheduler if available, otherwise fallback to WordPress cron
+            if (function_exists('as_schedule_single_action')) {
+                // Use Action Scheduler
+                as_schedule_single_action(
+                    $scheduled_timestamp,
+                    'bys_groups_send_scheduled_emails',
+                    array($batch_id)
+                );
+                error_log("[Mailer::queue_scheduled_emails] Scheduled batch $batch_id via Action Scheduler for timestamp: $scheduled_timestamp");
+            } else {
+                // Fallback to WordPress cron
+                $hook_name = 'bys_groups_send_scheduled_emails';
+                if (!wp_next_scheduled($hook_name, array($batch_id))) {
+                    wp_schedule_single_event($scheduled_timestamp, $hook_name, array($batch_id));
+                    error_log("[Mailer::queue_scheduled_emails] Scheduled batch $batch_id via WordPress cron for timestamp: $scheduled_timestamp");
+                }
+            }
+
+            return array(
+                'success' => true,
+                'sent_count' => $inserted_count,
+                'errors' => array(),
+                'message' => 'Emails scheduled for ' . wp_date('j M Y, H:i', $scheduled_timestamp) . ' (UTC)',
+            );
         }
     }
 }
