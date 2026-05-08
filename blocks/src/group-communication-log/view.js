@@ -41,12 +41,16 @@ jQuery(document).ready(($) => {
             $list.html('');
         }
 
-        // Reverse messages to show newest first
-        const reversed = [...messages].reverse();
+        // Sort messages by sent_at descending (newest first)
+        const sorted = [...messages].sort((a, b) => {
+            const dateA = a.sent_at ? new Date(a.sent_at.replace(' ', 'T')) : new Date(0);
+            const dateB = b.sent_at ? new Date(b.sent_at.replace(' ', 'T')) : new Date(0);
+            return dateB - dateA;
+        });
 
         // Build items from template
         const startIndex = isAppending ? $list.find('.gcl__item').length : 0;
-        reversed.forEach((msg, i) => {
+        sorted.forEach((msg, i) => {
             // sent_at is already in local time from the API (Y-m-d H:i:s format)
             // Parse it for display (handle both ISO format and MySQL format)
             let sentAt = null;
