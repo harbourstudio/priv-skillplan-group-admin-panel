@@ -17,6 +17,7 @@ jQuery(document).ready(($) => {
     let currentPromptType = null;
     let loadedRecipients = null; // Cache recipients so we don't refetch on back navigation
     let currentGroupId = null;
+    let screen2DateString = null; // Cache the formatted date for back navigation
 
     function showScreen(n, subtitle) {
         screen = n;
@@ -202,8 +203,10 @@ jQuery(document).ready(($) => {
         data.recipients.forEach((recipient) => {
             const statusLabel = capitalize(recipient.delivery_status || 'pending');
             const statusClass = `comm-status-badge--${recipient.delivery_status}`;
+            // Use message_id if available, otherwise fall back to DB row id
+            const detailId = recipient.message_id || recipient.id;
             const $row = $(`
-                <tr class="comm-user-row" data-message-id="${escapeHtml(recipient.message_id)}" data-recipient-name="${escapeHtml(recipient.recipient_name)}">
+                <tr class="comm-user-row" data-detail-id="${escapeHtml(String(detailId))}" data-recipient-name="${escapeHtml(recipient.recipient_name)}">
                     <td>${escapeHtml(recipient.recipient_name)}</td>
                     <td class="comm-email">${escapeHtml(recipient.recipient_email)}</td>
                     <td><span class="comm-status-badge ${statusClass}">${escapeHtml(statusLabel)}</span></td>
@@ -216,7 +219,7 @@ jQuery(document).ready(($) => {
     /**
      * Load detail for a single message
      */
-    async function loadMessageDetail(messageId) {
+    async function loadMessageDetail(detailId) {
         // Show all skeletons in Screen 3
         $screen3.find('.comm-message-subject').find('.skeleton').show();
         $screen3.find('.comm-message-recipient').find('.skeleton').show();
@@ -231,7 +234,8 @@ jQuery(document).ready(($) => {
         $screen3.find('.comm-message-body').empty();
 
         try {
-            const detail = await api.get(endpoints.communicationDetail(messageId));
+            // detailId is either a Postmark message_id or a DB row id (for scheduled emails)
+            const detail = await api.get(endpoints.communicationDetail(detailId));
             renderMessageDetail(detail);
         } catch (err) {
             console.error('[group-communication-history-modal] Error loading detail:', err);
@@ -319,7 +323,8 @@ jQuery(document).ready(($) => {
             showScreen(1, currentPromptType ? capitalize(currentPromptType.replace(/-/g, ' ')) : '');
         }
         if (screen === 3) {
-            showScreen(2, loadedRecipients ? new Date(loadedRecipients.created_at).toLocaleString() : '');
+            // Going back to Screen 2 — restore the cached date string
+            showScreen(2, screen2DateString || '');
         }
     });
 
@@ -329,7 +334,9 @@ jQuery(document).ready(($) => {
     $screen1.on('click', '.comm-batch-row', async function () {
         const batchId = $(this).data('batchId');
         currentBatchId = batchId;
-        showScreen(2, $(this).find('td').eq(0).text());
+        const dateStr = $(this).find('td').eq(0).text();
+        screen2DateString = dateStr; // Cache for back navigation
+        showScreen(2, dateStr);
         await loadRecipients(batchId);
     });
 
@@ -337,10 +344,10 @@ jQuery(document).ready(($) => {
      * Screen 2: click recipient row to view detail
      */
     $screen2.on('click', '.comm-user-row', async function () {
-        const messageId = $(this).data('messageId');
+        const detailId = $(this).data('detailId');
         const recipientName = $(this).data('recipientName');
         showScreen(3, recipientName);
-        await loadMessageDetail(messageId);
+        await loadMessageDetail(detailId);
     });
 
     /**
