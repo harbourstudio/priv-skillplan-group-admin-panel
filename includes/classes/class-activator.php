@@ -61,6 +61,8 @@ if (!class_exists('BYS_Groups_Activator')) {
                 prompt_type      VARCHAR(50)     NOT NULL,
                 batch_id         VARCHAR(36)     NOT NULL DEFAULT '',
                 subject          VARCHAR(255)    DEFAULT NULL,
+                body_html        LONGTEXT        DEFAULT NULL,
+                body_text        TEXT            DEFAULT NULL,
                 delivery_status  VARCHAR(50)     DEFAULT 'pending',
                 bounce_type      VARCHAR(50)     DEFAULT NULL,
                 delivered_at     DATETIME        DEFAULT NULL,

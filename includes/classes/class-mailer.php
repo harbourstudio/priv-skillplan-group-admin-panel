@@ -509,6 +509,8 @@ if (!class_exists('BYS_Groups_Mailer')) {
             foreach ($messages as $message) {
                 $recipient_email = $message['To'];
                 $subject = $message['Subject'] ?? '';
+                $body_html = $message['HtmlBody'] ?? null;
+                $body_text = $message['TextBody'] ?? null;
 
                 $inserted = $wpdb->insert(
                     $wpdb->prefix . BYS_GROUPS_COMMS_TABLE,
@@ -520,11 +522,13 @@ if (!class_exists('BYS_Groups_Mailer')) {
                         'prompt_type' => $prompt_type,
                         'batch_id' => $batch_id,
                         'subject' => $subject,
+                        'body_html' => $body_html,
+                        'body_text' => $body_text,
                         'delivery_status' => 'scheduled',
                         'scheduled_at' => $scheduled_mysql,
                         'created_at' => current_time('mysql'),
                     ),
-                    array('%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s')
+                    array('%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')
                 );
 
                 if ($inserted) {

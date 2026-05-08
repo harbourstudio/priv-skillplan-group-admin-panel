@@ -14,7 +14,6 @@ if (!class_exists('BYS_Groups_Scheduled_Emails')) {
     class BYS_Groups_Scheduled_Emails {
 
         public function __construct() {
-            // Hook into WordPress cron
             add_action('bys_groups_send_scheduled_emails', array($this, 'send_scheduled_batch'));
         }
 
@@ -91,10 +90,12 @@ if (!class_exists('BYS_Groups_Scheduled_Emails')) {
 
                 // Get email content based on prompt type
                 if ($prompt_type === 'custom') {
-                    // For custom emails, we'd need to store the subject/message in DB or retrieve from somewhere
-                    // For now, skip - this should be added to the queuing logic
-                    error_log("[BYS_Groups_Scheduled_Emails] Skipping custom email for batch: $batch_id - not yet implemented");
-                    continue;
+                    // Custom emails: subject and body were stored in DB at queue time
+                    $email_content = array(
+                        'subject' => $email_row['subject'] ?? '',
+                        'html'    => $email_row['body_html'] ?? '',
+                        'plain'   => $email_row['body_text'] ?? '',
+                    );
                 } else {
                     try {
                         $email_content = bys_get_comm_email($prompt_type, array(
