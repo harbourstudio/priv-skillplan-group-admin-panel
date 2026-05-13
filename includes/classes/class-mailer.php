@@ -35,7 +35,8 @@ if (!class_exists('BYS_Groups_Mailer')) {
             $recipient_ids = array(),
             $custom_subject = '',
             $custom_message = '',
-            $scheduled_at = ''
+            $scheduled_at = '',
+            $condition = array()
         ) {
             // Validate recipient type
             $valid_types = array('group', 'individual', 'condition');
@@ -94,6 +95,8 @@ if (!class_exists('BYS_Groups_Mailer')) {
 
             // Load email template functions
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/emails/group-comms.php';
+
+            $has_condition_meta = ($recipient_type === 'condition' && !empty($condition['type']));
 
             // Generate batch ID for this send
             $batch_id = wp_generate_uuid4();
@@ -156,7 +159,8 @@ if (!class_exists('BYS_Groups_Mailer')) {
                     $prompt_type,
                     $user_id,
                     $batch_id,
-                    $scheduled_at
+                    $scheduled_at,
+                    $has_condition_meta ? $condition : array()
                 );
             }
 
@@ -213,6 +217,7 @@ if (!class_exists('BYS_Groups_Mailer')) {
             // Log successful sends to bys_group_communication_log
             global $wpdb;
             $sent_count = 0;
+            $condition_meta_json = $has_condition_meta ? wp_json_encode($condition) : null;
 
             // Postmark /email/batch returns an array directly, not wrapped in 'Messages'
             $results = is_array($response_body) ? $response_body : ($response_body['Messages'] ?? array());
@@ -232,9 +237,10 @@ if (!class_exists('BYS_Groups_Mailer')) {
                                 'prompt_type' => $prompt_type,
                                 'batch_id' => $batch_id,
                                 'delivery_status' => 'pending',
+                                'condition_meta' => $condition_meta_json,
                                 'created_at' => current_time('mysql'),
                             ),
-                            array('%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s')
+                            array('%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s')
                         );
                         if (!$wpdb->last_error) {
                             $sent_count++;
@@ -261,8 +267,8 @@ if (!class_exists('BYS_Groups_Mailer')) {
         private function get_recipients_with_names($group_id, $recipient_type, $recipient_ids = array()) {
             $recipients = array();
 
-            if ($recipient_type === 'individual' && !empty($recipient_ids)) {
-                // Specific user IDs
+            if (($recipient_type === 'individual' || $recipient_type === 'condition') && !empty($recipient_ids)) {
+                // Specific user IDs (condition mode uses the snapshot resolved at queue time)
                 foreach ($recipient_ids as $user_id) {
                     $user = get_user_by('ID', $user_id);
                     if ($user && !empty($user->user_email)) {
@@ -273,7 +279,7 @@ if (!class_exists('BYS_Groups_Mailer')) {
                     }
                 }
             } else {
-                // All group members (for 'group' or 'condition' types)
+                // All group members (for 'group' type)
                 $recipients = $this->get_group_users_with_names($group_id);
             }
 
@@ -487,7 +493,7 @@ if (!class_exists('BYS_Groups_Mailer')) {
          * @param string $scheduled_at UTC ISO 8601 datetime when to send
          * @return array Response array with success, sent_count, errors
          */
-        private function queue_scheduled_emails($messages, $group_id, $prompt_type, $user_id, $batch_id, $scheduled_at) {
+        private function queue_scheduled_emails($messages, $group_id, $prompt_type, $user_id, $batch_id, $scheduled_at, $condition = array()) {
             global $wpdb;
 
             // Validate scheduled_at is a valid future datetime and convert to MySQL format
@@ -502,6 +508,7 @@ if (!class_exists('BYS_Groups_Mailer')) {
 
             // Convert ISO 8601 string to MySQL UTC format (use gmdate, not wp_date, to stay in UTC)
             $scheduled_mysql = gmdate('Y-m-d H:i:s', $scheduled_timestamp);
+            $condition_meta_json = !empty($condition) ? wp_json_encode($condition) : null;
 
             // Store emails in database with scheduled_at
             // Note: message_id will be populated when the email is actually sent
@@ -526,9 +533,10 @@ if (!class_exists('BYS_Groups_Mailer')) {
                         'body_text' => $body_text,
                         'delivery_status' => 'scheduled',
                         'scheduled_at' => $scheduled_mysql,
+                        'condition_meta' => $condition_meta_json,
                         'created_at' => current_time('mysql'),
                     ),
-                    array('%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')
+                    array('%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')
                 );
 
                 if ($inserted) {

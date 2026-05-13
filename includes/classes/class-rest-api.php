@@ -215,6 +215,14 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'permission_callback' => array($this, 'check_user_permission'),
             ));
 
+            // All quizzes in a course (no show_in_reporting / show_test_grading_config filter).
+            // Used by conditional-recipients UI where leaders need to pick from every quiz.
+            register_rest_route($this->namespace, '/courses/(?P<course_id>\d+)/quizzes', array(
+                'methods'             => 'GET',
+                'callback'            => array($this, 'get_course_quizzes'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
+
             // Batch quiz progress for multiple users in one course — used by CSV export
             register_rest_route($this->namespace, '/courses/(?P<course_id>\d+)/quiz-progress-batch', array(
                 'methods'             => 'GET',
@@ -444,6 +452,12 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             register_rest_route($this->namespace, '/communications/(?P<message_id>[a-zA-Z0-9\-]+)/detail', array(
                 'methods' => 'GET',
                 'callback' => array($this, 'get_communication_detail'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
+
+            register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/conditional-recipients', array(
+                'methods'             => 'POST',
+                'callback'            => array('BYS_Groups_Conditional_Emails', 'rest_get_recipients'),
                 'permission_callback' => array($this, 'check_user_permission'),
             ));
 
@@ -2518,6 +2532,50 @@ if (!class_exists('BYS_Groups_Rest_API')) {
         }
 
         /**
+         * GET /courses/{course_id}/quizzes
+         *
+         * Returns every published sfwd-quiz attached to a course, regardless of
+         * the show_in_reporting / show_test_grading_config meta. Distinct from
+         * get_course_quiz_steps() which scopes by those flags for reporting.
+         */
+        public function get_course_quizzes($request) {
+            $course_id = intval($request['course_id']);
+
+            if (!$course_id) {
+                return new \WP_REST_Response(array('error' => 'Invalid course ID'), 400);
+            }
+
+            $cache_key = "bys_course_quizzes_all_v1_{$course_id}";
+            $cached = get_transient($cache_key);
+            if ($cached !== false) {
+                return new \WP_REST_Response($cached, 200);
+            }
+
+            global $wpdb;
+            $rows = $wpdb->get_results($wpdb->prepare(
+                "SELECT p.ID as id, p.post_title as title
+                 FROM {$wpdb->posts} p
+                 JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
+                 WHERE pm.meta_key = 'course_id' AND pm.meta_value = %d
+                   AND p.post_type = 'sfwd-quiz' AND p.post_status = 'publish'
+                 ORDER BY p.menu_order ASC, p.post_title ASC",
+                $course_id
+            ));
+
+            $result = array();
+            foreach ((array) $rows as $row) {
+                $result[] = array(
+                    'id'    => intval($row->id),
+                    'title' => $row->title,
+                );
+            }
+
+            set_transient($cache_key, $result, HOUR_IN_SECONDS);
+
+            return new \WP_REST_Response($result, 200);
+        }
+
+        /**
          * Get quiz attempts for a user in a course
          * Returns the best attempt (highest percentage) for each quiz with configured pass threshold
          */
@@ -4395,6 +4453,7 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                     'custom_subject' => $request->get_param('custom_subject'),
                     'custom_message' => $request->get_param('custom_message'),
                     'scheduled_at' => $request->get_param('scheduled_at'),
+                    'condition' => $request->get_param('condition'),
                 );
             }
 
@@ -4405,6 +4464,16 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             $custom_message = wp_kses_post($body['custom_message'] ?? '');
             $scheduled_at = sanitize_text_field($body['scheduled_at'] ?? '');
 
+            $condition = array();
+            if ($recipient_type === 'condition' && isset($body['condition']) && is_array($body['condition'])) {
+                $condition = array(
+                    'type'      => sanitize_key($body['condition']['type'] ?? ''),
+                    'days'      => intval($body['condition']['days'] ?? 0),
+                    'course_id' => intval($body['condition']['course_id'] ?? 0),
+                    'quiz_id'   => intval($body['condition']['quiz_id'] ?? 0),
+                );
+            }
+
             if (!$prompt_type || !$recipient_type) {
                 return new \WP_REST_Response(array('error' => 'Missing prompt_type or recipient_type'), 400);
             }
@@ -4412,6 +4481,16 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             // For custom prompts, require both subject and message
             if ($prompt_type === 'custom' && (empty($custom_subject) || empty($custom_message))) {
                 return new \WP_REST_Response(array('error' => 'Custom prompts require both subject and message'), 400);
+            }
+
+            // Conditional sends must include the snapshotted recipient_ids and a condition.type
+            if ($recipient_type === 'condition') {
+                if (empty($recipient_ids)) {
+                    return new \WP_REST_Response(array('error' => 'Conditional send requires resolved recipients'), 400);
+                }
+                if (empty($condition['type'])) {
+                    return new \WP_REST_Response(array('error' => 'Conditional send requires a condition type'), 400);
+                }
             }
 
             // Use mailer class to send (includes leader and group validation)
@@ -4425,7 +4504,8 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 $recipient_ids,
                 $custom_subject,
                 $custom_message,
-                $scheduled_at
+                $scheduled_at,
+                $condition
             );
 
             $status_code = $result['success'] ? 200 : 400;

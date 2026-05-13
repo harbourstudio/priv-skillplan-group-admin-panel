@@ -26,6 +26,7 @@ export const endpoints = {
   courseHierarchialBreakdown: (courseId) => `/wp-json/bys-groups/v1/courses/${courseId}/steps`,
   groupUserCourseProgress: (userId, courseIds) => `/wp-json/bys-groups/v1/users/${userId}/course-progress?course_ids=${courseIds}`,
   courseQuizSteps: (courseId) => `/wp-json/bys-groups/v1/courses/${courseId}/quiz-steps`,
+  courseQuizzes: (courseId) => `/wp-json/bys-groups/v1/courses/${courseId}/quizzes`,
   courseQuizStepsGrading: (courseId) => `/wp-json/bys-groups/v1/courses/${courseId}/quiz-steps?filter=grading`,
   courseQuizProgressBatch: (courseId, userIds) => `/wp-json/bys-groups/v1/courses/${courseId}/quiz-progress-batch?user_ids=${userIds}`,
   groupQuizSubmissionStats: (groupId, quizIds) => `/wp-json/bys-groups/v1/groups/${groupId}/quiz-submission-stats?quiz_ids=${quizIds.join(',')}`,
@@ -61,7 +62,9 @@ export const endpoints = {
   communicationRecipients: (batchId) =>
     `/wp-json/bys-groups/v1/communications/batch/${batchId}/recipients`,
   communicationDetail: (messageId) =>
-    `/wp-json/bys-groups/v1/communications/${messageId}/detail`
+    `/wp-json/bys-groups/v1/communications/${messageId}/detail`,
+  conditionalRecipients: (groupId) =>
+    `/wp-json/bys-groups/v1/groups/${groupId}/conditional-recipients`
 };
 
 export const api = {

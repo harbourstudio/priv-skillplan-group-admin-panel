@@ -67,6 +67,7 @@ if (!class_exists('BYS_Groups_Activator')) {
                 bounce_type      VARCHAR(50)     DEFAULT NULL,
                 delivered_at     DATETIME        DEFAULT NULL,
                 scheduled_at     DATETIME        DEFAULT NULL,
+                condition_meta   TEXT            DEFAULT NULL,
                 created_at       DATETIME        NOT NULL,
                 PRIMARY KEY (id),
                 UNIQUE KEY message_id (message_id),

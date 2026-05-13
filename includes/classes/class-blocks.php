@@ -91,6 +91,14 @@ if (!class_exists('BYS_Groups_Blocks')) {
                 [],
                 BYS_GROUPS_VERSION
             );
+
+            // Skeleton loading state styles
+            wp_enqueue_style(
+                'bys-groups-skeleton',
+                BYS_GROUPS_PLUGIN_URL . 'blocks/src/_shared/skeleton.css',
+                [],
+                BYS_GROUPS_VERSION
+            );
         }
     }
 }
