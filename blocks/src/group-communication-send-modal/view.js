@@ -41,6 +41,7 @@ jQuery(document).ready(function($) {
     let coursesLoaded = false;
     let resolveTimer = null;
 
+
     // Per-condition required-input map. Drives both UI toggles and validation.
     const CONDITION_INPUTS = {
         outstanding_login:      { days: false, course: false, quiz: false },
@@ -138,7 +139,8 @@ jQuery(document).ready(function($) {
         // Reset sub-inputs on condition change to avoid stale values
         $conditionDays.val('');
         $conditionCourse.val('');
-        $conditionQuiz.val('').empty().append('<option value="">Select a quiz…</option>');
+        $conditionQuiz.val('').empty();
+        appendOption($conditionQuiz, '', 'Select a quiz…');
         validateDaysInput(); // re-runs against the now-empty field, hides any stale error
 
         scheduleResolveRecipients();
@@ -181,15 +183,36 @@ jQuery(document).ready(function($) {
         return isValid;
     }
 
+    /**
+     * Append an <option> to $select using the shared template.
+     */
+    function appendOption($select, value, label) {
+        const tpl = $block.find('template.gcsm__template-select-option')[0];
+        const $opt = $(tpl.content.firstElementChild.cloneNode(true));
+        $opt.attr('value', value).text(label);
+        $select.append($opt);
+    }
+
+    /**
+     * Append a disabled "empty state" row to a multiselect list.
+     */
+    function appendMultiselectEmpty($list, label) {
+        const tpl = $block.find('template.gcsm__template-multiselect-empty')[0];
+        const $li = $(tpl.content.firstElementChild.cloneNode(true));
+        $li.find('[data-field="label"]').text(label);
+        $list.append($li);
+    }
+
     async function loadGroupCourses() {
         if (coursesLoaded || !currentGroupId) return;
         try {
             const courses = await api.get(endpoints.groupCourses(currentGroupId));
-            $conditionCourse.empty().append('<option value="">Select a course…</option>');
+            $conditionCourse.empty();
+            appendOption($conditionCourse, '', 'Select a course…');
             (courses || []).forEach(c => {
                 const id = c.id ?? c.ID ?? c.course_id;
                 const title = c.title?.rendered ?? c.title ?? c.post_title ?? `Course #${id}`;
-                $conditionCourse.append(`<option value="${id}">${title}</option>`);
+                appendOption($conditionCourse, id, title);
             });
             coursesLoaded = true;
         } catch (err) {
@@ -198,12 +221,13 @@ jQuery(document).ready(function($) {
     }
 
     async function loadCourseQuizzes(courseId) {
-        $conditionQuiz.empty().append('<option value="">Select a quiz…</option>');
+        $conditionQuiz.empty();
+        appendOption($conditionQuiz, '', 'Select a quiz…');
         if (!courseId) return;
         try {
             const quizzes = await api.get(endpoints.courseQuizzes(courseId));
             (quizzes || []).forEach(q => {
-                $conditionQuiz.append(`<option value="${q.id}">${q.title}</option>`);
+                appendOption($conditionQuiz, q.id, q.title);
             });
         } catch (err) {
             console.error('[send-modal] Failed to load course quizzes:', err);
@@ -266,11 +290,12 @@ jQuery(document).ready(function($) {
                 return;
             }
 
+            const rowTpl = $block.find('template.gcsm__template-recipient-row')[0];
             recipients.forEach(r => {
-                const $row = $('<li class="gcsm__recipients-preview-row" role="row"></li>');
-                $row.append($('<span role="cell"></span>').text(r.display_name));
-                $row.append($('<span role="cell"></span>').text(r.email));
-                $row.append($('<span role="cell"></span>').text(r.user_id));
+                const $row = $(rowTpl.content.firstElementChild.cloneNode(true));
+                $row.find('[data-field="name"]').text(r.display_name);
+                $row.find('[data-field="email"]').text(r.email);
+                $row.find('[data-field="user-id"]').text(r.user_id);
                 $conditionalRecipientsList.append($row);
             });
             $conditionalRecipientsTable.show();
@@ -360,14 +385,11 @@ jQuery(document).ready(function($) {
         await populateGroupUsers(currentGroupId);
     }
 
-    // Listen for jQuery custom event
+    // The prompts block dispatches both a jQuery custom event and a native
+    // CustomEvent for the same click. Listen on jQuery only — both events
+    // carry identical data, and listening to both would fire setup twice.
     $(document).on('comm:open-send-modal', (e, data) => {
         handleOpenSendModal(data.promptType, data.promptTitle);
-    });
-
-    // Listen for native CustomEvent as fallback
-    document.addEventListener('comm:open-send-modal', (e) => {
-        handleOpenSendModal(e.detail.promptType, e.detail.promptTitle);
     });
 
     /**
@@ -401,27 +423,31 @@ jQuery(document).ready(function($) {
     }
 
     /**
-     * Populate group-users select for 'individual' sending
+     * Populate group-users multiselect for 'individual' sending.
+     * Fills the dropdown with one checkbox per member.
+     *
+     * Uses the user_ids already cached on window.bysGroupData by group-select
+     * to avoid a duplicate (and frequently timing-out) call to the
+     * /base-user-stats endpoint.
      */
     async function populateGroupUsers(groupId) {
-        const $select = $modal.find('#gcsm__recipient-selection');
+        const $multiselect = $modal.find('#gcsm__recipient-selection');
+        const $list = $multiselect.find('.bys-multiselect__list');
         const $recipientSkeleton = $modal.find('.gcsm__recipient-mode--individual .gcsm__skeleton');
 
         $recipientSkeleton.show();
-        $select.hide();
+        $multiselect.hide();
+        $list.empty();
 
         try {
-            // First, get base user stats to get all user IDs
-            const baseStats = await api.get(endpoints.groupBaseUsersStats(groupId));
+            const userIds = window.bysGroupData?.baseUsersStats?.user_ids;
 
-            if (!baseStats || !Array.isArray(baseStats.user_ids) || baseStats.user_ids.length === 0) {
+            if (!Array.isArray(userIds) || userIds.length === 0) {
                 console.warn('[group-communication-send-modal] No group members found');
-                $select.html('<option disabled>No members in group</option>');
+                appendMultiselectEmpty($list, 'No members in group');
                 return;
             }
 
-            // Fetch user details using user IDs
-            const userIds = baseStats.user_ids;
             const users = await api.get(endpoints.groupUsers(groupId, userIds.join(',')));
 
             if (!Array.isArray(users)) {
@@ -429,21 +455,91 @@ jQuery(document).ready(function($) {
                 return;
             }
 
-            $select.html('');
+            const optionTpl = $block.find('template.gcsm__template-multiselect-option')[0];
             users.forEach(user => {
                 const name = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.display_name || user.email;
-                const $option = $(`<option value="${user.id}"></option>`);
-                $option.text(`${name} (${user.email})`);
-                $select.append($option);
+                const $li = $(optionTpl.content.firstElementChild.cloneNode(true));
+                $li.find('input.bys-multiselect__checkbox')
+                    .attr('value', user.id)
+                    .attr('data-name', name);
+                $li.find('[data-field="label"]').text(`${name} (${user.email})`);
+                $list.append($li);
             });
         } catch (err) {
             console.error('[group-communication-send-modal] Error:', err);
-            $select.html('<option disabled>Error loading members</option>');
+            appendMultiselectEmpty($list, 'Error loading members');
         } finally {
             $recipientSkeleton.hide();
-            $select.show();
+            $multiselect.show();
+            renderRecipientPills();
         }
     }
+
+    /**
+     * Re-render the pill row inside the recipient multiselect based on which
+     * checkboxes are currently checked.
+     */
+    function renderRecipientPills() {
+        const $multiselect = $modal.find('#gcsm__recipient-selection');
+        const $pills = $multiselect.find('.bys-multiselect__pills');
+        const $checked = $multiselect.find('.bys-multiselect__checkbox:checked');
+
+        $pills.empty();
+
+        if ($checked.length === 0) {
+            const placeholderTpl = $block.find('template.gcsm__template-multiselect-placeholder')[0];
+            const $placeholder = $(placeholderTpl.content.firstElementChild.cloneNode(true));
+            $placeholder.text('Select recipients…');
+            $pills.append($placeholder);
+            return;
+        }
+
+        const pillTpl = $block.find('template.gcsm__template-multiselect-pill')[0];
+        $checked.each(function () {
+            const value = $(this).val();
+            const name = $(this).attr('data-name') || value;
+            const $pill = $(pillTpl.content.firstElementChild.cloneNode(true));
+            $pill.attr('data-value', value);
+            $pill.find('[data-field="label"]').text(name);
+            $pill.find('.bys-multiselect__pill-remove').attr('data-value', value);
+            $pills.append($pill);
+        });
+    }
+
+    // Toggle dropdown open/closed
+    $modal.on('click', '#gcsm__recipient-selection .bys-multiselect__control', function (e) {
+        // Ignore clicks on pill-remove (handled separately)
+        if ($(e.target).closest('.bys-multiselect__pill-remove').length) return;
+        const $multiselect = $modal.find('#gcsm__recipient-selection');
+        const isOpen = $multiselect.attr('aria-expanded') === 'true';
+        $multiselect.attr('aria-expanded', !isOpen);
+        $multiselect.find('.bys-multiselect__dropdown').toggleClass('hidden', isOpen);
+    });
+
+    // Sync pill row + aria-selected state on checkbox change
+    $modal.on('change', '#gcsm__recipient-selection .bys-multiselect__checkbox', function () {
+        $(this).closest('.bys-multiselect__option').attr('aria-selected', this.checked);
+        renderRecipientPills();
+    });
+
+    // Pill remove → uncheck the matching option
+    $modal.on('click', '#gcsm__recipient-selection .bys-multiselect__pill-remove', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const value = $(this).data('value');
+        $modal.find(`#gcsm__recipient-selection .bys-multiselect__checkbox[value="${value}"]`)
+            .prop('checked', false)
+            .trigger('change');
+    });
+
+    // Close dropdown on outside click
+    $(document).on('click', (e) => {
+        if (!$(e.target).closest('#gcsm__recipient-selection').length) {
+            const $multiselect = $modal.find('#gcsm__recipient-selection');
+            $multiselect.attr('aria-expanded', 'false');
+            $multiselect.find('.bys-multiselect__dropdown').addClass('hidden');
+        }
+    });
 
     /**
      * Form submit handler
@@ -467,7 +563,10 @@ jQuery(document).ready(function($) {
             let recipientIds = [];
             let conditionPayload = null;
             if (recipientType === 'individual') {
-                recipientIds = Array.from($modal.find('#gcsm__recipient-selection').val() || []).map(v => parseInt(v, 10));
+                recipientIds = $modal
+                    .find('#gcsm__recipient-selection .bys-multiselect__checkbox:checked')
+                    .map(function () { return parseInt($(this).val(), 10); })
+                    .get();
             } else if (recipientType === 'condition') {
                 const built = buildConditionPayload();
                 if (!built || conditionRecipients.length === 0) {

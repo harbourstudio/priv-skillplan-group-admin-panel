@@ -65,6 +65,7 @@
         &__modal-body {
             overflow-y: auto;
             flex: 1;
+            padding: var(--wp--preset--spacing--4);
         }
 
         &__modal-prompt {
@@ -95,7 +96,6 @@
             display: flex;
             flex-direction: column;
             gap: var(--wp--preset--spacing--4);
-            padding: var(--wp--preset--spacing--4);
         }
 
         &__recipient-mode {
@@ -114,7 +114,7 @@
                 margin-top: var(--wp--preset--spacing--1);
             }
         }
-        
+
         &__skeleton {
             display: flex;
             flex-direction: column;
@@ -135,6 +135,7 @@
                 color: var(--wp--preset--color--gray-400);
                 cursor: not-allowed;
             }
+
         }
 
         label {
@@ -192,6 +193,16 @@
     
             &::placeholder { color: var(--wp--preset--color--gray-400); }
             &:focus { border-color: var(--wp--preset--color--primary); }
+        }
+
+        // ── Multiselect (shared) ─────────────────────────────────────────────────────────
+
+        .bys-multiselect__option {
+            font-size: var(--wp--preset--font-size--x-small) !important;
+            
+            .bys-multiselect__checkbox {
+                width: fit-content;
+            }
         }
     
         // ── Radio buttons ─────────────────────────────────────────────────────────
@@ -342,6 +353,10 @@
             transition: color 0.15s;
 
             &:hover { color: var(--wp--preset--color--gray-700); }
+            
+            i {
+                color: var(--wp--preset--color--red-500);
+            }
         }
 
         // ── Submit ────────────────────────────────────────────────────────────────

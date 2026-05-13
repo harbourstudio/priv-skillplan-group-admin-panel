@@ -66,16 +66,55 @@ $wrapper_attributes = get_block_wrapper_attributes();
                     </div>
 
                     <div class="gcsm__recipient-mode gcsm__recipient-mode--individual" style="display:none;">
-                        <label for="gcsm__recipient-selection">
-                            <?php esc_html_e( 'Recipient', 'bys' ); ?>
-                        </label>
+                        <label id="gcsm__recipient-selection-label"><?php esc_html_e( 'Recipient', 'bys' ); ?></label>
+
                         <div class="gcsm__skeleton" role="status" aria-busy="true" aria-label="<?php esc_attr_e('Loading recipients', 'bys'); ?>" style="display:none;">
                             <div class="skeleton"></div>
                             <div class="skeleton"></div>
                             <div class="skeleton"></div>
                         </div>
-                        <select id="gcsm__recipient-selection" multiple size="4"></select>
-                        <p class="gcsm__hint"><?php esc_html_e( 'Hold Ctrl / ⌘ to select multiple', 'bys' ); ?></p>
+
+                        <div class="bys-multiselect" id="gcsm__recipient-selection" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="gcsm__recipient-selection-label">
+                            <div class="bys-multiselect__control">
+                                <div class="bys-multiselect__pills">
+                                    <span class="bys-multiselect__placeholder"><?php esc_html_e('Select recipients…', 'bys'); ?></span>
+                                </div>
+                                <button class="bys-multiselect__toggle btn-unstyled" type="button" aria-label="<?php esc_attr_e('Toggle recipient selector', 'bys'); ?>">
+                                    <i class="fa-regular fa-chevron-down"></i>
+                                </button>
+                            </div>
+                            <div class="bys-multiselect__dropdown hidden" role="listbox" aria-multiselectable="true">
+                                <ul class="bys-multiselect__list" role="group"></ul>
+                            </div>
+
+                            <template class="gcsm__template-multiselect-option">
+                                <li class="bys-multiselect__option" role="option" aria-selected="false">
+                                    <label>
+                                        <input type="checkbox" class="bys-multiselect__checkbox" />
+                                        <span data-field="label"></span>
+                                    </label>
+                                </li>
+                            </template>
+
+                            <template class="gcsm__template-multiselect-empty">
+                                <li class="bys-multiselect__option disabled">
+                                    <label data-field="label"></label>
+                                </li>
+                            </template>
+
+                            <template class="gcsm__template-multiselect-pill">
+                                <span class="bys-multiselect__pill">
+                                    <span data-field="label"></span>
+                                    <button class="bys-multiselect__pill-remove btn-unstyled" type="button" aria-label="<?php esc_attr_e('Remove', 'bys'); ?>">
+                                        <i class="fa-solid fa-xmark"></i>
+                                    </button>
+                                </span>
+                            </template>
+
+                            <template class="gcsm__template-multiselect-placeholder">
+                                <span class="bys-multiselect__placeholder"></span>
+                            </template>
+                        </div>
                     </div>
 
                     <div class="gcsm__recipient-mode gcsm__recipient-mode--condition" style="display:none;">
@@ -122,6 +161,10 @@ $wrapper_attributes = get_block_wrapper_attributes();
                                     <?php esc_html_e('Please enter a positive whole number.', 'bys'); ?>
                                 </p>
                             </div>
+
+                            <template class="gcsm__template-select-option">
+                                <option></option>
+                            </template>
                         </div>
                     </div>
 
@@ -160,6 +203,14 @@ $wrapper_attributes = get_block_wrapper_attributes();
                                 <span role="columnheader"><?php esc_html_e('User ID', 'bys'); ?></span>
                             </div>
                             <ul class="gcsm__recipients-preview-list" role="rowgroup"></ul>
+
+                            <template class="gcsm__template-recipient-row">
+                                <li class="gcsm__recipients-preview-row" role="row">
+                                    <span role="cell" data-field="name"></span>
+                                    <span role="cell" data-field="email"></span>
+                                    <span role="cell" data-field="user-id"></span>
+                                </li>
+                            </template>
                         </div>
                     </div>
 
