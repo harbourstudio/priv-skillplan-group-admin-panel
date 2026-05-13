@@ -1,8 +1,7 @@
 @use '../_shared/flatpickr';
 
 .wp-block-bys-groups-group-communication-send-modal {
-
-    .csm {
+    .gcsm {
         &.hs-overlay {
             display: none;
             position: fixed;
@@ -98,73 +97,31 @@
             gap: var(--wp--preset--spacing--4);
             padding: var(--wp--preset--spacing--4);
         }
-    
-        &__form-group {
+
+        &__recipient-mode {
             display: flex;
             flex-direction: column;
-            gap: var(--wp--preset--spacing--2);
         }
-    
-        &__form-label {
-            font-size: var(--wp--preset--font-size--small);
-            font-weight: 600;
-            color: var(--wp--preset--color--gray-700);
-            margin: 0;
-        }
-    
-        &__form-hint {
+
+        &__hint {
             font-size: var(--wp--preset--font-size--x-small);
             color: var(--wp--preset--color--gray-400);
-            margin: 0;
-        }
-    
-        // ── Radio buttons ─────────────────────────────────────────────────────────
-    
-        &__radios {
-            display: flex;
-            flex-wrap: wrap;
-            gap: var(--wp--preset--spacing--4);
-        }
-    
-        &__radio {
-            display: flex;
-            align-items: center;
-            gap: var(--wp--preset--spacing--2);
-            font-size: var(--wp--preset--font-size--small);
-            color: var(--wp--preset--color--gray-700);
-            cursor: pointer;
-    
-            input[type="radio"] {
-                accent-color: var(--wp--preset--color--primary);
-                width: 1rem;
-                height: 1rem;
-                cursor: pointer;
-                margin: 0;
+            margin: var(--wp--preset--spacing--1) 0 0 0;
+
+            &--days-error {
+                display:none;
+                color: var(--wp--preset--color--red-500);
+                margin-top: var(--wp--preset--spacing--1);
             }
         }
-    
-        // ── Selects ───────────────────────────────────────────────────────────────
-    
-        select {
-            padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--3);
-            border: 1px solid var(--wp--preset--color--gray-200);
-            border-radius: 0.5rem;
-            font-size: var(--wp--preset--font-size--small);
-            color: var(--wp--preset--color--gray-700);
-            background: white;
-            outline: none;
-    
-            &:focus { border-color: var(--wp--preset--color--primary); }
-    
-            &--multi {
-                min-height: 8rem;
-            }
+        
+        &__skeleton {
+            display: flex;
+            flex-direction: column;
+            row-gap: var(--wp--preset--spacing--1);
         }
-    
-        // ── Subject (disabled) ────────────────────────────────────────────────────
-    
-        &__input {
-            padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--3);
+
+        input {
             border: 1px solid var(--wp--preset--color--gray-200);
             border-radius: 0.5rem;
             font-size: var(--wp--preset--font-size--small);
@@ -173,17 +130,55 @@
             outline: none;
             width: 100%;
     
-            &--disabled {
+            &.disabled {
                 background: var(--wp--preset--color--gray-50);
                 color: var(--wp--preset--color--gray-400);
                 cursor: not-allowed;
             }
         }
-    
-        // ── Textarea ──────────────────────────────────────────────────────────────
-    
+
+        label {
+            font-size: var(--wp--preset--font-size--small);
+            font-weight: 600;
+            color: var(--wp--preset--color--gray-700);
+
+            &:has(input[type="radio"]) {
+                display: flex;
+                align-items: center;
+                gap: var(--wp--preset--spacing--2);
+                font-size: var(--wp--preset--font-size--small);
+                color: var(--wp--preset--color--gray-700);
+                cursor: pointer;
+        
+                input[type="radio"] {
+                    accent-color: var(--wp--preset--color--primary);
+                    width: 1rem;
+                    height: 1rem;
+                    cursor: pointer;
+                    margin: 0;
+                }
+            }
+        }
+
+        select {
+            padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--3);
+            border: 1px solid var(--wp--preset--color--gray-200);
+            border-radius: 0.5rem;
+            font-size: var(--wp--preset--font-size--small);
+            color: var(--wp--preset--color--gray-700);
+            background: white;
+            outline: none;
+
+            &:focus { border-color: var(--wp--preset--color--primary); }
+
+            &--multi {
+                min-height: 8rem;
+            }
+        }
+
         textarea {
             padding: var(--wp--preset--spacing--3);
+            margin-top: var(--wp--preset--spacing--2);
             border: 1px solid var(--wp--preset--color--gray-200);
             border-radius: 0.5rem;
             font-size: var(--wp--preset--font-size--small);
@@ -193,9 +188,28 @@
             resize: vertical;
             font-family: inherit;
             line-height: 1.5;
+            width: 100%;
     
             &::placeholder { color: var(--wp--preset--color--gray-400); }
             &:focus { border-color: var(--wp--preset--color--primary); }
+        }
+    
+        // ── Radio buttons ─────────────────────────────────────────────────────────
+    
+        &__radios-wrapper{
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--wp--preset--spacing--4);
+        }
+
+        // ── Conditional extra fields wrapper ────────────────────────────────────────────────────
+        &__condition-fields {
+            display: flex;
+            gap: var(--wp--preset--spacing--4);
+
+            > div {
+                margin-top: var(--wp--preset--spacing--2);
+            }
         }
     
         // ── Preview ───────────────────────────────────────────────────────────────
@@ -222,18 +236,85 @@
                 background: transparent;
             }
         }
-    
+
+        // ── Recipients preview (conditional mode) ─────────────────────────────────
+
+        &__recipients-preview {
+            margin-top: var(--wp--preset--spacing--3);
+
+            h6 {
+                font-size: var(--wp--preset--font-size--small);
+                color: var(--wp--preset--color--gray-700);
+                margin: 0 0 var(--wp--preset--spacing--2);
+            }
+        }
+
+        &__recipients-preview-table {
+            border: 1px solid var(--wp--preset--color--gray-200);
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+
+        &__recipients-preview-header {
+            display: grid;
+            grid-template-columns: 5fr 6fr 1fr;
+            gap: var(--wp--preset--spacing--2);
+            padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--3);
+            background: var(--wp--preset--color--gray-50);
+            font-weight: 500;
+            font-size: var(--wp--preset--font-size--x-small);
+            border-bottom: 1px solid var(--wp--preset--color--gray-200);
+        }
+
+        &__recipients-preview-list {
+            list-style: none;
+            margin: 0;
+            padding: 0 !important;
+            max-height: 240px;
+            overflow-y: auto;
+        }
+
+        &__recipients-preview-row {
+            display: grid;
+            grid-template-columns: 5fr 6fr 1fr;
+            gap: var(--wp--preset--spacing--2);
+            padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--3);
+            border-bottom: 1px solid var(--wp--preset--color--gray-100);
+            font-size: var(--wp--preset--font-size--x-small);
+
+            > span {
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            &:last-child {
+                border-bottom: none;
+            }
+        }
+
         // ── Schedule ──────────────────────────────────────────────────────────────
 
         &__form-schedule {
             display: flex;
             align-items: center;
             gap: var(--wp--preset--spacing--2);
-            background: var(--wp--preset--color--gray-50);
+            border: 1px solid var(--wp--preset--color--gray-200);
             border-radius: 0.5rem;
-            padding: var(--wp--preset--spacing--3);
+            padding: var(--wp--preset--spacing--3) var(--wp--preset--spacing--4);
             cursor: pointer;
             width: fit-content;
+
+            // Hide the original input (flatpickr creates a visible altInput sibling).
+            input:not(.flatpickr-alt-input) {
+                display: none;
+            }
+
+            i {
+                font-size: 0.75rem;
+                color: var(--wp--preset--color--gray-400);
+                flex-shrink: 0;
+            }
 
             .flatpickr-alt-input {
                 flex: 1;
@@ -250,24 +331,26 @@
             }
         }
 
-        &__schedule-input {
-            display: none;
-        }
+        &__schedule-clear {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--wp--preset--color--red-500);
+            padding: 0;
+            line-height: 1;
+            cursor: pointer;
+            transition: color 0.15s;
 
-        &__schedule-icon,
-        &__calendar-icon {
-            font-size: 0.75rem;
-            color: var(--wp--preset--color--gray-400);
-            flex-shrink: 0;
+            &:hover { color: var(--wp--preset--color--gray-700); }
         }
 
         // ── Submit ────────────────────────────────────────────────────────────────
-    
+
         &__form-actions {
             padding-top: var(--wp--preset--spacing--4);
             border-top: 1px solid var(--wp--preset--color--gray-100);
         }
-    
+
         &__form-submit {
             padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--6);
             background: var(--wp--preset--color--primary);
@@ -276,7 +359,7 @@
             font-size: var(--wp--preset--font-size--small);
             font-weight: 500;
             transition: opacity 0.15s;
-    
+
             &:hover { opacity: 0.88; }
         }
 
@@ -286,7 +369,7 @@
             border-radius: 0.25rem;
             margin-bottom: var(--wp--preset--spacing--4);
             font-size: var(--wp--preset--font-size--small);
-            
+
             &--success {
                 border-color: var(--wp--preset--color--green-500);
                 background-color: var(--wp--preset--color--green-50);
@@ -301,7 +384,3 @@
         }
     }
 }
-
-// Static positioning for flatpickr in modal
-// With static: true, the calendar renders inline in the DOM, not floating
-// No need for position: fixed when using static mode
