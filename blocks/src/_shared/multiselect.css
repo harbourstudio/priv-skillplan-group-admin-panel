@@ -1,0 +1,159 @@
+/**
+ * Shared multiselect component — checkbox-driven dropdown with pill selections.
+ * Markup pattern:
+ *
+ *   <div class="bys-multiselect" aria-haspopup="listbox" aria-expanded="false">
+ *     <div class="bys-multiselect__control">
+ *       <div class="bys-multiselect__pills">
+ *         <span class="bys-multiselect__placeholder">All items</span>
+ *       </div>
+ *       <button class="bys-multiselect__toggle btn-unstyled" type="button">…</button>
+ *     </div>
+ *     <div class="bys-multiselect__dropdown hidden" role="listbox" aria-multiselectable="true">
+ *       <ul class="bys-multiselect__list" role="group">
+ *         <li class="bys-multiselect__option" role="option">
+ *           <label>
+ *             <input type="checkbox" class="bys-multiselect__checkbox" value="…" />
+ *             <span>Label</span>
+ *           </label>
+ *         </li>
+ *       </ul>
+ *     </div>
+ *   </div>
+ */
+.bys-multiselect {
+    position: relative;
+}
+
+.bys-multiselect__control {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--wp--preset--spacing--1);
+    min-height: 3rem;
+    padding: var(--wp--preset--spacing--1) var(--wp--preset--spacing--3);
+    background: white;
+    border: 1px solid var(--wp--preset--color--gray-300);
+    border-radius: 0.375rem;
+    cursor: pointer;
+}
+
+.bys-multiselect[aria-expanded="true"] .bys-multiselect__control {
+    border-color: var(--wp--preset--color--primary);
+    box-shadow: 0 0 0 2px rgba(var(--wp--preset--color--primary-rgb, 0, 0, 0), 0.12);
+}
+
+.bys-multiselect__pills {
+    display: flex;
+    flex: 1;
+    flex-wrap: wrap;
+    gap: 4px;
+    min-width: 0;
+}
+
+.bys-multiselect__placeholder {
+    color: var(--wp--preset--color--gray-400);
+    font-size: var(--wp--preset--font-size--small);
+    line-height: 1.5;
+}
+
+.bys-multiselect__pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--wp--preset--color--orange-100);
+    color: var(--wp--preset--color--orange-700);
+    border-radius: 0.25rem;
+    padding: var(--wp--preset--spacing--1) var(--wp--preset--spacing--2);
+    font-size: var(--wp--preset--font-size--x-small);
+    font-weight: 500;
+    line-height: 1.4;
+}
+
+.bys-multiselect__pill-remove {
+    color: var(--wp--preset--color--red-500);
+    font-size: 0.65rem;
+    line-height: 1;
+    padding: 1px;
+    border-radius: 50%;
+}
+
+.bys-multiselect__toggle {
+    margin-left: auto;
+    color: var(--wp--preset--color--gray-400);
+    font-size: 0.7rem;
+    flex-shrink: 0;
+    transition: transform 0.2s;
+}
+
+.bys-multiselect[aria-expanded="true"] .bys-multiselect__toggle {
+    transform: rotate(180deg);
+}
+
+.bys-multiselect__dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: white;
+    border: 1px solid var(--wp--preset--color--gray-200);
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    max-height: 240px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.bys-multiselect__dropdown.hidden {
+    display: none;
+}
+
+.bys-multiselect__list {
+    list-style: none !important;
+    margin: 0;
+    padding: var(--wp--preset--spacing--1) 0 !important;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.bys-multiselect__option.hidden {
+    display: none;
+}
+
+.bys-multiselect__option.disabled label {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.bys-multiselect__option.disabled label:hover {
+    background: transparent;
+}
+
+.bys-multiselect__option label {
+    display: flex;
+    align-items: center;
+    gap: var(--wp--preset--spacing--2);
+    padding: 0 var(--wp--preset--spacing--2);
+    margin: 0 !important;
+    font-size: var(--wp--preset--font-size--x-small);
+    font-weight: normal;
+    cursor: pointer;
+}
+
+.bys-multiselect__option label:hover {
+    background: var(--wp--preset--color--gray-100);
+}
+
+.bys-multiselect__option input[type="checkbox"] {
+    flex-shrink: 0;
+}
+
+.bys-multiselect__option input[type="checkbox"]:disabled {
+    cursor: not-allowed;
+}
+
+.bys-multiselect__option[aria-selected="true"] label {
+    background: var(--wp--preset--color--blue-50, #f0f7ff);
+}
