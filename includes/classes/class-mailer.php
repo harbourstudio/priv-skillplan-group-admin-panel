@@ -16,7 +16,6 @@ if (!class_exists('BYS_Groups_Mailer')) {
             // error_log('[BYS_Groups_Mailer] Class instantiated');
         }
 
-
         /**
          * Send group communication emails via Postmark API.
          *
@@ -214,43 +213,50 @@ if (!class_exists('BYS_Groups_Mailer')) {
                 );
             }
 
-            // Log successful sends to bys_group_communication_log
+            // Log every attempted send to bys_group_communication_log so the
+            // history modal can show per-recipient delivery status.
             global $wpdb;
-            $sent_count = 0;
+            $logged_count = 0;
             $condition_meta_json = $has_condition_meta ? wp_json_encode($condition) : null;
 
             // Postmark /email/batch returns an array directly, not wrapped in 'Messages'
             $results = is_array($response_body) ? $response_body : ($response_body['Messages'] ?? array());
 
             foreach ((array)$results as $index => $result) {
-                // Check if send was successful (ErrorCode 0 means success)
-                if (!isset($result['ErrorCode']) || (int)$result['ErrorCode'] === 0) {
-                    $message_id = $result['MessageID'] ?? '';
-                    if (!empty($message_id)) {
-                        $wpdb->insert(
-                            $wpdb->prefix . BYS_GROUPS_COMMS_TABLE,
-                            array(
-                                'message_id' => $message_id,
-                                'recipient_email' => $messages[$index]['To'],
-                                'group_id' => $group_id,
-                                'sender_user_id' => $user_id,
-                                'prompt_type' => $prompt_type,
-                                'batch_id' => $batch_id,
-                                'delivery_status' => 'pending',
-                                'condition_meta' => $condition_meta_json,
-                                'created_at' => current_time('mysql'),
-                            ),
-                            array('%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s')
-                        );
-                        if (!$wpdb->last_error) {
-                            $sent_count++;
-                        }
-                    }
+                $error_code = isset($result['ErrorCode']) ? (int) $result['ErrorCode'] : 0;
+                $message_id = $result['MessageID'] ?? null;
+
+                // Postmark rejected this recipient (e.g., invalid address): no MessageID
+                // returned, but we still log a row so the history modal reflects the
+                // failure rather than silently dropping it.
+                $delivery_status = ($error_code === 0 && !empty($message_id)) ? 'pending' : 'failed';
+
+                $wpdb->insert(
+                    $wpdb->prefix . BYS_GROUPS_COMMS_TABLE,
+                    array(
+                        'message_id'      => $message_id,
+                        'recipient_email' => $messages[$index]['To'],
+                        'group_id'        => $group_id,
+                        'sender_user_id'  => $user_id,
+                        'prompt_type'     => $prompt_type,
+                        'batch_id'        => $batch_id,
+                        'delivery_status' => $delivery_status,
+                        'condition_meta'  => $condition_meta_json,
+                        'created_at'      => current_time('mysql'),
+                    ),
+                    array('%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s')
+                );
+
+                if (!$wpdb->last_error) {
+                    $logged_count++;
                 }
             }
 
+            // sent_count reflects the recipient selection size, NOT individual delivery success
+            $sent_count = count($recipients_data);
+
             return array(
-                'success' => $sent_count > 0,
+                'success' => $logged_count > 0,
                 'sent_count' => $sent_count,
                 'errors' => array(),
             );
@@ -563,8 +569,8 @@ if (!class_exists('BYS_Groups_Mailer')) {
             }
 
             return array(
-                'success' => true,
-                'sent_count' => $inserted_count,
+                'success' => $inserted_count > 0,
+                'sent_count' => count($messages),
                 'errors' => array(),
                 'message' => 'Emails scheduled for ' . wp_date('j M Y, H:i', $scheduled_timestamp) . ' (UTC)',
             );
