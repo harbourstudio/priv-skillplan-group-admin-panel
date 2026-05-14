@@ -231,20 +231,29 @@ if (!class_exists('BYS_Groups_Mailer')) {
                 // failure rather than silently dropping it.
                 $delivery_status = ($error_code === 0 && !empty($message_id)) ? 'pending' : 'failed';
 
+                // Snapshot subject + body from the same payload we sent so the
+                // history modal can render Screen 3 from the DB without depending
+                // on a Postmark detail fetch (which 404s for failed rows that
+                // never got a MessageID).
+                $msg = $messages[$index];
+
                 $wpdb->insert(
                     $wpdb->prefix . BYS_GROUPS_COMMS_TABLE,
                     array(
                         'message_id'      => $message_id,
-                        'recipient_email' => $messages[$index]['To'],
+                        'recipient_email' => $msg['To'],
                         'group_id'        => $group_id,
                         'sender_user_id'  => $user_id,
                         'prompt_type'     => $prompt_type,
                         'batch_id'        => $batch_id,
+                        'subject'         => $msg['Subject'] ?? '',
+                        'body_html'       => $msg['HtmlBody'] ?? null,
+                        'body_text'       => $msg['TextBody'] ?? null,
                         'delivery_status' => $delivery_status,
                         'condition_meta'  => $condition_meta_json,
                         'created_at'      => current_time('mysql'),
                     ),
-                    array('%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s')
+                    array('%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')
                 );
 
                 if (!$wpdb->last_error) {
