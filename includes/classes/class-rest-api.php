@@ -5011,6 +5011,28 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                         $status_info = $this->extract_delivery_status_from_events($pm_detail['MessageEvents']);
                         $delivery_status = $status_info['status'];
                         $bounce_type = $status_info['bounce_type'];
+
+                        // Write the live status back to the DB so next queries reflect it without re-hitting Postmark. Also independent of the webhook.
+                        $stored_status = $row['delivery_status'] ?? 'pending';
+                        if ($delivery_status !== $stored_status || ($bounce_type && $bounce_type !== $row['bounce_type'])) {
+                            $update_data = array('delivery_status' => $delivery_status);
+                            $update_format = array('%s');
+                            if ($bounce_type) {
+                                $update_data['bounce_type'] = $bounce_type;
+                                $update_format[] = '%s';
+                            }
+                            if ($delivery_status === 'delivered') {
+                                $update_data['delivered_at'] = current_time('mysql');
+                                $update_format[] = '%s';
+                            }
+                            $wpdb->update(
+                                $wpdb->prefix . BYS_GROUPS_COMMS_TABLE,
+                                $update_data,
+                                array('id' => (int) $row['id']),
+                                $update_format,
+                                array('%d')
+                            );
+                        }
                     }
                 }
 
@@ -5189,6 +5211,35 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                         $delivered_at = $events_by_type['Opened']['ReceivedAt'] ?? null;
                     } elseif (isset($events_by_type['Bounced'])) {
                         $delivered_at = $events_by_type['Bounced']['ReceivedAt'] ?? null;
+                    }
+
+                    // Self-healing write-back: store the live Postmark status
+                    // so the DB stays in sync without depending on the webhook
+                    $stored_status = $msg_row['delivery_status'] ?? 'pending';
+                    if ($delivery_status !== $stored_status || ($bounce_type && $bounce_type !== $msg_row['bounce_type'])) {
+                        $update_data = array('delivery_status' => $delivery_status);
+                        $update_format = array('%s');
+                        if ($bounce_type) {
+                            $update_data['bounce_type'] = $bounce_type;
+                            $update_format[] = '%s';
+                        }
+                        if ($delivery_status === 'delivered' && $delivered_at) {
+                            // Use Postmark's ReceivedAt when available so the DB
+                            // reflects the actual delivery time, not the moment
+                            // the leader happened to open the modal.
+                            $delivered_ts = strtotime($delivered_at);
+                            $update_data['delivered_at'] = $delivered_ts
+                                ? gmdate('Y-m-d H:i:s', $delivered_ts)
+                                : current_time('mysql');
+                            $update_format[] = '%s';
+                        }
+                        $wpdb->update(
+                            $wpdb->prefix . BYS_GROUPS_COMMS_TABLE,
+                            $update_data,
+                            array('id' => (int) $msg_row['id']),
+                            $update_format,
+                            array('%d')
+                        );
                     }
                 }
             }
