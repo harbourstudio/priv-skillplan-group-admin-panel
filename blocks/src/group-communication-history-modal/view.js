@@ -146,15 +146,15 @@ jQuery(document).ready(($) => {
                 statusClass = 'comm-status-badge--pending';
             }
 
-            // Fetch sender user info
+            // Fetch sender user info via the shared api client so the WP REST
+            // nonce + plugin auth header are included (bare fetch hits 401 for
+            // /wp/v2/users/{id} when the user has no public posts).
             let senderName = 'Unknown';
             if (batch.sender_user_id) {
-                fetch(`/wp-json/wp/v2/users/${batch.sender_user_id}`)
-                    .then(res => res.json())
+                api.get(`/wp-json/wp/v2/users/${batch.sender_user_id}`)
                     .then(data => {
-                        senderName = data.name || `User ${batch.sender_user_id}`;
-                        // Update the row with the actual sender name
-                        $tbody.find(`tr[data-batch-id="${escapeHtml(batch.batch_id)}"] .comm-sender-name`).text(senderName);
+                        const name = data?.name || `User ${batch.sender_user_id}`;
+                        $tbody.find(`tr[data-batch-id="${escapeHtml(batch.batch_id)}"] .comm-sender-name`).text(name);
                     })
                     .catch(() => {
                         // On error, just leave it as Unknown
@@ -320,10 +320,8 @@ jQuery(document).ready(($) => {
         $senderName.text(`Sent by user #${userId}`).show();
 
         try {
-            const res = await fetch(`/wp-json/wp/v2/users/${userId}`);
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const data = await res.json();
-            const name = data.name || `User ${userId}`;
+            const data = await api.get(`/wp-json/wp/v2/users/${userId}`);
+            const name = data?.name || `User ${userId}`;
             $senderName.text(`Sent by ${name}`);
         } catch (err) {
             console.warn('[group-communication-history-modal] Failed to load sender name:', err);
