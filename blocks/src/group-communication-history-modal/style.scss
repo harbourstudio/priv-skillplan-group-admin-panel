@@ -47,6 +47,17 @@
         * { color: white; }
     }
 
+    .modal__meta {
+        margin: 0;
+        font-size: var(--wp--preset--font-size--small);
+        opacity: 0.85;
+        margin: 0;
+
+        > * {
+            margin: 0;
+        }
+    }
+
     .modal__header-left {
         display: flex;
         align-items: flex-start;
@@ -80,12 +91,6 @@
         font-weight: 600;
         margin: 0 !important;
         line-height: 1.2;
-    }
-
-    .modal__prompt-name {
-        font-size: var(--wp--preset--font-size--small);
-        opacity: 0.85;
-        margin: 0;
     }
 
     .modal__close {

@@ -82,7 +82,8 @@ jQuery(document).ready(($) => {
                 .attr('data-batch-label', batchLabel)
                 .attr('data-prompt-type', msg.prompt_type)
                 .attr('data-batch-id', msg.batch_id)
-                .attr('data-message-id', msg.message_id);
+                .attr('data-message-id', msg.message_id)
+                .attr('data-sender-id', msg.sender_user_id || '');
 
             // Set badge class and text based on badge_type
             const badgeType = msg.badge_type || 'prompt';
@@ -117,11 +118,15 @@ jQuery(document).ready(($) => {
             $modal.removeClass('hidden');
             $('html').css('overflow', 'hidden');
 
+            const senderIdAttr = $(this).data('senderId');
+            const senderId = senderIdAttr ? parseInt(senderIdAttr, 10) : null;
+
             $(document).trigger('comm:open-batch', {
                 date: batchDate,
                 batchId: batchId,
                 subject: subject,
                 promptType: promptType,
+                senderUserId: senderId,
             });
         });
 

@@ -8,6 +8,7 @@ jQuery(document).ready(($) => {
     const $backdrop   = $modal.find('.modal-backdrop');
     const $back       = $modal.find('.modal__back');
     const $promptName = $modal.find('.modal__prompt-name');
+    const $senderName = $modal.find('.modal__sender-name');
     const $screen1    = $modal.find('.comm-screen--1');
     const $screen2    = $modal.find('.comm-screen--2');
     const $screen3    = $modal.find('.comm-screen--3');
@@ -18,13 +19,21 @@ jQuery(document).ready(($) => {
     let loadedRecipients = null; // Cache recipients so we don't refetch on back navigation
     let currentGroupId = null;
     let screen2DateString = null; // Cache the formatted date for back navigation
+    // Tracks how the modal was opened: 'batch' (from the log block, Screen 1
+    // is irrelevant) or 'history' (from the prompts block, Screen 1 is the
+    // entry point). Drives back-button visibility.
+    let entryMode = 'history';
 
     function showScreen(n, subtitle) {
         screen = n;
         $screen1.toggle(n === 1);
         $screen2.toggle(n === 2);
         $screen3.toggle(n === 3);
-        $back.toggle(n > 1);
+        // Back button is only meaningful when there's a previous screen to
+        // return to. In 'batch' entry mode, Screen 2 IS the entry point, so
+        // it has no previous screen.
+        const hasPrevious = (entryMode === 'batch') ? (n > 2) : (n > 1);
+        $back.toggle(hasPrevious);
         if (subtitle !== undefined) $promptName.text(subtitle);
     }
 
@@ -35,14 +44,14 @@ jQuery(document).ready(($) => {
         currentBatchId = null;
         currentPromptType = null;
         loadedRecipients = null;
+        entryMode = 'history';
+        $senderName.hide().text('');
         // Show skeletons and clear content on close
         $screen1.find('.skeleton-wrapper').removeClass('hidden');
         $screen1.find('.comm-batch-list').find('tr:not(.skeleton-wrapper)').remove();
         $screen2.find('.skeleton-wrapper').removeClass('hidden');
         $screen2.find('.comm-user-list').find('tr:not(.skeleton-wrapper)').remove();
-        $screen3.find('.comm-message-subject').find('.skeleton').parent().show().find(':not(.skeleton)').remove();
-        $screen3.find('.comm-message-recipient').find('.skeleton').parent().show().find(':not(.skeleton)').remove();
-        $screen3.find('.comm-status-badge').find('.skeleton').parent().show().find(':not(.skeleton)').remove();
+        setScreen3Loading(true);
     }
 
     $modal.find('.modal__close').on('click', closeModal);
@@ -120,6 +129,12 @@ jQuery(document).ready(($) => {
             if (batch.delivery_status === 'scheduled') {
                 statusText = 'Scheduled';
                 statusClass = 'comm-status-badge--scheduled';
+            } else if (batch.delivery_status === 'failed') {
+                statusText = 'All Failed';
+                statusClass = 'comm-status-badge--failed';
+            } else if (batch.delivery_status === 'partial_failure') {
+                statusText = 'Some Failed';
+                statusClass = 'comm-status-badge--partial-failure';
             } else if (batch.delivery_status === 'bounced') {
                 statusText = 'All Failed';
                 statusClass = 'comm-status-badge--bounced';
@@ -150,7 +165,7 @@ jQuery(document).ready(($) => {
                 <tr class="comm-batch-row" data-batch-id="${escapeHtml(batch.batch_id)}">
                     <td>${escapeHtml(dateStr)}</td>
                     <td class="comm-sender-name">${escapeHtml(senderName)}</td>
-                    <td style="text-align:center;">${batch.recipient_count || 0}</td>
+                    <td class="comm-recipient-count">${batch.recipient_count || 0}</td>
                     <td><span class="comm-status-badge ${statusClass}">${escapeHtml(statusText)}</span></td>
                 </tr>
             `);
@@ -219,27 +234,42 @@ jQuery(document).ready(($) => {
     /**
      * Load detail for a single message
      */
-    async function loadMessageDetail(detailId) {
-        // Show all skeletons in Screen 3
-        $screen3.find('.comm-message-subject').find('.skeleton').show();
-        $screen3.find('.comm-message-recipient').find('.skeleton').show();
-        $screen3.find('.comm-status-badge').find('.skeleton').show();
-        const $bodySkeleton = $screen3.find('.skeleton--body');
-        $bodySkeleton.show();
+    /**
+     * Show or hide every Screen 3 skeleton. `loading=true` blanks the
+     * content fields and shows their skeletons; `loading=false` hides the
+     * skeletons (subsequent text-setting reveals the content).
+     */
+    function setScreen3Loading(loading) {
+        const $subject   = $screen3.find('.comm-message-subject');
+        const $recipient = $screen3.find('.comm-message-recipient');
+        const $badge     = $screen3.find('.comm-status-badge');
+        const $body      = $screen3.find('.comm-message-body');
+        const $bodySkel  = $screen3.find('.comm-message-body-skeleton');
 
-        // Clear previous content
-        $screen3.find('.comm-message-subject').find(':not(.skeleton)').remove();
-        $screen3.find('.comm-message-recipient').find(':not(.skeleton)').remove();
-        $screen3.find('.comm-status-badge').find(':not(.skeleton)').remove();
-        $screen3.find('.comm-message-body').empty();
+        if (loading) {
+            // Wipe content but keep skeleton spans, then ensure they're visible.
+            [$subject, $recipient, $badge].forEach($el => {
+                $el.find(':not(.skeleton)').remove();
+                $el.find('.skeleton').show();
+            });
+            $body.empty();
+            $bodySkel.show();
+        } else {
+            $screen3.find('.comm-meta-value .skeleton, .comm-status-badge .skeleton').hide();
+            $bodySkel.hide();
+        }
+    }
+
+    async function loadMessageDetail(detailId) {
+        setScreen3Loading(true);
 
         try {
-            // detailId is either a Postmark message_id or a DB row id (for scheduled emails)
+            // detailId is either a Postmark message_id or a DB row id (for failed/scheduled rows)
             const detail = await api.get(endpoints.communicationDetail(detailId));
             renderMessageDetail(detail);
         } catch (err) {
             console.error('[group-communication-history-modal] Error loading detail:', err);
-            $bodySkeleton.remove();
+            setScreen3Loading(false);
             $screen3.find('.comm-message-body').html(`<p style="color:red;">Error loading message details</p>`);
         }
     }
@@ -251,34 +281,53 @@ jQuery(document).ready(($) => {
         const statusLabel = capitalize(detail.delivery_status || 'pending');
         const statusClass = `comm-status-badge--${detail.delivery_status}`;
 
-        // Remove skeletons and populate fields
-        $screen3.find('.comm-message-subject').find('.skeleton').remove();
+        setScreen3Loading(false);
+
         $screen3.find('.comm-message-subject').text(detail.subject || '(No subject)');
 
-        $screen3.find('.comm-message-recipient').find('.skeleton').remove();
         $screen3.find('.comm-message-recipient').text(
-            `${escapeHtml(detail.recipient_name)} <${escapeHtml(detail.recipient_email)}>`
+            `${detail.recipient_name} <${detail.recipient_email}>`
         );
 
         const $badge = $screen3.find('.comm-status-badge');
-        $badge.find('.skeleton').remove();
         $badge.removeClass().addClass(`comm-status-badge ${statusClass}`).text(statusLabel);
 
         // Render email body (prefer HTML, fallback to text)
-        let bodyHtml = detail.body_html || detail.body_text || '(No content)';
         const $body = $screen3.find('.comm-message-body');
-        $screen3.find('.skeleton--body').remove();
-
         if (detail.body_html) {
-            // Clean up HTML: remove <title> tags and collapse whitespace
-            bodyHtml = bodyHtml
-                .replace(/<title[^>]*>.*?<\/title>/gi, '') // Remove <title> tags
-                .replace(/>\s+</g, '><') // Remove whitespace between tags
-                .replace(/\s\s+/g, ' ') // Collapse multiple whitespaces to single space
+            const bodyHtml = detail.body_html
+                .replace(/<title[^>]*>.*?<\/title>/gi, '')
+                .replace(/>\s+</g, '><')
+                .replace(/\s\s+/g, ' ')
                 .trim();
             $body.html(bodyHtml);
         } else {
-            $body.text(bodyHtml);
+            $body.text(detail.body_text || '(No content)');
+        }
+    }
+
+    /**
+     * Fetch a WP user's display name and render it in the header slot. Hides
+     * the slot when no user id is given or the fetch fails.
+     */
+    async function renderSenderName(userId) {
+        if (!userId) {
+            $senderName.hide().text('');
+            return;
+        }
+
+        // Optimistic placeholder so something appears immediately.
+        $senderName.text(`Sent by user #${userId}`).show();
+
+        try {
+            const res = await fetch(`/wp-json/wp/v2/users/${userId}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            const name = data.name || `User ${userId}`;
+            $senderName.text(`Sent by ${name}`);
+        } catch (err) {
+            console.warn('[group-communication-history-modal] Failed to load sender name:', err);
+            // Leave the placeholder text in place rather than going blank.
         }
     }
 
@@ -288,9 +337,12 @@ jQuery(document).ready(($) => {
     $(document).on('comm:open-batch', async (e, data) => {
         currentBatchId = data.batchId;
         currentGroupId = window.bysGroupData?.groupId;
+        entryMode = 'batch';
         $modal.removeClass('hidden');
         $('html').css('overflow', 'hidden');
         showScreen(2, data.date || '');
+
+        renderSenderName(data.senderUserId);
 
         // Show skeleton before loading
         $screen2.find('.skeleton-wrapper').removeClass('hidden');
@@ -304,8 +356,12 @@ jQuery(document).ready(($) => {
     $(document).on('comm:open-history', async (e, data) => {
         currentPromptType = data.promptType;
         currentGroupId = window.bysGroupData?.groupId;
+        entryMode = 'history';
         $modal.removeClass('hidden');
         $('html').css('overflow', 'hidden');
+
+        // Sender slot is only relevant for the per-batch view from the log.
+        $senderName.hide().text('');
         showScreen(1, data.promptTitle || '');
 
         // Show skeleton before loading
@@ -318,8 +374,8 @@ jQuery(document).ready(($) => {
      * Back button handler
      */
     $back.on('click', () => {
-        if (screen === 2) {
-            // Going back to Screen 1 — show prompt type name
+        if (screen === 2 && entryMode === 'history') {
+            // Only meaningful when we entered via the prompts block.
             showScreen(1, currentPromptType ? capitalize(currentPromptType.replace(/-/g, ' ')) : '');
         }
         if (screen === 3) {

@@ -37,7 +37,10 @@ $wrapper_attributes = get_block_wrapper_attributes();
                     </button>
                     <div class="modal__header-titles">
                         <h4 id="communication-history-modal-title"><?php esc_html_e( 'Prompt History', 'bys' ); ?></h4>
-                        <p class="modal__prompt-name"></p>
+                        <div class="modal__meta">
+                            <p class="modal__prompt-name"></p>
+                            <p class="modal__sender-name" style="display:none;"></p>
+                        </div>
                     </div>
                 </div>
                 <button class="modal__close btn-unstyled" aria-label="<?php esc_attr_e( 'Close', 'bys' ); ?>">
@@ -96,27 +99,32 @@ $wrapper_attributes = get_block_wrapper_attributes();
                             <div class="comm-message-meta-row">
                                 <span class="comm-meta-label"><?php esc_html_e( 'Subject', 'bys' ); ?></span>
                                 <span class="comm-meta-value comm-message-subject">
-                                    <span class="skeleton" aria-label="Loading"></span>
+                                    <span class="skeleton" role="status" aria-busy="true" aria-label="<?php esc_attr_e( 'Loading subject', 'bys' ); ?>"></span>
                                 </span>
                             </div>
                             <div class="comm-message-meta-row">
                                 <span class="comm-meta-label"><?php esc_html_e( 'To', 'bys' ); ?></span>
                                 <span class="comm-meta-value comm-message-recipient">
-                                    <span class="skeleton" aria-label="Loading"></span>
+                                    <span class="skeleton" role="status" aria-busy="true" aria-label="<?php esc_attr_e( 'Loading recipient', 'bys' ); ?>"></span>
                                 </span>
                             </div>
                             <div class="comm-message-meta-row">
                                 <span class="comm-meta-label"><?php esc_html_e( 'Status', 'bys' ); ?></span>
                                 <span class="comm-meta-value comm-status-wrapper">
                                     <span class="comm-status-badge">
-                                        <span class="skeleton" aria-label="Loading"></span>
+                                        <span class="skeleton" role="status" aria-busy="true" aria-label="<?php esc_attr_e( 'Loading status', 'bys' ); ?>"></span>
                                     </span>
                                 </span>
                             </div>
                         </div>
-                        <div class="skeleton skeleton--body" aria-label="Loading"></div>
-                        <div class="comm-message-body">
+
+                        <div class="comm-message-body-skeleton" role="status" aria-busy="true" aria-label="<?php esc_attr_e( 'Loading message body', 'bys' ); ?>" style="display:none;">
+                            <div class="skeleton"></div>
+                            <div class="skeleton"></div>
+                            <div class="skeleton"></div>
+                            <div class="skeleton"></div>
                         </div>
+                        <div class="comm-message-body"></div>
                     </div>
                 </div>
 
