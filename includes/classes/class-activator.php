@@ -54,19 +54,27 @@ if (!class_exists('BYS_Groups_Activator')) {
 
             $sql_comms = "CREATE TABLE {$wpdb->prefix}" . BYS_GROUPS_COMMS_TABLE . " (
                 id               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-                message_id       VARCHAR(255)    NOT NULL,
+                message_id       VARCHAR(255)    DEFAULT NULL,
                 recipient_email  VARCHAR(255)    NOT NULL,
                 group_id         BIGINT UNSIGNED NOT NULL,
                 sender_user_id   BIGINT UNSIGNED NOT NULL,
                 prompt_type      VARCHAR(50)     NOT NULL,
+                batch_id         VARCHAR(36)     NOT NULL DEFAULT '',
+                subject          VARCHAR(255)    DEFAULT NULL,
+                body_html        LONGTEXT        DEFAULT NULL,
+                body_text        TEXT            DEFAULT NULL,
                 delivery_status  VARCHAR(50)     DEFAULT 'pending',
                 bounce_type      VARCHAR(50)     DEFAULT NULL,
                 delivered_at     DATETIME        DEFAULT NULL,
+                scheduled_at     DATETIME        DEFAULT NULL,
+                condition_meta   TEXT            DEFAULT NULL,
                 created_at       DATETIME        NOT NULL,
                 PRIMARY KEY (id),
                 UNIQUE KEY message_id (message_id),
                 KEY group_sender (group_id, sender_user_id),
-                KEY delivery_status (delivery_status)
+                KEY batch_id (batch_id),
+                KEY delivery_status (delivery_status),
+                KEY scheduled_at (scheduled_at)
                 ) $charset_collate;";
             dbDelta($sql_comms);
 

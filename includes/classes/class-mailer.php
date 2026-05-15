@@ -16,7 +16,6 @@ if (!class_exists('BYS_Groups_Mailer')) {
             // error_log('[BYS_Groups_Mailer] Class instantiated');
         }
 
-
         /**
          * Send group communication emails via Postmark API.
          *
@@ -34,7 +33,9 @@ if (!class_exists('BYS_Groups_Mailer')) {
             $recipient_type,
             $recipient_ids = array(),
             $custom_subject = '',
-            $custom_message = ''
+            $custom_message = '',
+            $scheduled_at = '',
+            $condition = array()
         ) {
             // Validate recipient type
             $valid_types = array('group', 'individual', 'condition');
@@ -94,6 +95,12 @@ if (!class_exists('BYS_Groups_Mailer')) {
             // Load email template functions
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/emails/group-comms.php';
 
+            $has_condition_meta = ($recipient_type === 'condition' && !empty($condition['type']));
+
+            // Generate batch ID for this send
+            $batch_id = wp_generate_uuid4();
+            error_log("[Mailer::send_group_communication] Generated batch_id: $batch_id");
+
             // Build Postmark batch payload
             $messages = array();
             foreach ($recipients_data as $recipient) {
@@ -130,6 +137,7 @@ if (!class_exists('BYS_Groups_Mailer')) {
                         'group_id' => (string)$group_id,
                         'sender_user_id' => (string)$user_id,
                         'prompt_type' => $prompt_type,
+                        'batch_id' => $batch_id,
                     ),
                 );
             }
@@ -139,6 +147,19 @@ if (!class_exists('BYS_Groups_Mailer')) {
                     'success' => false,
                     'sent_count' => 0,
                     'errors' => array('Failed to build email payloads'),
+                );
+            }
+
+            // If scheduled for later, queue the emails instead of sending immediately
+            if (!empty($scheduled_at)) {
+                return $this->queue_scheduled_emails(
+                    $messages,
+                    $group_id,
+                    $prompt_type,
+                    $user_id,
+                    $batch_id,
+                    $scheduled_at,
+                    $has_condition_meta ? $condition : array()
                 );
             }
 
@@ -192,39 +213,59 @@ if (!class_exists('BYS_Groups_Mailer')) {
                 );
             }
 
-            // Log successful sends to bys_group_communication_log
+            // Log every attempted send to bys_group_communication_log so the
+            // history modal can show per-recipient delivery status.
             global $wpdb;
-            $sent_count = 0;
+            $logged_count = 0;
+            $condition_meta_json = $has_condition_meta ? wp_json_encode($condition) : null;
 
             // Postmark /email/batch returns an array directly, not wrapped in 'Messages'
             $results = is_array($response_body) ? $response_body : ($response_body['Messages'] ?? array());
 
             foreach ((array)$results as $index => $result) {
-                // Check if send was successful (ErrorCode 0 means success)
-                if (!isset($result['ErrorCode']) || (int)$result['ErrorCode'] === 0) {
-                    $message_id = $result['MessageID'] ?? '';
-                    if (!empty($message_id)) {
-                        $wpdb->insert(
-                            $wpdb->prefix . BYS_GROUPS_COMMS_TABLE,
-                            array(
-                                'message_id' => $message_id,
-                                'recipient_email' => $messages[$index]['To'],
-                                'group_id' => $group_id,
-                                'sender_user_id' => $user_id,
-                                'prompt_type' => $prompt_type,
-                                'created_at' => current_time('mysql'),
-                            ),
-                            array('%s', '%s', '%d', '%d', '%s', '%s')
-                        );
-                        if (!$wpdb->last_error) {
-                            $sent_count++;
-                        }
-                    }
+                $error_code = isset($result['ErrorCode']) ? (int) $result['ErrorCode'] : 0;
+                $message_id = $result['MessageID'] ?? null;
+
+                // Postmark rejected this recipient (e.g., invalid address): no MessageID
+                // returned, but we still log a row so the history modal reflects the
+                // failure rather than silently dropping it.
+                $delivery_status = ($error_code === 0 && !empty($message_id)) ? 'pending' : 'failed';
+
+                // Snapshot subject + body from the same payload we sent so the
+                // history modal can render Screen 3 from the DB without depending
+                // on a Postmark detail fetch (which 404s for failed rows that
+                // never got a MessageID).
+                $msg = $messages[$index];
+
+                $wpdb->insert(
+                    $wpdb->prefix . BYS_GROUPS_COMMS_TABLE,
+                    array(
+                        'message_id'      => $message_id,
+                        'recipient_email' => $msg['To'],
+                        'group_id'        => $group_id,
+                        'sender_user_id'  => $user_id,
+                        'prompt_type'     => $prompt_type,
+                        'batch_id'        => $batch_id,
+                        'subject'         => $msg['Subject'] ?? '',
+                        'body_html'       => $msg['HtmlBody'] ?? null,
+                        'body_text'       => $msg['TextBody'] ?? null,
+                        'delivery_status' => $delivery_status,
+                        'condition_meta'  => $condition_meta_json,
+                        'created_at'      => current_time('mysql'),
+                    ),
+                    array('%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')
+                );
+
+                if (!$wpdb->last_error) {
+                    $logged_count++;
                 }
             }
 
+            // sent_count reflects the recipient selection size, NOT individual delivery success
+            $sent_count = count($recipients_data);
+
             return array(
-                'success' => $sent_count > 0,
+                'success' => $logged_count > 0,
                 'sent_count' => $sent_count,
                 'errors' => array(),
             );
@@ -241,8 +282,8 @@ if (!class_exists('BYS_Groups_Mailer')) {
         private function get_recipients_with_names($group_id, $recipient_type, $recipient_ids = array()) {
             $recipients = array();
 
-            if ($recipient_type === 'individual' && !empty($recipient_ids)) {
-                // Specific user IDs
+            if (($recipient_type === 'individual' || $recipient_type === 'condition') && !empty($recipient_ids)) {
+                // Specific user IDs (condition mode uses the snapshot resolved at queue time)
                 foreach ($recipient_ids as $user_id) {
                     $user = get_user_by('ID', $user_id);
                     if ($user && !empty($user->user_email)) {
@@ -253,7 +294,7 @@ if (!class_exists('BYS_Groups_Mailer')) {
                     }
                 }
             } else {
-                // All group members (for 'group' or 'condition' types)
+                // All group members (for 'group' type)
                 $recipients = $this->get_group_users_with_names($group_id);
             }
 
@@ -454,6 +495,94 @@ if (!class_exists('BYS_Groups_Mailer')) {
             // error_log("[BYS_Mailer::get_group_users_emails] Found " . count($unique_emails) . " unique group members");
 
             return $unique_emails;
+        }
+
+        /**
+         * Queue emails to be sent at a scheduled time
+         *
+         * @param array $messages Postmark messages to send
+         * @param int $group_id Group ID
+         * @param string $prompt_type Prompt type
+         * @param int $user_id Sender user ID
+         * @param string $batch_id Batch ID
+         * @param string $scheduled_at UTC ISO 8601 datetime when to send
+         * @return array Response array with success, sent_count, errors
+         */
+        private function queue_scheduled_emails($messages, $group_id, $prompt_type, $user_id, $batch_id, $scheduled_at, $condition = array()) {
+            global $wpdb;
+
+            // Validate scheduled_at is a valid future datetime and convert to MySQL format
+            $scheduled_timestamp = strtotime($scheduled_at);
+            if (!$scheduled_timestamp || $scheduled_timestamp <= current_time('timestamp')) {
+                return array(
+                    'success' => false,
+                    'sent_count' => 0,
+                    'errors' => array('Scheduled time must be in the future'),
+                );
+            }
+
+            // Convert ISO 8601 string to MySQL UTC format (use gmdate, not wp_date, to stay in UTC)
+            $scheduled_mysql = gmdate('Y-m-d H:i:s', $scheduled_timestamp);
+            $condition_meta_json = !empty($condition) ? wp_json_encode($condition) : null;
+
+            // Store emails in database with scheduled_at
+            // Note: message_id will be populated when the email is actually sent
+            $inserted_count = 0;
+            foreach ($messages as $message) {
+                $recipient_email = $message['To'];
+                $subject = $message['Subject'] ?? '';
+                $body_html = $message['HtmlBody'] ?? null;
+                $body_text = $message['TextBody'] ?? null;
+
+                $inserted = $wpdb->insert(
+                    $wpdb->prefix . BYS_GROUPS_COMMS_TABLE,
+                    array(
+                        'message_id' => null,
+                        'recipient_email' => $recipient_email,
+                        'group_id' => $group_id,
+                        'sender_user_id' => $user_id,
+                        'prompt_type' => $prompt_type,
+                        'batch_id' => $batch_id,
+                        'subject' => $subject,
+                        'body_html' => $body_html,
+                        'body_text' => $body_text,
+                        'delivery_status' => 'scheduled',
+                        'scheduled_at' => $scheduled_mysql,
+                        'condition_meta' => $condition_meta_json,
+                        'created_at' => current_time('mysql'),
+                    ),
+                    array('%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')
+                );
+
+                if ($inserted) {
+                    $inserted_count++;
+                }
+            }
+
+            // Schedule via Action Scheduler if available, otherwise fallback to WordPress cron
+            if (function_exists('as_schedule_single_action')) {
+                // Use Action Scheduler
+                as_schedule_single_action(
+                    $scheduled_timestamp,
+                    'bys_groups_send_scheduled_emails',
+                    array($batch_id)
+                );
+                error_log("[Mailer::queue_scheduled_emails] Scheduled batch $batch_id via Action Scheduler for timestamp: $scheduled_timestamp");
+            } else {
+                // Fallback to WordPress cron
+                $hook_name = 'bys_groups_send_scheduled_emails';
+                if (!wp_next_scheduled($hook_name, array($batch_id))) {
+                    wp_schedule_single_event($scheduled_timestamp, $hook_name, array($batch_id));
+                    error_log("[Mailer::queue_scheduled_emails] Scheduled batch $batch_id via WordPress cron for timestamp: $scheduled_timestamp");
+                }
+            }
+
+            return array(
+                'success' => $inserted_count > 0,
+                'sent_count' => count($messages),
+                'errors' => array(),
+                'message' => 'Emails scheduled for ' . wp_date('j M Y, H:i', $scheduled_timestamp) . ' (UTC)',
+            );
         }
     }
 }

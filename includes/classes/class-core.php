@@ -27,6 +27,8 @@ if (!class_exists('BYS_Groups_Core')) {
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-required-courses.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-invites.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-quiz-access.php';
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-scheduled-emails.php';
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-conditional-emails.php';
         }
 
         public function init() {
@@ -47,6 +49,7 @@ if (!class_exists('BYS_Groups_Core')) {
             new BYS_Required_Courses();
             new BYS_Groups_Invites();
             new BYS_Groups_Quiz_Access();
+            new BYS_Groups_Scheduled_Emails();
 
             // Enqueue certificate tracking script on certificate pages
             add_action('wp_enqueue_scripts', array($this, 'enqueue_certificate_tracker'));

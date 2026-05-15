@@ -71,3 +71,37 @@ export function formatDateTime(timestamp) {
     return '—';
   }
 }
+
+/**
+ * Convert a UTC ISO 8601 string to a local datetime string in
+ * `YYYY-MM-DDTHH:mm` format (the dateFormat used by Flatpickr).
+ *
+ * @param {string} utcDatetimeValue ISO 8601 UTC datetime
+ * @returns {string} Local datetime in YYYY-MM-DDTHH:mm, or '' if invalid
+ */
+export function convertFromUTC(utcDatetimeValue) {
+  if (!utcDatetimeValue) return '';
+  const dt = new Date(utcDatetimeValue);
+  if (isNaN(dt.getTime())) return '';
+  const Y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, '0');
+  const d = String(dt.getDate()).padStart(2, '0');
+  const H = String(dt.getHours()).padStart(2, '0');
+  const i = String(dt.getMinutes()).padStart(2, '0');
+  return `${Y}-${m}-${d}T${H}:${i}`;
+}
+
+/**
+ * Convert a Flatpickr-style local datetime string (`YYYY-MM-DDTHH:mm`)
+ * into a UTC ISO 8601 string suitable for sending to a server.
+ *
+ * @param {string} localDatetimeValue Local datetime in YYYY-MM-DDTHH:mm
+ * @returns {string} UTC ISO 8601 string, or '' if input is empty
+ */
+export function convertToUTC(localDatetimeValue) {
+  if (!localDatetimeValue) return '';
+  const [datePart, timePart] = localDatetimeValue.split('T');
+  const [year, month, day] = datePart.split('-').map(Number);
+  const [hours, minutes] = timePart.split(':').map(Number);
+  return new Date(year, month - 1, day, hours, minutes).toISOString();
+}

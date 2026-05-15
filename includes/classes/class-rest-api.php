@@ -215,6 +215,14 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'permission_callback' => array($this, 'check_user_permission'),
             ));
 
+            // All quizzes in a course (no show_in_reporting / show_test_grading_config filter).
+            // Used by conditional-recipients UI where leaders need to pick from every quiz.
+            register_rest_route($this->namespace, '/courses/(?P<course_id>\d+)/quizzes', array(
+                'methods'             => 'GET',
+                'callback'            => array($this, 'get_course_quizzes'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
+
             // Batch quiz progress for multiple users in one course — used by CSV export
             register_rest_route($this->namespace, '/courses/(?P<course_id>\d+)/quiz-progress-batch', array(
                 'methods'             => 'GET',
@@ -383,6 +391,13 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'permission_callback' => array($this, 'check_user_permission')
             ));
 
+            // Notify a group-user about per-user quiz-access window
+            register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/users/(?P<user_id>\d+)/notify-quiz-access', array(
+                'methods' => 'POST',
+                'callback' => array($this, 'notify_user_quiz_access'),
+                'permission_callback' => array($this, 'check_user_permission')
+            ));
+
             // send group communication (emails)
             register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/send-communication', array(
                 'methods' => 'POST',
@@ -431,6 +446,26 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'methods' => 'POST',
                 'callback' => array($this, 'handle_postmark_webhook'),
                 'permission_callback' => '__return_true',
+            ));
+
+            // Get all recipients in a batch send
+            register_rest_route($this->namespace, '/communications/batch/(?P<batch_id>[a-zA-Z0-9\-]+)/recipients', array(
+                'methods' => 'GET',
+                'callback' => array($this, 'get_communication_recipients'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
+
+            // Get detail for a single message
+            register_rest_route($this->namespace, '/communications/(?P<message_id>[a-zA-Z0-9\-]+)/detail', array(
+                'methods' => 'GET',
+                'callback' => array($this, 'get_communication_detail'),
+                'permission_callback' => array($this, 'check_user_permission'),
+            ));
+
+            register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/conditional-recipients', array(
+                'methods'             => 'POST',
+                'callback'            => array('BYS_Groups_Conditional_Emails', 'rest_get_recipients'),
+                'permission_callback' => array($this, 'check_user_permission'),
             ));
 
         }
@@ -2504,6 +2539,50 @@ if (!class_exists('BYS_Groups_Rest_API')) {
         }
 
         /**
+         * GET /courses/{course_id}/quizzes
+         *
+         * Returns every published sfwd-quiz attached to a course, regardless of
+         * the show_in_reporting / show_test_grading_config meta. Distinct from
+         * get_course_quiz_steps() which scopes by those flags for reporting.
+         */
+        public function get_course_quizzes($request) {
+            $course_id = intval($request['course_id']);
+
+            if (!$course_id) {
+                return new \WP_REST_Response(array('error' => 'Invalid course ID'), 400);
+            }
+
+            $cache_key = "bys_course_quizzes_all_v1_{$course_id}";
+            $cached = get_transient($cache_key);
+            if ($cached !== false) {
+                return new \WP_REST_Response($cached, 200);
+            }
+
+            global $wpdb;
+            $rows = $wpdb->get_results($wpdb->prepare(
+                "SELECT p.ID as id, p.post_title as title
+                 FROM {$wpdb->posts} p
+                 JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
+                 WHERE pm.meta_key = 'course_id' AND pm.meta_value = %d
+                   AND p.post_type = 'sfwd-quiz' AND p.post_status = 'publish'
+                 ORDER BY p.menu_order ASC, p.post_title ASC",
+                $course_id
+            ));
+
+            $result = array();
+            foreach ((array) $rows as $row) {
+                $result[] = array(
+                    'id'    => intval($row->id),
+                    'title' => $row->title,
+                );
+            }
+
+            set_transient($cache_key, $result, HOUR_IN_SECONDS);
+
+            return new \WP_REST_Response($result, 200);
+        }
+
+        /**
          * Get quiz attempts for a user in a course
          * Returns the best attempt (highest percentage) for each quiz with configured pass threshold
          */
@@ -4353,6 +4432,111 @@ if (!class_exists('BYS_Groups_Rest_API')) {
         }
 
         /**
+         * Send an email to a group user about their per-user quiz-access
+         */
+        public function notify_user_quiz_access($request) {
+            $group_id = intval($request['group_id']);
+            $user_id  = intval($request['user_id']);
+
+            if (!$group_id || !$user_id) {
+                return new \WP_REST_Response(array('error' => 'Invalid group_id or user_id'), 400);
+            }
+
+            $body    = $request->get_json_params();
+            $quiz_id = intval($body['quiz_id'] ?? 0);
+            if (!$quiz_id) {
+                return new \WP_REST_Response(array('error' => 'Missing quiz_id'), 400);
+            }
+
+            $recipient = get_user_by('ID', $user_id);
+            if (!$recipient || empty($recipient->user_email)) {
+                return new \WP_REST_Response(array('error' => 'Recipient not found'), 404);
+            }
+
+            $access_dates = BYS_Groups_Quiz_Access::get_user_quiz_access_dates($user_id, $group_id);
+            $window = $access_dates[$quiz_id] ?? array();
+            $start  = $window['start'] ?? '';
+            $end    = $window['end']   ?? '';
+
+            $postmark_token = get_option('bys_postmark_token', '');
+            if (empty($postmark_token)) {
+                return new \WP_REST_Response(array('error' => 'Postmark token not configured'), 500);
+            }
+
+            // Build email via the dedicated template
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/emails/user-quiz-config.php';
+
+            $sender    = get_user_by('ID', $sender_id);
+            $quiz_post = get_post($quiz_id);
+
+            $email = bys_get_quiz_access_notification_email(array(
+                'recipient_name' => !empty($recipient->display_name) ? $recipient->display_name : $recipient->user_login,
+                'site_name'      => get_bloginfo('name'),
+                'site_url'       => home_url(),
+                'quiz_title'     => $quiz_post ? get_the_title($quiz_post) : 'your quiz',
+                'quiz_url'       => $quiz_post ? get_permalink($quiz_post) : home_url(),
+                'start'          => $start,
+                'end'            => $end,
+                'sender_email'   => $sender ? $sender->user_email : get_bloginfo('admin_email'),
+            ));
+
+            if (empty($email['subject']) || empty($email['html'])) {
+                return new \WP_REST_Response(array('error' => 'Failed to build email'), 500);
+            }
+
+            $response = wp_remote_post(
+                'https://api.postmarkapp.com/email',
+                array(
+                    'headers' => array(
+                        'X-Postmark-Server-Token' => $postmark_token,
+                        'Content-Type'            => 'application/json',
+                        'Accept'                  => 'application/json',
+                    ),
+                    'body' => wp_json_encode(array(
+                        'From'     => get_bloginfo('admin_email'),
+                        'To'       => $recipient->user_email,
+                        'Subject'  => $email['subject'],
+                        'HtmlBody' => $email['html'],
+                        'TextBody' => $email['plain'],
+                        'Tag'      => 'user-quiz-access',
+                        'Metadata' => array(
+                            'group_id'       => (string) $group_id,
+                            'user_id'        => (string) $user_id,
+                            'quiz_id'        => (string) $quiz_id,
+                            'sender_user_id' => (string) $sender_id,
+                        ),
+                    )),
+                    'timeout'   => 30,
+                    'sslverify' => true,
+                )
+            );
+
+            if (is_wp_error($response)) {
+                error_log('[notify_user_quiz_access] Postmark transport error: ' . $response->get_error_message());
+                return new \WP_REST_Response(array('error' => 'Postmark API error: ' . $response->get_error_message()), 502);
+            }
+
+            $status_code   = wp_remote_retrieve_response_code($response);
+            $response_body = json_decode(wp_remote_retrieve_body($response), true);
+
+            if ($status_code !== 200 || (isset($response_body['ErrorCode']) && (int) $response_body['ErrorCode'] !== 0)) {
+                $msg = $response_body['Message'] ?? 'Unknown Postmark error';
+                error_log(sprintf(
+                    '[notify_user_quiz_access] Postmark rejected — status %d, ErrorCode: %s, Message: %s',
+                    $status_code,
+                    $response_body['ErrorCode'] ?? 'n/a',
+                    $msg
+                ));
+                return new \WP_REST_Response(array('error' => $msg), 502);
+            }
+
+            return new \WP_REST_Response(array(
+                'success'    => true,
+                'message_id' => $response_body['MessageID'] ?? null,
+            ), 200);
+        }
+
+        /**
          * Send group communication (emails via prompts or custom messages)
          *
          * @param WP_REST_Request $request Request object with group_id and JSON body
@@ -4380,6 +4564,8 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                     'recipient_ids' => $request->get_param('recipient_ids'),
                     'custom_subject' => $request->get_param('custom_subject'),
                     'custom_message' => $request->get_param('custom_message'),
+                    'scheduled_at' => $request->get_param('scheduled_at'),
+                    'condition' => $request->get_param('condition'),
                 );
             }
 
@@ -4388,6 +4574,17 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             $recipient_ids = isset($body['recipient_ids']) && is_array($body['recipient_ids']) ? array_map('intval', $body['recipient_ids']) : array();
             $custom_subject = sanitize_text_field($body['custom_subject'] ?? '');
             $custom_message = wp_kses_post($body['custom_message'] ?? '');
+            $scheduled_at = sanitize_text_field($body['scheduled_at'] ?? '');
+
+            $condition = array();
+            if ($recipient_type === 'condition' && isset($body['condition']) && is_array($body['condition'])) {
+                $condition = array(
+                    'type'      => sanitize_key($body['condition']['type'] ?? ''),
+                    'days'      => intval($body['condition']['days'] ?? 0),
+                    'course_id' => intval($body['condition']['course_id'] ?? 0),
+                    'quiz_id'   => intval($body['condition']['quiz_id'] ?? 0),
+                );
+            }
 
             if (!$prompt_type || !$recipient_type) {
                 return new \WP_REST_Response(array('error' => 'Missing prompt_type or recipient_type'), 400);
@@ -4396,6 +4593,16 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             // For custom prompts, require both subject and message
             if ($prompt_type === 'custom' && (empty($custom_subject) || empty($custom_message))) {
                 return new \WP_REST_Response(array('error' => 'Custom prompts require both subject and message'), 400);
+            }
+
+            // Conditional sends must include the snapshotted recipient_ids and a condition.type
+            if ($recipient_type === 'condition') {
+                if (empty($recipient_ids)) {
+                    return new \WP_REST_Response(array('error' => 'Conditional send requires resolved recipients'), 400);
+                }
+                if (empty($condition['type'])) {
+                    return new \WP_REST_Response(array('error' => 'Conditional send requires a condition type'), 400);
+                }
             }
 
             // Use mailer class to send (includes leader and group validation)
@@ -4408,7 +4615,9 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 $recipient_type,
                 $recipient_ids,
                 $custom_subject,
-                $custom_message
+                $custom_message,
+                $scheduled_at,
+                $condition
             );
 
             $status_code = $result['success'] ? 200 : 400;
@@ -4538,44 +4747,213 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 );
             }
 
-            // Query bys_group_communication_log for this group + sender only
+            // Query bys_group_communication_log for this group (all senders), grouped by batch_id
+            // Include all emails that have been sent to Postmark (message_id IS NOT NULL)
             global $wpdb;
             $placeholders = implode(',', array_fill(0, count($postmark_ids), '%s'));
-            $log_rows = $wpdb->get_results(
+            // Fetch every log row whose batch_id appears in the Postmark result
+            // set. We resolve batch_ids first so we can also include sibling rows
+            // with NULL message_id (i.e. Postmark-rejected sends — they share a
+            // batch_id with their successful peers) in the aggregation.
+            $batch_id_rows = $wpdb->get_results(
                 $wpdb->prepare(
-                    "SELECT message_id, prompt_type, delivery_status, bounce_type FROM {$wpdb->prefix}" . BYS_GROUPS_COMMS_TABLE . "
-                     WHERE message_id IN ($placeholders)
-                     AND group_id = %d AND sender_user_id = %d",
-                    array_merge($postmark_ids, array($group_id, $user_id))
+                    "SELECT DISTINCT batch_id FROM {$wpdb->prefix}" . BYS_GROUPS_COMMS_TABLE . "
+                     WHERE message_id IN ($placeholders) AND group_id = %d",
+                    array_merge($postmark_ids, array($group_id))
+                ),
+                ARRAY_A
+            );
+            $batch_ids_in_postmark = array_filter(array_column((array) $batch_id_rows, 'batch_id'));
+
+            $log_rows = array();
+            if (!empty($batch_ids_in_postmark)) {
+                $batch_placeholders = implode(',', array_fill(0, count($batch_ids_in_postmark), '%s'));
+                $log_rows = $wpdb->get_results(
+                    $wpdb->prepare(
+                        "SELECT message_id, batch_id, prompt_type, subject, delivery_status, bounce_type, sender_user_id, scheduled_at FROM {$wpdb->prefix}" . BYS_GROUPS_COMMS_TABLE . "
+                         WHERE batch_id IN ($batch_placeholders) AND group_id = %d",
+                        array_merge($batch_ids_in_postmark, array($group_id))
+                    ),
+                    ARRAY_A
+                );
+            }
+
+            // Build a batch_id => total recipient count map. This is the
+            // authoritative selection-size count and includes ALL rows
+            // (sent, scheduled, and failed sends with message_id = NULL).
+            $recipient_counts = array();
+            $count_rows = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT batch_id, COUNT(*) AS cnt
+                     FROM {$wpdb->prefix}" . BYS_GROUPS_COMMS_TABLE . "
+                     WHERE group_id = %d
+                     GROUP BY batch_id",
+                    $group_id
+                ),
+                ARRAY_A
+            );
+            foreach ((array) $count_rows as $cr) {
+                $recipient_counts[$cr['batch_id']] = (int) $cr['cnt'];
+            }
+
+            // Also fetch emails still waiting to be scheduled (not yet sent to Postmark)
+            $scheduled_rows = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT batch_id, prompt_type, subject, delivery_status, sender_user_id, scheduled_at, created_at FROM {$wpdb->prefix}" . BYS_GROUPS_COMMS_TABLE . "
+                     WHERE group_id = %d
+                     AND delivery_status = 'scheduled'
+                     AND message_id IS NULL
+                     ORDER BY scheduled_at DESC
+                     LIMIT %d",
+                    $group_id,
+                    $count
                 ),
                 ARRAY_A
             );
 
-            // Index by message_id for O(1) lookup
-            $log_index = array_column($log_rows, null, 'message_id');
+            // If no sent or scheduled emails, return empty
+            if (empty($log_rows) && empty($scheduled_rows)) {
+                return new \WP_REST_Response(
+                    array('total' => 0, 'messages' => array(), 'offset' => $offset, 'count' => $count),
+                    200
+                );
+            }
 
-            // Map Postmark response, filtering to only messages in this group/sender's log
-            $messages = array();
+            // Index log rows by batch_id to group them
+            $batches_by_id = array();
+            $postmark_msgs_by_id = array();
+
+            // Build Postmark lookup by message_id
             foreach ((array) ($body['Messages'] ?? array()) as $msg) {
                 $mid = $msg['MessageID'] ?? '';
-                if (!isset($log_index[$mid])) {
-                    continue;  // Skip if not in this leader's/group's log
+                if (!empty($mid)) {
+                    $postmark_msgs_by_id[$mid] = $msg;
+                }
+            }
+
+            // Group log rows by batch_id
+            foreach ($log_rows as $row) {
+                $batch_id = $row['batch_id'];
+                if (!isset($batches_by_id[$batch_id])) {
+                    $batches_by_id[$batch_id] = array(
+                        'batch_id' => $batch_id,
+                        'message_ids' => array(),
+                        'prompt_type' => $row['prompt_type'],
+                        'subject' => $row['subject'],
+                        'delivery_statuses' => array(),
+                        'first_message_id' => $row['message_id'],
+                        'first_postmark_msg' => null,
+                        'sender_user_id' => $row['sender_user_id'],
+                        'scheduled_at' => $row['scheduled_at'],
+                    );
+                }
+                $batches_by_id[$batch_id]['message_ids'][] = $row['message_id'];
+                $batches_by_id[$batch_id]['delivery_statuses'][] = $row['delivery_status'] ?? 'pending';
+
+                // Store first postmark message for subject/sent_at
+                if ($batches_by_id[$batch_id]['first_postmark_msg'] === null && isset($postmark_msgs_by_id[$row['message_id']])) {
+                    $batches_by_id[$batch_id]['first_postmark_msg'] = $postmark_msgs_by_id[$row['message_id']];
+                }
+            }
+
+            // Process scheduled emails
+            foreach ($scheduled_rows as $row) {
+                $batch_id = $row['batch_id'];
+                if (!isset($batches_by_id[$batch_id])) {
+                    $batches_by_id[$batch_id] = array(
+                        'batch_id' => $batch_id,
+                        'message_ids' => array(),
+                        'prompt_type' => $row['prompt_type'],
+                        'subject' => $row['subject'],
+                        'delivery_statuses' => array('scheduled'),
+                        'first_message_id' => null,
+                        'first_postmark_msg' => null,
+                        'sender_user_id' => $row['sender_user_id'],
+                        'scheduled_at' => $row['scheduled_at'],
+                    );
+                }
+            }
+
+            // Get Postmark token for fetching live MessageEvents
+            $postmark_token = get_option('bys_postmark_token', '');
+
+            // Transform batches into response items
+            $messages = array();
+            foreach ($batches_by_id as $batch_id => $batch) {
+                $prompt_type = $batch['prompt_type'];
+                $postmark_msg = $batch['first_postmark_msg'] ?? array();
+                // Use stored subject first, fall back to Postmark's subject
+                $subject = !empty($batch['subject']) ? $batch['subject'] : ($postmark_msg['Subject'] ?? '(No subject)');
+                $sent_at = $postmark_msg['ReceivedAt'] ?? '';
+                $first_message_id = $batch['first_message_id'];
+
+                // Determine delivery status based on all recipients in the batch
+                $delivery_status = 'pending';
+                $postmark_detail = null;
+
+                $has_failed = in_array('failed', $batch['delivery_statuses'], true);
+                $non_failed_count = count(array_filter($batch['delivery_statuses'], fn($s) => $s !== 'failed'));
+
+                if ($has_failed && $non_failed_count === 0) {
+                    // Every recipient failed at submit time (no Postmark delivery to fetch).
+                    $delivery_status = 'failed';
+                } elseif (count($batch['delivery_statuses']) > 0 &&
+                    count($batch['delivery_statuses']) === count(array_filter($batch['delivery_statuses'], fn($s) => $s === 'scheduled'))) {
+                    $delivery_status = 'scheduled';
+                } elseif (!empty($postmark_token) && !empty($first_message_id)) {
+                    // Fetch live delivery status from Postmark for the first message
+                    $postmark_detail = $this->fetch_postmark_message_detail($first_message_id, $postmark_token);
+                    if ($postmark_detail && isset($postmark_detail['MessageEvents'])) {
+                        $status_info = $this->extract_delivery_status_from_events($postmark_detail['MessageEvents']);
+                        $delivery_status = $status_info['status'];
+                    } else {
+                        // If live fetch failed, fall back to aggregate of DB delivery_statuses
+                        if (!empty($batch['delivery_statuses'])) {
+                            if (in_array('bounced', $batch['delivery_statuses'])) {
+                                $delivery_status = 'bounced';
+                            } elseif (in_array('spam', $batch['delivery_statuses'])) {
+                                $delivery_status = 'spam';
+                            } elseif (in_array('scheduled', $batch['delivery_statuses'])) {
+                                // Some are still scheduled, some may be sent
+                                $delivery_status = 'pending';
+                            } elseif (!in_array('pending', $batch['delivery_statuses'])) {
+                                $delivery_status = 'delivered';
+                            }
+                        }
+                    }
                 }
 
-                $log_entry = $log_index[$mid];
-                $prompt_type = $log_entry['prompt_type'];
-                $delivery_status = $log_entry['delivery_status'] ?? 'pending';
+                // Partial-failure overlay: if some recipients failed at submit
+                // time but others were accepted, flag the whole batch as such
+                // so the Screen 1 badge can show "Some Failed".
+                if ($has_failed && $non_failed_count > 0 && $delivery_status !== 'scheduled') {
+                    $delivery_status = 'partial_failure';
+                }
+
+                // If subject still empty, try to get it from the detail fetch
+                if ($subject === '(No subject)' && !empty($postmark_detail['Subject'])) {
+                    $subject = $postmark_detail['Subject'];
+                }
+
+                // Also use ReceivedAt from the detail if not already set
+                if (empty($sent_at) && !empty($postmark_detail['ReceivedAt'])) {
+                    $sent_at = $postmark_detail['ReceivedAt'];
+                }
+
+                // For scheduled emails, use scheduled_at; otherwise use sent_at
+                // Convert UTC to local time for display
+                $display_time = $delivery_status === 'scheduled' ? $this->utc_to_local_datetime($batch['scheduled_at']) : $sent_at;
 
                 $messages[] = array(
-                    'message_id' => $mid,
-                    'to' => $msg['To'] ?? '',
-                    'subject' => $msg['Subject'] ?? '',
-                    'status' => $msg['Status'] ?? '',
-                    'sent_at' => $msg['ReceivedAt'] ?? '',
+                    'batch_id' => $batch_id,
+                    'message_id' => $first_message_id,
+                    'subject' => $subject,
+                    'sent_at' => $display_time,
                     'prompt_type' => $prompt_type,
                     'badge_type' => $prompt_type === 'custom' ? 'custom' : 'prompt',
+                    'recipient_count' => $recipient_counts[$batch_id] ?? count($batch['message_ids']),
                     'delivery_status' => $delivery_status,
-                    'bounce_type' => $log_entry['bounce_type'] ?? null,
+                    'sender_user_id' => $batch['sender_user_id'],
                 );
             }
 
@@ -4652,19 +5030,386 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                     return new \WP_REST_Response(array('ok' => true), 200);
             }
 
-            // Update the communication log
+            // Update the communication log — only update if new status is "better" (not a downgrade)
             if (!empty($update_data)) {
-                $wpdb->update(
-                    $wpdb->prefix . BYS_GROUPS_COMMS_TABLE,
-                    $update_data,
-                    array('message_id' => $message_id),
-                    $update_format,
-                    array('%s')
+                // Get current status
+                $current_row = $wpdb->get_row(
+                    $wpdb->prepare(
+                        "SELECT delivery_status FROM {$wpdb->prefix}" . BYS_GROUPS_COMMS_TABLE . " WHERE message_id = %s",
+                        $message_id
+                    ),
+                    ARRAY_A
                 );
+
+                $current_status = $current_row['delivery_status'] ?? 'pending';
+                $new_status = $update_data['delivery_status'] ?? '';
+
+                // Status hierarchy: pending < delivered < bounced/spam
+                // Only update if new status is "better" or equal
+                $status_order = array('pending' => 0, 'delivered' => 1, 'bounced' => 2, 'spam' => 2);
+                $current_rank = $status_order[$current_status] ?? 0;
+                $new_rank = $status_order[$new_status] ?? 0;
+
+                // Only update if new status has higher or equal rank (no downgrade)
+                if ($new_rank >= $current_rank) {
+                    $wpdb->update(
+                        $wpdb->prefix . BYS_GROUPS_COMMS_TABLE,
+                        $update_data,
+                        array('message_id' => $message_id),
+                        $update_format,
+                        array('%s')
+                    );
+                }
             }
 
             // Always return 200 so Postmark knows we got the webhook
             return new \WP_REST_Response(array('ok' => true), 200);
+        }
+
+        /**
+         * Get all recipients in a batch send by batch_id
+         *
+         * @param WP_REST_Request $request Request with batch_id
+         * @return WP_REST_Response Response with recipient list
+         */
+        public function get_communication_recipients($request) {
+            $batch_id = sanitize_text_field($request['batch_id']);
+            $user_id = get_current_user_id();
+
+            if (empty($batch_id)) {
+                return new \WP_REST_Response(array('error' => 'Missing batch_id'), 400);
+            }
+
+            if (!$user_id) {
+                return new \WP_REST_Response(array('error' => 'Not logged in'), 401);
+            }
+
+            global $wpdb;
+
+            // Query all rows for this batch (all leaders in the group can view)
+            $rows = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT id, message_id, recipient_email, delivery_status, bounce_type, group_id
+                     FROM {$wpdb->prefix}" . BYS_GROUPS_COMMS_TABLE . "
+                     WHERE batch_id = %s",
+                    $batch_id
+                ),
+                ARRAY_A
+            );
+
+            if (empty($rows)) {
+                return new \WP_REST_Response(array('error' => 'Batch not found'), 404);
+            }
+
+            // Get Postmark token for fetching live status
+            $postmark_token = get_option('bys_postmark_token', '');
+
+            // Resolve recipient emails to display names and fetch live delivery status
+            $recipients = array();
+            foreach ($rows as $row) {
+                $user = get_user_by('email', $row['recipient_email']);
+                $display_name = $user ? ($user->display_name ?: $user->user_login) : $row['recipient_email'];
+
+                // Get live delivery status from Postmark MessageEvents if token is available
+                $delivery_status = $row['delivery_status'] ?? 'pending';
+                $bounce_type = $row['bounce_type'];
+
+                // Skip Postmark fetch for rows that never reached Postmark
+                // (failed/scheduled — message_id is NULL). Their DB status is
+                // authoritative.
+                if (!empty($postmark_token) && !empty($row['message_id'])) {
+                    $pm_detail = $this->fetch_postmark_message_detail($row['message_id'], $postmark_token);
+                    if ($pm_detail && !empty($pm_detail['MessageEvents'])) {
+                        $status_info = $this->extract_delivery_status_from_events($pm_detail['MessageEvents']);
+                        $delivery_status = $status_info['status'];
+                        $bounce_type = $status_info['bounce_type'];
+
+                        // Write the live status back to the DB so next queries reflect it without re-hitting Postmark. Also independent of the webhook.
+                        $stored_status = $row['delivery_status'] ?? 'pending';
+                        if ($delivery_status !== $stored_status || ($bounce_type && $bounce_type !== $row['bounce_type'])) {
+                            $update_data = array('delivery_status' => $delivery_status);
+                            $update_format = array('%s');
+                            if ($bounce_type) {
+                                $update_data['bounce_type'] = $bounce_type;
+                                $update_format[] = '%s';
+                            }
+                            if ($delivery_status === 'delivered') {
+                                $update_data['delivered_at'] = current_time('mysql');
+                                $update_format[] = '%s';
+                            }
+                            $wpdb->update(
+                                $wpdb->prefix . BYS_GROUPS_COMMS_TABLE,
+                                $update_data,
+                                array('id' => (int) $row['id']),
+                                $update_format,
+                                array('%d')
+                            );
+                        }
+                    }
+                }
+
+                $recipients[] = array(
+                    'id' => (int) $row['id'],
+                    'message_id' => $row['message_id'],
+                    'recipient_name' => $display_name,
+                    'recipient_email' => $row['recipient_email'],
+                    'delivery_status' => $delivery_status,
+                    'bounce_type' => $bounce_type,
+                );
+            }
+
+            return new \WP_REST_Response($recipients, 200);
+        }
+
+        /**
+         * Fetch message details from Postmark API
+         *
+         * @param string $message_id Postmark MessageID
+         * @param string $postmark_token Server token
+         * @return array|null Decoded response or null on error
+         */
+        private function fetch_postmark_message_detail($message_id, $postmark_token) {
+            $url = "https://api.postmarkapp.com/messages/outbound/{$message_id}/details";
+
+            $response = wp_remote_get(
+                $url,
+                array(
+                    'headers' => array(
+                        'X-Postmark-Server-Token' => $postmark_token,
+                        'Accept' => 'application/json',
+                    ),
+                    'timeout' => 10,
+                    'sslverify' => true,
+                )
+            );
+
+            if (is_wp_error($response)) {
+                error_log("[fetch_postmark_message_detail] WP Error for message_id $message_id: " . $response->get_error_message());
+                return null;
+            }
+
+            $status = wp_remote_retrieve_response_code($response);
+            if ($status !== 200) {
+                $body = wp_remote_retrieve_body($response);
+                error_log("[fetch_postmark_message_detail] Status $status for message_id $message_id: $body");
+                return null;
+            }
+
+            $body = wp_remote_retrieve_body($response);
+            $decoded = json_decode($body, true);
+
+            if (!$decoded) {
+                error_log("[fetch_postmark_message_detail] Failed to decode JSON for message_id $message_id");
+                return null;
+            }
+
+            return $decoded;
+        }
+
+        /**
+         * Extract delivery status from MessageEvents array
+         *
+         * @param array $events MessageEvents array from Postmark
+         * @return array With 'status' and 'bounce_type' keys
+         */
+        private function extract_delivery_status_from_events($events) {
+            $status = 'pending';
+            $bounce_type = null;
+
+            if (empty($events) || !is_array($events)) {
+                return array('status' => $status, 'bounce_type' => $bounce_type);
+            }
+
+            // Find the latest event of each type
+            $events_by_type = array();
+            foreach ($events as $event) {
+                $type = $event['Type'] ?? '';
+                $received_at = $event['ReceivedAt'] ?? '';
+                if (!empty($type)) {
+                    if (!isset($events_by_type[$type]) || $received_at > $events_by_type[$type]['ReceivedAt']) {
+                        $events_by_type[$type] = $event;
+                    }
+                }
+            }
+
+            // Determine status (priority order)
+            if (isset($events_by_type['Bounced'])) {
+                $status = 'bounced';
+                $bounce_type = $events_by_type['Bounced']['Details']['Summary'] ?? 'unknown';
+            } elseif (isset($events_by_type['SubscriptionChanged'])) {
+                $status = 'spam';
+            } elseif (isset($events_by_type['Delivered'])) {
+                $status = 'delivered';
+            } elseif (isset($events_by_type['Opened']) || isset($events_by_type['LinkClicked'])) {
+                $status = 'delivered'; // Opened/clicked implies delivered
+            } elseif (isset($events_by_type['Transient'])) {
+                $status = 'pending'; // Temporary failure
+            }
+
+            return array('status' => $status, 'bounce_type' => $bounce_type);
+        }
+
+        /**
+         * Get detail for a single message (email body from Postmark)
+         *
+         * @param WP_REST_Request $request Request with message_id
+         * @return WP_REST_Response Response with message detail
+         */
+        public function get_communication_detail($request) {
+            $identifier = sanitize_text_field($request['message_id']);
+            $user_id = get_current_user_id();
+
+            if (empty($identifier)) {
+                return new \WP_REST_Response(array('error' => 'Missing identifier'), 400);
+            }
+
+            if (!$user_id) {
+                return new \WP_REST_Response(array('error' => 'Not logged in'), 401);
+            }
+
+            global $wpdb;
+
+            // Look up message in DB. The route parameter is normally a Postmark
+            // MessageID, but for rows that never reached Postmark (failed,
+            // scheduled) the frontend passes the DB row id as a fallback.
+            $msg_row = $wpdb->get_row(
+                $wpdb->prepare(
+                    "SELECT id, message_id, recipient_email, delivery_status, bounce_type, sender_user_id, subject, body_html, body_text
+                     FROM {$wpdb->prefix}" . BYS_GROUPS_COMMS_TABLE . "
+                     WHERE message_id = %s OR id = %d",
+                    $identifier,
+                    is_numeric($identifier) ? (int) $identifier : 0
+                ),
+                ARRAY_A
+            );
+
+            if (!$msg_row) {
+                return new \WP_REST_Response(array('error' => 'Message not found'), 404);
+            }
+
+            $message_id = $msg_row['message_id'];
+            $delivery_status = $msg_row['delivery_status'] ?? 'pending';
+            $bounce_type = $msg_row['bounce_type'];
+            $delivered_at = null;
+
+            // Try Postmark first, but only when the row actually has a MessageID
+            // (i.e., reached Postmark). Failed rows have message_id = NULL and
+            // are rendered entirely from the snapshot stored at send time.
+            $postmark_body = null;
+            $postmark_token = get_option('bys_postmark_token', '');
+
+            if (!empty($message_id) && !empty($postmark_token)) {
+                $postmark_body = $this->fetch_postmark_message_detail($message_id, $postmark_token);
+
+                if ($postmark_body && !empty($postmark_body['MessageEvents']) && is_array($postmark_body['MessageEvents'])) {
+                    $status_info = $this->extract_delivery_status_from_events($postmark_body['MessageEvents']);
+                    $delivery_status = $status_info['status'];
+                    $bounce_type = $status_info['bounce_type'];
+
+                    $events_by_type = array();
+                    foreach ($postmark_body['MessageEvents'] as $event) {
+                        $type = $event['Type'] ?? '';
+                        $received_at = $event['ReceivedAt'] ?? '';
+                        if (!empty($type)) {
+                            if (!isset($events_by_type[$type]) || $received_at > $events_by_type[$type]['ReceivedAt']) {
+                                $events_by_type[$type] = $event;
+                            }
+                        }
+                    }
+
+                    if (isset($events_by_type['Delivered'])) {
+                        $delivered_at = $events_by_type['Delivered']['ReceivedAt'] ?? null;
+                    } elseif (isset($events_by_type['Opened'])) {
+                        $delivered_at = $events_by_type['Opened']['ReceivedAt'] ?? null;
+                    } elseif (isset($events_by_type['Bounced'])) {
+                        $delivered_at = $events_by_type['Bounced']['ReceivedAt'] ?? null;
+                    }
+
+                    // Self-healing write-back: store the live Postmark status
+                    // so the DB stays in sync without depending on the webhook
+                    $stored_status = $msg_row['delivery_status'] ?? 'pending';
+                    if ($delivery_status !== $stored_status || ($bounce_type && $bounce_type !== $msg_row['bounce_type'])) {
+                        $update_data = array('delivery_status' => $delivery_status);
+                        $update_format = array('%s');
+                        if ($bounce_type) {
+                            $update_data['bounce_type'] = $bounce_type;
+                            $update_format[] = '%s';
+                        }
+                        if ($delivery_status === 'delivered' && $delivered_at) {
+                            // Use Postmark's ReceivedAt when available so the DB
+                            // reflects the actual delivery time, not the moment
+                            // the leader happened to open the modal.
+                            $delivered_ts = strtotime($delivered_at);
+                            $update_data['delivered_at'] = $delivered_ts
+                                ? gmdate('Y-m-d H:i:s', $delivered_ts)
+                                : current_time('mysql');
+                            $update_format[] = '%s';
+                        }
+                        $wpdb->update(
+                            $wpdb->prefix . BYS_GROUPS_COMMS_TABLE,
+                            $update_data,
+                            array('id' => (int) $msg_row['id']),
+                            $update_format,
+                            array('%d')
+                        );
+                    }
+                }
+            }
+
+            // Resolve recipient email to display name
+            $user = get_user_by('email', $msg_row['recipient_email']);
+            $display_name = $user ? ($user->display_name ?: $user->user_login) : $msg_row['recipient_email'];
+
+            // Subject: prefer Postmark, fall back to DB snapshot
+            $subject = $postmark_body['Subject'] ?? $msg_row['subject'] ?? '(No subject)';
+            if (empty($subject)) {
+                $subject = '(No subject)';
+            }
+
+            // Body HTML: prefer Postmark, fall back to DB snapshot
+            $html_body = $postmark_body['HtmlBody'] ?? $msg_row['body_html'] ?? '';
+            if (!empty($html_body)) {
+                $html_body = preg_replace('/<meta[^>]*>/i', '', $html_body);
+                $html_body = preg_replace('/<style[^>]*>.*?<\/style>/is', '', $html_body);
+                $html_body = preg_replace('/\s{2,}/s', ' ', $html_body);
+                $html_body = trim($html_body);
+            }
+
+            // Plain-text body: same fallback chain
+            $text_body = $postmark_body['TextBody'] ?? $msg_row['body_text'] ?? '';
+
+            return new \WP_REST_Response(array(
+                'message_id' => $message_id,
+                'subject' => $subject,
+                'recipient_name' => $display_name,
+                'recipient_email' => $msg_row['recipient_email'],
+                'delivery_status' => $delivery_status,
+                'bounce_type' => $bounce_type,
+                'delivered_at' => $delivered_at,
+                'body_html' => $html_body,
+                'body_text' => $text_body,
+            ), 200);
+        }
+
+        /**
+         * Convert UTC datetime string to local time for display
+         *
+         * @param string $utc_datetime UTC datetime in 'Y-m-d H:i:s' format
+         * @return string Formatted local datetime string or empty if invalid
+         */
+        private function utc_to_local_datetime($utc_datetime) {
+            if (empty($utc_datetime)) {
+                return '';
+            }
+
+            // Parse the UTC datetime to a timestamp
+            $timestamp = strtotime($utc_datetime);
+            if (!$timestamp) {
+                return '';
+            }
+
+            // Convert to local time using wp_date which applies site timezone
+            return wp_date('Y-m-d H:i:s', $timestamp);
         }
     }
 }

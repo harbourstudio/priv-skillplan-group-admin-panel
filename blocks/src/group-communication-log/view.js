@@ -41,15 +41,35 @@ jQuery(document).ready(($) => {
             $list.html('');
         }
 
+        // Sort messages by sent_at descending (newest first)
+        const sorted = [...messages].sort((a, b) => {
+            const dateA = a.sent_at ? new Date(a.sent_at.replace(' ', 'T')) : new Date(0);
+            const dateB = b.sent_at ? new Date(b.sent_at.replace(' ', 'T')) : new Date(0);
+            return dateB - dateA;
+        });
+
         // Build items from template
         const startIndex = isAppending ? $list.find('.gcl__item').length : 0;
-        messages.forEach((msg, i) => {
-            const sentAt = msg.sent_at ? new Date(msg.sent_at) : null;
-            const dateStr = sentAt
+        sorted.forEach((msg, i) => {
+            // sent_at is already in local time from the API (Y-m-d H:i:s format)
+            // Parse it for display (handle both ISO format and MySQL format)
+            let sentAt = null;
+            if (msg.sent_at) {
+                // Try parsing as MySQL format first (YYYY-MM-DD HH:MM:SS)
+                const mysqlMatch = msg.sent_at.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})$/);
+                if (mysqlMatch) {
+                    sentAt = new Date(mysqlMatch[1], mysqlMatch[2] - 1, mysqlMatch[3], mysqlMatch[4], mysqlMatch[5], mysqlMatch[6]);
+                } else {
+                    // Fall back to standard Date parsing (ISO format)
+                    sentAt = new Date(msg.sent_at);
+                }
+            }
+
+            const dateStr = sentAt && !isNaN(sentAt.getTime())
                 ? sentAt.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })
                 : '';
             const batchLabel = msg.subject || '(No subject)';
-            const batchDate = sentAt
+            const batchDate = sentAt && !isNaN(sentAt.getTime())
                 ? sentAt.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
                 : '';
 
@@ -57,7 +77,13 @@ jQuery(document).ready(($) => {
             const $button = $(template.content.cloneNode(true));
             $button.find('.gcl__date').text(dateStr);
             $button.find('.gcl__label').text(batchLabel);
-            $button.find('.gcl__item').attr('data-batch-date', batchDate).attr('data-batch-label', batchLabel).attr('data-prompt-type', msg.prompt_type);
+            $button.find('.gcl__item')
+                .attr('data-batch-date', batchDate)
+                .attr('data-batch-label', batchLabel)
+                .attr('data-prompt-type', msg.prompt_type)
+                .attr('data-batch-id', msg.batch_id)
+                .attr('data-message-id', msg.message_id)
+                .attr('data-sender-id', msg.sender_user_id || '');
 
             // Set badge class and text based on badge_type
             const badgeType = msg.badge_type || 'prompt';
@@ -83,13 +109,25 @@ jQuery(document).ready(($) => {
         $block.off('click', '[data-opens-modal]').on('click', '[data-opens-modal]', function () {
             const targetId = $(this).data('opensModal');
             const batchDate = $(this).data('batchDate');
+            const batchId = $(this).data('batchId');
+            const subject = $(this).data('batchLabel');
+            const promptType = $(this).data('promptType');
             const $modal = $(targetId);
             if (!$modal.length) return;
 
             $modal.removeClass('hidden');
             $('html').css('overflow', 'hidden');
 
-            $(document).trigger('comm:open-batch', { date: batchDate });
+            const senderIdAttr = $(this).data('senderId');
+            const senderId = senderIdAttr ? parseInt(senderIdAttr, 10) : null;
+
+            $(document).trigger('comm:open-batch', {
+                date: batchDate,
+                batchId: batchId,
+                subject: subject,
+                promptType: promptType,
+                senderUserId: senderId,
+            });
         });
 
         // Setup show-more button

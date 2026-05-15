@@ -78,6 +78,9 @@ $tz_offset_hours = $tz_offset_seconds / 3600;
                         aria-expanded="false"
                     />
                     <ul class="guqc__suggestions guqc__suggestions--quiz hidden" role="listbox"></ul>
+                    <div class="guqc__field-skeleton" role="status" aria-busy="true" aria-label="<?php esc_attr_e( 'Awaiting quiz selection', 'bys' ); ?>" hidden>
+                        <span class="skeleton"></span>
+                    </div>
                 </div>
             </div>
 
@@ -94,6 +97,18 @@ $tz_offset_hours = $tz_offset_seconds / 3600;
                     readonly
                 />
                 <i class="fa-regular fa-calendar guqc__calendar-icon" aria-hidden="true"></i>
+                <button
+                    type="button"
+                    class="guqc__date-clear btn-unstyled"
+                    aria-label="<?php esc_attr_e( 'Clear start date', 'bys' ); ?>"
+                    data-field-type="start"
+                    hidden
+                >
+                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                </button>
+                <div class="guqc__field-skeleton" role="status" aria-busy="true" aria-label="<?php esc_attr_e( 'Awaiting quiz selection', 'bys' ); ?>" hidden>
+                    <span class="skeleton"></span>
+                </div>
             </div>
             <div class="guqc__date-field">
                 <i class="fa-solid fa-flag guqc__date-icon" aria-hidden="true"></i>
@@ -105,6 +120,18 @@ $tz_offset_hours = $tz_offset_seconds / 3600;
                     readonly
                 />
                 <i class="fa-regular fa-calendar guqc__calendar-icon" aria-hidden="true"></i>
+                <button
+                    type="button"
+                    class="guqc__date-clear btn-unstyled"
+                    aria-label="<?php esc_attr_e( 'Clear end date', 'bys' ); ?>"
+                    data-field-type="end"
+                    hidden
+                >
+                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                </button>
+                <div class="guqc__field-skeleton" role="status" aria-busy="true" aria-label="<?php esc_attr_e( 'Awaiting quiz selection', 'bys' ); ?>" hidden>
+                    <span class="skeleton"></span>
+                </div>
             </div>
         </div>
 
@@ -112,7 +139,7 @@ $tz_offset_hours = $tz_offset_seconds / 3600;
             <button class="guqc__save guqc__btn-primary btn-unstyled" type="button">
                 <?php esc_html_e( 'Save Changes', 'bys' ); ?>
             </button>
-            <button class="guqc__notify guqc__btn-outline btn-unstyled" type="button" disabled>
+            <button class="guqc__notify guqc__btn-outline btn-unstyled" type="button">
                 <?php esc_html_e( 'Notify Learner', 'bys' ); ?>
             </button>
         </div>

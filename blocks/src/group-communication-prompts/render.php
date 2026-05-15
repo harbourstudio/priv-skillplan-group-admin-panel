@@ -73,6 +73,7 @@ $prompts = [
                     class="gcp__history btn-unstyled"
                     type="button"
                     data-opens-modal="#communication-history-modal"
+                    data-prompt-type="<?php echo esc_attr( $prompt['type'] ); ?>"
                     data-prompt-title="<?php echo esc_attr( $prompt['title'] ); ?>"
                 >
                     <?php esc_html_e( 'Prompt History', 'bys' ); ?>
