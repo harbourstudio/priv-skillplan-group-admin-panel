@@ -391,6 +391,13 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'permission_callback' => array($this, 'check_user_permission')
             ));
 
+            // Notify a group-user about per-user quiz-access window
+            register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/users/(?P<user_id>\d+)/notify-quiz-access', array(
+                'methods' => 'POST',
+                'callback' => array($this, 'notify_user_quiz_access'),
+                'permission_callback' => array($this, 'check_user_permission')
+            ));
+
             // send group communication (emails)
             register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/send-communication', array(
                 'methods' => 'POST',
@@ -4422,6 +4429,111 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             }
 
             return new \WP_REST_Response(array('error' => 'Error executing this request.'), 405);
+        }
+
+        /**
+         * Send an email to a group user about their per-user quiz-access
+         */
+        public function notify_user_quiz_access($request) {
+            $group_id = intval($request['group_id']);
+            $user_id  = intval($request['user_id']);
+
+            if (!$group_id || !$user_id) {
+                return new \WP_REST_Response(array('error' => 'Invalid group_id or user_id'), 400);
+            }
+
+            $body    = $request->get_json_params();
+            $quiz_id = intval($body['quiz_id'] ?? 0);
+            if (!$quiz_id) {
+                return new \WP_REST_Response(array('error' => 'Missing quiz_id'), 400);
+            }
+
+            $recipient = get_user_by('ID', $user_id);
+            if (!$recipient || empty($recipient->user_email)) {
+                return new \WP_REST_Response(array('error' => 'Recipient not found'), 404);
+            }
+
+            $access_dates = BYS_Groups_Quiz_Access::get_user_quiz_access_dates($user_id, $group_id);
+            $window = $access_dates[$quiz_id] ?? array();
+            $start  = $window['start'] ?? '';
+            $end    = $window['end']   ?? '';
+
+            $postmark_token = get_option('bys_postmark_token', '');
+            if (empty($postmark_token)) {
+                return new \WP_REST_Response(array('error' => 'Postmark token not configured'), 500);
+            }
+
+            // Build email via the dedicated template
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/emails/user-quiz-config.php';
+
+            $sender    = get_user_by('ID', $sender_id);
+            $quiz_post = get_post($quiz_id);
+
+            $email = bys_get_quiz_access_notification_email(array(
+                'recipient_name' => !empty($recipient->display_name) ? $recipient->display_name : $recipient->user_login,
+                'site_name'      => get_bloginfo('name'),
+                'site_url'       => home_url(),
+                'quiz_title'     => $quiz_post ? get_the_title($quiz_post) : 'your quiz',
+                'quiz_url'       => $quiz_post ? get_permalink($quiz_post) : home_url(),
+                'start'          => $start,
+                'end'            => $end,
+                'sender_email'   => $sender ? $sender->user_email : get_bloginfo('admin_email'),
+            ));
+
+            if (empty($email['subject']) || empty($email['html'])) {
+                return new \WP_REST_Response(array('error' => 'Failed to build email'), 500);
+            }
+
+            $response = wp_remote_post(
+                'https://api.postmarkapp.com/email',
+                array(
+                    'headers' => array(
+                        'X-Postmark-Server-Token' => $postmark_token,
+                        'Content-Type'            => 'application/json',
+                        'Accept'                  => 'application/json',
+                    ),
+                    'body' => wp_json_encode(array(
+                        'From'     => get_bloginfo('admin_email'),
+                        'To'       => $recipient->user_email,
+                        'Subject'  => $email['subject'],
+                        'HtmlBody' => $email['html'],
+                        'TextBody' => $email['plain'],
+                        'Tag'      => 'user-quiz-access',
+                        'Metadata' => array(
+                            'group_id'       => (string) $group_id,
+                            'user_id'        => (string) $user_id,
+                            'quiz_id'        => (string) $quiz_id,
+                            'sender_user_id' => (string) $sender_id,
+                        ),
+                    )),
+                    'timeout'   => 30,
+                    'sslverify' => true,
+                )
+            );
+
+            if (is_wp_error($response)) {
+                error_log('[notify_user_quiz_access] Postmark transport error: ' . $response->get_error_message());
+                return new \WP_REST_Response(array('error' => 'Postmark API error: ' . $response->get_error_message()), 502);
+            }
+
+            $status_code   = wp_remote_retrieve_response_code($response);
+            $response_body = json_decode(wp_remote_retrieve_body($response), true);
+
+            if ($status_code !== 200 || (isset($response_body['ErrorCode']) && (int) $response_body['ErrorCode'] !== 0)) {
+                $msg = $response_body['Message'] ?? 'Unknown Postmark error';
+                error_log(sprintf(
+                    '[notify_user_quiz_access] Postmark rejected — status %d, ErrorCode: %s, Message: %s',
+                    $status_code,
+                    $response_body['ErrorCode'] ?? 'n/a',
+                    $msg
+                ));
+                return new \WP_REST_Response(array('error' => $msg), 502);
+            }
+
+            return new \WP_REST_Response(array(
+                'success'    => true,
+                'message_id' => $response_body['MessageID'] ?? null,
+            ), 200);
         }
 
         /**

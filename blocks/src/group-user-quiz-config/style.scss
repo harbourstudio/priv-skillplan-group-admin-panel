@@ -94,6 +94,31 @@
             position: relative;
         }
 
+        // ── Field skeleton overlay ─────────────────────────────────────────────
+        // Sits above the quiz field and datetime fields while the leader has
+        // not yet picked a quiz (after switching users). Communicates that the
+        // displayed values are no longer authoritative.
+
+        &__field-skeleton {
+            position: absolute;
+            inset: 0;
+            background: var(--wp--preset--color--gray-50);
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            padding: var(--wp--preset--spacing--3);
+            z-index: 50;
+
+            // Native `hidden` attr must win over the explicit display above.
+            &[hidden] { display: none; }
+
+            .skeleton {
+                display: block;
+                height: 1rem;
+                width: 60%;
+            }
+        }
+
         // ── Suggestion list ────────────────────────────────────────────────────────
 
         &__suggestions {
@@ -153,6 +178,7 @@
         }
 
         &__date-field {
+            position: relative;
             display: flex;
             align-items: center;
             gap: var(--wp--preset--spacing--2);
@@ -185,6 +211,24 @@
             font-size: 0.75rem;
             color: var(--wp--preset--color--gray-400);
             flex-shrink: 0;
+        }
+
+        &__date-clear {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            color: var(--wp--preset--color--red-500);
+            flex-shrink: 0;
+            padding: 0;
+            line-height: 1;
+            cursor: pointer;
+            transition: color 0.15s;
+
+            &:hover { color: var(--wp--preset--color--gray-700); }
+
+            // Native `hidden` attr must win over the explicit display above.
+            &[hidden] { display: none; }
         }
 
         &__datetime {

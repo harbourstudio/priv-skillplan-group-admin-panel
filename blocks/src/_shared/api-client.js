@@ -56,6 +56,7 @@ export const endpoints = {
   },
   groupQuizAccess: (groupId) => `/wp-json/bys-groups/v1/groups/${groupId}/quiz-access`,
   userQuizAccess: (groupId, userId) => `/wp-json/bys-groups/v1/groups/${groupId}/users/${userId}/quiz-access`,
+  notifyUserQuizAccess: (groupId, userId) => `/wp-json/bys-groups/v1/groups/${groupId}/users/${userId}/notify-quiz-access`,
   groupInviteBulk: (groupId) => `/wp-json/bys-groups/v1/groups/${groupId}/invite-bulk`,
   groupCommunicationLog: (groupId, count = 25, offset = 0) =>
     `/wp-json/bys-groups/v1/groups/${groupId}/communication-log?count=${count}&offset=${offset}`,

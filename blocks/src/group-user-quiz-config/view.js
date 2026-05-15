@@ -45,12 +45,17 @@ jQuery(document).ready(($) => {
     const $block = $('.wp-block-bys-groups-group-user-quiz-config').first();
     if (!$block.length) return;
 
-    const $learnerInput = $block.find('#guqc__learner-search');
-    const $learnerList  = $block.find('.guqc__suggestions--learner');
-    const $quizInput    = $block.find('#guqc__quiz-search');
-    const $quizList     = $block.find('.guqc__suggestions--quiz');
-    const $saveBtn      = $block.find('.guqc__save');
-    const $notifyBtn    = $block.find('.guqc__notify');
+    const $learnerInput  = $block.find('#guqc__learner-search');
+    const $learnerList   = $block.find('.guqc__suggestions--learner');
+    const $quizInput     = $block.find('#guqc__quiz-search');
+    const $quizList      = $block.find('.guqc__suggestions--quiz');
+    const $saveBtn       = $block.find('.guqc__save');
+    const $notifyBtn     = $block.find('.guqc__notify');
+    // Skeletons are scoped: one over the quiz field, two over the date fields.
+    const $quizSkeleton  = $block.find('.guqc__combobox-wrap .guqc__field-skeleton');
+    const $dateSkeletons = $block.find('.guqc__date-field .guqc__field-skeleton');
+    const $startClear    = $block.find('.guqc__date-clear[data-field-type="start"]');
+    const $endClear      = $block.find('.guqc__date-clear[data-field-type="end"]');
 
     // ── Flatpickr init ────────────────────────────────────────────────────────
 
@@ -71,11 +76,25 @@ jQuery(document).ready(($) => {
         },
     };
 
+    /**
+     * Toggle a date-clear button based on whether the picker has a value.
+     * Called from flatpickr's onChange and any programmatic clear/set path.
+     */
+    function syncClearButton($btn, hasValue) {
+        if (hasValue) {
+            $btn.removeAttr('hidden');
+        } else {
+            $btn.attr('hidden', '');
+        }
+    }
+
     startFp = flatpickr($block.find('.guqc__datetime[data-field-type="start"]')[0], {
         ...FP_SHARED,
         placeholder: 'No date restriction',
         onChange(_, dateStr) {
             endFp.set('minDate', dateStr || null);
+            syncClearButton($startClear, Boolean(dateStr));
+            updateActions();
         },
     });
 
@@ -84,22 +103,74 @@ jQuery(document).ready(($) => {
         placeholder: 'No date restriction',
         onChange(_, dateStr) {
             startFp.set('maxDate', dateStr || null);
+            syncClearButton($endClear, Boolean(dateStr));
+            updateActions();
         },
     });
 
-    // Clicking anywhere in the date-field (icon, gap) opens the picker
+    // Clicking anywhere in the date-field (icon, gap) opens the picker —
+    // except the clear button, which has its own handler.
     $block.find('.guqc__datetime[data-field-type="start"]')
         .closest('.guqc__date-field')
-        .on('click', (e) => { if (!e.target.classList.contains('flatpickr-alt-input')) startFp.open(); });
+        .on('click', (e) => {
+            if (e.target.closest('.guqc__date-clear')) return;
+            if (!e.target.classList.contains('flatpickr-alt-input')) startFp.open();
+        });
     $block.find('.guqc__datetime[data-field-type="end"]')
         .closest('.guqc__date-field')
-        .on('click', (e) => { if (!e.target.classList.contains('flatpickr-alt-input')) endFp.open(); });
+        .on('click', (e) => {
+            if (e.target.closest('.guqc__date-clear')) return;
+            if (!e.target.classList.contains('flatpickr-alt-input')) endFp.open();
+        });
+
+    // Clear button handlers — empty the picker, hide the button. The change
+    // is committed when the leader clicks Save (an empty start/end pair tells
+    // the backend to remove any access restriction for this user/quiz).
+    $startClear.on('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        startFp.clear();
+        syncClearButton($startClear, false);
+    });
+    $endClear.on('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        endFp.clear();
+        syncClearButton($endClear, false);
+    });
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     function updateActions() {
-        $saveBtn.prop('disabled', !(selectedUserId && selectedQuizId));
-        $notifyBtn.prop('disabled', !selectedUserId);
+        // Both Save and Notify require a selected learner and a selected quiz.
+        // (The email template handles the "no window set" case explicitly, so
+        // we don't gate notify on hasAnyDate().)
+        const ready = Boolean(selectedUserId && selectedQuizId);
+        $saveBtn.prop('disabled', !ready);
+        $notifyBtn.prop('disabled', !ready);
+    }
+
+    /**
+     * Toggle a skeleton-overlay jQuery set on or off using the native
+     * `hidden` attribute (semantic + screen-reader friendly).
+     */
+    function setSkeleton($skel, showing) {
+        if (showing) {
+            $skel.removeAttr('hidden').attr('aria-busy', 'true');
+        } else {
+            $skel.attr('hidden', '').removeAttr('aria-busy');
+        }
+    }
+
+    function setAwaitingQuiz(awaiting) {
+        // Quiz field + date fields are both stale when the user changes.
+        setSkeleton($quizSkeleton, awaiting);
+        setSkeleton($dateSkeletons, awaiting);
+    }
+
+    function setAwaitingDates(awaiting) {
+        // Quiz field is fine — only the date fields need invalidating.
+        setSkeleton($dateSkeletons, awaiting);
     }
 
     function setDates(startUtc, endUtc) {
@@ -117,6 +188,9 @@ jQuery(document).ready(($) => {
             endFp.clear();
             startFp.set('maxDate', null);
         }
+        // setDate(_, false) skips onChange, so sync the clear buttons here.
+        syncClearButton($startClear, Boolean(startUtc));
+        syncClearButton($endClear, Boolean(endUtc));
     }
 
     function clearDates() {
@@ -179,8 +253,23 @@ jQuery(document).ready(($) => {
 
     function hideLearnerSuggestions() { $learnerList.addClass('hidden').empty(); }
 
+    /**
+     * Invalidate the quiz selection + dates when the user changes. The
+     * previously visible quiz/dates were tied to the previous user, so
+     * leaving them on screen would be misleading.
+     */
+    function invalidateQuizForUserChange() {
+        selectedQuizId = null;
+        $quizInput.val('');
+        clearDates();
+        setAwaitingQuiz(true);
+    }
+
     $learnerInput.on('focus', function () { showLearnerSuggestions($(this).val()); });
     $learnerInput.on('input', function () {
+        if (selectedUserId !== null) {
+            invalidateQuizForUserChange();
+        }
         selectedUserId = null;
         updateActions();
         showLearnerSuggestions($(this).val());
@@ -188,8 +277,18 @@ jQuery(document).ready(($) => {
 
     $learnerList.on('mousedown', '.guqc__suggestion:not(.guqc__suggestion--empty)', function (e) {
         e.preventDefault();
-        selectedUserId = parseInt($(this).data('userId'), 10);
+        const newUserId = parseInt($(this).data('userId'), 10);
+        // Only invalidate when SWITCHING from one user to a different user.
+        // The first selection (selectedUserId === null) is not a "change" —
+        // there's no stale quiz/date state to invalidate yet.
+        if (selectedUserId !== null && newUserId !== selectedUserId) {
+            invalidateQuizForUserChange();
+        }
+        selectedUserId = newUserId;
         $learnerInput.val($(this).data('displayName'));
+        // A user is now selected — quiz and date fields return to their
+        // unset/reset state, ready for the leader's next pick.
+        setAwaitingQuiz(false);
         updateActions();
         hideLearnerSuggestions();
     });
@@ -226,8 +325,20 @@ jQuery(document).ready(($) => {
 
     function hideQuizSuggestions() { $quizList.addClass('hidden').empty(); }
 
+    /**
+     * Invalidate just the dates when the quiz changes. The quiz field itself
+     * stays interactive — only the start/end dates are stale.
+     */
+    function invalidateDatesForQuizChange() {
+        clearDates();
+        setAwaitingDates(true);
+    }
+
     $quizInput.on('focus', function () { showQuizSuggestions($(this).val()); });
     $quizInput.on('input', function () {
+        if (selectedQuizId !== null && selectedUserId !== null) {
+            invalidateDatesForQuizChange();
+        }
         selectedQuizId = null;
         updateActions();
         showQuizSuggestions($(this).val());
@@ -235,11 +346,20 @@ jQuery(document).ready(($) => {
 
     $quizList.on('mousedown', '.guqc__suggestion:not(.guqc__suggestion--empty)', function (e) {
         e.preventDefault();
-        selectedQuizId = parseInt($(this).data('stepId'), 10);
+        const newQuizId = parseInt($(this).data('stepId'), 10);
+        // Only invalidate dates when SWITCHING from one quiz to a different
+        // one. The first quiz selection has no stale dates to invalidate.
+        if (selectedQuizId !== null && newQuizId !== selectedQuizId) {
+            invalidateDatesForQuizChange();
+        }
+        selectedQuizId = newQuizId;
         $quizInput.val($(this).data('stepTitle'));
+        // Quiz is now picked — hide both skeletons. The date skeletons will
+        // remain visible only until loadQuizAccessDates() populates them.
+        setSkeleton($quizSkeleton, false);
         updateActions();
         hideQuizSuggestions();
-        loadQuizAccessDates();
+        loadQuizAccessDates().then(() => setAwaitingDates(false));
     });
 
     // ── Click outside ─────────────────────────────────────────────────────────
@@ -289,6 +409,37 @@ jQuery(document).ready(($) => {
             console.error('[uqc] Failed to save changes:', err);
             $saveBtn.prop('disabled', false).text('Save Changes');
             alert('Failed to save changes. Please try again.');
+        }
+    });
+
+    // ── Notify learner ────────────────────────────────────────────────────────
+
+    $notifyBtn.on('click', async function () {
+        // Notify is valid even when both dates are empty — the email template
+        // renders an explicit "no restriction" message in that case, which is
+        // useful for telling a learner that gating has been lifted.
+        if (!selectedUserId || !selectedQuizId || !currentGroupId) return;
+
+        const originalLabel = $notifyBtn.text();
+        $notifyBtn.prop('disabled', true).text('Notifying...');
+
+        try {
+            await api.post(
+                endpoints.notifyUserQuizAccess(currentGroupId, selectedUserId),
+                { quiz_id: selectedQuizId }
+            );
+            $notifyBtn.text('Learner notified!');
+            setTimeout(() => {
+                $notifyBtn.text(originalLabel);
+                updateActions();
+            }, 2000);
+        } catch (err) {
+            console.error('[uqc] Failed to notify learner:', err);
+            $notifyBtn.text('Failed — try again');
+            setTimeout(() => {
+                $notifyBtn.text(originalLabel);
+                updateActions();
+            }, 2500);
         }
     });
 
@@ -346,6 +497,7 @@ jQuery(document).ready(($) => {
         clearDates();
         hideLearnerSuggestions();
         hideQuizSuggestions();
+        setAwaitingQuiz(false); // Fresh group → no stale quiz to invalidate.
         updateActions();
 
         const userIds = baseUsersStats?.user_ids || [];
