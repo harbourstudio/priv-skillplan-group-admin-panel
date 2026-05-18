@@ -441,13 +441,6 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'permission_callback' => array($this, 'check_user_permission')
             ));
 
-            // Postmark webhook endpoint (no authentication required — Postmark calls this)
-            register_rest_route($this->namespace, '/webhooks/postmark', array(
-                'methods' => 'POST',
-                'callback' => array($this, 'handle_postmark_webhook'),
-                'permission_callback' => '__return_true',
-            ));
-
             // Get all recipients in a batch send
             register_rest_route($this->namespace, '/communications/batch/(?P<batch_id>[a-zA-Z0-9\-]+)/recipients', array(
                 'methods' => 'GET',
@@ -4966,105 +4959,7 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             ), 200);
         }
 
-        /**
-         * Handle Postmark webhook events (Delivery, Bounce, SpamComplaint)
-         *
-         * @param WP_REST_Request $request
-         * @return WP_REST_Response Always returns 200 (Postmark expects this for any response)
-         */
-        public function handle_postmark_webhook($request) {
-            // Validate Postmark token in header
-            $postmark_token = get_option('bys_postmark_token', '');
-            if (empty($postmark_token)) {
-                // No token configured, but still return 200 so Postmark doesn't retry
-                return new \WP_REST_Response(array('ok' => false, 'reason' => 'token_not_configured'), 200);
-            }
-
-            $request_token = $request->get_header('X-Postmark-Server-Token');
-            if ($request_token !== $postmark_token) {
-                // Invalid token, but still return 200 (security: don't reveal token mismatch)
-                return new \WP_REST_Response(array('ok' => false, 'reason' => 'invalid_token'), 200);
-            }
-
-            // Parse webhook body
-            $body = $request->get_json_params();
-            if (empty($body)) {
-                return new \WP_REST_Response(array('ok' => true), 200);
-            }
-
-            $record_type = $body['RecordType'] ?? '';
-            $message_id = $body['MessageID'] ?? '';
-
-            if (empty($record_type) || empty($message_id)) {
-                return new \WP_REST_Response(array('ok' => true), 200);
-            }
-
-            global $wpdb;
-            $update_data = array();
-            $update_format = array();
-
-            // Map Postmark events to delivery status
-            switch ($record_type) {
-                case 'Delivery':
-                    $update_data['delivery_status'] = 'delivered';
-                    $update_data['delivered_at'] = current_time('mysql');
-                    $update_format = array('%s', '%s');
-                    break;
-
-                case 'Bounce':
-                    $update_data['delivery_status'] = 'bounced';
-                    $bounce_type = $body['Details']['BounceType'] ?? 'unknown';
-                    $update_data['bounce_type'] = $bounce_type;
-                    $update_data['delivered_at'] = current_time('mysql');
-                    $update_format = array('%s', '%s', '%s');
-                    break;
-
-                case 'SpamComplaint':
-                    $update_data['delivery_status'] = 'spam';
-                    $update_data['delivered_at'] = current_time('mysql');
-                    $update_format = array('%s', '%s');
-                    break;
-
-                default:
-                    // Unknown record type, acknowledge but don't process
-                    return new \WP_REST_Response(array('ok' => true), 200);
-            }
-
-            // Update the communication log — only update if new status is "better" (not a downgrade)
-            if (!empty($update_data)) {
-                // Get current status
-                $current_row = $wpdb->get_row(
-                    $wpdb->prepare(
-                        "SELECT delivery_status FROM {$wpdb->prefix}" . BYS_GROUPS_COMMS_TABLE . " WHERE message_id = %s",
-                        $message_id
-                    ),
-                    ARRAY_A
-                );
-
-                $current_status = $current_row['delivery_status'] ?? 'pending';
-                $new_status = $update_data['delivery_status'] ?? '';
-
-                // Status hierarchy: pending < delivered < bounced/spam
-                // Only update if new status is "better" or equal
-                $status_order = array('pending' => 0, 'delivered' => 1, 'bounced' => 2, 'spam' => 2);
-                $current_rank = $status_order[$current_status] ?? 0;
-                $new_rank = $status_order[$new_status] ?? 0;
-
-                // Only update if new status has higher or equal rank (no downgrade)
-                if ($new_rank >= $current_rank) {
-                    $wpdb->update(
-                        $wpdb->prefix . BYS_GROUPS_COMMS_TABLE,
-                        $update_data,
-                        array('message_id' => $message_id),
-                        $update_format,
-                        array('%s')
-                    );
-                }
-            }
-
-            // Always return 200 so Postmark knows we got the webhook
-            return new \WP_REST_Response(array('ok' => true), 200);
-        }
+        // (handle_postmark_webhook moved to BYS_Groups_Webhooks_Router)
 
         /**
          * Get all recipients in a batch send by batch_id

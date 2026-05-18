@@ -12,12 +12,23 @@ if (!defined('ABSPATH')) exit;
 if (!class_exists('BYS_Groups_Core')) {
     class BYS_Groups_Core {
 
+        /** Shared REST namespace across all routers */
+        const REST_NAMESPACE = 'bys-groups/v1';
+
         public function __construct() {
             $this->includes();
             $this->init();
         }
 
         private function includes() {
+            // Utilities (load first — referenced by routers and feature classes)
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/utils/class-permissions.php';
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/utils/class-response.php';
+
+            // REST routers
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/rest/class-webhooks-router.php';
+
+            // Core classes
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-activator.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-auth.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-rest-api.php';
@@ -50,6 +61,9 @@ if (!class_exists('BYS_Groups_Core')) {
             new BYS_Groups_Invites();
             new BYS_Groups_Quiz_Access();
             new BYS_Groups_Scheduled_Emails();
+
+            // REST routers (incremental migration from BYS_Groups_Rest_API)
+            new BYS_Groups_Webhooks_Router();
 
             // Enqueue certificate tracking script on certificate pages
             add_action('wp_enqueue_scripts', array($this, 'enqueue_certificate_tracker'));
