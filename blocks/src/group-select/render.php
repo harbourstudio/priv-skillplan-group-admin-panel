@@ -15,18 +15,12 @@ foreach ($attrs as $a) {
 }
 
 $user_id = get_current_user_id();
-$groups = array();
-
+$groups  = array();
 if ($user_id) {
-	// Fetch current user's group via a method of the BYS_Groups_Rest_API class
-	require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-rest-api.php';
-	$rest_api = new BYS_Groups_Rest_API();
-	$response = $rest_api->get_current_user_groups(null);
-
-	if(!is_wp_error($response)) {
-		$data = $response->get_data();
-		$groups = isset($data['groups']) ? $data['groups'] : [];
-	}
+	$router   = new BYS_Groups_Me_Router();
+	$response = $router->get_current_user_groups(null);
+	$payload  = $response->get_data();
+	$groups   = $payload['data']['groups'] ?? array();
 }
 $wrapper_attributes = get_block_wrapper_attributes();
 

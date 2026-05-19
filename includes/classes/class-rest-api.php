@@ -99,19 +99,6 @@ if (!class_exists('BYS_Groups_Rest_API')) {
          */
         public function register_routes() {
 
-            // currentUserGroups
-            register_rest_route($this->namespace, '/me/groups', array(
-                'methods'             => 'GET',
-                'callback'            => array($this, 'get_current_user_groups'),
-                'permission_callback' => array($this, 'check_user_permission'),
-            ));
-
-            register_rest_route($this->namespace, '/me/organizations', array(
-                'methods'             => 'GET',
-                'callback'            => array($this, 'get_current_user_organizations'),
-                'permission_callback' => array($this, 'check_user_permission'),
-            ));
-
             register_rest_route($this->namespace, '/organizations', array(
                 'methods'             => 'POST',
                 'callback'            => array($this, 'create_organization'),
@@ -297,13 +284,6 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/unarchive', array(
                 'methods'             => 'POST',
                 'callback'            => array($this, 'unarchive_group'),
-                'permission_callback' => array($this, 'check_user_permission'),
-            ));
-
-            // currentUserArchivedGroups - draft-status groups the current user leads
-            register_rest_route($this->namespace, '/me/archived-groups', array(
-                'methods'             => 'GET',
-                'callback'            => array($this, 'get_current_user_archived_groups'),
                 'permission_callback' => array($this, 'check_user_permission'),
             ));
 
@@ -551,231 +531,6 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             }
             $user = wp_get_current_user();
             return user_can($user, 'manage_options') || in_array('marker', (array) $user->roles, true);
-        }
-
-        /**
-         * Get all LD groups the current user is a leader of.
-         *
-         * LD stores group leadership as user meta with key format:
-         * learndash_group_leaders_{group_id} => group_id
-         */
-        public function get_current_user_groups($request) {
-            $user_id = get_current_user_id();
-
-            if (!$user_id) {
-                return new \WP_REST_Response(array('error' => 'Not logged in'), 401);
-            }
-
-            // Site admins and graders see every published group
-            $is_grader = $this->is_grader_user();
-            if (current_user_can('manage_options') || $is_grader) {
-                $all_groups = get_posts(array(
-                    'post_type'      => 'groups',
-                    'post_status'    => 'publish',
-                    'posts_per_page' => -1,
-                    'orderby'        => 'title',
-                    'order'          => 'ASC',
-                ));
-                $user_groups = array();
-                foreach ($all_groups as $group) {
-                    $user_groups[] = array(
-                        'id'           => $group->ID,
-                        'title'        => $group->post_title,
-                        'is_org_admin' => !$is_grader, // graders can't act as org admins
-                    );
-                }
-                return new \WP_REST_Response(array('groups' => $user_groups), 200);
-            }
-
-            // Collect group IDs via LD group leader meta
-            $led_ids = array();
-            foreach (get_user_meta($user_id) as $meta_key => $meta_values) {
-                if (strpos($meta_key, 'learndash_group_leaders_') === 0) {
-                    $group_id = intval(str_replace('learndash_group_leaders_', '', $meta_key));
-                    if ($group_id > 0) {
-                        $led_ids[] = $group_id;
-                    }
-                }
-            }
-
-            // Collect group IDs from organizations where this user is an admin
-            $org_admin_ids = array();
-            $all_orgs = get_posts(array(
-                'post_type'      => 'organization',
-                'post_status'    => 'publish',
-                'posts_per_page' => -1,
-                'fields'         => 'ids',
-            ));
-            foreach ($all_orgs as $org_id) {
-                $raw_admins = get_field('administrators', $org_id);
-                $admin_ids  = array();
-                foreach ((array) $raw_admins as $admin) {
-                    $admin_ids[] = $admin instanceof \WP_User ? $admin->ID : intval($admin);
-                }
-                if (!in_array($user_id, $admin_ids, true)) continue;
-
-                $raw_groups = get_field('groups', $org_id);
-                foreach ((array) $raw_groups as $group) {
-                    $g_id = $group instanceof \WP_Post ? $group->ID : intval($group);
-                    if ($g_id > 0) {
-                        $org_admin_ids[] = $g_id;
-                    }
-                }
-            }
-
-            $org_admin_set  = array_flip(array_unique($org_admin_ids));
-            $accessible_ids = array_unique(array_merge($led_ids, $org_admin_ids));
-
-            if (empty($accessible_ids)) {
-                return new \WP_REST_Response(array('groups' => array()), 200);
-            }
-
-            // Build response — only published groups
-            $user_groups = array();
-            foreach ($accessible_ids as $group_id) {
-                $group = get_post($group_id);
-                if ($group && $group->post_type === 'groups' && $group->post_status === 'publish') {
-                    $user_groups[] = array(
-                        'id'           => $group->ID,
-                        'title'        => $group->post_title,
-                        'is_org_admin' => isset($org_admin_set[$group_id]),
-                    );
-                }
-            }
-
-            return new \WP_REST_Response(array('groups' => $user_groups), 200);
-        }
-
-        /**
-         * Get all organizations the current user is an admin of or leads a group in,
-         * plus any groups they lead that don't belong to any organization.
-         */
-        public function get_current_user_organizations($request) {
-            $user_id = get_current_user_id();
-            if (!$user_id) {
-                return new \WP_REST_Response(array('error' => 'Not logged in'), 401);
-            }
-
-            $is_site_admin = current_user_can('manage_options');
-            $is_grader     = $this->is_grader_user();
-            $sees_all      = $is_site_admin || $is_grader;
-
-            // Collect every group ID the current user leads (via LD group leader meta)
-            $all_led_ids = array();
-            if (!$sees_all) {
-                foreach (get_user_meta($user_id) as $meta_key => $meta_values) {
-                    if (strpos($meta_key, 'learndash_group_leaders_') === 0) {
-                        $g_id = intval(str_replace('learndash_group_leaders_', '', $meta_key));
-                        if ($g_id > 0) $all_led_ids[] = $g_id;
-                    }
-                }
-            }
-
-            $all_orgs = get_posts(array(
-                'post_type'      => 'organization',
-                'post_status'    => 'publish',
-                'posts_per_page' => -1,
-                'orderby'        => 'title',
-                'order'          => 'ASC',
-            ));
-
-            $organizations = array();
-            $claimed_ids   = array(); // group IDs that belong to at least one org
-
-            foreach ($all_orgs as $org) {
-                // Site admins are org admins; graders see everything but aren't org admins
-                if ($is_site_admin) {
-                    $is_admin = true;
-                } elseif ($is_grader) {
-                    $is_admin = false;
-                } else {
-                    $raw_admins = get_field('administrators', $org->ID);
-                    $admin_ids  = array();
-                    foreach ((array) $raw_admins as $admin) {
-                        $admin_ids[] = $admin instanceof \WP_User ? $admin->ID : intval($admin);
-                    }
-                    $is_admin = in_array($user_id, $admin_ids, true);
-                }
-
-                // Resolve group IDs — ACF may return WP_Post objects or raw IDs
-                $raw_groups         = get_field('groups', $org->ID);
-                $groups             = array();
-                $archived_groups    = array();
-                $user_leads_a_group = false;
-
-                foreach ((array) $raw_groups as $group) {
-                    if ($group instanceof \WP_Post) {
-                        $g_id     = $group->ID;
-                        $g_title  = $group->post_title;
-                        $g_status = $group->post_status;
-                    } else {
-                        $g_id    = intval($group);
-                        $g_post  = get_post($g_id);
-                        $g_title  = $g_post ? $g_post->post_title  : '';
-                        $g_status = $g_post ? $g_post->post_status : '';
-                    }
-
-                    if (!$g_id || !$g_title) continue;
-
-                    $claimed_ids[] = $g_id;
-
-                    if (!$user_leads_a_group && in_array($g_id, $all_led_ids, true)) {
-                        $user_leads_a_group = true;
-                    }
-
-                    if ($g_status === 'publish') {
-                        $groups[] = array('id' => $g_id, 'name' => $g_title);
-                    } elseif ($g_status === 'draft' && $is_admin) {
-                        $archived_date = get_post_meta($g_id, '_bys_archived_date', true)
-                            ?: get_post_modified_time('U', false, $g_id);
-                        $archived_groups[] = array(
-                            'id'            => $g_id,
-                            'name'          => $g_title,
-                            'archived_date' => (int) $archived_date,
-                        );
-                    }
-                }
-
-                if (!$sees_all && !$is_admin && !$user_leads_a_group) continue;
-
-                $organizations[] = array(
-                    'id'              => $org->ID,
-                    'name'            => $org->post_title,
-                    'is_admin'        => $is_admin,
-                    'groups'          => $groups,
-                    'archived_groups' => $archived_groups,
-                );
-            }
-
-            // Groups not belonging to any organization
-            $ungrouped = array();
-            if ($sees_all) {
-                // Site admins and graders see all published groups not claimed by an org
-                $all_groups = get_posts(array(
-                    'post_type'      => 'groups',
-                    'post_status'    => 'publish',
-                    'posts_per_page' => -1,
-                    'fields'         => 'ids',
-                ));
-                foreach (array_diff($all_groups, $claimed_ids) as $g_id) {
-                    $g_post = get_post($g_id);
-                    if ($g_post) {
-                        $ungrouped[] = array('id' => $g_id, 'name' => $g_post->post_title);
-                    }
-                }
-            } else {
-                foreach (array_diff($all_led_ids, $claimed_ids) as $g_id) {
-                    $g_post = get_post($g_id);
-                    if ($g_post && $g_post->post_type === 'groups' && $g_post->post_status === 'publish') {
-                        $ungrouped[] = array('id' => $g_id, 'name' => $g_post->post_title);
-                    }
-                }
-            }
-
-            return new \WP_REST_Response(array(
-                'organizations'    => $organizations,
-                'ungrouped_groups' => $ungrouped,
-            ), 200);
         }
 
         /**
@@ -3925,52 +3680,6 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             return new \WP_REST_Response(array('success' => true, 'group_id' => $group_id), 200);
         }
 
-        /**
-         * Get all draft-status groups the current user leads.
-         * Returns id, title, and the timestamp stored when the group was archived.
-         * Falls back to post_modified if the meta was not set (pre-existing drafts).
-         */
-        public function get_current_user_archived_groups($request) {
-            $user_id = intval($request->get_param('user_id')) ?: get_current_user_id();
-
-            if (!$user_id) {
-                return new \WP_REST_Response(array('groups' => array()), 200);
-            }
-
-            $user_group_metas = get_user_meta($user_id);
-            $led_group_ids    = array();
-
-            foreach ($user_group_metas as $meta_key => $meta_values) {
-                if (strpos($meta_key, 'learndash_group_leaders_') === 0) {
-                    $group_id = intval(str_replace('learndash_group_leaders_', '', $meta_key));
-                    if ($group_id > 0) {
-                        $led_group_ids[] = $group_id;
-                    }
-                }
-            }
-
-            $archived_groups = array();
-
-            foreach ($led_group_ids as $group_id) {
-                $group = get_post($group_id);
-                if (!$group || $group->post_type !== 'groups' || $group->post_status !== 'draft') {
-                    continue;
-                }
-
-                $archived_date = get_post_meta($group_id, '_bys_archived_date', true);
-                if (!$archived_date) {
-                    $archived_date = get_post_modified_time('U', false, $group_id);
-                }
-
-                $archived_groups[] = array(
-                    'id'            => $group->ID,
-                    'title'         => $group->post_title,
-                    'archived_date' => (int) $archived_date,
-                );
-            }
-
-            return new \WP_REST_Response(array('groups' => $archived_groups), 200);
-        }
 
         public function get_all_courses($request) {
             $search = sanitize_text_field($request->get_param('search') ?? '');
@@ -4958,8 +4667,6 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                 'count' => $count,
             ), 200);
         }
-
-        // (handle_postmark_webhook moved to BYS_Groups_Webhooks_Router)
 
         /**
          * Get all recipients in a batch send by batch_id
