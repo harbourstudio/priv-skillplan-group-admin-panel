@@ -12,8 +12,18 @@ if (!class_exists('BYS_Groups_Activator')) {
     class BYS_Groups_Activator {
 
         public static function activate() {
+
+            $current_version = get_option('bys_groups_db_version');
+
+            if (version_compare((string) $current_version, BYS_GROUPS_DB_VERSION, '==')) {
+                return;
+            }
+
             self::create_tables();
+
+            update_option('bys_groups_db_version', BYS_GROUPS_DB_VERSION, true);
         }
+
     
         public static function create_tables() {
             global $wpdb;
