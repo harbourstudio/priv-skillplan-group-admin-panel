@@ -99,17 +99,7 @@ if (!class_exists('BYS_Groups_Rest_API')) {
          */
         public function register_routes() {
 
-            register_rest_route($this->namespace, '/organizations', array(
-                'methods'             => 'POST',
-                'callback'            => array($this, 'create_organization'),
-                'permission_callback' => array($this, 'check_site_admin_permission'),
-            ));
-
-            register_rest_route($this->namespace, '/organizations/(?P<org_id>\d+)/groups', array(
-                'methods'             => 'POST',
-                'callback'            => array($this, 'create_organization_group'),
-                'permission_callback' => array($this, 'check_user_permission'),
-            ));
+            // (/organizations and /organizations/{org_id}/groups moved to BYS_Groups_Organizations_Router)
 
             // groupBaseUsersStats
             register_rest_route($this->namespace, '/groups/(?P<group_id>\d+)/base-user-stats', array(
@@ -481,97 +471,7 @@ if (!class_exists('BYS_Groups_Rest_API')) {
             return user_can($user, 'manage_options') || in_array('marker', (array) $user->roles, true);
         }
 
-        /**
-         * Create a new organization post (site admins only).
-         */
-        public function create_organization($request) {
-            $name = sanitize_text_field($request->get_param('name'));
-            if (empty($name)) {
-                return new \WP_REST_Response(array('error' => 'Organization name is required'), 400);
-            }
-
-            $org_id = wp_insert_post(array(
-                'post_type'   => 'organization',
-                'post_status' => 'publish',
-                'post_title'  => $name,
-                'post_author' => get_current_user_id(),
-            ), true);
-
-            if (is_wp_error($org_id)) {
-                return new \WP_REST_Response(array('error' => $org_id->get_error_message()), 500);
-            }
-
-            return new \WP_REST_Response(array(
-                'id'              => $org_id,
-                'name'            => get_the_title($org_id),
-                'is_admin'        => true,
-                'groups'          => array(),
-                'archived_groups' => array(),
-            ), 201);
-        }
-
-        /**
-         * Create a new LearnDash group and attach it to an organization.
-         * Only callable by a user who is an administrator of that organization.
-         */
-        public function create_organization_group($request) {
-            $user_id = get_current_user_id();
-            if (!$user_id) {
-                return new \WP_REST_Response(array('error' => 'Not logged in'), 401);
-            }
-
-            $org_id = intval($request['org_id']);
-            $org    = get_post($org_id);
-            if (!$org || $org->post_type !== 'organization' || $org->post_status !== 'publish') {
-                return new \WP_REST_Response(array('error' => 'Organization not found'), 404);
-            }
-
-            // Verify the current user is a site admin or an admin of this org
-            if (!current_user_can('manage_options')) {
-                $raw_admins = get_field('administrators', $org_id);
-                $admin_ids  = array();
-                foreach ((array) $raw_admins as $admin) {
-                    $admin_ids[] = $admin instanceof \WP_User ? $admin->ID : intval($admin);
-                }
-                if (!in_array($user_id, $admin_ids, true)) {
-                    return new \WP_REST_Response(array('error' => 'Forbidden'), 403);
-                }
-            }
-
-            $name = sanitize_text_field($request->get_param('name'));
-            if (empty($name)) {
-                return new \WP_REST_Response(array('error' => 'Group name is required'), 400);
-            }
-
-            // Create the LearnDash group post
-            $group_id = wp_insert_post(array(
-                'post_type'   => 'groups',
-                'post_status' => 'publish',
-                'post_title'  => $name,
-                'post_author' => $user_id,
-            ), true);
-
-            if (is_wp_error($group_id)) {
-                return new \WP_REST_Response(array('error' => $group_id->get_error_message()), 500);
-            }
-
-            // Also make the creating user a group leader in LearnDash
-            ld_update_leader_group_access($user_id, $group_id, false);
-
-            // Append the new group to the org's ACF groups field
-            $existing = get_field('groups', $org_id);
-            $existing_ids = array();
-            foreach ((array) $existing as $g) {
-                $existing_ids[] = $g instanceof \WP_Post ? $g->ID : intval($g);
-            }
-            $existing_ids[] = $group_id;
-            update_field('groups', $existing_ids, $org_id);
-
-            return new \WP_REST_Response(array(
-                'id'   => $group_id,
-                'name' => get_the_title($group_id),
-            ), 201);
-        }
+        // (create_organization and create_organization_group moved to BYS_Groups_Organizations_Router)
 
         public function get_group_base_users_stats($request) {
             $group_id = intval($request['group_id']);

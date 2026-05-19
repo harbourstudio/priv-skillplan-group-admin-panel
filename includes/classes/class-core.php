@@ -29,6 +29,7 @@ if (!class_exists('BYS_Groups_Core')) {
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/rest/class-webhooks-router.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/rest/class-me-router.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/rest/class-users-router.php';
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/rest/class-organizations-router.php';
 
             // Core classes
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-activator.php';
@@ -68,6 +69,7 @@ if (!class_exists('BYS_Groups_Core')) {
             new BYS_Groups_Webhooks_Router();
             new BYS_Groups_Me_Router();
             new BYS_Groups_Users_Router();
+            new BYS_Groups_Organizations_Router();
 
             // Enqueue certificate tracking script on certificate pages
             add_action('wp_enqueue_scripts', array($this, 'enqueue_certificate_tracker'));

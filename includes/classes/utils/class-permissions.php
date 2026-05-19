@@ -48,6 +48,33 @@ if (!class_exists('BYS_Groups_Permissions')) {
         }
 
         /**
+         * Checks if the user is an administrator of a specific organization.
+         *
+         * Site admins (manage_options) always pass. Otherwise the user must be
+         * listed in the organization's ACF 'administrators' field.
+         */
+        public static function is_org_admin($org_id, $user_id = null) {
+            $org_id  = (int) $org_id;
+            $user_id = $user_id ?: get_current_user_id();
+            if (!$org_id || !$user_id) return false;
+
+            if (self::is_site_admin($user_id)) return true;
+
+            if (!function_exists('get_field')) return false;
+
+            $org = get_post($org_id);
+            if (!$org || $org->post_type !== 'organization' || $org->post_status !== 'publish') return false;
+
+            $raw_admins = get_field('administrators', $org_id);
+            foreach ((array) $raw_admins as $admin) {
+                $admin_id = $admin instanceof \WP_User ? $admin->ID : intval($admin);
+                if ($admin_id === $user_id) return true;
+            }
+
+            return false;
+        }
+
+        /**
          * Org-admin check: iterate ACF 'organization' posts and verify the
          * group is contained AND the user is an admin
          */
