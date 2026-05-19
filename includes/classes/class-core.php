@@ -28,6 +28,7 @@ if (!class_exists('BYS_Groups_Core')) {
             // REST routers
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/rest/class-webhooks-router.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/rest/class-me-router.php';
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/rest/class-users-router.php';
 
             // Core classes
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-activator.php';
@@ -66,6 +67,7 @@ if (!class_exists('BYS_Groups_Core')) {
             // REST routers (incremental migration from BYS_Groups_Rest_API)
             new BYS_Groups_Webhooks_Router();
             new BYS_Groups_Me_Router();
+            new BYS_Groups_Users_Router();
 
             // Enqueue certificate tracking script on certificate pages
             add_action('wp_enqueue_scripts', array($this, 'enqueue_certificate_tracker'));
@@ -74,8 +76,8 @@ if (!class_exists('BYS_Groups_Core')) {
         public function enqueue_certificate_tracker() {
             // Enqueue link tracker on all pages (to intercept certificate link clicks)
             wp_enqueue_script(
-                'bys-certificate-link-tracker',
-                BYS_GROUPS_PLUGIN_URL . 'assets/js/certificate-link-tracker.js',
+                'bys-view-certificate',
+                BYS_GROUPS_PLUGIN_URL . 'assets/js/view-certificate.js',
                 array('jquery'),
                 BYS_GROUPS_VERSION,
                 true
@@ -85,7 +87,7 @@ if (!class_exists('BYS_Groups_Core')) {
             // The nonce enables cookie-based REST auth so get_current_user_id() resolves
             // correctly in GET requests (the Basic auth header is a service-account credential,
             // not a WP Application Password, so it cannot resolve a user on its own).
-            wp_localize_script('bys-certificate-link-tracker', 'bysGroupsAuth', array(
+            wp_localize_script('bys-view-certificate', 'bysGroupsAuth', array(
                 'userId' => get_current_user_id(),
                 'header' => BYS_Groups_Auth::get_auth_header(),
                 'nonce'  => wp_create_nonce('wp_rest'),

@@ -46,7 +46,8 @@ jQuery(document).ready(async ($) => {
   }
 
   try {
-    const courses = await api.get(endpoints.userCourses(userId));
+    // Single bundled call: courses list + per-course progress in one round trip
+    const courses = await api.get(endpoints.userCoursesWithProgress(userId));
 
     $coursesList.find('.hs-accordion--skeleton').remove();
 
@@ -85,37 +86,32 @@ jQuery(document).ready(async ($) => {
       // Set loading placeholder
       $accordionContent.html('<p>Click to load course structure...</p>');
 
-      // Fetch course-level completion data asynchronously
-      api.get(endpoints.groupUserCourseProgress(userId, course.id))
-        .then(courseProgress => {
-          if (!Array.isArray(courseProgress) || !courseProgress.length) return;
+      // Render course-level completion data from the bundled response (no extra fetch)
+      const progress = course.progress;
+      if (progress) {
+        const $stepsCompleted = $toggle.find('.course-steps-completed');
+        const $stepsTotal = $toggle.find('.course-steps-total');
+        const $completionBadge = $toggle.find('.accordion-toggle__completion .completion-badge');
+        const $dateElement = $toggle.find('.accordion-toggle__date');
 
-          const progress = courseProgress[0];
-          const $stepsCompleted = $toggle.find('.course-steps-completed');
-          const $stepsTotal = $toggle.find('.course-steps-total');
-          const $completionBadge = $toggle.find('.accordion-toggle__completion .completion-badge');
-          const $dateElement = $toggle.find('.accordion-toggle__date');
+        $stepsCompleted.html(progress.steps_completed || 0);
+        $stepsTotal.html(progress.steps_total || 0);
+        $completionBadge.addClass(`completion-badge--${progress.progress_status}`);
+        $completionBadge.text(STATUS_LABELS[progress.progress_status] || progress.progress_status);
 
-          // Update course header
-          $stepsCompleted.html(progress.steps_completed || 0);
-          $stepsTotal.html(progress.steps_total || 0);
-          $completionBadge.addClass(`completion-badge--${progress.progress_status}`);
-          $completionBadge.text(STATUS_LABELS[progress.progress_status] || progress.progress_status);
-
-          // Update date: completed or last activity
-          if (progress.progress_status === 'completed' && progress.date_completed_gmt) {
-            $dateElement.html(formatDateTime(progress.date_completed_gmt));
-          } else if (progress.progress_status !== 'not_started') {
-            api.get(endpoints.userCourseActivity(userId, course.id))
-              .then(activityData => {
-                if (activityData?.last_activity_gmt) {
-                  $dateElement.html(formatDateTime(activityData.last_activity_gmt));
-                }
-              })
-              .catch(err => console.warn(`[user-progress] Failed to fetch course activity for course ${course.id}:`, err));
-          }
-        })
-        .catch(err => console.error(`[user-progress] Failed to fetch course progress for course ${course.id}:`, err));
+        // Date: completed timestamp or last-activity fallback
+        if (progress.progress_status === 'completed' && progress.date_completed_gmt) {
+          $dateElement.html(formatDateTime(progress.date_completed_gmt));
+        } else if (progress.progress_status !== 'not_started') {
+          api.get(endpoints.userCourseActivity(userId, course.id))
+            .then(activityData => {
+              if (activityData?.last_activity_gmt) {
+                $dateElement.html(formatDateTime(activityData.last_activity_gmt));
+              }
+            })
+            .catch(err => console.warn(`[user-progress] Failed to fetch course activity for course ${course.id}:`, err));
+        }
+      }
 
       // Fetch and render course structure on-demand
       let structureLoaded = false;

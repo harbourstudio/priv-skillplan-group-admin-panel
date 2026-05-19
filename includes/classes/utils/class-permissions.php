@@ -48,23 +48,6 @@ if (!class_exists('BYS_Groups_Permissions')) {
         }
 
         /**
-         * Checks if the user can read or manage the current group
-         */
-        public static function can_access_group($group_id, $user_id = null) {
-            $group_id = (int) $group_id;
-            if ($group_id <= 0) return false;
-
-            $user_id = $user_id ?: get_current_user_id();
-            if (!$user_id) return false;
-
-            if (self::is_site_admin($user_id)) return true; // if site_admin, this is enough permission
-
-            if (get_user_meta($user_id, "learndash_group_leaders_{$group_id}", true)) return true; // if user is a leader fo this group, then allow
-
-            return self::is_org_admin_for_group($user_id, $group_id); // if the user administers an org that contains this group, then allow
-        }
-
-        /**
          * Org-admin check: iterate ACF 'organization' posts and verify the
          * group is contained AND the user is an admin
          */
@@ -96,17 +79,65 @@ if (!class_exists('BYS_Groups_Permissions')) {
             return false;
         }
 
+
+        /**
+         * Checks if the user can read or manage the current group
+         */
+        public static function can_access_group($group_id, $user_id = null) {
+            $group_id = (int) $group_id;
+            if ($group_id <= 0) return false;
+
+            $user_id = $user_id ?: get_current_user_id();
+            if (!$user_id) return false;
+
+            if (self::is_site_admin($user_id)) return true; // if site_admin, this is enough permission
+
+            if (get_user_meta($user_id, "learndash_group_leaders_{$group_id}", true)) return true; // if user is a leader fo this group, then allow
+
+            return self::is_org_admin_for_group($user_id, $group_id); // if the user administers an org that contains this group, then allow
+        }
+
+        /**
+         * Checks if the current user can read a specific user's data when no group context
+         * is provided by the URL (e.g. /users/{user_id}/* endpoints).
+         *
+         * Allows access when:
+         *  - current user IS the target (self-access always passes), OR
+         *  - current user is a site admin, OR
+         *  - current user shares at least one group with the target — either as a leader
+         *    of that group or as an admin of an organization containing it
+         *    (delegated to can_access_group per matched group).
+         */
+        public static function can_access_user($target_user_id, $user_id = null) {
+            $target_user_id = (int) $target_user_id;
+            $user_id       = $user_id ?: get_current_user_id();
+
+            if (!$target_user_id || !$user_id) return false;
+
+            if ($user_id === $target_user_id) return true; // self always passes
+            if (self::is_site_admin($user_id)) return true; // site admins always pass
+
+            if (!function_exists('learndash_get_users_group_ids')) return false;
+
+            $target_group_ids = (array) learndash_get_users_group_ids($target_user_id);
+            foreach ($target_group_ids as $group_id) {
+                if (self::can_access_group($group_id, $user_id)) return true;
+            }
+
+            return false;
+        }
+
         /**
          * The current user can perform a leader action against $target_user_id within $group_id
          */
-        public static function can_manage_user_in_group($group_id, $target_user_id, $actor_id = null) {
+        public static function can_manage_user_in_group($group_id, $target_user_id, $user_id = null) {
             $group_id       = (int) $group_id;
             $target_user_id = (int) $target_user_id;
-            $actor_id       = $actor_id ?: get_current_user_id();
+            $user_id       = $user_id ?: get_current_user_id();
 
-            if ($group_id <= 0 || $target_user_id <= 0 || !$actor_id) return false;
+            if ($group_id <= 0 || $target_user_id <= 0 || !$user_id) return false;
 
-            if (!self::can_access_group($group_id, $actor_id)) return false;
+            if (!self::can_access_group($group_id, $user_id)) return false;
 
             // Target must be a member of the group.
             if (function_exists('learndash_is_user_in_group')) {

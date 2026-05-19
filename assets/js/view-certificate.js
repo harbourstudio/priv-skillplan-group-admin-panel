@@ -40,7 +40,7 @@ jQuery(document).ready(function($) {
         console.log('[BYS] Logging certificate view for user', userId, 'course', courseId);
 
         const response = await fetch(
-          `/wp-json/bys-groups/v1/users/${userId}/log-certificate-view`,
+          `/wp-json/bys-groups/v1/users/${userId}/activity/view-certificate`,
           {
             method: 'POST',
             headers: {
