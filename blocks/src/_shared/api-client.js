@@ -66,23 +66,6 @@ export const endpoints = {
     `/wp-json/bys-groups/v1/groups/${groupId}/conditional-recipients`
 };
 
-/**
- * Unwrap the standard { status, data } response envelope from refactored routers.
- * Legacy endpoints returning raw shapes are passed through untouched.
- */
-function unwrapEnvelope(response) {
-  if (
-    response
-    && typeof response === 'object'
-    && !Array.isArray(response)
-    && typeof response.status === 'number'
-    && Object.prototype.hasOwnProperty.call(response, 'data')
-  ) {
-    return response.data;
-  }
-  return response;
-}
-
 export const api = {
   _cache: new Map(),
   _pending: new Map(),
@@ -124,9 +107,8 @@ export const api = {
         console.log(`Success for ${url}:`, { status: jqXHR.status, data });
       })
       .then((data) => {
-        const unwrapped = unwrapEnvelope(data);
-        this._cache.set(url, unwrapped);
-        return unwrapped;
+        this._cache.set(url, data);
+        return data;
       })
       .catch((jqXHR, textStatus, errorThrown) => {
         console.error(`API request failed for ${url}:`, {
@@ -161,8 +143,6 @@ export const api = {
       headers,
       data: JSON.stringify(body),
       dataType: 'json',
-    }).then((data) => {
-      return unwrapEnvelope(data);
     }).catch((jqXHR) => {
       console.error(`POST failed for ${url}:`, jqXHR.status, jqXHR.responseText?.substring(0, 200));
       throw new Error(`POST failed: ${jqXHR.status} ${jqXHR.responseText?.substring(0, 100)}`);
@@ -183,7 +163,7 @@ export const api = {
       type: 'DELETE',
       headers,
       dataType: 'json',
-    }).then((data) => unwrapEnvelope(data)).catch((jqXHR) => {
+    }).catch((jqXHR) => {
       console.error(`DELETE failed for ${url}:`, jqXHR.status, jqXHR.responseText?.substring(0, 200));
       throw new Error(`DELETE failed: ${jqXHR.status} ${jqXHR.responseText?.substring(0, 100)}`);
     });

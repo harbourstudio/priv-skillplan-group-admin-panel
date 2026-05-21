@@ -87,7 +87,7 @@ if (!class_exists('BYS_Groups_Users_Router')) {
          */
         public function get_user_courses($request) {
             $user_id = intval($request['user_id']);
-            if (!$user_id) return BYS_Groups_Response::bad_request('Invalid user ID');
+            if (!$user_id) return new WP_Error('bad_request', 'Invalid user ID', ['status' => 400]);
 
             $course_ids = learndash_user_get_enrolled_courses($user_id);
             $courses = [];
@@ -114,7 +114,7 @@ if (!class_exists('BYS_Groups_Users_Router')) {
                 unset($course);
             }
 
-            return BYS_Groups_Response::success($courses);
+            return $courses;
         }
 
         /**
@@ -126,11 +126,11 @@ if (!class_exists('BYS_Groups_Users_Router')) {
             $course_ids_param = $request->get_param('course_ids');
 
             if (!$user_id || !$course_ids_param) {
-                return BYS_Groups_Response::bad_request('Invalid user ID or course_ids');
+                return new WP_Error('bad_request', 'Invalid user ID or course_ids', ['status' => 400]);
             }
 
             $course_ids = array_filter(array_map('intval', explode(',', $course_ids_param)));
-            if (empty($course_ids)) return BYS_Groups_Response::success([]);
+            if (empty($course_ids)) return [];
 
             $progress_by_course = $this->compute_user_course_progress($user_id, $course_ids);
 
@@ -141,7 +141,7 @@ if (!class_exists('BYS_Groups_Users_Router')) {
                 $row['course_id'] = $course_id;
                 $result[] = $row;
             }
-            return BYS_Groups_Response::success($result);
+            return $result;
         }
 
         /**
@@ -221,11 +221,11 @@ if (!class_exists('BYS_Groups_Users_Router')) {
             $user_id   = intval($request['user_id']);
             $course_id = intval($request['course_id']);
             if (!$user_id || !$course_id) {
-                return BYS_Groups_Response::bad_request('Invalid user_id or course_id');
+                return new WP_Error('bad_request', 'Invalid user_id or course_id', ['status' => 400]);
             }
 
             $auth_header = BYS_Groups_Auth::get_auth_header();
-            if (!$auth_header) return BYS_Groups_Response::server_error('API credentials not configured');
+            if (!$auth_header) return new WP_Error('server_error', 'API credentials not configured', ['status' => 500]);
 
             // Fetch all paginated steps from LD API
             $all_steps = [];
@@ -240,11 +240,11 @@ if (!class_exists('BYS_Groups_Users_Router')) {
                 ]);
 
                 if (is_wp_error($response)) {
-                    return BYS_Groups_Response::server_error($response->get_error_message());
+                    return new WP_Error('server_error', $response->get_error_message(), ['status' => 500]);
                 }
                 $status = wp_remote_retrieve_response_code($response);
                 if ($status !== 200) {
-                    return BYS_Groups_Response::error('ld_api_failure', 'Failed to fetch course steps progress from LearnDash API', $status);
+                    return new WP_Error('ld_api_failure', 'Failed to fetch course steps progress from LearnDash API', ['status' => $status]);
                 }
 
                 $data = json_decode(wp_remote_retrieve_body($response), true);
@@ -336,7 +336,7 @@ if (!class_exists('BYS_Groups_Users_Router')) {
                 unset($step);
             }
 
-            return BYS_Groups_Response::success($all_steps);
+            return $all_steps;
         }
 
         /**
@@ -347,10 +347,10 @@ if (!class_exists('BYS_Groups_Users_Router')) {
          */
         public function get_user_quiz_progress_summary($request) {
             $user_id = intval($request['user_id']);
-            if (!$user_id) return BYS_Groups_Response::bad_request('user_id parameter required');
+            if (!$user_id) return new WP_Error('bad_request', 'user_id parameter required', ['status' => 400]);
 
             $auth_header = BYS_Groups_Auth::get_auth_header();
-            if (!$auth_header) return BYS_Groups_Response::server_error('API credentials not configured');
+            if (!$auth_header) return new WP_Error('server_error', 'API credentials not configured', ['status' => 500]);
 
             global $wpdb;
             $rows = $wpdb->get_results($wpdb->prepare(
@@ -360,7 +360,7 @@ if (!class_exists('BYS_Groups_Users_Router')) {
                 $user_id
             ), ARRAY_A);
 
-            if (empty($rows)) return BYS_Groups_Response::success([]);
+            if (empty($rows)) return [];
 
             // Build quiz_id → course_id map (first-seen course per quiz)
             $quiz_course_map = [];
@@ -435,7 +435,7 @@ if (!class_exists('BYS_Groups_Users_Router')) {
                 return strtotime($b['latest_timestamp'] ?? 0) - strtotime($a['latest_timestamp'] ?? 0);
             });
 
-            return BYS_Groups_Response::success($result);
+            return $result;
         }
 
         /**
@@ -447,11 +447,11 @@ if (!class_exists('BYS_Groups_Users_Router')) {
             $user_id = intval($request['user_id']);
             $quiz_id = intval($request['quiz_id']);
             if (!$user_id || !$quiz_id) {
-                return BYS_Groups_Response::bad_request('user_id and quiz_id parameters required');
+                return new WP_Error('bad_request', 'user_id and quiz_id parameters required', ['status' => 400]);
             }
 
             $auth_header = BYS_Groups_Auth::get_auth_header();
-            if (!$auth_header) return BYS_Groups_Response::server_error('API credentials not configured');
+            if (!$auth_header) return new WP_Error('server_error', 'API credentials not configured', ['status' => 500]);
 
             $url = get_home_url() . "/wp-json/ldlms/v2/users/{$user_id}/quiz-progress?quiz={$quiz_id}";
             $response = wp_remote_get($url, [
@@ -460,11 +460,11 @@ if (!class_exists('BYS_Groups_Users_Router')) {
                 'sslverify' => false,
             ]);
 
-            if (is_wp_error($response)) return BYS_Groups_Response::server_error($response->get_error_message());
+            if (is_wp_error($response)) return new WP_Error('server_error', $response->get_error_message(), ['status' => 500]);
 
             $status = wp_remote_retrieve_response_code($response);
             if ($status !== 200) {
-                return BYS_Groups_Response::error('ld_api_failure', 'Failed to fetch quiz attempts from LearnDash API', $status);
+                return new WP_Error('ld_api_failure', 'Failed to fetch quiz attempts from LearnDash API', ['status' => $status]);
             }
 
             $attempts = json_decode(wp_remote_retrieve_body($response), true);
@@ -486,7 +486,7 @@ if (!class_exists('BYS_Groups_Users_Router')) {
                 return strtotime($b['completed'] ?? 0) - strtotime($a['completed'] ?? 0);
             });
 
-            return BYS_Groups_Response::success($normalized);
+            return $normalized;
         }
 
         /**
@@ -503,7 +503,7 @@ if (!class_exists('BYS_Groups_Users_Router')) {
          */
         public function get_user_activity($request) {
             $user_id = intval($request['user_id']);
-            if (!$user_id) return BYS_Groups_Response::bad_request('Invalid user ID');
+            if (!$user_id) return new WP_Error('bad_request', 'Invalid user ID', ['status' => 400]);
 
             // ?course_id present → return only the last-activity timestamp for that course
             $course_id = intval($request->get_param('course_id') ?? 0);
@@ -634,11 +634,11 @@ if (!class_exists('BYS_Groups_Users_Router')) {
 
             $pages = $per_page > 0 ? ceil($total / $per_page) : 0;
 
-            return BYS_Groups_Response::success([
+            return [
                 'total' => $total,
                 'pages' => $pages,
                 'items' => $paginated_items,
-            ]);
+            ];
         }
 
         /**
@@ -649,15 +649,15 @@ if (!class_exists('BYS_Groups_Users_Router')) {
         public function log_certificate_view($request) {
             $user_id   = intval($request['user_id']);
             $course_id = intval($request->get_param('course_id') ?? 0);
-            if (!$user_id || !$course_id) return BYS_Groups_Response::bad_request('Invalid user_id or course_id');
+            if (!$user_id || !$course_id) return new WP_Error('bad_request', 'Invalid user_id or course_id', ['status' => 400]);
 
             $user = get_user_by('ID', $user_id);
-            if (!$user) return BYS_Groups_Response::not_found('User not found');
+            if (!$user) return new WP_Error('not_found', 'User not found', ['status' => 404]);
 
             // Prevent duplicate logs within 30 minutes
             $cache_key = "bys_cert_viewed_{$user_id}_{$course_id}";
             if (get_transient($cache_key)) {
-                return BYS_Groups_Response::success(['message' => 'Certificate view already logged within 30 minutes']);
+                return ['message' => 'Certificate view already logged within 30 minutes'];
             }
 
             $course_title = get_the_title($course_id);
@@ -714,7 +714,7 @@ if (!class_exists('BYS_Groups_Users_Router')) {
 
             set_transient($cache_key, true, 30 * MINUTE_IN_SECONDS);
 
-            return BYS_Groups_Response::success(['message' => 'Certificate view logged']);
+            return ['message' => 'Certificate view logged'];
         }
 
         // ─── Private helpers ────────────────────────────────────────────────
@@ -763,17 +763,17 @@ if (!class_exists('BYS_Groups_Users_Router')) {
                         'course_id' => intval($course_id),
                     ]);
                     if ($activity && isset($activity->activity_updated)) {
-                        return BYS_Groups_Response::success(['last_activity_gmt' => $activity->activity_updated]);
+                        return ['last_activity_gmt' => $activity->activity_updated];
                     }
                 } else {
                     error_log('[BYS Groups] learndash_get_user_activity function not found');
                 }
             } catch (\Exception $e) {
                 error_log('[BYS Groups] Error getting user last activity: ' . $e->getMessage());
-                return BYS_Groups_Response::server_error($e->getMessage());
+                return new WP_Error('server_error', $e->getMessage(), ['status' => 500]);
             }
 
-            return BYS_Groups_Response::success(['last_activity_gmt' => null]);
+            return ['last_activity_gmt' => null];
         }
 
         /**

@@ -17,10 +17,9 @@ foreach ($attrs as $a) {
 $user_id = get_current_user_id();
 $groups  = array();
 if ($user_id) {
-	$router   = new BYS_Groups_Me_Router();
-	$response = $router->get_current_user_groups(null);
-	$payload  = $response->get_data();
-	$groups   = $payload['data']['groups'] ?? array();
+	$router  = new BYS_Groups_Me_Router();
+	$payload = $router->get_current_user_groups(null);
+	$groups  = $payload['groups'] ?? array();
 }
 $wrapper_attributes = get_block_wrapper_attributes();
 

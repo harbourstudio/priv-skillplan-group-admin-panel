@@ -41,7 +41,7 @@ if (!class_exists('BYS_Groups_Organizations_Router')) {
          */
         public function create_organization($request) {
             $name = sanitize_text_field($request->get_param('name'));
-            if (empty($name)) return BYS_Groups_Response::bad_request('Organization name is required');
+            if (empty($name)) return new WP_Error('bad_request', 'Organization name is required', ['status' => 400]);
 
             $org_id = wp_insert_post([
                 'post_type'   => 'organization',
@@ -50,9 +50,9 @@ if (!class_exists('BYS_Groups_Organizations_Router')) {
                 'post_author' => get_current_user_id(),
             ], true);
 
-            if (is_wp_error($org_id)) return BYS_Groups_Response::server_error($org_id->get_error_message());
+            if (is_wp_error($org_id)) return new WP_Error('server_error', $org_id->get_error_message(), ['status' => 500]);
 
-            return BYS_Groups_Response::success([
+            return new WP_REST_Response([
                 'id'              => $org_id,
                 'name'            => get_the_title($org_id),
                 'is_admin'        => true,
@@ -72,11 +72,11 @@ if (!class_exists('BYS_Groups_Organizations_Router')) {
             $org_id = intval($request['org_id']);
             $org    = get_post($org_id);
             if (!$org || $org->post_type !== 'organization' || $org->post_status !== 'publish') {
-                return BYS_Groups_Response::not_found('Organization not found');
+                return new WP_Error('not_found', 'Organization not found', ['status' => 404]);
             }
 
             $name = sanitize_text_field($request->get_param('name'));
-            if (empty($name)) return BYS_Groups_Response::bad_request('Group name is required');
+            if (empty($name)) return new WP_Error('bad_request', 'Group name is required', ['status' => 400]);
 
             $user_id = get_current_user_id();
 
@@ -87,7 +87,7 @@ if (!class_exists('BYS_Groups_Organizations_Router')) {
                 'post_author' => $user_id,
             ], true);
 
-            if (is_wp_error($group_id)) return BYS_Groups_Response::server_error($group_id->get_error_message());
+            if (is_wp_error($group_id)) return new WP_Error('server_error', $group_id->get_error_message(), ['status' => 500]);
 
             // Make the creating user a group leader in LearnDash
             ld_update_leader_group_access($user_id, $group_id, false);
@@ -101,7 +101,7 @@ if (!class_exists('BYS_Groups_Organizations_Router')) {
             $existing_ids[] = $group_id;
             update_field('groups', $existing_ids, $org_id);
 
-            return BYS_Groups_Response::success([
+            return new WP_REST_Response([
                 'id'   => $group_id,
                 'name' => get_the_title($group_id),
             ], 201);

@@ -47,17 +47,13 @@ if (!class_exists('BYS_Groups_Me_Router')) {
          *  - Site admins and graders: every published group
          *  - Group leaders: groups via learndash_group_leaders_{group_id} user meta
          *  - Org admins: groups in any ACF organization where the user is an administrator
-         *
-         * NOTE: uses has_grader_role() ('grader' role) — a different definition
-         * than has_marker_role() ('marker' role or manage_options). Preserved
-         * verbatim from the old code; flagged for dev team review.
          */
         public function get_current_user_groups($request) {
             $user_id = get_current_user_id();
-            if (!$user_id) return BYS_Groups_Response::success(['groups' => []]);
+            if (!$user_id) return ['groups' => []];
 
             // Site admins and graders see every published group
-            $is_grader = BYS_Groups_Permissions::has_grader_role($user_id);
+            $is_grader = BYS_Groups_Permissions::is_grader($user_id);
             if (BYS_Groups_Permissions::is_site_admin($user_id) || $is_grader) {
                 $all_groups = get_posts([
                     'post_type'      => 'groups',
@@ -74,7 +70,7 @@ if (!class_exists('BYS_Groups_Me_Router')) {
                         'is_org_admin' => !$is_grader, // graders can't act as org admins
                     ];
                 }
-                return BYS_Groups_Response::success(['groups' => $user_groups]);
+                return ['groups' => $user_groups];
             }
 
             // Collect group IDs via LD group leader meta
@@ -116,7 +112,7 @@ if (!class_exists('BYS_Groups_Me_Router')) {
             $org_admin_set  = array_flip(array_unique($org_admin_ids));
             $accessible_ids = array_unique(array_merge($led_ids, $org_admin_ids));
 
-            if (empty($accessible_ids)) return BYS_Groups_Response::success(['groups' => []]);
+            if (empty($accessible_ids)) return ['groups' => []];
 
             // Build response — only published groups
             $user_groups = [];
@@ -131,7 +127,7 @@ if (!class_exists('BYS_Groups_Me_Router')) {
                 }
             }
 
-            return BYS_Groups_Response::success(['groups' => $user_groups]);
+            return ['groups' => $user_groups];
         }
 
         /**
@@ -140,13 +136,13 @@ if (!class_exists('BYS_Groups_Me_Router')) {
          * Returns all organizations the user is an admin of or leads a group in,
          * plus any groups they lead that don't belong to any organization.
          *
-         * NOTE: uses has_grader_role() per the same convention as get_current_user_groups().
+         * NOTE: uses is_grader() per the same convention as get_current_user_groups().
          */
         public function get_current_user_organizations($request) {
             $user_id = get_current_user_id();
 
             $is_site_admin = BYS_Groups_Permissions::is_site_admin($user_id);
-            $is_grader     = BYS_Groups_Permissions::has_grader_role($user_id);
+            $is_grader     = BYS_Groups_Permissions::is_grader($user_id);
 
             // Collect every group ID the current user leads (via LD group leader meta)
             $all_led_ids = [];
@@ -260,10 +256,10 @@ if (!class_exists('BYS_Groups_Me_Router')) {
                 }
             }
 
-            return BYS_Groups_Response::success([
+            return [
                 'organizations'    => $organizations,
                 'ungrouped_groups' => $ungrouped,
-            ]);
+            ];
         }
 
         /**
@@ -281,7 +277,7 @@ if (!class_exists('BYS_Groups_Me_Router')) {
             $user_id = intval($request->get_param('user_id')) ?: get_current_user_id();
 
             if (!$user_id) {
-                return BYS_Groups_Response::success(['groups' => []]);
+                return ['groups' => []];
             }
 
             $led_group_ids = [];
@@ -313,7 +309,7 @@ if (!class_exists('BYS_Groups_Me_Router')) {
                 ];
             }
 
-            return BYS_Groups_Response::success(['groups' => $archived_groups]);
+            return ['groups' => $archived_groups];
         }
     }
 }

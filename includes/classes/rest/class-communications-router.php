@@ -45,7 +45,7 @@ if (!class_exists('BYS_Groups_Communications_Router')) {
          */
         public function get_communication_recipients($request) {
             $batch_id = sanitize_text_field($request['batch_id']);
-            if (empty($batch_id)) return BYS_Groups_Response::bad_request('Missing batch_id');
+            if (empty($batch_id)) return new WP_Error('bad_request', 'Missing batch_id', ['status' => 400]);
 
             global $wpdb;
             $table = $wpdb->prefix . BYS_GROUPS_COMMS_TABLE;
@@ -60,12 +60,12 @@ if (!class_exists('BYS_Groups_Communications_Router')) {
                 ARRAY_A
             );
 
-            if (empty($rows)) return BYS_Groups_Response::not_found('Batch not found');
+            if (empty($rows)) return new WP_Error('not_found', 'Batch not found', ['status' => 404]);
 
             // Authorization: current user must have access to the batch's group.
             $group_id = (int) ($rows[0]['group_id'] ?? 0);
             if (!BYS_Groups_Permissions::can_access_group($group_id)) {
-                return BYS_Groups_Response::forbidden();
+                return new WP_Error('forbidden', 'Forbidden.', ['status' => 403]);
             }
 
             $postmark_token = get_option('bys_postmark_token', '');
@@ -81,9 +81,9 @@ if (!class_exists('BYS_Groups_Communications_Router')) {
                 // Fetch live status from Postmark — skip for rows that never reached it
                 // (failed/scheduled rows have message_id = NULL; their DB status is authoritative)
                 if (!empty($postmark_token) && !empty($row['message_id'])) {
-                    $pm_detail = $this->fetch_postmark_message_detail($row['message_id'], $postmark_token);
+                    $pm_detail = BYS_Groups_Postmark::fetch_message_detail($row['message_id'], $postmark_token);
                     if ($pm_detail && !empty($pm_detail['MessageEvents'])) {
-                        $status_info     = $this->extract_delivery_status_from_events($pm_detail['MessageEvents']);
+                        $status_info     = BYS_Groups_Postmark::extract_delivery_status_from_events($pm_detail['MessageEvents']);
                         $delivery_status = $status_info['status'];
                         $bounce_type     = $status_info['bounce_type'];
 
@@ -121,7 +121,7 @@ if (!class_exists('BYS_Groups_Communications_Router')) {
                 ];
             }
 
-            return BYS_Groups_Response::success($recipients);
+            return $recipients;
         }
 
         /**
@@ -132,7 +132,7 @@ if (!class_exists('BYS_Groups_Communications_Router')) {
          */
         public function get_communication_detail($request) {
             $identifier = sanitize_text_field($request['message_id']);
-            if (empty($identifier)) return BYS_Groups_Response::bad_request('Missing identifier');
+            if (empty($identifier)) return new WP_Error('bad_request', 'Missing identifier', ['status' => 400]);
 
             global $wpdb;
             $table = $wpdb->prefix . BYS_GROUPS_COMMS_TABLE;
@@ -148,12 +148,12 @@ if (!class_exists('BYS_Groups_Communications_Router')) {
                 ARRAY_A
             );
 
-            if (!$msg_row) return BYS_Groups_Response::not_found('Message not found');
+            if (!$msg_row) return new WP_Error('not_found', 'Message not found', ['status' => 404]);
 
             // Authorization: actor must have access to the message's group
             $group_id = (int) ($msg_row['group_id'] ?? 0);
             if (!BYS_Groups_Permissions::can_access_group($group_id)) {
-                return BYS_Groups_Response::forbidden();
+                return new WP_Error('forbidden', 'Forbidden.', ['status' => 403]);
             }
 
             $message_id      = $msg_row['message_id'];
@@ -167,10 +167,10 @@ if (!class_exists('BYS_Groups_Communications_Router')) {
             // Try Postmark for rows that actually reached it. Failed rows are rendered
             // entirely from the DB snapshot stored at send time.
             if (!empty($message_id) && !empty($postmark_token)) {
-                $postmark_body = $this->fetch_postmark_message_detail($message_id, $postmark_token);
+                $postmark_body = BYS_Groups_Postmark::fetch_message_detail($message_id, $postmark_token);
 
                 if ($postmark_body && !empty($postmark_body['MessageEvents']) && is_array($postmark_body['MessageEvents'])) {
-                    $status_info     = $this->extract_delivery_status_from_events($postmark_body['MessageEvents']);
+                    $status_info     = BYS_Groups_Postmark::extract_delivery_status_from_events($postmark_body['MessageEvents']);
                     $delivery_status = $status_info['status'];
                     $bounce_type     = $status_info['bounce_type'];
 
@@ -243,7 +243,7 @@ if (!class_exists('BYS_Groups_Communications_Router')) {
             // Plain-text body: same fallback chain
             $text_body = $postmark_body['TextBody'] ?? $msg_row['body_text'] ?? '';
 
-            return BYS_Groups_Response::success([
+            return [
                 'message_id'      => $message_id,
                 'subject'         => $subject,
                 'recipient_name'  => $display_name,
@@ -253,88 +253,8 @@ if (!class_exists('BYS_Groups_Communications_Router')) {
                 'delivered_at'    => $delivered_at,
                 'body_html'       => $html_body,
                 'body_text'       => $text_body,
-            ]);
+            ];
         }
 
-        // ─── Private helpers ────────────────────────────────────────────────
-
-        /**
-         * Fetch message details from the Postmark Messages API.
-         * Returns the decoded response or null on any error.
-         */
-        private function fetch_postmark_message_detail($message_id, $postmark_token) {
-            $url = "https://api.postmarkapp.com/messages/outbound/{$message_id}/details";
-
-            $response = wp_remote_get($url, [
-                'headers' => [
-                    'X-Postmark-Server-Token' => $postmark_token,
-                    'Accept'                  => 'application/json',
-                ],
-                'timeout'   => 10,
-                'sslverify' => true,
-            ]);
-
-            if (is_wp_error($response)) {
-                error_log("[fetch_postmark_message_detail] WP Error for message_id $message_id: " . $response->get_error_message());
-                return null;
-            }
-
-            $status = wp_remote_retrieve_response_code($response);
-            if ($status !== 200) {
-                $body = wp_remote_retrieve_body($response);
-                error_log("[fetch_postmark_message_detail] Status $status for message_id $message_id: $body");
-                return null;
-            }
-
-            $decoded = json_decode(wp_remote_retrieve_body($response), true);
-            if (!$decoded) {
-                error_log("[fetch_postmark_message_detail] Failed to decode JSON for message_id $message_id");
-                return null;
-            }
-
-            return $decoded;
-        }
-
-        /**
-         * Reduce a Postmark MessageEvents array down to a delivery status + bounce type.
-         * Picks the latest event of each type, then applies priority order:
-         *   Bounced > SubscriptionChanged > Delivered > Opened/LinkClicked > Transient.
-         */
-        private function extract_delivery_status_from_events($events) {
-            $status      = 'pending';
-            $bounce_type = null;
-
-            if (empty($events) || !is_array($events)) {
-                return ['status' => $status, 'bounce_type' => $bounce_type];
-            }
-
-            // Index events by type, keeping the latest per type
-            $events_by_type = [];
-            foreach ($events as $event) {
-                $type        = $event['Type'] ?? '';
-                $received_at = $event['ReceivedAt'] ?? '';
-                if (!empty($type)) {
-                    if (!isset($events_by_type[$type]) || $received_at > $events_by_type[$type]['ReceivedAt']) {
-                        $events_by_type[$type] = $event;
-                    }
-                }
-            }
-
-            // Priority order
-            if (isset($events_by_type['Bounced'])) {
-                $status      = 'bounced';
-                $bounce_type = $events_by_type['Bounced']['Details']['Summary'] ?? 'unknown';
-            } elseif (isset($events_by_type['SubscriptionChanged'])) {
-                $status = 'spam';
-            } elseif (isset($events_by_type['Delivered'])) {
-                $status = 'delivered';
-            } elseif (isset($events_by_type['Opened']) || isset($events_by_type['LinkClicked'])) {
-                $status = 'delivered'; // Opened/clicked implies delivered
-            } elseif (isset($events_by_type['Transient'])) {
-                $status = 'pending'; // Temporary failure
-            }
-
-            return ['status' => $status, 'bounce_type' => $bounce_type];
-        }
     }
 }
