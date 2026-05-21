@@ -1,4 +1,5 @@
 import { api, endpoints } from '../_shared/api-client.js';
+import store from '../_shared/store.js';
 
 jQuery(document).ready(($) => {
   const $block = $('.wp-block-bys-groups-group-select').first(); // will only have 1 instance of this block per page
@@ -45,6 +46,14 @@ jQuery(document).ready(($) => {
       // Fetch shared data that both group-stats and group-reporting blocks need
       const baseUsersStats = await api.get(endpoints.groupBaseUsersStats(groupId), true); // Force refresh
       const courses = await api.get(endpoints.groupCourses(groupId), true); // Force refresh
+
+      // Populate the shared store so other blocks can read user_ids and courses
+      // without re-fetching.
+      store.setCurrentGroup(groupId);
+      store.setUserIdsAsStubs(baseUsersStats.user_ids || []);
+      store.setCourses(Array.isArray(courses) ? courses : []);
+      console.log('[bys-store] group-select wrote users (stubs) for group', parseInt(groupId), store.getUsers());
+      console.log('[bys-store] group-select wrote courses for group', parseInt(groupId), store.getCourses());
 
       // Read org-admin flag from the selected <option> data attribute
       const isOrgAdmin    = $select.find(`option[value="${groupId}"]`).data('is-org-admin') === 1;

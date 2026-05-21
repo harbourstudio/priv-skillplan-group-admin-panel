@@ -1,4 +1,5 @@
 import { api, endpoints } from '../_shared/api-client.js';
+import store from '../_shared/store.js';
 import flatpickr from 'flatpickr';
 import 'flatpickr/dist/flatpickr.min.css';
 
@@ -448,7 +449,19 @@ jQuery(document).ready(($) => {
     async function loadMembers(groupId, userIds) {
         if (!userIds?.length) { allMembers = []; return; }
         try {
-            const users = await api.get(endpoints.groupUsers(groupId, userIds.join(',')));
+            // Hydrated-cache fast path
+            const cachedHydrated = store.getCurrentGroup() === Number(groupId)
+                ? store.getHydratedUsers(userIds)
+                : null;
+            let users;
+            if (cachedHydrated !== null) {
+                console.log('[bys-store] group-user-quiz-config: HIT hydrated — using store, skipping fetch');
+                users = cachedHydrated;
+            } else {
+                console.log('[bys-store] group-user-quiz-config: MISS hydrated — fetching and writing through');
+                users = await api.get(endpoints.groupUsers(groupId, userIds.join(',')));
+                if (Array.isArray(users)) store.setUsers(users);
+            }
             allMembers = (Array.isArray(users) ? users : []).map((u) => ({
                 id:           u.id,
                 display_name: `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.display_name || '',
@@ -508,11 +521,21 @@ jQuery(document).ready(($) => {
         init(groupId, baseUsersStats, Array.isArray(courses) ? courses : []);
     });
 
-    if (window.bysGroupData?.groupId) {
-        init(
-            window.bysGroupData.groupId,
-            window.bysGroupData.baseUsersStats,
-            window.bysGroupData.courses || []
-        );
+    // Fast first paint: if the store has group_id + courses + users cached
+    // from a prior page in this session, kick off init() immediately. The
+    // bys:groupSelected handler above re-fires when group-select finishes its
+    // forceRefresh fetch (init re-renders cleanly).
+    const cachedGroupId = store.getCurrentGroup();
+    const cachedCourses = store.getCourses();
+    const cachedUserIds = store.getUserIds();
+    if (cachedGroupId !== null && cachedCourses !== null && cachedUserIds !== null) {
+        console.log('[bys-store] group-user-quiz-config: HIT — init from cache', {
+            group_id: cachedGroupId,
+            courses: cachedCourses.length,
+            users: cachedUserIds.length,
+        });
+        init(cachedGroupId, { user_ids: cachedUserIds }, cachedCourses);
+    } else {
+        console.log('[bys-store] group-user-quiz-config: MISS — waiting for bys:groupSelected');
     }
 });

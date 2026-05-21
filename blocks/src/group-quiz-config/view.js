@@ -1,4 +1,5 @@
 import { api, endpoints } from '../_shared/api-client.js';
+import store from '../_shared/store.js';
 import flatpickr from 'flatpickr';
 import 'flatpickr/dist/flatpickr.min.css';
 
@@ -286,13 +287,23 @@ jQuery(document).ready(($) => {
             api.invalidate('quiz-steps');
             api.invalidate('quiz-submission-stats');
             api.invalidate('quiz-attempts');
-            loadQuizData($block, currentGroupId, window.bysGroupData?.courses || []);
+            loadQuizData($block, currentGroupId, store.getCourses() || []);
         }
     });
 
-    if (window.bysGroupData?.courses) {
-        currentGroupId = window.bysGroupData.groupId;
-        memberCount    = window.bysGroupData.baseUsersStats?.total_members || 0;
-        loadQuizData($block, currentGroupId, window.bysGroupData.courses);
+    // Fast first paint: if the store has group_id + courses cached from a prior
+    // page in this session, kick off loadQuizData immediately. The
+    // bys:groupSelected handler above will re-fire when group-select finishes
+    // its forceRefresh fetch (this is benign — loadQuizData re-renders cleanly).
+    const cachedGroupId = store.getCurrentGroup();
+    const cachedCourses = store.getCourses();
+    const cachedUsers   = store.getUsers();
+    if (cachedGroupId !== null && cachedCourses !== null) {
+        console.log('[bys-store] group-quiz-config: HIT — loading quiz data from cached courses', cachedCourses);
+        currentGroupId = cachedGroupId;
+        memberCount    = cachedUsers ? cachedUsers.length : 0;
+        loadQuizData($block, currentGroupId, cachedCourses);
+    } else {
+        console.log('[bys-store] group-quiz-config: MISS — waiting for bys:groupSelected');
     }
 });

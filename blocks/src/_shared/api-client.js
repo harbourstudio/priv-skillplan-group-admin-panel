@@ -31,8 +31,7 @@ export const endpoints = {
   courseQuizProgressBatch: (courseId, userIds) => `/wp-json/bys-groups/v1/courses/${courseId}/quiz-progress-batch?user_ids=${userIds}`,
   groupQuizSubmissionStats: (groupId, quizIds) => `/wp-json/bys-groups/v1/groups/${groupId}/quiz-submission-stats?quiz_ids=${quizIds.join(',')}`,
   groupQuizAttempts: (groupId, quizId) => `/wp-json/bys-groups/v1/groups/${groupId}/quizzes/${quizId}/attempts`,
-  userQuizAttempts: (userId, courseId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-attempts?course_id=${courseId}`,
-  userCourses: (userId) => `/wp-json/bys-groups/v1/users/${userId}/courses`,
+  userCoursesWithProgress: (userId) => `/wp-json/bys-groups/v1/users/${userId}/courses?include=progress`,
   userQuizProgress: (userId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-progress`,
   userQuizAttemptsDetails: (userId, quizId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-attempts/${quizId}`,
   attemptDetail: (activityId) => `/wp-json/bys-groups/v1/attempts/${activityId}`,
@@ -40,7 +39,6 @@ export const endpoints = {
   userActivity: (userId) => `/wp-json/bys-groups/v1/users/${userId}/activity`,
   userCourseActivity: (userId, courseId) => `/wp-json/bys-groups/v1/users/${userId}/activity?course_id=${courseId}`,
   userCourseStepsProgress: (userId, courseId) => `/wp-json/bys-groups/v1/users/${userId}/course-progress-steps/${courseId}`,
-  trackTopicVisit: (userId) => `/wp-json/bys-groups/v1/users/${userId}/track-topic-visit`,
   groupLeaders: (groupId) => `/wp-json/bys-groups/v1/groups/${groupId}/leaders`,
   removeGroupLeader: (groupId, userId) => `/wp-json/bys-groups/v1/groups/${groupId}/leaders/${userId}`,
   allCourses: () => '/wp-json/bys-groups/v1/all-courses',
@@ -68,7 +66,8 @@ export const endpoints = {
     `/wp-json/bys-groups/v1/groups/${groupId}/conditional-recipients`
 };
 
-export const api = {
+// Singleton anchored on `window` so every block bundle shares one cache
+const apiSingleton = window.bysGroupsApi || {
   _cache: new Map(),
   _pending: new Map(),
 
@@ -145,8 +144,6 @@ export const api = {
       headers,
       data: JSON.stringify(body),
       dataType: 'json',
-    }).then((data) => {
-      return data;
     }).catch((jqXHR) => {
       console.error(`POST failed for ${url}:`, jqXHR.status, jqXHR.responseText?.substring(0, 200));
       throw new Error(`POST failed: ${jqXHR.status} ${jqXHR.responseText?.substring(0, 100)}`);
@@ -167,7 +164,7 @@ export const api = {
       type: 'DELETE',
       headers,
       dataType: 'json',
-    }).then((data) => data).catch((jqXHR) => {
+    }).catch((jqXHR) => {
       console.error(`DELETE failed for ${url}:`, jqXHR.status, jqXHR.responseText?.substring(0, 200));
       throw new Error(`DELETE failed: ${jqXHR.status} ${jqXHR.responseText?.substring(0, 100)}`);
     });
@@ -191,3 +188,6 @@ export const api = {
     this._cache.clear();
   }
 };
+
+window.bysGroupsApi = apiSingleton;
+export const api = apiSingleton;

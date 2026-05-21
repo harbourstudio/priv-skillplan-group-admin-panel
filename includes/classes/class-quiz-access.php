@@ -48,9 +48,9 @@ if (!class_exists('BYS_Groups_Quiz_Access')) {
                 return $content;
             }
 
-            // Only apply to sfwd-quiz with show_in_reporting post meta as true (1)
-            $show_in_reporting = get_post_meta($quiz_id, 'show_in_reporting', true);
-            if (empty($show_in_reporting) || '1' !== $show_in_reporting) {
+            // Only apply to sfwd-quiz with show_test_grading_config post meta as true (1)
+            $show_test_grading_config = get_post_meta($quiz_id, 'show_test_grading_config', true);
+            if (empty($show_test_grading_config) || '1' !== $show_test_grading_config) {
                 return $content;
             }
 
@@ -237,9 +237,9 @@ if (!class_exists('BYS_Groups_Quiz_Access')) {
                 return $access_from;
             }
 
-            // Only apply to sfwd-quiz with show_in_reporting post meta as true (1)
-            $show_in_reporting = get_post_meta( $quiz_id, 'show_in_reporting', true );
-            if (empty($show_in_reporting) || '1' !== $show_in_reporting) {
+            // Only apply to sfwd-quiz with show_test_grading_config post meta as true (1)
+            $show_test_grading_config = get_post_meta( $quiz_id, 'show_test_grading_config', true );
+            if (empty($show_test_grading_config) || '1' !== $show_test_grading_config) {
                 return $access_from;
             }
 

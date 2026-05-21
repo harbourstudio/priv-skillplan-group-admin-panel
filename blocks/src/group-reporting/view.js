@@ -1,4 +1,5 @@
 import { api, endpoints } from '../_shared/api-client.js';
+import store from '../_shared/store.js';
 
 jQuery(document).ready(function($) {
   const $block = $('.wp-block-bys-groups-group-reporting').first();
@@ -213,6 +214,32 @@ jQuery(document).ready(function($) {
 
   // ── Group selection ───────────────────────────────────────────────────────────
   let currentGroupId = null;
+
+  // Fast first paint: if the store has the current group + courses + user_ids
+  // cached from a prior page in this session, pre-render the table header and
+  // skeleton rows so the user sees structure before group-select's fetches
+  // complete. The bys:groupSelected handler below will re-render with fresh
+  // data shortly after.
+  (function preRenderFromCache() {
+    const cachedGroupId = store.getCurrentGroup();
+    const cachedCourses = store.getCourses();
+    const cachedUserIds = store.getUserIds();
+
+    if (cachedGroupId !== null && cachedCourses !== null && cachedUserIds !== null) {
+      console.log('[bys-store] group-reporting: HIT — pre-rendering from cache', {
+        group_id: cachedGroupId,
+        courses: cachedCourses.length,
+        users: cachedUserIds.length,
+      });
+      currentGroupId  = cachedGroupId;
+      coursesInView   = cachedCourses;
+      allGroupUserIds = cachedUserIds;
+      rebuildTableHeader(cachedCourses);
+      showSkeletonRows(Math.min(PAGE_SIZE, cachedUserIds.length || PAGE_SIZE), cachedCourses.length);
+    } else {
+      console.log('[bys-store] group-reporting: MISS — waiting for bys:groupSelected');
+    }
+  })();
 
   $(document).on('bys:groupSelected', async function(_, data) {
     const groupId = data.groupId;

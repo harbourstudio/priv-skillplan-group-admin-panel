@@ -113,9 +113,8 @@ $tz_offset_hours = $tz_offset_seconds / 3600;
         </template>
 
         <p class="gqc__empty" style="display:none;"></p>
-
-        <button class="gqc__show-more btn-unstyled" style="display:none;" type="button">
-            <?php esc_html_e( 'Show More', 'bys' ); ?>
-        </button>
     </div>
+    <button class="gqc__show-more btn-unstyled" style="display:none;" type="button">
+        <?php esc_html_e( 'Show More', 'bys' ); ?>
+    </button>
 </div>

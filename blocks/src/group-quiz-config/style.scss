@@ -54,9 +54,10 @@
         &__show-more {
             width: 100%;
             padding: var(--wp--preset--spacing--3) var(--wp--preset--spacing--4);
-            background: var(--wp--preset--color--blue-50);
+            background: var(--wp--preset--color--blue-100);
             border-top: 1px solid var(--wp--preset--color--gray-100);
-            color: var(--wp--preset--color--primary);
+            border-radius: 0 0 0.75rem 0.75rem;
+            color: var(--wp--preset--color--blue-800);
             font-size: var(--wp--preset--font-size--small);
             font-weight: 600;
             text-align: center;

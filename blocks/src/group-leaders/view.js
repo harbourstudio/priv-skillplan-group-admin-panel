@@ -1,4 +1,5 @@
 import { api, endpoints } from '../_shared/api-client.js';
+import store from '../_shared/store.js';
 
 function buildLeaderRow(leader, groupId, canRemove) {
     const name = `${leader.first_name} ${leader.last_name}`.trim() || leader.display_name || leader.email;
@@ -21,6 +22,10 @@ function buildLeaderRow(leader, groupId, canRemove) {
 
             try {
                 await api.delete(endpoints.removeGroupLeader(groupId, leader.id));
+                // Invalidate caches so a page nav doesn't resurrect the removed leader.
+                api.invalidate(endpoints.groupLeaders(groupId));
+                const remaining = (store.getLeaders() || []).filter((l) => l.id !== leader.id);
+                store.setLeaders(remaining);
                 $row.fadeOut(200, () => $row.remove());
             } catch (err) {
                 console.error('[group-leaders] Failed to remove leader', err);
@@ -46,7 +51,17 @@ jQuery(document).ready(async ($) => {
         $empty.hide();
 
         try {
-            const leaders = await api.get(endpoints.groupLeaders(groupId));
+            const cachedLeaders = store.getCurrentGroup() === Number(groupId) ? store.getLeaders() : null;
+            let leaders;
+
+            if (cachedLeaders !== null) {
+                console.log('[bys-store] group-leaders: HIT — rendering from store, skipping fetch', cachedLeaders);
+                leaders = cachedLeaders;
+            } else {
+                console.log('[bys-store] group-leaders: MISS — fetching and writing through to store');
+                leaders = await api.get(endpoints.groupLeaders(groupId));
+                store.setLeaders(leaders);
+            }
 
             $skeleton.hide();
 

@@ -1,5 +1,6 @@
 import { api, endpoints } from '../_shared/api-client.js';
 import { convertToUTC } from '../_shared/helpers.js';
+import store from '../_shared/store.js';
 import flatpickr from 'flatpickr';
 import 'flatpickr/dist/flatpickr.min.css';
 
@@ -206,7 +207,20 @@ jQuery(document).ready(function($) {
     async function loadGroupCourses() {
         if (coursesLoaded || !currentGroupId) return;
         try {
-            const courses = await api.get(endpoints.groupCourses(currentGroupId));
+            // Prefer cached courses from the store — group-select forceRefreshes
+            // them on every page load, so this is fresh and avoids a redundant
+            // round trip when the user opens the modal.
+            const cachedCourses = store.getCurrentGroup() === Number(currentGroupId)
+                ? store.getCourses()
+                : null;
+            let courses;
+            if (cachedCourses !== null) {
+                console.log('[bys-store] send-modal: HIT — courses from store', cachedCourses);
+                courses = cachedCourses;
+            } else {
+                console.log('[bys-store] send-modal: MISS — fetching group courses');
+                courses = await api.get(endpoints.groupCourses(currentGroupId));
+            }
             $conditionCourse.empty();
             appendOption($conditionCourse, '', 'Select a course…');
             (courses || []).forEach(c => {
@@ -335,7 +349,8 @@ jQuery(document).ready(function($) {
         $promptName.text(promptTitle);
         $form.attr('data-prompt-type', promptType);
 
-        const groupId = window.bysGroupData?.groupId;
+        // Prefer the store's current group; fall back to legacy global.
+        const groupId = store.getCurrentGroup() ?? window.bysGroupData?.groupId;
         if (groupId) {
             currentGroupId = groupId;
             showForm();
@@ -440,7 +455,18 @@ jQuery(document).ready(function($) {
         $list.empty();
 
         try {
-            const userIds = window.bysGroupData?.baseUsersStats?.user_ids;
+            // Prefer cached user_ids from the store; fall back to the legacy
+            // window.bysGroupData global if the store hasn't been populated yet
+            // (e.g. modal opened before group-select wrote through).
+            const cachedUserIds = store.getCurrentGroup() === Number(groupId)
+                ? store.getUserIds()
+                : null;
+            const userIds = cachedUserIds ?? window.bysGroupData?.baseUsersStats?.user_ids;
+            if (cachedUserIds !== null) {
+                console.log('[bys-store] send-modal: HIT — user_ids from store', cachedUserIds);
+            } else {
+                console.log('[bys-store] send-modal: MISS — user_ids from window.bysGroupData');
+            }
 
             if (!Array.isArray(userIds) || userIds.length === 0) {
                 console.warn('[group-communication-send-modal] No group members found');
@@ -448,7 +474,19 @@ jQuery(document).ready(function($) {
                 return;
             }
 
-            const users = await api.get(endpoints.groupUsers(groupId, userIds.join(',')));
+            // Hydrated-cache fast path for the recipient list
+            const cachedHydrated = store.getCurrentGroup() === Number(groupId)
+                ? store.getHydratedUsers(userIds)
+                : null;
+            let users;
+            if (cachedHydrated !== null) {
+                console.log('[bys-store] send-modal: HIT hydrated users — populating from store, skipping fetch');
+                users = cachedHydrated;
+            } else {
+                console.log('[bys-store] send-modal: MISS hydrated — fetching groupUsers and writing through');
+                users = await api.get(endpoints.groupUsers(groupId, userIds.join(',')));
+                if (Array.isArray(users)) store.setUsers(users);
+            }
 
             if (!Array.isArray(users)) {
                 console.error('[group-communication-send-modal] Invalid response');

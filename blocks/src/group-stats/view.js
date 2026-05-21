@@ -1,5 +1,6 @@
 import { api, endpoints } from '../_shared/api-client.js';
 import { LOADING } from '../_shared/loading.js';
+import store from '../_shared/store.js';
 
 jQuery(document).ready(($) => {
   const $block = $('.wp-block-bys-groups-group-stats').first(); // will only have 1 instance of this block per page
@@ -12,6 +13,17 @@ jQuery(document).ready(($) => {
 
   // Show loading state immediately — stats are empty until a group loads
   $block.find('.stat__number').addClass('stat__number--loading').html('');
+
+  // Fast first paint: if the store already has users cached (from a prior page
+  // in this session), show total_members right away. The other stats need data
+  // we don't cache yet, so they stay in loading state until the event arrives.
+  const cachedUsers = store.getUsers();
+  if (cachedUsers !== null) {
+    console.log('[bys-store] group-stats: HIT — pre-filling total_members from cache', cachedUsers.length);
+    $totalMembers.removeClass('stat__number--loading').html(cachedUsers.length);
+  } else {
+    console.log('[bys-store] group-stats: MISS — waiting for bys:groupSelected');
+  }
 
   // listen for the custom jquery event triggered by group-select block
   $(document).on('bys:groupSelected', async (_, {groupId, baseUsersStats, courses}) => {
