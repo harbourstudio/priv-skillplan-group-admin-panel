@@ -31,9 +31,15 @@
             align-items: center;
             gap: var(--wp--preset--spacing--4);
             padding: var(--wp--preset--spacing--4) var(--wp--preset--spacing--5);
-    
+
             &:not(:last-of-type) {
                 border-bottom: 1px solid var(--wp--preset--color--gray-100);
+            }
+
+            @media (max-width: 821px) {
+                flex-wrap: wrap;
+                padding: var(--wp--preset--spacing--4);
+                align-items: flex-start;
             }
         }
     
@@ -80,6 +86,11 @@
             align-items: center;
             gap: var(--wp--preset--spacing--2);
             flex-shrink: 0;
+
+            @media (max-width: 821px) {
+                flex-basis: 100%;
+                margin-left: calc(2.75rem + var(--wp--preset--spacing--4));
+            }
         }
     
         &__history {

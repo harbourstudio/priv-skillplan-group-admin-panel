@@ -80,6 +80,12 @@
             margin-left: auto;
             padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--4);
             background: var(--wp--preset--color--primary);
+
+            @media (max-width: 1023px) {
+                grid-column: 1 / -1;
+                justify-self: end;
+                margin-left: 0;
+            }
             color: white;
             border-radius: 9999px;
             font-size: var(--wp--preset--font-size--small);
@@ -105,8 +111,14 @@
             display: flex;
             justify-content: space-between;
             width: 100%;
+
+            @media (max-width: 1023px) {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: var(--wp--preset--spacing--1);
+            }
         }
-    
+
         &__course-name {
             font-size: 0.75rem;
             font-weight: 500;
@@ -114,6 +126,10 @@
             text-transform: uppercase;
             letter-spacing: 0.04em;
             text-align: right;
+
+            @media (max-width: 1023px) {
+                text-align: left;
+            }
         }
 
         // ── Quiz row ──────────────────────────────────────────────────────────────
@@ -189,11 +205,20 @@
 
         // ── Completion badges ─────────────────────────────────────────────────────
 
+         &__actions {
+            width: 100%;
+            display: flex;
+            gap: var(--wp--preset--spacing--2);
+
+            @media screen and (max-width: 1023px){
+                flex-direction: column;
+            }
+         }
+
         &__badges {
             display: flex;
             gap: var(--wp--preset--spacing--2);
-            flex-shrink: 0;
-            justify-content: space-between;
+            justify-content: flex-start;
             width: 100%;
         }
 
@@ -207,6 +232,12 @@
             font-weight: 500;
             cursor: pointer;
             transition: opacity 0.15s;
+
+            @media screen and (max-width: 1023px){
+                flex-grow: 1;
+                text-align: center;
+                justify-content: center;
+            }
 
             &:hover {
                 opacity: 0.8;

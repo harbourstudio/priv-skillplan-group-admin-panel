@@ -10,6 +10,10 @@
         grid-template-columns: repeat(4, 1fr);
         gap: var(--wp--preset--spacing--3);
         margin-top: var(--wp--preset--spacing--4);
+
+        @media (max-width: 821px) {
+            grid-template-columns: repeat(2, 1fr);
+        }
     }
 
     .stat {
@@ -22,6 +26,10 @@
             display: flex;
             gap: var(--wp--preset--spacing--4);
             align-items: center;
+
+            @media screen and (min-width: 1024px){
+                padding: var(--wp--preset--spacing--3) var(--wp--preset--spacing--4);
+            }
         }
 
         &__icon img {
@@ -35,6 +43,7 @@
             font-size: var(--wp--preset--font-size--small);
             color: var(--wp--preset--color--gray-500);
             font-weight: 500;
+            line-height: 1.2;
         }
 
         &__number {

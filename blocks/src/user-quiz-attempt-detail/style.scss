@@ -48,12 +48,36 @@
         flex-wrap: wrap;
         gap: var(--wp--preset--spacing--2);
         margin-bottom: var(--wp--preset--spacing--5);
+
+        @media (max-width: 821px) {
+            flex-direction: column;
+            align-items: flex-start;
+            overflow-x: clip;
+        }
+    }
+
+    .attempt-detail__filters-scroll {
+        display: contents; // transparent on desktop — buttons flow as direct flex children
+
+        @media (max-width: 821px) {
+            display: flex;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            gap: var(--wp--preset--spacing--2);
+            width: calc(100% + (var(--wp--preset--spacing--4) * 2));
+            margin-left: calc(-1 * var(--wp--preset--spacing--4));
+            margin-right: calc(-1 * var(--wp--preset--spacing--4));
+            padding-left: var(--wp--preset--spacing--4);
+            padding-right: var(--wp--preset--spacing--4);
+        }
     }
 
     .filter-btn {
         display: inline-flex;
         align-items: center;
         gap: 0.4rem;
+        flex-shrink: 0;
         padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--3) 0.375rem var(--wp--preset--spacing--3);
         border-radius: 999px;
         border: 1px solid var(--wp--preset--color--gray-200);
@@ -178,8 +202,12 @@
         border: 1px solid var(--wp--preset--color--gray-100);
         border-left: 12px solid var(--wp--preset--color--gray-200);
         border-radius: 0.75rem;
-        padding: var(--wp--preset--spacing--5) var(--wp--preset--spacing--6);
+        padding: var(--wp--preset--spacing--4) var(--wp--preset--spacing--5);
         background: white;
+
+        @media screen and (min-width: 1024px){
+            padding: var(--wp--preset--spacing--5) var(--wp--preset--spacing--6);
+        }
 
         // Result-based left-border colour
         &--correct   { border-left-color: var(--wp--preset--color--green-500); }
@@ -351,6 +379,10 @@
         cursor: pointer;
         margin-left: auto;
         transition: background 0.15s, border-color 0.15s;
+
+        @media (max-width: 821px) {
+            margin-left: 0;
+        }
 
         &:hover { background: var(--wp--preset--color--gray-50); border-color: var(--wp--preset--color--gray-400); }
         &.hidden { display: none; }

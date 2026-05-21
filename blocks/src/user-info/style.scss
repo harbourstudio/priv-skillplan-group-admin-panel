@@ -33,6 +33,12 @@
         padding-left: 0 !important;
         margin: 0;
 
+        @media (max-width: 599px) {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: var(--wp--preset--spacing--1);
+        }
+
         &-item {
             font-size: var(--wp--preset--font-size--x-small);
             color: var(--wp--preset--color--gray-600);

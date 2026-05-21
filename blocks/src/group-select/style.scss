@@ -1,4 +1,9 @@
 .wp-block-bys-groups-group-select {
+
+    @media (max-width: 821px) {
+        width: 100%;
+    }
+    
 	.group-selector{
         display: flex;
         gap: var(--wp--preset--spacing--4);
@@ -7,6 +12,10 @@
         &__wrapper {
             position: relative;
             display: inline-block;
+
+            @media (max-width: 821px) {
+                width: 100%;
+            }
         }
 
         &__select{
@@ -19,6 +28,12 @@
             min-width: 23.5rem;
             padding: var(--wp--preset--spacing--3);
             min-height: 3.25rem;
+
+            @media (max-width: 821px) {
+                min-width: 0;
+                width: 100%;
+                box-sizing: border-box;
+            }
         }
 
         &__spinner-wrapper {
