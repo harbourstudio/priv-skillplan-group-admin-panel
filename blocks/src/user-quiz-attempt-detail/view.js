@@ -326,7 +326,7 @@ jQuery(document).ready(($) => {
         }
       });
 
-      // ── Edit Grades button (admin / marker only) ─────────────────────────────
+      // ── Edit Grades button (admin / grader only) ─────────────────────────────
 
       if (canGrade) {
         const $editBtn = $('<button type="button" class="attempt-detail__edit-btn">')

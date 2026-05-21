@@ -14,7 +14,7 @@ foreach ($attrs as $a) {
     }
 }
 
-$can_grade = current_user_can('manage_options') || in_array('marker', (array) wp_get_current_user()->roles, true);
+$can_grade = current_user_can('manage_options') || in_array('grader', (array) wp_get_current_user()->roles, true);
 $wrapper_attributes = get_block_wrapper_attributes(array('data-can-grade' => $can_grade ? '1' : '0'));
 ?>
 

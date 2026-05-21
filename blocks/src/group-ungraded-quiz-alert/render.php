@@ -1,4 +1,14 @@
 <?php
+// Visibility gate: site admins, organization admins, and users with the
+// 'grader' role only
+if (
+    ! BYS_Groups_Permissions::is_site_admin()
+    && ! BYS_Groups_Permissions::is_any_org_admin()
+    && ! BYS_Groups_Permissions::is_grader()
+) {
+    return;
+}
+
 $attrs = ['blockId'];
 foreach ($attrs as $a) {
     if (isset($attributes[$a])) {

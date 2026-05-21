@@ -24,22 +24,9 @@ if (!class_exists('BYS_Groups_Permissions')) {
         }
 
         /**
-         * Permission for grading-attempt endpoints
-         */
-        public static function has_marker_role($user_id = null) {
-            $user_id = $user_id ?: get_current_user_id();
-            if (!$user_id) return false;
-
-            if (user_can($user_id, 'manage_options')) return true;
-
-            $user = get_userdata($user_id);
-            return $user && in_array('marker', (array) $user->roles, true);
-        }
-
-        /**
          * Checks if the user holds the 'grader' role
          */
-        public static function has_grader_role($user_id = null) {
+        public static function is_grader($user_id = null) {
             $user_id = $user_id ?: get_current_user_id();
             if (!$user_id) return false;
 
@@ -69,6 +56,38 @@ if (!class_exists('BYS_Groups_Permissions')) {
             foreach ((array) $raw_admins as $admin) {
                 $admin_id = $admin instanceof \WP_User ? $admin->ID : intval($admin);
                 if ($admin_id === $user_id) return true;
+            }
+
+            return false;
+        }
+
+        /**
+         * Checks if the user is an administrator of any organization.
+         * Used for render-time visibility gates where no specific org/group
+         * is known yet (the block decides what to render before the user
+         * selects a group).
+         */
+        public static function is_any_org_admin($user_id = null) {
+            $user_id = $user_id ?: get_current_user_id();
+            if (!$user_id) return false;
+
+            if (self::is_site_admin($user_id)) return true;
+
+            if (!function_exists('get_field')) return false;
+
+            $orgs = get_posts(array(
+                'post_type'      => 'organization',
+                'post_status'    => 'publish',
+                'posts_per_page' => -1,
+                'fields'         => 'ids',
+            ));
+
+            foreach ($orgs as $org_id) {
+                $raw_admins = get_field('administrators', $org_id);
+                foreach ((array) $raw_admins as $admin) {
+                    $admin_id = $admin instanceof \WP_User ? $admin->ID : intval($admin);
+                    if ($admin_id === $user_id) return true;
+                }
             }
 
             return false;
@@ -117,11 +136,14 @@ if (!class_exists('BYS_Groups_Permissions')) {
             $user_id = $user_id ?: get_current_user_id();
             if (!$user_id) return false;
 
-            if (self::is_site_admin($user_id)) return true; // if site_admin, this is enough permission
+            $user = get_userdata($user_id);
+            if($user && in_array('grader', (array) $user->roles, true)) return true; // 'grader' role passes
 
-            if (get_user_meta($user_id, "learndash_group_leaders_{$group_id}", true)) return true; // if user is a leader fo this group, then allow
+            if (self::is_site_admin($user_id)) return true; // site_admin passes
 
-            return self::is_org_admin_for_group($user_id, $group_id); // if the user administers an org that contains this group, then allow
+            if (get_user_meta($user_id, "learndash_group_leaders_{$group_id}", true)) return true; //  group leaders passes
+
+            return self::is_org_admin_for_group($user_id, $group_id); // if the user administers an org that contains this group, pass if so
         }
 
         /**
