@@ -1,4 +1,5 @@
 import { api, endpoints } from '../_shared/api-client.js';
+import store from '../_shared/store.js';
 
 // Module constants
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -201,6 +202,23 @@ jQuery(document).ready(($) => {
         $reviewBtn.prop('disabled', true).text('Loading...');
 
         try {
+            // Use cached user_ids from the store if available; otherwise fetch.
+            // user_ids are only used client-side to split "already a member" from
+            // "newly enrolled" in the review screen — a minor display distinction
+            // — so reading from cache is safe.
+            const cachedUserIds = store.getCurrentGroup() === Number(currentGroupId)
+                ? store.getUserIds()
+                : null;
+
+            let groupStatsPromise;
+            if (cachedUserIds !== null) {
+                console.log('[bys-store] add-member-modal: HIT — using cached user_ids', cachedUserIds);
+                groupStatsPromise = Promise.resolve({ user_ids: cachedUserIds });
+            } else {
+                console.log('[bys-store] add-member-modal: MISS — fetching base-user-stats');
+                groupStatsPromise = api.get(endpoints.groupBaseUsersStats(currentGroupId));
+            }
+
             // Fetch dry_run preview and current group member IDs in parallel
             const [response, groupStatsResp] = await Promise.all([
                 api.post(endpoints.groupInviteBulk(currentGroupId), {
@@ -208,7 +226,7 @@ jQuery(document).ready(($) => {
                     role: 'learner',
                     dry_run: true,
                 }),
-                api.get(endpoints.groupBaseUsersStats(currentGroupId))
+                groupStatsPromise
             ]);
 
             // Store both response and group member IDs for later use in results

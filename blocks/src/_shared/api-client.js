@@ -66,7 +66,8 @@ export const endpoints = {
     `/wp-json/bys-groups/v1/groups/${groupId}/conditional-recipients`
 };
 
-export const api = {
+// Singleton anchored on `window` so every block bundle shares one cache
+const apiSingleton = window.bysGroupsApi || {
   _cache: new Map(),
   _pending: new Map(),
 
@@ -187,3 +188,6 @@ export const api = {
     this._cache.clear();
   }
 };
+
+window.bysGroupsApi = apiSingleton;
+export const api = apiSingleton;

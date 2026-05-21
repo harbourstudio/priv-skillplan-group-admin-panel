@@ -1,5 +1,6 @@
 import { api, endpoints } from '../_shared/api-client.js';
 import { bysConfirm } from '../_shared/confirm.js';
+import store from '../_shared/store.js';
 
 let currentGroupId = null;
 let groupCourses   = [];
@@ -204,9 +205,17 @@ jQuery(document).ready(async ($) => {
         }
     });
 
-    if (window.bysGroupData?.courses) {
-        currentGroupId = window.bysGroupData.groupId;
-        groupCourses   = window.bysGroupData.courses;
+    // Fast first paint: if the store has courses cached from a prior page in
+    // this session, render the list immediately. The bys:groupSelected handler
+    // above will re-render with fresh data shortly after.
+    const cachedGroupId = store.getCurrentGroup();
+    const cachedCourses = store.getCourses();
+    if (cachedGroupId !== null && cachedCourses !== null) {
+        console.log('[bys-store] group-course-config: HIT — rendering courses from cache', cachedCourses);
+        currentGroupId = cachedGroupId;
+        groupCourses   = cachedCourses;
         renderList();
+    } else {
+        console.log('[bys-store] group-course-config: MISS — waiting for bys:groupSelected');
     }
 });

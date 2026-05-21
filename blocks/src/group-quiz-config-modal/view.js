@@ -1,4 +1,5 @@
 import { api, endpoints } from '../_shared/api-client.js';
+import store from '../_shared/store.js';
 
 jQuery(document).ready(($) => {
     const $block    = $('.wp-block-bys-groups-group-quiz-config-modal').first();
@@ -105,7 +106,21 @@ jQuery(document).ready(($) => {
             let notAttempted = [];
             if (notAttemptIds.length) {
                 try {
-                    const users = await api.get(endpoints.groupUsers(groupId, notAttemptIds.join(',')));
+                    // Hydrated-cache fast path. This block fetches only a SUBSET
+                    // of users (those who haven't attempted) — getHydratedUsers
+                    // returns null unless every requested id is hydrated.
+                    const cachedHydrated = store.getCurrentGroup() === Number(groupId)
+                        ? store.getHydratedUsers(notAttemptIds)
+                        : null;
+                    let users;
+                    if (cachedHydrated !== null) {
+                        console.log('[bys-store] quiz-config-modal: HIT hydrated subset — skipping fetch');
+                        users = cachedHydrated;
+                    } else {
+                        console.log('[bys-store] quiz-config-modal: MISS hydrated subset — fetching and writing through');
+                        users = await api.get(endpoints.groupUsers(groupId, notAttemptIds.join(',')));
+                        if (Array.isArray(users)) store.setUsers(users);
+                    }
                     notAttempted = (Array.isArray(users) ? users : []).map((u) => ({
                         display_name: u.display_name || `${u.first_name} ${u.last_name}`.trim(),
                         email:        u.email || '',

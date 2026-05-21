@@ -1,14 +1,12 @@
 import { __ } from '@wordpress/i18n';
 import { useEffect } from 'react';
 import { useBlockProps } from '@wordpress/block-editor';
-import './editor.scss';
+// import './editor.scss';
 
 const MOCK_MEMBERS = [
-    { id: 1, name: 'Wade Ouellet', email: 'wade@thewestharbour.com' },
-    { id: 2, name: 'Wade Ouellet', email: 'wade@thewestharbour.com' },
-    { id: 3, name: 'Wade Ouellet', email: 'wade@thewestharbour.com' },
-    { id: 4, name: 'Wade Ouellet', email: 'wade@thewestharbour.com' },
-    { id: 5, name: 'Wade Ouellet', email: 'wade@thewestharbour.com' },
+    {name: 'Wade Ouellet', email: 'wade@thewestharbour.com' },
+    {name: 'Wade Ouellet', email: 'wade@thewestharbour.com' },
+    {name: 'Wade Ouellet', email: 'wade@thewestharbour.com' },
 ];
 
 export default function Edit({ clientId, attributes, setAttributes }) {
@@ -20,26 +18,26 @@ export default function Edit({ clientId, attributes, setAttributes }) {
 
     return (
         <div {...useBlockProps()}>
-            <div className="group-members__header">
-                <h5 className="group-members__title">{__('Group Members', 'bys')}</h5>
-                <p className="group-members__count">18 members</p>
+            <div className="gm__header">
+                <h5 className="gm__title">{__('Group Members', 'bys')}</h5>
+                <p className="gm__count"># members</p>
             </div>
-            <div className="group-members__card">
-                <div className="group-members__list">
-                    {MOCK_MEMBERS.map((m) => (
-                        <div key={m.id} className="group-members__item">
-                            <div className="group-members__avatar">
-                                <span className="group-members__avatar-initial">{m.name.charAt(0)}</span>
+            <div className="gm__card">
+                <div className="gm__list">
+                    {MOCK_MEMBERS.map((idx) => (
+                        <div key={idx} className="gm__item">
+                            <div className="gm__avatar">
+                                <span className="gm__avatar-initial">{idx.name.charAt(0)}</span>
                             </div>
-                            <div className="group-members__info">
-                                <span className="group-members__name">{m.name}</span>
-                                <span className="group-members__email">{m.email}</span>
+                            <div className="gm__info">
+                                <span className="gm__name">{idx.name}</span>
+                                <span className="gm__email">{idx.email}</span>
                             </div>
-                            <button className="group-members__remove" type="button" disabled>&#x2715;</button>
+                            <button className="gm__remove" type="button" disabled>&#x2715;</button>
                         </div>
                     ))}
                 </div>
-                <div className="group-members__show-more">{__('Show 13 more', 'bys')}</div>
+                <div className="gm__show-more">{__('Show # more', 'bys')}</div>
             </div>
         </div>
     );

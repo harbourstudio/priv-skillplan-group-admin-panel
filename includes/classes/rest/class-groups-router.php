@@ -251,7 +251,6 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 $login_meta = [
                     intval(get_user_meta($user_id, '_ld_notifications_last_login', true) ?: 0),
                     intval(get_user_meta($user_id, 'learndash-last-login',          true) ?: 0),
-                    intval(get_user_meta($user_id, 'last_login',                    true) ?: 0),
                 ];
                 if (max($login_meta) === 0) $inactive_members++;
             }
@@ -296,7 +295,6 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 $meta_values = [
                     intval(get_user_meta($user_id, '_ld_notifications_last_login', true) ?: 0),
                     intval(get_user_meta($user_id, 'learndash-last-login',          true) ?: 0),
-                    intval(get_user_meta($user_id, 'last_login',                    true) ?: 0),
                 ];
                 $last_login_timestamp = max($meta_values);
                 $last_login_timestamp = $last_login_timestamp > 0 ? $last_login_timestamp : null;
@@ -340,7 +338,6 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             $meta_values = [
                 intval(get_user_meta($user_id, '_ld_notifications_last_login', true) ?: 0),
                 intval(get_user_meta($user_id, 'learndash-last-login',          true) ?: 0),
-                intval(get_user_meta($user_id, 'last_login',                    true) ?: 0),
             ];
             $last_login_timestamp = max($meta_values);
             $last_login_timestamp = $last_login_timestamp > 0 ? $last_login_timestamp : null;
@@ -422,7 +419,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 }
             }
 
-            return $formatted_courses;
+            return new WP_REST_Response($formatted_courses, 200);
         }
 
         /**
@@ -1797,7 +1794,6 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             $meta_values = [
                 intval(get_user_meta($user_id, '_ld_notifications_last_login', true) ?: 0),
                 intval(get_user_meta($user_id, 'learndash-last-login',          true) ?: 0),
-                intval(get_user_meta($user_id, 'last_login',                    true) ?: 0),
             ];
             return max($meta_values) > 0 ? 'offline' : 'never';
         }
