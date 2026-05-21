@@ -6,12 +6,20 @@
         padding: var(--wp--preset--spacing--5) var(--wp--preset--spacing--6);
         border-radius: 1rem;
 
+        @media (max-width: 821px) {
+            padding: var(--wp--preset--spacing--4) var(--wp--preset--spacing--4);
+        }
+
         .filters__fields{
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             column-gap: var(--wp--preset--spacing--5);
             row-gap: var(--wp--preset--spacing--3);
             margin-bottom: var(--wp--preset--spacing--6);
+
+            @media (max-width: 821px) {
+                grid-template-columns: 1fr;
+            }
 
             .filters__field{
                 display: flex;
@@ -91,11 +99,15 @@
             justify-content: space-between;
             gap: var(--wp--preset--spacing--5);
 
+            @media (max-width: 821px) {
+                flex-wrap: wrap;
+                gap: var(--wp--preset--spacing--3);
+            }
+
             &__buttons{
                 display: flex;
                 align-items: center;
                 gap: var(--wp--preset--spacing--3);
-
 
                 .filters__reset{
                     background: white;
@@ -107,6 +119,10 @@
                 display: flex;
                 align-items: center;
                 gap: var(--wp--preset--spacing--3);
+
+                @media (max-width: 821px) {
+                    flex-basis: 100%;
+                }
             }
         }
     }
@@ -180,12 +196,15 @@
 
     .table__actions{
         display: flex;
-        justify-content: flex-end;
         align-items: center;
         gap: var(--wp--preset--spacing--4);
         margin-top: var(--wp--preset--spacing--7);
         margin-bottom: var(--wp--preset--spacing--4);
         font-size: var(--wp--preset--font-size--small);
+
+        @media (min-width: 822px) {
+            justify-content: flex-end;
+        }
 
         label {
             display: flex;
@@ -197,13 +216,29 @@
     }
 
     table{
-        width: 100%;
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        max-width: 100%;
         font-size: var(--wp--preset--font-size--small);
         background: white;
         border-radius: 1rem;
         text-align: left;
         border-collapse: collapse;
-        overflow: hidden;
+
+        td, th{
+            border: 0;
+        }
+
+        // Column min-widths
+        .col_quiz_title      { min-width: 180px; }
+        .col_last_activity   { min-width: 130px; white-space: nowrap; }
+        .col_parent_course   { min-width: 150px; }
+        .col_total_attempts  { min-width: 80px; }
+        .col_score_highest,
+        .col_score_latest    { min-width: 100px; }
+        .col_result_highest,
+        .col_result_latest   { min-width: 80px; }
 
         // Hide 'latest' columns by default (shown when 'latest' sort is selected)
         .col_score_latest,

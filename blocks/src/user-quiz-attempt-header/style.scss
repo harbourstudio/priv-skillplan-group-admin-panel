@@ -62,11 +62,14 @@
         display: flex;
         align-items: center;
         flex-wrap: wrap;
-        gap: var(--wp--preset--spacing--5);
         margin-bottom: var(--wp--preset--spacing--4);
+        column-gap: var(--wp--preset--spacing--5);
 
-        .attempt-header__quiz-title {
-            margin: 0;
+        @media screen and (min-width: 1024px){
+
+            .attempt-header__quiz-title {
+                margin: 0;
+            }
         }
 
         .attempt-header__badges{
@@ -142,7 +145,11 @@
     .attempt-header__row--meta {
         display: flex;
         flex-wrap: wrap;
-        gap: var(--wp--preset--spacing--5);
+        gap: 0 var(--wp--preset--spacing--5);
+
+        @media screen and (min-width: 1024px){
+            gap: var(--wp--preset--spacing--5);
+        }
     }
 
     .attempt-header__meta-item {

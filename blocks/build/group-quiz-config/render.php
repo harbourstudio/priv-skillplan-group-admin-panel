@@ -88,23 +88,25 @@ $tz_offset_hours = $tz_offset_seconds / 3600;
                     </div>
                 </div>
 
-                <div class="gqc__badges">
-                    <button
-                        class="gqc__badge gqc__badge--completed btn-unstyled"
-                        type="button"
-                        data-opens-modal="#quiz-attempts-modal"
-                        data-quiz-id=""
-                        data-quiz-name="">
-                        <span class="gqc__badge-count"></span> <?php esc_html_e('Completed', 'bys'); ?>
-                    </button>
-                    <button
-                        class="gqc__badge gqc__badge--pending btn-unstyled"
-                        type="button"
-                        data-opens-modal="#quiz-attempts-modal"
-                        data-quiz-id=""
-                        data-quiz-name="">
-                        <span class="gqc__badge-count"></span> <?php esc_html_e('Outstanding', 'bys'); ?>
-                    </button>
+                <div class="gqc__actions">
+                    <div class="gqc__badges">
+                        <button
+                            class="gqc__badge gqc__badge--completed btn-unstyled"
+                            type="button"
+                            data-opens-modal="#quiz-attempts-modal"
+                            data-quiz-id=""
+                            data-quiz-name="">
+                            <span class="gqc__badge-count"></span> <?php esc_html_e('Completed', 'bys'); ?>
+                        </button>
+                        <button
+                            class="gqc__badge gqc__badge--pending btn-unstyled"
+                            type="button"
+                            data-opens-modal="#quiz-attempts-modal"
+                            data-quiz-id=""
+                            data-quiz-name="">
+                            <span class="gqc__badge-count"></span> <?php esc_html_e('Outstanding', 'bys'); ?>
+                        </button>
+                    </div>
                     <button class="gqc__save-row btn-unstyled" type="button" disabled>
                         <?php esc_html_e( 'Save', 'bys' ); ?>
                     </button>
@@ -113,9 +115,8 @@ $tz_offset_hours = $tz_offset_seconds / 3600;
         </template>
 
         <p class="gqc__empty" style="display:none;"></p>
-
-        <button class="gqc__show-more btn-unstyled" style="display:none;" type="button">
-            <?php esc_html_e( 'Show More', 'bys' ); ?>
-        </button>
     </div>
+    <button class="gqc__show-more btn-unstyled" style="display:none;" type="button">
+        <?php esc_html_e( 'Show More', 'bys' ); ?>
+    </button>
 </div>

@@ -47,7 +47,7 @@ $auth_header = BYS_Groups_Auth::get_auth_header();
                         <span class="accordion-toggle__name--skeleton"></span>
                     </div>
                     <div class="accordion-toggle__right-wrapper">
-                        <span class="accordion-toggle__date--skeleton"></span>
+                        <!-- <span class="accordion-toggle__date--skeleton"></span> -->
                         <span class="accordion-toggle__badge--skeleton"></span>
                         <span class="accordion-toggle__progress--skeleton"></span>
                     </div>
@@ -67,7 +67,7 @@ $auth_header = BYS_Groups_Auth::get_auth_header();
                         <span class="accordion-toggle__course-name"></span>
                     </div>
                     <div class="accordion-toggle__right-wrapper">
-                        <span class="accordion-toggle__date"></span>
+                        <!-- <span class="accordion-toggle__date"></span> -->
                         <span class="accordion-toggle__completion">
                             <span class="completion-badge"></span>
                         </span>

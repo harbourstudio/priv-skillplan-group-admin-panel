@@ -7,6 +7,10 @@
         padding: var(--wp--preset--spacing--5) var(--wp--preset--spacing--6);
         border-radius: 1rem;
 
+        @media (max-width: 821px) {
+            padding: var(--wp--preset--spacing--4) var(--wp--preset--spacing--4);
+        }
+
         // Filters fields
         .filters__fields{
             display: grid;
@@ -14,6 +18,10 @@
             column-gap: var(--wp--preset--spacing--5);
             row-gap: var(--wp--preset--spacing--3);
             margin-bottom: var(--wp--preset--spacing--6);
+
+            @media (max-width: 821px) {
+                grid-template-columns: 1fr;
+            }
 
             .filters__field {
                 display: flex;
@@ -242,6 +250,10 @@
             align-items: center;
             gap: var(--wp--preset--spacing--3);
 
+            @media (max-width: 821px) {
+                flex-wrap: wrap;
+            }
+
             .filters__reset{
                 background: white;
                 color: var(--wp--preset--color--primary);
@@ -253,14 +265,20 @@
     .table-wrapper{
         margin-top: var(--wp--preset--spacing--7);
         border-radius: 1.5rem;
-        overflow: hidden;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
 
         table{
             width: 100%;
+            min-width: 560px;
             font-size: var(--wp--preset--font-size--small);
             background: white;
             text-align: left;
             border-collapse: collapse;
+
+            td, th{
+                border: 0;
+            }
 
             thead{
 
@@ -313,20 +331,31 @@
                 }
             }
 
-            // Table cell specifics 
+            // Table cell specifics
+            .cell-activity {
+                min-width: 140px;
+            }
+
             .cell-activity__icon {
                 margin-right: var(--wp--preset--spacing--2);
             }
-        
+
             .cell-created-at {
+                min-width: 120px;
+                white-space: nowrap;
+
                 &__time, &__date {
                     display: block;
                 }
-        
+
                 &__time {
                     font-size: var(--wp--preset--font-size--x-small);
                 }
             }
+
+            .cell-object-title   { min-width: 150px; }
+            .cell-object-type    { min-width: 120px; }
+            .cell-initiated-by   { min-width: 120px; }
         
             .cell-object-type__dot {
                 display: inline-block;

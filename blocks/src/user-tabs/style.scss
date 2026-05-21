@@ -1,8 +1,26 @@
 .wp-block-bys-groups-user-tabs {
 
+    @media (max-width: 599px) {
+        margin-inline: calc(-1 * var(--wp--custom--container-padding));
+    }
+
     .tab-nav {
         display: flex;
         gap: var(--wp--preset--spacing--4);
+
+        @media (max-width: 599px) {
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            gap: var(--wp--preset--spacing--2);
+            padding-inline-start: var(--wp--custom--container-padding);
+
+            &::after {
+                content: '';
+                flex-shrink: 0;
+                width: var(--wp--custom--container-padding);
+            }
+        }
     }
 
     .tab-nav__item {
@@ -17,6 +35,12 @@
         cursor: pointer;
         transition: color 0.2s ease, border-color 0.2s ease;
         flex-grow: 1;
+        flex-shrink: 0;
+
+        @media (max-width: 599px) {
+            flex-grow: 0;
+            padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--4);
+        }
 
         &:hover {
             border-color: var(--wp--preset--color--primary);
@@ -31,6 +55,10 @@
 
     .tab-panels {
         padding-top: var(--wp--preset--spacing--6);
+
+        @media (max-width: 599px) {
+            padding-inline: var(--wp--custom--container-padding);
+        }
     }
 
     .tab-panel {

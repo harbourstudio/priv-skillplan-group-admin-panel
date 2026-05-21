@@ -25,6 +25,7 @@ window.bysGradingNonce = window.bysGradingNonce || '<?php echo esc_js( wp_create
 <div <?= $wrapper_attributes; ?>>
 
     <div class="attempt-detail__filters hidden">
+        <div class="attempt-detail__filters-scroll">
         <?php
         $filters = [
             'all'       => __( 'All',       'bys' ),
@@ -44,6 +45,8 @@ window.bysGradingNonce = window.bysGradingNonce || '<?php echo esc_js( wp_create
             <span class="filter-btn__count"></span>
         </button>
         <?php endforeach; ?>
+        </div>
+        <!-- .attempt-detail__edit-btn appended here by JS -->
     </div>
 
     <div class="attempt-detail__loading" aria-hidden="true">

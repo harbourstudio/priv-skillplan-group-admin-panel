@@ -262,7 +262,7 @@
         animation: bys-shimmer 1.4s infinite linear;
     }
 
-    @media (max-width: 768px) {
+    @media (max-width: 821px) {
         .accordion-toggle__date,
         .accordion-toggle__quiz-count {
             display: none;
@@ -270,10 +270,27 @@
 
         .accordion-toggle__course-name {
             min-width: auto;
+            white-space: normal;
         }
 
-        .quiz-row__meta {
-            display: none;
+        .quiz-row {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0;
+
+            &__left {
+                width: 100%;
+                min-width: 0;
+            }
+
+            &__meta {
+                flex-wrap: wrap;
+                margin-left: calc(1.25rem + var(--wp--preset--spacing--2));
+            }
+
+            &__last-submission {
+                margin-left: calc(1.25rem + var(--wp--preset--spacing--2));
+            }
         }
     }
 }

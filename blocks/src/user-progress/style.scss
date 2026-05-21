@@ -57,6 +57,10 @@
         &:hover {
             background-color: var(--wp--preset--color--gray-100);
         }
+
+        @media (max-width: 821px) {
+            flex-wrap: wrap;
+        }
     }
 
     .accordion-toggle {
@@ -69,7 +73,11 @@
         &__right-wrapper {
             display: flex;
             align-items: center;
-            gap: var(--wp--preset--spacing--4);
+            gap: var(--wp--preset--spacing--2);
+
+            @media (max-width: 821px) {
+                margin-left: calc(2rem + var(--wp--preset--spacing--2));
+            }
         }
 
         &__icon {
@@ -103,6 +111,7 @@
                 padding: var(--wp--preset--spacing--1) var(--wp--preset--spacing--3);
                 font-weight: 500;
                 white-space: nowrap;
+                font-size: var(--wp--preset--font-size--x-small);
 
                 &::before {
                     display: inline-flex;
@@ -167,14 +176,17 @@
             width: 100%;
             border-collapse: collapse;
             font-size: var(--wp--preset--font-size--x-small);
-    
+
+            th, td{
+                border: 0;
+            }
+
             thead {
                 th {
                     text-align: left;
                     font-weight: 500;
                     color: var(--wp--preset--color--gray-500);
                     padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--3);
-                    border-bottom: 1px solid var(--wp--preset--color--gray-200);
                     white-space: nowrap;
                     background: transparent;
                     font-size: 0.7rem;
@@ -186,18 +198,21 @@
                     width: 40%;
                 }
             }
-    
+
             tbody {
                 td {
                     padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--3);
                     color: var(--wp--preset--color--gray-700);
-                    border-bottom: 1px solid var(--wp--preset--color--gray-100);
                     vertical-align: middle;
                 }
-    
-                tr:last-child td {
-                    border-bottom: none;
-                }
+            }
+        }
+
+        @media (max-width: 821px) {
+            table {
+                display: block;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
             }
         }
     }
