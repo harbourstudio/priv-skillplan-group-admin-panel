@@ -23,7 +23,7 @@ if (!class_exists('BYS_Groups_Core')) {
         private function includes() {
             // Utilities (load first — referenced by routers and feature classes)
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/utils/class-permissions.php';
-            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/utils/class-response.php';
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/utils/class-postmark.php';
 
             // REST routers
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/rest/class-webhooks-router.php';
@@ -31,11 +31,12 @@ if (!class_exists('BYS_Groups_Core')) {
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/rest/class-users-router.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/rest/class-organizations-router.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/rest/class-communications-router.php';
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/rest/class-courses-router.php';
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/rest/class-groups-router.php';
 
             // Core classes
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-activator.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-auth.php';
-            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-rest-api.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-blocks.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-admin-settings.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-activity-logger.php';
@@ -58,7 +59,6 @@ if (!class_exists('BYS_Groups_Core')) {
 
             // Initialize classes
             new BYS_Groups_Admin_Settings();
-            new BYS_Groups_Rest_API();
             new BYS_Groups_Blocks();
             new BYS_Groups_Activity_Logger();
             new BYS_Required_Courses();
@@ -66,12 +66,14 @@ if (!class_exists('BYS_Groups_Core')) {
             new BYS_Groups_Quiz_Access();
             new BYS_Groups_Scheduled_Emails();
 
-            // REST routers (incremental migration from BYS_Groups_Rest_API)
+            // REST routers
             new BYS_Groups_Webhooks_Router();
             new BYS_Groups_Me_Router();
             new BYS_Groups_Users_Router();
             new BYS_Groups_Organizations_Router();
             new BYS_Groups_Communications_Router();
+            new BYS_Groups_Courses_Router();
+            new BYS_Groups_Groups_Router();
 
             // Enqueue certificate tracking script on certificate pages
             add_action('wp_enqueue_scripts', array($this, 'enqueue_certificate_tracker'));

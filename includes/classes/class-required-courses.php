@@ -24,7 +24,7 @@ if (!class_exists('BYS_Required_Courses')) {
         /** Post meta key that stores the array of required course IDs. */
         const META_KEY = '_bys_required_course_ids';
 
-        /** REST namespace — shared with BYS_Groups_Rest_API. */
+        /** REST namespace — shared with BYS_Groups_Core::REST_NAMESPACE. */
         const REST_NS  = 'bys-groups/v1';
 
         public function __construct() {
@@ -102,21 +102,22 @@ if (!class_exists('BYS_Required_Courses')) {
                 return $response;
             }
 
-            $data = $response->get_data();
-            if (!is_array($data)) return $response;
+            $courses = $response->get_data();
+            if (!is_array($courses)) return $response;
 
             $required_ids = $this->load_ids((int) $matches[1]);
 
-            foreach ($data as &$course) {
+            foreach ($courses as &$course) {
+                if (!is_array($course)) continue;
                 $course['required'] = in_array((int) ($course['id'] ?? 0), $required_ids, true);
             }
             unset($course);
 
-            usort($data, function ($a, $b) {
+            usort($courses, function ($a, $b) {
                 return ($b['required'] ? 1 : 0) - ($a['required'] ? 1 : 0);
             });
 
-            $response->set_data($data);
+            $response->set_data($courses);
             return $response;
         }
 
