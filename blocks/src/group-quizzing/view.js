@@ -1,5 +1,6 @@
 import { api, endpoints } from '../_shared/api-client.js';
 import { formatDate } from '../_shared/helpers.js';
+import store from '../_shared/store.js';
 
 jQuery(document).ready(($) => {
   const $block = $('.wp-block-bys-groups-group-quizzing').first();
@@ -156,10 +157,13 @@ jQuery(document).ready(($) => {
   }
 
   $(document).on('bys:groupSelected', function(_, data) {
-    renderCourses(data.groupId, data.courses);
+    renderCourses(data.groupId, store.getCourses() || []);
   });
 
-  if (window.bysGroupData?.courses) {
-    renderCourses(window.bysGroupData.groupId, window.bysGroupData.courses);
+  // Fast first paint from store cache.
+  const cachedGroupId = store.getCurrentGroup();
+  const cachedCourses = store.getCourses();
+  if (cachedGroupId !== null && cachedCourses !== null) {
+    renderCourses(cachedGroupId, cachedCourses);
   }
 });

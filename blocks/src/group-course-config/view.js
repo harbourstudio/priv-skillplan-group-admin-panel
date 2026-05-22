@@ -179,7 +179,10 @@ jQuery(document).ready(async ($) => {
 
     // ── Group selected ────────────────────────────────────────────────────────
 
-    $(document).on('bys:groupSelected', (_, { groupId, courses, isSiteEditor }) => {
+    $(document).on('bys:groupSelected', (_, { groupId }) => {
+        // courses come from the store — group-select writes them before firing.
+        const courses = store.getCourses() || [];
+        const isSiteEditor = window.bysGroupsAuth?.isSiteEditor === true;
         currentGroupId = groupId;
         selectedCourse = null;
         allCourses     = [];
@@ -215,6 +218,7 @@ jQuery(document).ready(async ($) => {
         currentGroupId = cachedGroupId;
         groupCourses   = cachedCourses;
         renderList();
+        $skeleton.hide();
     } else {
         console.log('[bys-store] group-course-config: MISS — waiting for bys:groupSelected');
     }

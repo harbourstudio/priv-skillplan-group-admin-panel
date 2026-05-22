@@ -1,4 +1,5 @@
 import { api, endpoints } from '../_shared/api-client.js';
+import store from '../_shared/store.js';
 
 jQuery(document).ready(($) => {
     const $block = $('.wp-block-bys-groups-group-communication-log').first();
@@ -140,7 +141,7 @@ jQuery(document).ready(($) => {
     function setupShowMore() {
         let visibleCount = 5;
         let currentOffset = 0;
-        let groupId = window.bysGroupData?.groupId;
+        let groupId = store.getCurrentGroup();
         let isLoadingMore = false;
 
         // Remove existing show-more button

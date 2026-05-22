@@ -14,32 +14,16 @@ function getAuthorizationHeader() {
 
 // custom API endpoint definitions
 export const endpoints = {
-  currentUserGroups: () => '/wp-json/bys-groups/v1/me/groups',
-  currentUserOrganizations: () => '/wp-json/bys-groups/v1/me/organizations',
-  createOrganization: () => '/wp-json/bys-groups/v1/organizations',
-  createOrganizationGroup: (orgId) => `/wp-json/bys-groups/v1/organizations/${orgId}/groups`,
-  groupBaseUsersStats: (groupId) => `/wp-json/bys-groups/v1/groups/${groupId}/base-user-stats`,
+  // /groups/* routes
+  baseGroupData: (groupId) => `/wp-json/bys-groups/v1/groups/${groupId}/base-group-data`,
+  baseGroupStats: (groupId) => `/wp-json/bys-groups/v1/groups/${groupId}/group-stats`,
+  groupLeaders: (groupId) => `/wp-json/bys-groups/v1/groups/${groupId}/leaders`,
   groupUsers: (groupId, userIds) => `/wp-json/bys-groups/v1/groups/${groupId}/users?user_ids=${userIds}`,
   groupUserInfo: (groupId, userId ) => `/wp-json/bys-groups/v1/groups/${groupId}/users/${userId}`,
   groupCourses: (groupId) => `/wp-json/bys-groups/v1/groups/${groupId}/courses`,
   groupCourseCompletionStats: (groupId) => `/wp-json/bys-groups/v1/groups/${groupId}/course-completion-stats`,
-  courseHierarchialBreakdown: (courseId) => `/wp-json/bys-groups/v1/courses/${courseId}/steps`,
-  groupUserCourseProgress: (userId, courseIds) => `/wp-json/bys-groups/v1/users/${userId}/course-progress?course_ids=${courseIds}`,
-  courseQuizSteps: (courseId) => `/wp-json/bys-groups/v1/courses/${courseId}/quiz-steps`,
-  courseQuizzes: (courseId) => `/wp-json/bys-groups/v1/courses/${courseId}/quizzes`,
-  courseQuizStepsGrading: (courseId) => `/wp-json/bys-groups/v1/courses/${courseId}/quiz-steps?filter=grading`,
-  courseQuizProgressBatch: (courseId, userIds) => `/wp-json/bys-groups/v1/courses/${courseId}/quiz-progress-batch?user_ids=${userIds}`,
   groupQuizSubmissionStats: (groupId, quizIds) => `/wp-json/bys-groups/v1/groups/${groupId}/quiz-submission-stats?quiz_ids=${quizIds.join(',')}`,
   groupQuizAttempts: (groupId, quizId) => `/wp-json/bys-groups/v1/groups/${groupId}/quizzes/${quizId}/attempts`,
-  userCoursesWithProgress: (userId) => `/wp-json/bys-groups/v1/users/${userId}/courses?include=progress`,
-  userQuizProgress: (userId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-progress`,
-  userQuizAttemptsDetails: (userId, quizId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-attempts/${quizId}`,
-  attemptDetail: (activityId) => `/wp-json/bys-groups/v1/attempts/${activityId}`,
-  attemptQuestions: (activityId) => `/wp-json/bys-groups/v1/attempts/${activityId}/questions`,
-  userActivity: (userId) => `/wp-json/bys-groups/v1/users/${userId}/activity`,
-  userCourseActivity: (userId, courseId) => `/wp-json/bys-groups/v1/users/${userId}/activity?course_id=${courseId}`,
-  userCourseStepsProgress: (userId, courseId) => `/wp-json/bys-groups/v1/users/${userId}/course-progress-steps/${courseId}`,
-  groupLeaders: (groupId) => `/wp-json/bys-groups/v1/groups/${groupId}/leaders`,
   removeGroupLeader: (groupId, userId) => `/wp-json/bys-groups/v1/groups/${groupId}/leaders/${userId}`,
   allCourses: () => '/wp-json/bys-groups/v1/all-courses',
   addGroupCourse: (groupId, courseId) => `/wp-json/bys-groups/v1/groups/${groupId}/courses/${courseId}/add`,
@@ -63,7 +47,34 @@ export const endpoints = {
   communicationDetail: (messageId) =>
     `/wp-json/bys-groups/v1/communications/${messageId}/detail`,
   conditionalRecipients: (groupId) =>
-    `/wp-json/bys-groups/v1/groups/${groupId}/conditional-recipients`
+    `/wp-json/bys-groups/v1/groups/${groupId}/conditional-recipients`,
+
+  // /me/* routes
+  currentUserGroups: () => '/wp-json/bys-groups/v1/me/groups',
+  currentUserOrganizations: () => '/wp-json/bys-groups/v1/me/organizations',
+  
+  // /organizations/* routes
+  createOrganization: () => '/wp-json/bys-groups/v1/organizations',
+  createOrganizationGroup: (orgId) => `/wp-json/bys-groups/v1/organizations/${orgId}/groups`,
+
+  // /courses/* routes
+  courseHierarchialBreakdown: (courseId) => `/wp-json/bys-groups/v1/courses/${courseId}/steps`,
+  courseQuizSteps: (courseId) => `/wp-json/bys-groups/v1/courses/${courseId}/quiz-steps`,
+  courseQuizzes: (courseId) => `/wp-json/bys-groups/v1/courses/${courseId}/quizzes`,
+  courseQuizStepsGrading: (courseId) => `/wp-json/bys-groups/v1/courses/${courseId}/quiz-steps?filter=grading`,
+  courseQuizProgressBatch: (courseId, userIds) => `/wp-json/bys-groups/v1/courses/${courseId}/quiz-progress-batch?user_ids=${userIds}`,
+
+  // /users/* routes
+  userCoursesWithProgress: (userId) => `/wp-json/bys-groups/v1/users/${userId}/courses?include=progress`,
+  userQuizProgress: (userId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-progress`,
+  userQuizAttemptsDetails: (userId, quizId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-attempts/${quizId}`,
+  userActivity: (userId) => `/wp-json/bys-groups/v1/users/${userId}/activity`,
+  userCourseActivity: (userId, courseId) => `/wp-json/bys-groups/v1/users/${userId}/activity?course_id=${courseId}`,
+  userCourseStepsProgress: (userId, courseId) => `/wp-json/bys-groups/v1/users/${userId}/course-progress-steps/${courseId}`,
+
+  // /attempts/* routes
+  attemptDetail: (activityId) => `/wp-json/bys-groups/v1/attempts/${activityId}`,
+  attemptQuestions: (activityId) => `/wp-json/bys-groups/v1/attempts/${activityId}/questions`,
 };
 
 // Singleton anchored on `window` so every block bundle shares one cache

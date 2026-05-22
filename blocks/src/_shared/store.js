@@ -96,14 +96,21 @@ const store = window[KEY] || {
     this._emit();
   },
 
-  // Stores course objects with the fields blocks need at render time
-  // (id, title, shortname, required). Anything else stays in api._cache.
+  // Stores course objects with the fields blocks need at render time.
+  // - quizzes_show_test_grading_config:  int[] of quiz step IDs (show_test_grading_config=1)
+  //                      used by group-ungraded-quiz-alert.
+  // - quizzes_show_in_reporting: [{step_id, step_title}, ...] (show_in_reporting=1)
+  //                      used by group-reporting's quizzing sub-cells.
+  // Both are pre-baked by /base-group-data so blocks don't fan out per-course
+  // /quiz-steps fetches.
   setCourses(courses) {
     this.state.courses = courses.map((c) => ({
       id: c.id,
       title: c.title,
       shortname: c.shortname ?? null,
       required: c.required ?? false,
+      quizzes_show_test_grading_config:  Array.isArray(c.quizzes_show_test_grading_config)  ? c.quizzes_show_test_grading_config  : [],
+      quizzes_show_in_reporting: Array.isArray(c.quizzes_show_in_reporting) ? c.quizzes_show_in_reporting : [],
     }));
     this._emit();
   },

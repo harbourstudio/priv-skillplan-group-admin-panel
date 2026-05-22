@@ -276,10 +276,13 @@ jQuery(document).ready(($) => {
         $(document).trigger('quiz:open', { quizId, quizName });
     });
 
-    $(document).on('bys:groupSelected', (_, { groupId, baseUsersStats, courses, isSiteEditor }) => {
+    $(document).on('bys:groupSelected', (_, { groupId }) => {
         currentGroupId = groupId;
-        memberCount    = baseUsersStats?.total_members || 0;
-        loadQuizData($block, groupId, Array.isArray(courses) ? courses : [], isSiteEditor);
+        // users + courses come from the store — guaranteed populated by group-select
+        // before this event fires.
+        memberCount    = store.getUsers()?.length ?? 0;
+        const isSiteEditor = window.bysGroupsAuth?.isSiteEditor === true;
+        loadQuizData($block, groupId, store.getCourses() || [], isSiteEditor);
     });
 
     document.addEventListener('visibilitychange', () => {

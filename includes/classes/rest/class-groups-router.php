@@ -18,9 +18,16 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
 
         public function register_routes() {
             // ── Cluster A: group users + stats ─────────────────────────────
-            register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/groups/(?P<group_id>\d+)/base-user-stats', [
+
+            register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/groups/(?P<group_id>\d+)/base-group-data', [
                 'methods'             => WP_REST_Server::READABLE,
-                'callback'            => [$this, 'get_group_base_users_stats'],
+                'callback'            => [$this, 'get_base_group_data'],
+                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_access_group($request['group_id']),
+            ]);
+
+            register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/groups/(?P<group_id>\d+)/group-stats', [
+                'methods'             => WP_REST_Server::READABLE,
+                'callback'            => [$this, 'get_base_group_stats'],
                 'permission_callback' => fn($request) => BYS_Groups_Permissions::can_access_group($request['group_id']),
             ]);
 
@@ -200,24 +207,23 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
         // ─── REST callbacks: Cluster A ──────────────────────────────────────
 
         /**
-         * GET /groups/{group_id}/base-user-stats
-         * Returns total members, total inactive members, and the flat user_ids
-         * array for the group. Inactive = no login meta of any kind.
-         *
-         * Pulls user IDs from the LD API (paginated). The login-check loop is
-         * a known N+1 — flagged for Phase 2 caching/batch-loading work.
+         * GET /groups/{group_id}/base-group-data
+         * Single-call dashboard bootstrap: returns hydrated users + courses
+         * for the group. Replaces the legacy two-call pattern (user-stats
+         * + courses) used by group-select. Does NOT compute the expensive
+         * inactive-members count — that lives in /group-stats.
          */
-        public function get_group_base_users_stats($request) {
+        public function get_base_group_data($request) {
             $group_id = intval($request['group_id']);
             if (!$group_id) return new WP_Error('bad_request', 'Invalid group ID', ['status' => 400]);
 
             $auth_header = BYS_Groups_Auth::get_auth_header();
             if (!$auth_header) return new WP_Error('server_error', 'API credentials not configured', ['status' => 500]);
 
-            // Paginate through LD's group users endpoint (defaults to 10/page; ask for 100)
-            $group_users = [];
-            $page        = 1;
-            $per_page    = 100;
+            // ── 1. Collect user IDs from LD's group-users endpoint (paginated)
+            $user_ids = [];
+            $page     = 1;
+            $per_page = 100;
 
             do {
                 $url = get_home_url() . "/wp-json/ldlms/v2/groups/{$group_id}/users?_fields=id&per_page={$per_page}&page={$page}";
@@ -227,27 +233,132 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 ]);
 
                 if (is_wp_error($response)) return new WP_Error('server_error', $response->get_error_message(), ['status' => 500]);
-
-                $status = wp_remote_retrieve_response_code($response);
-                if ($status !== 200) {
-                    return new WP_Error('ld_api_failure', 'Failed to fetch users from LearnDash API', ['status' => $status]);
+                if (wp_remote_retrieve_response_code($response) !== 200) {
+                    return new WP_Error('ld_api_failure', 'Failed to fetch users from LearnDash API', ['status' => 502]);
                 }
 
                 $page_users = json_decode(wp_remote_retrieve_body($response), true);
                 if (!is_array($page_users) || empty($page_users)) break;
 
-                $group_users = array_merge($group_users, $page_users);
+                foreach ($page_users as $u) {
+                    $user_ids[] = intval($u['id']);
+                }
                 $page++;
             } while (count($page_users) === $per_page);
 
-            $total_members    = count($group_users);
-            $inactive_members = 0;
+            // ── 2. Hydrate user objects (mirrors get_group_users shape)
+            $users = [];
+            foreach ($user_ids as $user_id) {
+                $user = get_user_by('ID', $user_id);
+                if (!$user) continue;
 
+                $meta_values = [
+                    intval(get_user_meta($user_id, '_ld_notifications_last_login', true) ?: 0),
+                    intval(get_user_meta($user_id, 'learndash-last-login',          true) ?: 0),
+                ];
+                $last_login_timestamp = max($meta_values);
+                $last_login_timestamp = $last_login_timestamp > 0 ? $last_login_timestamp : null;
+
+                $enrolled_at_raw = get_user_meta($user_id, "learndash_group_{$group_id}_enrolled_at", true);
+
+                $users[] = [
+                    'id'           => $user->ID,
+                    'first_name'   => get_user_meta($user_id, 'first_name', true) ?: '',
+                    'last_name'    => get_user_meta($user_id, 'last_name', true) ?: '',
+                    'display_name' => $user->display_name,
+                    'email'        => $user->user_email,
+                    'avatar'       => get_avatar_url($user_id, ['size' => 64]),
+                    'enrolled_at'  => $enrolled_at_raw ? wp_date('c', (int) $enrolled_at_raw) : null,
+                    'last_login'   => $last_login_timestamp ? wp_date('c', $last_login_timestamp) : null,
+                    'status'       => $this->get_user_online_status($user_id),
+                ];
+            }
+
+            // ── 3. Group's enrolled courses (mirrors get_group_courses shape)
+            $courses = [];
+            $courses_url = get_home_url() . "/wp-json/ldlms/v2/groups/{$group_id}/courses?_fields=id,title";
+            $courses_response = wp_remote_get($courses_url, [
+                'headers'   => ['Authorization' => $auth_header],
+                'sslverify' => false,
+            ]);
+            // Source of truth for "is this course required for this group" lives
+            // in _bys_required_course_ids post meta on the group post. Read once
+            // and lookup-by-id below.
+            $required_raw = get_post_meta($group_id, '_bys_required_course_ids', true);
+            $required_ids = is_array($required_raw) ? array_map('intval', $required_raw) : [];
+            if (!is_wp_error($courses_response) && wp_remote_retrieve_response_code($courses_response) === 200) {
+                $raw_courses = json_decode(wp_remote_retrieve_body($courses_response), true);
+                if (is_array($raw_courses)) {
+                    $course_ids_collected = [];
+                    foreach ($raw_courses as $course) {
+                        $course_id = $course['id'] ?? null;
+                        $shortname = $course_id ? get_post_meta($course_id, 'shortname', true) : '';
+                        $courses[] = [
+                            'id'        => $course_id,
+                            'title'     => $course['title'] ?? 'Untitled',
+                            'shortname' => $shortname ?: null,
+                            'required'  => $course_id ? in_array(intval($course_id), $required_ids, true) : false,
+                            // Filled in below from a single batched query so blocks
+                            // don't fan out per-course /quiz-steps requests.
+                            'quizzes_show_test_grading_config'   => [],
+                            'quizzes_show_in_reporting'  => [],
+                        ];
+                        if ($course_id) $course_ids_collected[] = intval($course_id);
+                    }
+
+                    // Batch query: per-course grading + reporting quiz sets.
+                    if (!empty($course_ids_collected)) {
+                        $quiz_meta = $this->fetch_quiz_meta_by_course($course_ids_collected);
+                        foreach ($courses as &$course_ref) {
+                            $cid = intval($course_ref['id']);
+                            $course_ref['quizzes_show_test_grading_config']  = $quiz_meta[$cid]['grading']   ?? [];
+                            $course_ref['quizzes_show_in_reporting'] = $quiz_meta[$cid]['reporting'] ?? [];
+                        }
+                        unset($course_ref);
+                    }
+                }
+            }
+
+            return new WP_REST_Response([
+                'group_id' => $group_id,
+                'users'    => $users,
+                'courses'  => $courses,
+            ], 200);
+        }
+
+        public function get_base_group_stats($request) {
+            $group_id = intval($request['group_id']);
+            if (!$group_id) return new WP_Error('bad_request', 'Invalid group ID', ['status' => 400]);
+
+            $auth_header = BYS_Groups_Auth::get_auth_header();
+            if (!$auth_header) return new WP_Error('server_error', 'API credentials not configured', ['status' => 500]);
+
+            // Paginate LD's group-users endpoint for IDs
             $user_ids = [];
-            foreach ($group_users as $user_data) {
-                $user_id    = intval($user_data['id']);
-                $user_ids[] = $user_id;
+            $page     = 1;
+            $per_page = 100;
+            do {
+                $url = get_home_url() . "/wp-json/ldlms/v2/groups/{$group_id}/users?_fields=id&per_page={$per_page}&page={$page}";
+                $response = wp_remote_get($url, [
+                    'headers'   => ['Authorization' => $auth_header],
+                    'sslverify' => false,
+                ]);
+                if (is_wp_error($response)) return new WP_Error('server_error', $response->get_error_message(), ['status' => 500]);
+                if (wp_remote_retrieve_response_code($response) !== 200) {
+                    return new WP_Error('ld_api_failure', 'Failed to fetch users from LearnDash API', ['status' => 502]);
+                }
+                $page_users = json_decode(wp_remote_retrieve_body($response), true);
+                if (!is_array($page_users) || empty($page_users)) break;
+                foreach ($page_users as $u) {
+                    $user_ids[] = intval($u['id']);
+                }
+                $page++;
+            } while (count($page_users) === $per_page);
 
+            // Inactive = no login meta at all. Known N+1, intentionally kept
+            // isolated to this endpoint so only group-stats pays the cost.
+            $inactive_members = 0;
+            foreach ($user_ids as $user_id) {
                 $login_meta = [
                     intval(get_user_meta($user_id, '_ld_notifications_last_login', true) ?: 0),
                     intval(get_user_meta($user_id, 'learndash-last-login',          true) ?: 0),
@@ -257,11 +368,12 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
 
             return [
                 'group_id'               => $group_id,
-                'total_members'          => $total_members,
+                'total_members'          => count($user_ids),
                 'total_inactive_members' => $inactive_members,
                 'user_ids'               => $user_ids,
             ];
         }
+
 
         /**
          * GET /groups/{group_id}/users?user_ids=1,2,3
@@ -406,7 +518,12 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
 
             $courses = json_decode(wp_remote_retrieve_body($response), true);
 
+            // Look up which course IDs are flagged as required for this group.
+            $required_raw = get_post_meta($group_id, '_bys_required_course_ids', true);
+            $required_ids = is_array($required_raw) ? array_map('intval', $required_raw) : [];
+
             $formatted_courses = [];
+            $course_ids_collected = [];
             if (is_array($courses)) {
                 foreach ($courses as $course) {
                     $course_id = $course['id'] ?? null;
@@ -415,7 +532,21 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                         'id'        => $course_id,
                         'title'     => $course['title'] ?? 'Untitled',
                         'shortname' => $shortname ?: null,
+                        'required'  => $course_id ? in_array(intval($course_id), $required_ids, true) : false,
+                        'quizzes_show_test_grading_config'   => [],
+                        'quizzes_show_in_reporting'  => [],
                     ];
+                    if ($course_id) $course_ids_collected[] = intval($course_id);
+                }
+
+                if (!empty($course_ids_collected)) {
+                    $quiz_meta = $this->fetch_quiz_meta_by_course($course_ids_collected);
+                    foreach ($formatted_courses as &$c) {
+                        $cid = intval($c['id']);
+                        $c['quizzes_show_test_grading_config']  = $quiz_meta[$cid]['grading']   ?? [];
+                        $c['quizzes_show_in_reporting'] = $quiz_meta[$cid]['reporting'] ?? [];
+                    }
+                    unset($c);
                 }
             }
 
@@ -1805,6 +1936,61 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
          * Internal-only — different shape than the public get_group_courses()
          * which adds shortname and wraps in the standard response envelope.
          */
+        /**
+         * Return a per-course map of quiz step data for both dashboard surfaces:
+         *   - grading[]:   int[]                          (show_test_grading_config=1)
+         *   - reporting[]: [{step_id, step_title}, ...]   (show_in_reporting=1)
+         *
+         * One batched SQL query LEFT JOINs both meta keys and filters to quizzes
+         * that match at least one. The PHP loop then sorts each row into the
+         * appropriate slot per course. Used by /base-group-data and
+         * /groups/{id}/courses so neither block needs follow-up /quiz-steps calls.
+         */
+        private function fetch_quiz_meta_by_course(array $course_ids) {
+            if (empty($course_ids)) return [];
+
+            global $wpdb;
+            $placeholders = implode(',', array_fill(0, count($course_ids), '%d'));
+            $rows = $wpdb->get_results($wpdb->prepare(
+                "SELECT
+                    p.ID            AS quiz_id,
+                    p.post_title    AS quiz_title,
+                    pm_course.meta_value   AS course_id,
+                    pm_grading.meta_value  AS is_grading,
+                    pm_reporting.meta_value AS is_reporting
+                 FROM {$wpdb->posts} p
+                 JOIN {$wpdb->postmeta} pm_course ON p.ID = pm_course.post_id
+                      AND pm_course.meta_key = 'course_id'
+                 LEFT JOIN {$wpdb->postmeta} pm_grading ON p.ID = pm_grading.post_id
+                      AND pm_grading.meta_key = 'show_test_grading_config'
+                 LEFT JOIN {$wpdb->postmeta} pm_reporting ON p.ID = pm_reporting.post_id
+                      AND pm_reporting.meta_key = 'show_in_reporting'
+                 WHERE p.post_type = 'sfwd-quiz'
+                   AND p.post_status = 'publish'
+                   AND pm_course.meta_value IN ($placeholders)
+                   AND (pm_grading.meta_value = '1' OR pm_reporting.meta_value = '1')
+                 ORDER BY p.menu_order ASC, p.ID ASC",
+                ...array_map('intval', $course_ids)
+            ));
+
+            $out = [];
+            foreach ($rows ?: [] as $row) {
+                $cid = intval($row->course_id);
+                if (!isset($out[$cid])) $out[$cid] = ['grading' => [], 'reporting' => []];
+
+                if ($row->is_grading === '1') {
+                    $out[$cid]['grading'][] = intval($row->quiz_id);
+                }
+                if ($row->is_reporting === '1') {
+                    $out[$cid]['reporting'][] = [
+                        'step_id'    => intval($row->quiz_id),
+                        'step_title' => $row->quiz_title,
+                    ];
+                }
+            }
+            return $out;
+        }
+
         private function fetch_group_courses_minimal($group_id, $auth_header) {
             $url = get_home_url() . "/wp-json/ldlms/v2/groups/{$group_id}/courses?_fields=id,title";
 

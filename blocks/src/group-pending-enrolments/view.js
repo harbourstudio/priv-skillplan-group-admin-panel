@@ -1,4 +1,5 @@
 import { api } from '../_shared/api-client.js';
+import store from '../_shared/store.js';
 
 const PAGE_SIZE = 10;
 
@@ -122,7 +123,8 @@ jQuery(document).ready(($) => {
         if (currentGroupId) loadInvites(currentGroupId);
     });
 
-    if (window.bysGroupData?.groupId) {
-        loadInvites(window.bysGroupData.groupId);
+    const cachedGroupId = store.getCurrentGroup();
+    if (cachedGroupId !== null) {
+        loadInvites(cachedGroupId);
     }
 });

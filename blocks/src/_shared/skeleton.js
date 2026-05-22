@@ -37,7 +37,7 @@ export function skeletonRows(colCount, rowCount = 1) {
  * Carries its own ARIA — drop it straight into any container.
  */
 export const SKELETON = `
-    <div class="skeleton" role="status" aria-busy="true" aria-live="polite" aria-label="Loading"></div>
+    <div class="skeleton" role="status" aria-busy="true" aria-live="polite></div>
 `;
 
 /**
@@ -45,9 +45,9 @@ export const SKELETON = `
  * should be announced as one loading region.
  */
 export const SKELETONS = `
-    <div class="skeletons" role="status" aria-busy="true" aria-live="polite" aria-label="Loading">
-        <div class="skeleton" aria-hidden="true"></div>
-        <div class="skeleton" aria-hidden="true"></div>
-        <div class="skeleton" aria-hidden="true"></div>
+    <div class="skeletons" role="status" aria-busy="true" aria-live="polite">
+        <div class="skeleton"></div>
+        <div class="skeleton"></div>
+        <div class="skeleton"></div>
     </div>
 `;

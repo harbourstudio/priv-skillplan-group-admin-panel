@@ -1,4 +1,5 @@
 import { api } from '../_shared/api-client.js';
+import store from '../_shared/store.js';
 
 jQuery(document).ready(($) => {
     const $block   = $('.wp-block-bys-groups-group-add-member').first();
@@ -41,7 +42,7 @@ jQuery(document).ready(($) => {
     $enrol.on('click', async function () {
         const email   = $input.val().trim();
         const role    = $block.find('input[name="add-member-role"]:checked').val() || 'learner';
-        const groupId = window.bysGroupData?.groupId;
+        const groupId = store.getCurrentGroup();
 
         if (!isValidEmail(email) || !groupId) return;
 

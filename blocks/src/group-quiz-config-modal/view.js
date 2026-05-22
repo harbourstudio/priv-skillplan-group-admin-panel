@@ -100,7 +100,7 @@ jQuery(document).ready(($) => {
 
             // Find members with no attempts at all
             const attemptedIds  = new Set(attempted.map((u) => u.user_id));
-            const allMemberIds  = window.bysGroupData?.baseUsersStats?.user_ids || [];
+            const allMemberIds  = store.getUserIds() || [];
             const notAttemptIds = allMemberIds.filter((id) => !attemptedIds.has(id));
 
             let notAttempted = [];
@@ -161,7 +161,7 @@ jQuery(document).ready(($) => {
     }
 
     $(document).on('quiz:open', (_, { quizId, quizName }) => {
-        const groupId = window.bysGroupData?.groupId;
+        const groupId = store.getCurrentGroup();
         if (!groupId || !quizId) return;
         loadQuizData(groupId, quizId, quizName);
     });

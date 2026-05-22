@@ -3,10 +3,10 @@ import { useEffect } from 'react';
 import { useBlockProps } from '@wordpress/block-editor';
 
 const STATS = [
-	{ label: __('Members', 'bys'),         value: '—' },
-	{ label: __('Active Users', 'bys'),     value: '—' },
-	{ label: __('Courses', 'bys'),          value: '—' },
-	{ label: __('Avg. Completion', 'bys'),  value: '—' },
+	{ label: __('Total Participants', 'bys'),         value: '—' },
+	{ label: __('Completed Courses', 'bys'),     value: '—' },
+	{ label: __('Incomplete Courses', 'bys'),          value: '—' },
+	{ label: __('Inactive Participants', 'bys'),  value: '—' },
 ];
 
 export default function Edit({ clientId, attributes, setAttributes }) {
@@ -16,14 +16,16 @@ export default function Edit({ clientId, attributes, setAttributes }) {
 		if (blockId !== clientId) setAttributes({ blockId: clientId });
 	}, [clientId]);
 
+	const blockProps = useBlockProps();
+
 	return (
-		<div {...useBlockProps()}>
-			<div className="stats__grid">
+		<div {...blockProps}>
+			<div className="group-stats__grid">
 				{STATS.map(({ label, value }) => (
-					<div key={label} className="stat__box">
-						<div className="stat__content">
-							<span className="stat__number">{value}</span>
-							<span>{label}</span>
+					<div key={label} className="group-stats__box">
+						<div className="group-stats__content">
+							<span className="group-stats__number">{value}</span>
+							<span className="group-stats__label">{label}</span>
 						</div>
 					</div>
 				))}

@@ -1,4 +1,5 @@
 import { api, endpoints } from '../_shared/api-client.js';
+import store from '../_shared/store.js';
 
 jQuery(document).ready(($) => {
   const $block  = $('.wp-block-bys-groups-group-ungraded-quiz-alert').first();
@@ -13,21 +14,12 @@ jQuery(document).ready(($) => {
   async function updateAlert(groupId, courses) {
     if (!Array.isArray(courses) || !courses.length) return;
 
-    // Fetch quiz steps for all courses in parallel
-    const quizStepsByCourse = {};
-    await Promise.all(courses.map(async (course) => {
-      try {
-        const steps = await api.get(endpoints.courseQuizSteps(course.id));
-        quizStepsByCourse[course.id] = Array.isArray(steps) ? steps : [];
-      } catch {
-        quizStepsByCourse[course.id] = [];
-      }
-    }));
-
-    const allQuizIds = Object.values(quizStepsByCourse).flat().map(s => s.step_id);
+    // Quiz IDs whose show_test_grading_config is true are pre-baked into each
+    // course by /base-group-data. Flatten the union — these are the only
+    // quizzes that can ever have ungraded attempts.
+    const allQuizIds = courses.flatMap((c) => Array.isArray(c.quizzes_show_test_grading_config) ? c.quizzes_show_test_grading_config : []);
     if (!allQuizIds.length) return;
 
-    // Fetch submission stats (already cached if group-quizzing block ran first)
     let totalUngraded = 0;
     try {
       const statsArray = await api.get(endpoints.groupQuizSubmissionStats(groupId, allQuizIds));
@@ -51,10 +43,13 @@ jQuery(document).ready(($) => {
     // Reset on group change
     $alert.addClass('hidden');
     $count.text('');
-    updateAlert(data.groupId, data.courses);
+    updateAlert(data.groupId, store.getCourses() || []);
   });
 
-  if (window.bysGroupData?.courses) {
-    updateAlert(window.bysGroupData.groupId, window.bysGroupData.courses);
+  // Fast first paint from store cache (sessionStorage-rehydrated across page navs).
+  const cachedGroupId = store.getCurrentGroup();
+  const cachedCourses = store.getCourses();
+  if (cachedGroupId !== null && cachedCourses !== null) {
+    updateAlert(cachedGroupId, cachedCourses);
   }
 });

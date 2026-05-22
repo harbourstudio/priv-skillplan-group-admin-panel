@@ -10,13 +10,16 @@ export default function Edit({ clientId, attributes, setAttributes }) {
 		if (blockId !== clientId) setAttributes({ blockId: clientId });
 	}, [clientId]);
 
+	const blockProps = useBlockProps();
+
 	return (
-		<div {...useBlockProps()}>
-			<div className="group-selector">
-				<select className="group-selector__select" disabled>
+		<div {...blockProps}>
+			<div className="group-select">
+				<select className="group-select__select" disabled>
 					<option>{__('Select a group…', 'bys')}</option>
 				</select>
 			</div>
+			<button class="group-select__button" type="button">{__('Show Group', 'bys')}</button>
 		</div>
 	);
 }

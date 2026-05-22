@@ -257,6 +257,9 @@
         }
 
         thead {
+            display: table;
+            width: 100%;
+
             th, td{
                 background-color: var(--wp--preset--color--primary);
                 color: white;
@@ -279,6 +282,9 @@
         }
 
         tbody {
+            display: table;
+            width: 100%;
+
             tr:not(:last-of-type) td{
                 border-bottom: 1px solid var(--wp--preset--color--gray-200);
             }

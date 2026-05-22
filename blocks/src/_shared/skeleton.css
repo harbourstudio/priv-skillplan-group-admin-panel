@@ -11,7 +11,9 @@
 
  /* Singular, horizontal loader */
 .skeleton {
+    display: inline-block;
     height: 0.75rem;
+    width: 100%;
     border-radius: 0.25rem;
     background: linear-gradient(
         90deg,

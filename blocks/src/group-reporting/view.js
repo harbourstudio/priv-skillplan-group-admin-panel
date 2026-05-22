@@ -1,12 +1,45 @@
 import { api, endpoints } from '../_shared/api-client.js';
 import store from '../_shared/store.js';
+import flatpickr from 'flatpickr';
+import 'flatpickr/dist/flatpickr.min.css';
 
 jQuery(document).ready(function($) {
   const $block = $('.wp-block-bys-groups-group-reporting').first();
   const $table = $block.find('.reporting-table');
+  if (!$table.length) return;
+
   const detailUrl = $table.data('detailUrl') || '/administrator-dashboard/user-progress-detail/';
 
-  if (!$table.length) return;
+  // ── DOM lookups ─────────────────────────────────────────────────────
+  const $filtersToggle      = $block.find('.group-reporting__filters-toggle');
+  const $filtersBox         = $block.find('#filters-box');
+  const $filtersForm        = $block.find('.filters__form');
+  const $submitBtn          = $block.find('.group-reporting__submit');
+  const $resetBtn           = $block.find('.group-reporting__reset');
+
+  const $sortSelect         = $block.find('#sort-select');
+  const $sortOptionsCompletion = $block.find('.group-reporting__sort-option--completion');
+
+  const $filterStatus       = $block.find('#filter-status');
+  const $filterUserStatus   = $block.find('#filter-user-status');
+  const $filterEnrolFrom    = $block.find('#filter-enrolment-date-from');
+  const $filterEnrolTo      = $block.find('#filter-enrolment-date-to');
+  const $filterComplFrom    = $block.find('#filter-completion-date-from');
+  const $filterComplTo      = $block.find('#filter-completion-date-to');
+  const $enrolRangeText     = $block.find('#enrolment-date-range-text');
+  const $enrolRangeDropdown = $block.find('#enrolment-date-range-dropdown');
+  const $enrolRangeTrigger  = $block.find('#enrolment-date-range-trigger');
+  const $complRangeText     = $block.find('#completion-date-range-text');
+  const $complRangeDropdown = $block.find('#completion-date-range-dropdown');
+  const $complRangeTrigger  = $block.find('#completion-date-range-trigger');
+
+  const $courseDepFields    = $block.find('.group-reporting__field--course-dep');
+
+  const $msCourse           = $block.find('#bys-multiselect-course');
+  const $msUsers            = $block.find('#bys-multiselect-users');
+
+  const $showMoreBtn        = $block.find('.group-reporting__show-more');
+  const $exportBtn          = $block.find('.group-reporting__export a');
 
   let expandedIdx = null;
   let usersInView = [];         // current page of users
@@ -24,7 +57,7 @@ jQuery(document).ready(function($) {
   // ── Filter state ────────────────────────────────────────────────────────────
   let selectedCourseIds   = []; // course multiselect state
   let selectedUserIds     = []; // user multiselect state
-  let allGroupUserIds     = []; // full list of user IDs for current group (from baseUsersStats)
+  let allGroupUserIds     = []; // full list of user IDs for current group (from bysGroupsStore)
   let allGroupUsers       = []; // full fetched user objects for the filter list (lazy-loaded)
   let allGroupUsersLoaded = false; // whether the full user list has been fetched
 
@@ -38,9 +71,9 @@ jQuery(document).ready(function($) {
   };
 
   // ── Filter panel toggle ──────────────────────────────────────────────────────
-  $block.find('.filters__toggle').on('click', function() {
+  $filtersToggle.on('click', function() {
     const $toggle = $(this);
-    const $box = $block.find('#filters-box');
+    const $box = $filtersBox;
     const isOpen = $toggle.attr('aria-expanded') === 'true';
     $toggle.attr('aria-expanded', !isOpen);
     $box.attr('aria-hidden', isOpen);
@@ -52,7 +85,7 @@ jQuery(document).ready(function($) {
   });
 
   // ── Course column expand/collapse ────────────────────────────────────────────
-  $table.on('click', '.bys-course-toggle', function(e) {
+  $table.on('click', '.group-reporting__course-toggle', function(e) {
     e.stopPropagation();
     const idx = parseInt($(this).data('courseIdx'), 10);
     const opening = expandedIdx !== idx;
@@ -70,36 +103,36 @@ jQuery(document).ready(function($) {
   });
 
   function resetAllCourses() {
-    $table.find('.course-col-header')
-      .removeClass('course-col-header--expanded')
-      .addClass('course-col-header--collapsed')
-      .removeClass('course-col--hidden')
-      .find('.bys-course-toggle')
+    $table.find('.group-reporting__course-header')
+      .removeClass('group-reporting__course-header--expanded')
+      .addClass('group-reporting__course-header--collapsed')
+      .removeClass('group-reporting__col--hidden')
+      .find('.group-reporting__course-toggle')
       .attr('aria-expanded', 'false');
-    $table.find('.course-cell--badge').removeClass('course-col--hidden');
-    $table.find('.course-sub-col, .course-sub-cell').addClass('course-sub-col--hidden');
+    $table.find('.group-reporting__cell--badge').removeClass('group-reporting__col--hidden');
+    $table.find('.group-reporting__sub-col, .group-reporting__sub-cell').addClass('group-reporting__sub-col--hidden');
 
     // Re-apply course column filter after reset
     applyColumnFilter();
   }
 
   function expandCourse(idx) {
-    const $header = $table.find(`.course-col-header[data-course-idx="${idx}"]`);
+    const $header = $table.find(`.group-reporting__course-header[data-course-idx="${idx}"]`);
     $header
-      .removeClass('course-col-header--collapsed')
-      .addClass('course-col-header--expanded')
-      .find('.bys-course-toggle')
+      .removeClass('group-reporting__course-header--collapsed')
+      .addClass('group-reporting__course-header--expanded')
+      .find('.group-reporting__course-toggle')
       .attr('aria-expanded', 'true');
 
-    $table.find(`.course-sub-col[data-course-idx="${idx}"]`).removeClass('course-sub-col--hidden');
-    $table.find(`.course-sub-cell[data-course-idx="${idx}"]`).removeClass('course-sub-col--hidden');
-    $table.find(`.course-col-header:not([data-course-idx="${idx}"])`).addClass('course-col--hidden');
-    $table.find(`.course-cell--badge:not([data-course-idx="${idx}"])`).addClass('course-col--hidden');
+    $table.find(`.group-reporting__sub-col[data-course-idx="${idx}"]`).removeClass('group-reporting__sub-col--hidden');
+    $table.find(`.group-reporting__sub-cell[data-course-idx="${idx}"]`).removeClass('group-reporting__sub-col--hidden');
+    $table.find(`.group-reporting__course-header:not([data-course-idx="${idx}"])`).addClass('group-reporting__col--hidden');
+    $table.find(`.group-reporting__cell--badge:not([data-course-idx="${idx}"])`).addClass('group-reporting__col--hidden');
   }
 
   // ── Row click to detail page ─────────────────────────────────────────────────
-  $table.on('click', '.reporting-table__row', function(e) {
-    if ($(e.target).closest('.bys-course-toggle').length) return;
+  $table.on('click', '.group-reporting__row', function(e) {
+    if ($(e.target).closest('.group-reporting__course-toggle').length) return;
     if ($(e.target).closest('a').length) return;
 
     const userId = $(this).data('userId');
@@ -128,7 +161,7 @@ jQuery(document).ready(function($) {
 
     if (pointsFraction || percentage) {
       $tip.html(`
-        <div class="bys-tooltip__title">${escapeHtml(quizTitle)}</div>
+        <div class="bys-tooltip__title">${quizTitle}</div>
         <div class="bys-tooltip__content">
           <div class="bys-tooltip__fraction">${escapeHtml(pointsFraction)}</div>
           <div class="bys-tooltip__percentage">${escapeHtml(percentage)}</div>
@@ -152,7 +185,7 @@ jQuery(document).ready(function($) {
     $('.bys-tooltip-instance').remove();
   }
 
-  $table.on('mouseenter', '.bys-quiz-icon[data-quiz-id]:not([data-tip-loaded])', async function() {
+  $table.on('mouseenter', '.group-reporting__quiz-icon[data-quiz-id]:not([data-tip-loaded])', async function() {
     const $icon = $(this);
     const quizId = parseInt($icon.data('quizId'));
     const userId = parseInt($icon.data('userId'));
@@ -178,7 +211,7 @@ jQuery(document).ready(function($) {
         : 'N/A';
 
       const tip = `${$icon.data('quizTitle')}|${pointsFraction}|${$icon.data('percent')}%`;
-      $icon.attr('data-tip', escapeHtml(tip)).attr('data-tip-loaded', '1');
+      $icon.attr('data-tip', tip).attr('data-tip-loaded', '1');
       createAndShowTooltip($icon);
     } catch (err) {
       console.error(`[group-reporting] Failed to fetch quiz attempts for user ${userId}, quiz ${quizId}:`, err);
@@ -187,11 +220,11 @@ jQuery(document).ready(function($) {
     }
   });
 
-  $table.on('mouseenter', '.bys-quiz-icon[data-tip-loaded]', function() {
+  $table.on('mouseenter', '.group-reporting__quiz-icon[data-tip-loaded]', function() {
     createAndShowTooltip($(this));
   });
 
-  $table.on('mouseleave', '.bys-quiz-icon', function() {
+  $table.on('mouseleave', '.group-reporting__quiz-icon', function() {
     destroyTooltip();
   });
 
@@ -225,33 +258,35 @@ jQuery(document).ready(function($) {
     const cachedCourses = store.getCourses();
     const cachedUserIds = store.getUserIds();
 
-    if (cachedGroupId !== null && cachedCourses !== null && cachedUserIds !== null) {
-      console.log('[bys-store] group-reporting: HIT — pre-rendering from cache', {
-        group_id: cachedGroupId,
-        courses: cachedCourses.length,
-        users: cachedUserIds.length,
-      });
+    const cachedHydratedUsers = store.getUsers();
+    if (cachedGroupId !== null && cachedCourses !== null && cachedHydratedUsers !== null) {
       currentGroupId  = cachedGroupId;
       coursesInView   = cachedCourses;
       allGroupUserIds = cachedUserIds;
+      // Render the column headers and the first page of users from the cache.
+      // Course cells stay as loading placeholders until progress fetches resolve
+      // in populateTableFromAPI (triggered by bys:groupSelected).
       rebuildTableHeader(cachedCourses);
-      showSkeletonRows(Math.min(PAGE_SIZE, cachedUserIds.length || PAGE_SIZE), cachedCourses.length);
-    } else {
-      console.log('[bys-store] group-reporting: MISS — waiting for bys:groupSelected');
+      const firstPage = cachedHydratedUsers.slice(0, PAGE_SIZE);
+      renderUserRowsFromCache(cachedCourses, firstPage);
+      usersInView = firstPage;
+      loadedOffset = firstPage.length;
     }
   })();
 
   $(document).on('bys:groupSelected', async function(_, data) {
     const groupId = data.groupId;
-    const baseUsersStats = data.baseUsersStats || {};
-    const courses = data.courses || [];
     if (!groupId) return;
     currentGroupId = groupId;
+
+    // Read from the store now — group-select wrote both before firing this event.
+    const userIds = store.getUserIds() || [];
+    const courses = store.getCourses() || [];
 
     // Reset filter state on group change
     selectedCourseIds = [];
     selectedUserIds   = [];
-    allGroupUserIds   = data.baseUsersStats?.user_ids || [];
+    allGroupUserIds   = userIds;
     allGroupUsers     = [];
     allGroupUsersLoaded = false;
     activeFilters = { courseIds: [], userIds: [], courseStatus: '', userStatus: '', enrolmentDate: { from: '', to: '' }, completionDate: { from: '', to: '' } };
@@ -262,54 +297,95 @@ jQuery(document).ready(function($) {
     currentSort   = 'first_name_asc';
     sortedUsers   = [];
     displayedCount = 0;
-    $block.find('#sort-select').val('first_name_asc');
+    $sortSelect.val('first_name_asc');
     resetFilterFormUI();
     updateCompletionSortVisibility();
 
-    await populateTableFromAPI(groupId, baseUsersStats, courses);
+    await populateTableFromAPI(groupId, userIds, courses);
   });
 
   // ── Table population ──────────────────────────────────────────────────────────
-  async function populateTableFromAPI(groupId, baseUsersStats, courses) {
+  async function populateTableFromAPI(groupId, userIds, courses) {
     try {
-      const userIds = baseUsersStats.user_ids || [];
       const firstTenUserIds = userIds.slice(0, 10);
 
       rebuildTableHeader(courses);
-      showSkeletonRows(firstTenUserIds.length || PAGE_SIZE, courses.length);
+
+      // Preserve any rows the pre-render path already put on screen. Only
+      // show the bulk skeleton when the tbody is empty (cold load).
+      const tbodyHasRows = $table.find('tbody tr').length > 0;
+      if (!tbodyHasRows) {
+        showSkeletonRows(firstTenUserIds.length || PAGE_SIZE, courses.length);
+      }
 
       if (!firstTenUserIds.length) {
         rebuildTableBody(courses, [], {});
         return;
       }
 
-      const usersUrl = `/wp-json/bys-groups/v1/groups/${groupId}/users?user_ids=${firstTenUserIds.join(',')}`;
-      const usersResponse = await api.get(usersUrl, true);
+      // Hydrated users come from the store on the warm path (no /users call).
+      // Fall back to the network only if the store hasn't been populated yet.
+      const cachedHydrated = store.getCurrentGroup() === Number(groupId)
+        ? store.getHydratedUsers(firstTenUserIds)
+        : null;
 
-      if (!usersResponse || !Array.isArray(usersResponse)) {
-        console.error('Invalid users response:', usersResponse);
-        return;
+      let usersResponse;
+      if (cachedHydrated !== null) {
+        console.log('[bys-store] group-reporting: HIT hydrated — skipping /users fetch');
+        usersResponse = cachedHydrated;
+      } else {
+        console.log('[bys-store] group-reporting: MISS hydrated — fetching /users');
+        const usersUrl = `/wp-json/bys-groups/v1/groups/${groupId}/users?user_ids=${firstTenUserIds.join(',')}`;
+        usersResponse = await api.get(usersUrl, true);
+        if (!usersResponse || !Array.isArray(usersResponse)) {
+          console.error('Invalid users response:', usersResponse);
+          return;
+        }
+        store.setUsers(usersResponse); // write-through so other blocks reuse it
       }
 
       usersInView = usersResponse;
       coursesInView = courses;
       courseQuizLoadedIdx.clear();
 
+      // Render rows now — name/email/status synchronously from usersResponse;
+      // course cells start as skeletons (from the cell template) and fill in
+      // per-user as each progress fetch resolves below. We re-render whenever
+      // the existing rows don't match the new user set (group switch / cold
+      // load); we keep them when the pre-render path already painted them.
+      const $tbody = $table.find('tbody');
+      const $existingFirstRow = $tbody.find('tr').first();
+      const existingUserId = $existingFirstRow.length ? parseInt($existingFirstRow.data('userId'), 10) : null;
+      const needsRerender = !existingUserId || !firstTenUserIds.includes(existingUserId);
+      if (needsRerender) {
+        renderUserRowsFromCache(courses, usersResponse);
+        // Re-apply expanded-course visibility to freshly-rendered cells.
+        if (expandedIdx !== null) expandCourse(expandedIdx);
+      }
+
       const courseIds = courses.map(c => c.id).join(',');
 
-      await Promise.all(usersResponse.map(async (user) => {
-        if (!courseIds) { userCourseProgressAll[user.id] = []; return; }
-        const progressUrl = `/wp-json/bys-groups/v1/users/${user.id}/course-progress?course_ids=${courseIds}`;
-        try {
-          userCourseProgressAll[user.id] = await api.get(progressUrl, true);
-        } catch (err) {
-          console.error(`Failed to fetch course progress for user ${user.id}:`, err);
+      // Per-user progress fetches in parallel — no Promise.all wait. Each
+      // .then() fills only its own row's cells, so users trickle in as their
+      // data lands instead of waiting for the slowest fetch.
+      usersResponse.forEach((user) => {
+        if (!courseIds) {
           userCourseProgressAll[user.id] = [];
+          return;
         }
-      }));
+        const endpoint = `/wp-json/bys-groups/v1/users/${user.id}/course-progress?course_ids=${courseIds}`;
+        api.get(endpoint, true)
+          .then((progressArray) => {
+            userCourseProgressAll[user.id] = Array.isArray(progressArray) ? progressArray : [];
+            const $row = $tbody.find(`tr[data-user-id="${user.id}"]`);
+            if ($row.length) applyCourseProgressToRow($row, courses, userCourseProgressAll[user.id]);
+          })
+          .catch((err) => {
+            console.error(`Failed to fetch course progress for user ${user.id}:`, err);
+            userCourseProgressAll[user.id] = [];
+          });
+      });
 
-      rebuildTableHeader(courses);
-      rebuildTableBody(courses, usersResponse, userCourseProgressAll);
       loadedOffset = firstTenUserIds.length;
       updateShowMoreButton();
 
@@ -332,7 +408,7 @@ jQuery(document).ready(function($) {
 
   /**
    * Show/hide course columns based on activeFilters.courseIds.
-   * Works by toggling course-col--hidden on matching [data-course-idx] elements.
+   * Works by toggling group-reporting__col--hidden on matching [data-course-idx] elements.
    */
   function applyColumnFilter() {
     const filtered = activeFilters.courseIds.length > 0;
@@ -343,14 +419,14 @@ jQuery(document).ready(function($) {
       // Sub-columns only matter if this course is the expanded one — leave their
       // own hidden state alone; just hide the whole group if column is filtered out.
       if (!visible) {
-        $table.find(`[data-course-idx="${idx}"]`).addClass('course-col--hidden');
+        $table.find(`[data-course-idx="${idx}"]`).addClass('group-reporting__col--hidden');
       } else if (expandedIdx !== idx) {
-        // Visible but not expanded: clear course-col--hidden from everything for
+        // Visible but not expanded: clear group-reporting__col--hidden from everything for
         // this course (the toggle button inside the header also receives it when
         // hidden), then keep sub-cols hidden via their own class.
-        $table.find(`[data-course-idx="${idx}"]`).removeClass('course-col--hidden');
-        $table.find(`.course-sub-col[data-course-idx="${idx}"]`).addClass('course-sub-col--hidden');
-        $table.find(`.course-sub-cell[data-course-idx="${idx}"]`).addClass('course-sub-col--hidden');
+        $table.find(`[data-course-idx="${idx}"]`).removeClass('group-reporting__col--hidden');
+        $table.find(`.group-reporting__sub-col[data-course-idx="${idx}"]`).addClass('group-reporting__sub-col--hidden');
+        $table.find(`.group-reporting__sub-cell[data-course-idx="${idx}"]`).addClass('group-reporting__sub-col--hidden');
       }
     });
   }
@@ -424,12 +500,12 @@ jQuery(document).ready(function($) {
    * All filtering is against in-memory data — no re-fetch.
    */
   function applyRowFilters() {
-    $table.find('tbody tr.reporting-table__row').each(function() {
+    $table.find('tbody tr.group-reporting__row').each(function() {
       const userId = parseInt($(this).data('userId'), 10);
       const user = usersInView.find(u => u.id === userId);
       if (!user) return;
       const visible = userPassesRowFilter(user);
-      $(this).toggleClass('reporting-table__row--filtered', !visible);
+      $(this).toggleClass('group-reporting__row--filtered', !visible);
       $(this).css('display', visible ? '' : 'none');
     });
   }
@@ -437,43 +513,43 @@ jQuery(document).ready(function($) {
   // ── Course-dependent field enable/disable ────────────────────────────────────
   function updateCourseDepFieldState() {
     const singleCourse = selectedCourseIds.length === 1;
-    const $depFields = $block.find('.filters__field--course-dep');
+    const $depFields = $courseDepFields;
     $depFields.toggleClass('is-disabled', !singleCourse);
     $depFields.find('select, input[type="date"], .date-range__trigger').prop('disabled', !singleCourse);
 
     if (!singleCourse) {
-      $block.find('#filter-status').val('').addClass('is-placeholder');
-      resetDateRangeField('filter-enrolment-date-from', 'filter-enrolment-date-to', 'enrolment-date-range-text', 'enrolment-date-range-dropdown');
-      resetDateRangeField('filter-completion-date-from', 'filter-completion-date-to', 'completion-date-range-text', 'completion-date-range-dropdown');
+      $filterStatus.val('').addClass('is-placeholder');
+      resetDateRangeField($filterEnrolFrom, $filterEnrolTo, $enrolRangeText, $enrolRangeDropdown);
+      resetDateRangeField($filterComplFrom, $filterComplTo, $complRangeText, $complRangeDropdown);
     }
   }
 
   function updateCompletionSortVisibility() {
     const singleCourse = activeFilters.courseIds.length === 1;
-    const $opts = $block.find('.sort-option--completion');
+    const $opts = $sortOptionsCompletion;
     $opts.toggleClass('hidden', !singleCourse);
     // If a completion sort is active but the option is now hidden, fall back to default
     if (!singleCourse && (currentSort === 'completion_date_asc' || currentSort === 'completion_date_desc')) {
       currentSort = 'first_name_asc';
-      $block.find('#sort-select').val('first_name_asc');
+      $sortSelect.val('first_name_asc');
     }
   }
 
   // ── Filter form submit ────────────────────────────────────────────────────────
-  $block.find('.filters__form').on('submit', async function(e) {
+  $filtersForm.on('submit', async function(e) {
     e.preventDefault();
 
     const singleCourse = selectedCourseIds.length === 1;
 
     activeFilters.courseIds      = selectedCourseIds.slice();
     activeFilters.userIds        = selectedUserIds.slice();
-    activeFilters.courseStatus   = singleCourse ? $block.find('#filter-status').val() : '';
-    activeFilters.userStatus     = $block.find('#filter-user-status').val();
-    activeFilters.enrolmentDate  = singleCourse ? { from: $block.find('#filter-enrolment-date-from').val(), to: $block.find('#filter-enrolment-date-to').val() } : { from: '', to: '' };
-    activeFilters.completionDate = singleCourse ? { from: $block.find('#filter-completion-date-from').val(), to: $block.find('#filter-completion-date-to').val() } : { from: '', to: '' };
+    activeFilters.courseStatus   = singleCourse ? $filterStatus.val() : '';
+    activeFilters.userStatus     = $filterUserStatus.val();
+    activeFilters.enrolmentDate  = singleCourse ? { from: $filterEnrolFrom.val(), to: $filterEnrolTo.val() } : { from: '', to: '' };
+    activeFilters.completionDate = singleCourse ? { from: $filterComplFrom.val(), to: $filterComplTo.val() } : { from: '', to: '' };
 
-    closeMultiselect($block.find('#bys-multiselect-course'));
-    closeMultiselect($block.find('#bys-multiselect-users'));
+    closeMultiselect($msCourse);
+    closeMultiselect($msUsers);
 
     // Row filters may match users not yet loaded — drain remaining pages first
     const hasRowFilter = activeFilters.userIds.length > 0 ||
@@ -482,7 +558,7 @@ jQuery(document).ready(function($) {
       activeFilters.completionDate.from || activeFilters.completionDate.to;
 
     if (hasRowFilter && loadedOffset < allGroupUserIds.length) {
-      const $btn = $block.find('.filters__submit');
+      const $btn = $submitBtn;
       $btn.prop('disabled', true).text('Loading…');
       await loadAllRemainingUsers();
       $btn.prop('disabled', false).text('Filter');
@@ -493,7 +569,7 @@ jQuery(document).ready(function($) {
   });
 
   // ── Filter reset ──────────────────────────────────────────────────────────────
-  $block.find('.filters__reset').on('click', function() {
+  $resetBtn.on('click', function() {
     selectedCourseIds = [];
     selectedUserIds   = [];
     activeFilters = { courseIds: [], userIds: [], courseStatus: '', userStatus: '', enrolmentDate: { from: '', to: '' }, completionDate: { from: '', to: '' } };
@@ -501,49 +577,138 @@ jQuery(document).ready(function($) {
     resetFilterFormUI();
     updateCourseDepFieldState();
     updateCompletionSortVisibility();
-    closeMultiselect($block.find('#bys-multiselect-course'));
-    closeMultiselect($block.find('#bys-multiselect-users'));
+    closeMultiselect($msCourse);
+    closeMultiselect($msUsers);
     populateCourseMultiselect();
     populateUserMultiselect();
 
     // Restore all rows and columns
-    $table.find('tbody tr').css('display', '').removeClass('reporting-table__row--filtered');
-    $table.find('[data-course-idx]').removeClass('course-col--hidden');
-    $table.find('.course-sub-col, .course-sub-cell').addClass('course-sub-col--hidden');
+    $table.find('tbody tr').css('display', '').removeClass('group-reporting__row--filtered');
+    $table.find('[data-course-idx]').removeClass('group-reporting__col--hidden');
+    $table.find('.group-reporting__sub-col, .group-reporting__sub-cell').addClass('group-reporting__sub-col--hidden');
     expandedIdx = null;
   });
 
-  function resetDateRangeField(fromId, toId, textId, dropdownId) {
-    $block.find('#' + fromId).val('').removeAttr('min').removeAttr('max');
-    $block.find('#' + toId).val('').removeAttr('min').removeAttr('max');
-    $block.find('#' + textId).text('Select a date range');
-    $block.find('#' + dropdownId).addClass('hidden');
+  // ── Flatpickr instances ─────────────────────────────────────────────────────
+  // Shared config for filter date pickers (date-only, no time).
+  // altInput=true means flatpickr hides the original input and displays a
+  // formatted alt input; the hidden input still holds the machine value (Y-m-d).
+  const FP_FILTER = {
+    dateFormat:    'd-m-y',
+    altInput:      true,
+    altInputClass: 'flatpickr-input group-reporting__datetime',
+    altFormat:     'j M Y',
+    disableMobile: true,
+    allowInput:    false,
+    onReady(_, __, fp) {
+      fp.calendarContainer.classList.add('bys-fp');
+      if (fp.altInput && fp.config.placeholder) {
+        fp.altInput.placeholder = fp.config.placeholder;
+      }
+    },
+  };
+
+  function syncClearButton($input, hasValue) {
+    // Clear button is a sibling of the (hidden) original input; flatpickr's alt
+    // input sits between them. Use the input's parent to find the button.
+    const $btn = $input.parent().find('.group-reporting__date-clear');
+    if (hasValue) $btn.removeAttr('hidden');
+    else          $btn.attr('hidden', '');
   }
 
-  function validateDateRange(fromId, toId) {
-    const $from = $block.find('#' + fromId);
-    const $to   = $block.find('#' + toId);
+  let fpEnrolFrom, fpEnrolTo, fpComplFrom, fpComplTo;
+
+  fpEnrolFrom = flatpickr($filterEnrolFrom[0], {
+    ...FP_FILTER,
+    placeholder: 'Pick a date',
+    onChange(_, dateStr) {
+      fpEnrolTo.set('minDate', dateStr || null);
+      syncClearButton($filterEnrolFrom, Boolean(dateStr));
+      updateDateRangeText($filterEnrolFrom, $filterEnrolTo, $enrolRangeText);
+    },
+  });
+  fpEnrolTo = flatpickr($filterEnrolTo[0], {
+    ...FP_FILTER,
+    placeholder: 'Pick a date',
+    onChange(_, dateStr) {
+      fpEnrolFrom.set('maxDate', dateStr || null);
+      syncClearButton($filterEnrolTo, Boolean(dateStr));
+      updateDateRangeText($filterEnrolFrom, $filterEnrolTo, $enrolRangeText);
+    },
+  });
+  fpComplFrom = flatpickr($filterComplFrom[0], {
+    ...FP_FILTER,
+    placeholder: 'Pick a date',
+    onChange(_, dateStr) {
+      fpComplTo.set('minDate', dateStr || null);
+      syncClearButton($filterComplFrom, Boolean(dateStr));
+      updateDateRangeText($filterComplFrom, $filterComplTo, $complRangeText);
+    },
+  });
+  fpComplTo = flatpickr($filterComplTo[0], {
+    ...FP_FILTER,
+    placeholder: 'Pick a date',
+    onChange(_, dateStr) {
+      fpComplFrom.set('maxDate', dateStr || null);
+      syncClearButton($filterComplTo, Boolean(dateStr));
+      updateDateRangeText($filterComplFrom, $filterComplTo, $complRangeText);
+    },
+  });
+
+  // Map each input to its flatpickr instance — used by resetDateRangeField
+  // and the clear-button handler.
+  const fpFor = new Map([
+    [$filterEnrolFrom[0].id, fpEnrolFrom],
+    [$filterEnrolTo[0].id,   fpEnrolTo],
+    [$filterComplFrom[0].id, fpComplFrom],
+    [$filterComplTo[0].id,   fpComplTo],
+  ]);
+
+  // Clear-button handler. Delegated so it works regardless of when flatpickr
+  // mutates the surrounding DOM.
+  $block.on('click', '.group-reporting__date-clear', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const targetId = $(this).data('target');
+    const fp = fpFor.get(targetId);
+    if (fp) fp.clear(); // triggers onChange → syncClearButton + updateDateRangeText
+  });
+
+  // Field-wrap click → open the picker. flatpickr's auto click-open can
+  // fail when the original input is initialised inside a display:none parent
+  // (our dropdown starts hidden), so we wire it explicitly.
+  $block.on('click', '.group-reporting__date-field__input', function (e) {
+    if (e.target.closest('.group-reporting__date-clear')) return; // clear has its own handler
+    // Find the (hidden) original input inside this wrap and look up its fp.
+    const inputId = $(this).find('input.group-reporting__datetime').attr('id');
+    const fp = fpFor.get(inputId);
+    if (fp) fp.open();
+  });
+
+  function resetDateRangeField($from, $to, $text, $dropdown) {
+    // Clear via flatpickr so onChange fires (which hides clear buttons + updates text).
+    const fpFrom = fpFor.get($from[0].id);
+    const fpTo   = fpFor.get($to[0].id);
+    if (fpFrom) fpFrom.clear();
+    if (fpTo)   fpTo.clear();
+    $text.text('Select a date range');
+    $dropdown.addClass('hidden');
+  }
+
+  function updateDateRangeText($from, $to, $text) {
     const dateFrom = $from.val();
     const dateTo   = $to.val();
-    if (dateFrom) $to.attr('min', dateFrom); else $to.removeAttr('min');
-    if (dateTo)   $from.attr('max', dateTo); else $from.removeAttr('max');
-    if (dateFrom && dateTo && dateFrom > dateTo) $from.val(dateTo);
-  }
-
-  function updateDateRangeText(fromId, toId, textId) {
-    const dateFrom = $block.find('#' + fromId).val();
-    const dateTo   = $block.find('#' + toId).val();
-    if (!dateFrom && !dateTo)     $block.find('#' + textId).text('Select a date range');
-    else if (dateFrom && dateTo)  $block.find('#' + textId).text(`${dateFrom} – ${dateTo}`);
-    else if (dateFrom)            $block.find('#' + textId).text(`From ${dateFrom}`);
-    else                          $block.find('#' + textId).text(`Until ${dateTo}`);
+    if (!dateFrom && !dateTo)     $text.text('Select a date range');
+    else if (dateFrom && dateTo)  $text.text(`${dateFrom} – ${dateTo}`);
+    else if (dateFrom)            $text.text(`From ${dateFrom}`);
+    else                          $text.text(`Until ${dateTo}`);
   }
 
   function resetFilterFormUI() {
-    $block.find('#filter-status').val('').addClass('is-placeholder');
-    $block.find('#filter-user-status').val('').addClass('is-placeholder');
-    resetDateRangeField('filter-enrolment-date-from', 'filter-enrolment-date-to', 'enrolment-date-range-text', 'enrolment-date-range-dropdown');
-    resetDateRangeField('filter-completion-date-from', 'filter-completion-date-to', 'completion-date-range-text', 'completion-date-range-dropdown');
+    $filterStatus.val('').addClass('is-placeholder');
+    $filterUserStatus.val('').addClass('is-placeholder');
+    resetDateRangeField($filterEnrolFrom, $filterEnrolTo, $enrolRangeText, $enrolRangeDropdown);
+    resetDateRangeField($filterComplFrom, $filterComplTo, $complRangeText, $complRangeDropdown);
   }
 
   // ── Table builders ────────────────────────────────────────────────────────────
@@ -556,7 +721,7 @@ jQuery(document).ready(function($) {
       const tr = row.querySelector('tr');
       for (let c = 0; c < courseCount; c++) {
         const td = document.createElement('td');
-        td.className = 'course-cell course-cell--badge';
+        td.className = 'group-reporting__cell group-reporting__cell--badge';
         const span = document.createElement('span');
         span.style.width = '24px';
         td.appendChild(span);
@@ -567,10 +732,10 @@ jQuery(document).ready(function($) {
   }
 
   function showSkeletonCourseHeaders(count) {
-    const headerRow = $table.find('thead .reporting-table__head')[0];
+    const headerRow = $table.find('thead .group-reporting__table-head')[0];
     if (!headerRow) return;
     // Remove any existing skeleton course headers
-    $(headerRow).find('.course-col-header--skeleton').remove();
+    $(headerRow).find('.group-reporting__course-header--skeleton').remove();
     const skeletonTemplate = document.getElementById('skeleton-course-header-template');
     for (let i = 0; i < count; i++) {
       headerRow.appendChild(skeletonTemplate.content.cloneNode(true));
@@ -582,19 +747,19 @@ jQuery(document).ready(function($) {
     $thead.html('');
 
     const headerRow = document.createElement('tr');
-    headerRow.className = 'reporting-table__head';
+    headerRow.className = 'group-reporting__table-head';
 
     const statusTh = document.createElement('th');
-    statusTh.className = 'col-status';
+    statusTh.className = 'group-reporting__col group-reporting__col--status';
     headerRow.appendChild(statusTh);
 
     const nameTh = document.createElement('th');
-    nameTh.className = 'col-name';
+    nameTh.className = 'group-reporting__col group-reporting__col--name';
     nameTh.textContent = 'Name';
     headerRow.appendChild(nameTh);
 
     const emailTh = document.createElement('th');
-    emailTh.className = 'col-email';
+    emailTh.className = 'group-reporting__col group-reporting__col--email';
     emailTh.textContent = 'Email';
     headerRow.appendChild(emailTh);
 
@@ -606,14 +771,14 @@ jQuery(document).ready(function($) {
       $headers.find('[data-course-idx]').attr('data-course-idx', idx);
 
       const courseTitle = course.title?.rendered || course.title || '';
-      $headers.find('.bys-course-toggle')
-        .text(truncateTitle(courseTitle))
+      $headers.find('.group-reporting__course-toggle')
+        .html(truncateTitle(courseTitle))
         .attr('title', courseTitle)
         .attr('data-course-idx', idx);
       if (course.required) {
-        $headers.find('.bys-required-badge').removeClass('hidden');
+        $headers.find('.group-reporting__required-badge').removeClass('hidden');
       }
-      $headers.find('.bys-dl-link').attr('title', `Download ${escapeHtml(courseTitle)}`).attr('data-course-idx', idx);
+      $headers.find('.group-reporting__dl-link').attr('title', `Download ${courseTitle}`).attr('data-course-idx', idx);
 
       $headers.children().each(function() {
         headerRow.appendChild(this);
@@ -625,7 +790,7 @@ jQuery(document).ready(function($) {
 
   function buildQuizBars(quizData, userId, userQuizProgress) {
     if (!quizData || quizData.length === 0) {
-      return '<span class="bys-quiz-empty">—</span>';
+      return '<span class="group-reporting__quiz-empty">—</span>';
     }
 
     const barsMaxHeight = 24;
@@ -636,16 +801,62 @@ jQuery(document).ready(function($) {
 
       if (!summary || summary.total_attempts === 0) {
         const tip = `${quizTitle}|Not attempted`;
-        return `<span class="bys-quiz-icon bys-quiz-icon--neutral" data-tip="${escapeHtml(tip)}" data-quiz-id="${quizId}" data-quiz-title="${escapeHtml(quizTitle)}"></span>`;
+        return `<span class="group-reporting__quiz-icon group-reporting__quiz-icon--neutral" data-tip="${tip}" data-quiz-id="${quizId}" data-quiz-title="${quizTitle}"></span>`;
       }
 
-      const cls = summary.pass_highest ? 'bys-quiz-icon--pass' : 'bys-quiz-icon--fail';
+      const cls = summary.pass_highest ? 'group-reporting__quiz-icon--pass' : 'group-reporting__quiz-icon--fail';
       const barHeight = barsMaxHeight * (summary.percent_highest * 0.01);
       const tip = `${quizTitle}|Loading...|${Math.round(summary.percent_highest)}%`;
 
-      return `<span class="bys-quiz-icon ${cls}" data-tip="${escapeHtml(tip)}" data-quiz-id="${quizId}" data-user-id="${userId}" data-quiz-title="${escapeHtml(quizTitle)}" data-percent="${Math.round(summary.percent_highest)}" style="height: ${barHeight}px"></span>`;
+      return `<span class="group-reporting__quiz-icon ${cls}" data-tip="${tip}" data-quiz-id="${quizId}" data-user-id="${userId}" data-quiz-title="${quizTitle}" data-percent="${Math.round(summary.percent_highest)}" style="height: ${barHeight}px"></span>`;
     });
-    return `<div class="bys-quiz-icons">${bars.join('')}</div>`;
+    return `<div class="group-reporting__quiz-icons">${bars.join('')}</div>`;
+  }
+
+  /**
+   * Fast first paint: render a row per cached hydrated user using only the
+   * fields the store gives us (status, name, email). All markup comes from
+   * #group-reporting__row-template + #group-reporting__cell-template — no HTML
+   * strings are constructed in this script. Course cells stay empty until
+   * populateTableFromAPI's progress fetches resolve and rebuildTableBody runs.
+   */
+  function renderUserRowsFromCache(courses, users) {
+    const $tbody       = $table.find('tbody');
+    const rowTemplate  = document.getElementById('group-reporting__row-template');
+    const cellTemplate = document.getElementById('group-reporting__cell-template');
+
+    $tbody.html('');
+
+    users.forEach((user) => {
+      const $fragment = $(rowTemplate.content.cloneNode(true));
+      const $tr       = $fragment.find('tr');
+
+      $tr.attr('data-user-id', user.id);
+
+      // Status dot — toggle modifier class for online/offline/never.
+      const userStatus = user.status || 'never';
+      $tr.find('.status-badge').addClass('status-badge--' + userStatus);
+
+      // Name + detail link. .text() escapes safely — no manual escapeHtml needed.
+      const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.display_name || '';
+      $tr.find('.group-reporting__name-link')
+        .attr('href', detailUrl + '?group_id=' + currentGroupId + '&user_id=' + user.id)
+        .text(fullName);
+
+      // Email
+      $tr.find('.group-reporting__col--email').text(user.email || '');
+
+      // Course cells — clone the per-course cell template once per course.
+      // Inner spans stay empty so they don't claim "Not Started" before
+      // progress data arrives.
+      courses.forEach((course, idx) => {
+        const $cells = $(cellTemplate.content.cloneNode(true));
+        $cells.find('td').attr('data-course-idx', idx);
+        $tr.append($cells);
+      });
+
+      $tbody.append($fragment);
+    });
   }
 
   function rebuildTableBody(courses, users, userCourseProgress) {
@@ -653,11 +864,58 @@ jQuery(document).ready(function($) {
     appendTableRows(courses, users, userCourseProgress);
   }
 
+  /**
+   * Update one existing row's course cells in place — used by the trickle-in
+   * path in populateTableFromAPI when a single user's progress fetch resolves.
+   * Mirrors the per-course cell-fill logic in appendTableRows but mutates the
+   * already-rendered cells instead of cloning the template.
+   */
+  function applyCourseProgressToRow($tr, courses, userProgress) {
+    const progress = Array.isArray(userProgress) ? userProgress : [];
+
+    courses.forEach((course, idx) => {
+      const courseData = progress.find((cp) => cp.course_id === course.id);
+      const progressStatus = courseData?.progress_status || 'not_started';
+
+      let status = 'not-started';
+      if (progressStatus === 'completed') status = 'completed';
+      else if (progressStatus === 'in_progress') status = 'in-progress';
+
+      // Badge cell — replace the skeleton span's class with the completion-badge state.
+      $tr.find(`.group-reporting__cell--badge[data-course-idx="${idx}"] span`)
+        .attr('class', `completion-badge completion-badge--${status}`);
+
+      // Progress sub-cell
+      const stepsCompleted = courseData?.steps_completed || 0;
+      const stepsTotal = courseData?.steps_total || 0;
+      const percentage = stepsTotal > 0 ? Math.round((stepsCompleted / stepsTotal) * 100) : 0;
+      const percentageClass = percentage === 100 ? 'complete' : percentage === 0 ? 'not-started' : 'in-progress';
+
+      $tr.find(`.group-reporting__sub-cell--progress[data-course-idx="${idx}"]`).html(`
+        <div class="group-reporting__progress-wrap"><div class="group-reporting__progress-bar" style="width:${percentage}%;"></div></div>
+        <span class="group-reporting__percent group-reporting__percent--${percentageClass}">${percentage}%</span>
+      `);
+
+      // Quizzing sub-cell — defaults to a loading spinner until the course
+      // column is expanded and loadQuizDataForCourse fills in the real bars.
+      $tr.find(`.group-reporting__sub-cell--quizzing[data-course-idx="${idx}"]`)
+        .html('<span class="group-reporting__quiz-loading"><i class="fa-regular fa-spinner-third fa-spin"></i></span>');
+
+      // Date sub-cells
+      const enrolledAt = courseData?.enrolled_at || '';
+      const dateCompleted = courseData?.date_completed || '';
+      $tr.find(`.group-reporting__sub-cell--enrolment[data-course-idx="${idx}"]`)
+        .html(`<span class="group-reporting__date">${enrolledAt ? formatDate(enrolledAt) : 'Not started'}</span>`);
+      $tr.find(`.group-reporting__sub-cell--completion[data-course-idx="${idx}"]`)
+        .html(`<span class="group-reporting__date">${dateCompleted ? formatDate(dateCompleted) : 'Not completed'}</span>`);
+    });
+  }
+
   function appendTableRows(courses, users, userCourseProgress) {
     const $tbody = $table.find('tbody');
 
     const rowTemplate = document.getElementById('skeleton-row-template');
-    const cellTemplate = document.getElementById('course-cell-template');
+    const cellTemplate = document.getElementById('group-reporting__cell-template');
 
     users.forEach(user => {
       const userProgress = userCourseProgress[user.id] || [];
@@ -665,7 +923,7 @@ jQuery(document).ready(function($) {
       const rowContent = rowTemplate.content.cloneNode(true);
       const $row = $(rowContent);
 
-      $row.find('tr').attr('data-user-id', user.id).removeClass('reporting-table__row--loading');
+      $row.find('tr').attr('data-user-id', user.id).removeClass('group-reporting__row--loading');
 
       const userStatus = user.status || 'never';
       const statusClass = `status-badge--${userStatus}`;
@@ -681,12 +939,12 @@ jQuery(document).ready(function($) {
       $row.find('.status-badge').attr('class', `status-badge ${statusClass}`).html(statusBadge);
 
       const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.display_name || '';
-      $row.find('.col-name').html(`
-        <a href="${detailUrl}?group_id=${currentGroupId}&user_id=${user.id}" class="reporting-table__name-link" onclick="event.stopPropagation();">
+      $row.find('.group-reporting__col--name').html(`
+        <a href="${detailUrl}?group_id=${currentGroupId}&user_id=${user.id}" class="group-reporting__name-link" onclick="event.stopPropagation();">
           ${escapeHtml(fullName)}
         </a>
       `);
-      $row.find('.col-email').html(escapeHtml(user.email));
+      $row.find('.group-reporting__col--email').html(escapeHtml(user.email));
 
       courses.forEach((course, idx) => {
         const courseData = userProgress.find(cp => cp.course_id === course.id);
@@ -700,34 +958,34 @@ jQuery(document).ready(function($) {
         const $cells = $(cellContent);
 
         $cells.find('td').attr('data-course-idx', idx);
-        $cells.find('.course-cell--badge span').attr('class', `completion-badge completion-badge--${status}`);
+        $cells.find('.group-reporting__cell--badge span').attr('class', `completion-badge completion-badge--${status}`);
 
         const stepsCompleted = courseData?.steps_completed || 0;
         const stepsTotal = courseData?.steps_total || 0;
         const percentage = stepsTotal > 0 ? Math.round((stepsCompleted / stepsTotal) * 100) : 0;
         let percentageClass = percentage === 100 ? 'complete' : percentage === 0 ? 'not-started' : 'in-progress';
 
-        $cells.find('.course-sub-cell--progress').html(`
-          <div class="bys-progress-wrap"><div class="bys-progress-bar" style="width:${percentage}%;"></div></div>
-          <span class="bys-percent bys-percent--${percentageClass}">${percentage}%</span>
+        $cells.find('.group-reporting__sub-cell--progress').html(`
+          <div class="group-reporting__progress-wrap"><div class="group-reporting__progress-bar" style="width:${percentage}%;"></div></div>
+          <span class="group-reporting__percent group-reporting__percent--${percentageClass}">${percentage}%</span>
         `);
 
-        $cells.find('.course-sub-cell--quizzing').html('<span class="bys-quiz-loading"><i class="fa-regular fa-spinner-third fa-spin"></i></span>');
+        $cells.find('.group-reporting__sub-cell--quizzing').html('<span class="group-reporting__quiz-loading"><i class="fa-regular fa-spinner-third fa-spin"></i></span>');
 
         const enrolledAt = courseData?.enrolled_at || '';
         const dateCompleted = courseData?.date_completed || '';
-        $cells.find('.course-sub-cell--enrolment').html(`<span class="bys-date">${enrolledAt ? formatDate(enrolledAt) : 'Not started'}</span>`);
-        $cells.find('.course-sub-cell--completion').html(`<span class="bys-date">${dateCompleted ? formatDate(dateCompleted) : 'Not completed'}</span>`);
+        $cells.find('.group-reporting__sub-cell--enrolment').html(`<span class="group-reporting__date">${enrolledAt ? formatDate(enrolledAt) : 'Not started'}</span>`);
+        $cells.find('.group-reporting__sub-cell--completion').html(`<span class="group-reporting__date">${dateCompleted ? formatDate(dateCompleted) : 'Not completed'}</span>`);
 
         // Apply expanded-course visibility state at creation time so new rows
         // are correct immediately, without depending on a post-append fixup pass.
         if (expandedIdx !== null) {
           if (idx !== expandedIdx) {
             // Non-expanded course: hide badge, keep sub-cells hidden (template default)
-            $cells.find('.course-cell--badge').addClass('course-col--hidden');
+            $cells.find('.group-reporting__cell--badge').addClass('group-reporting__col--hidden');
           } else {
             // Expanded course: show sub-cells
-            $cells.find('.course-sub-cell').removeClass('course-sub-col--hidden');
+            $cells.find('.group-reporting__sub-cell').removeClass('group-reporting__sub-col--hidden');
           }
         }
 
@@ -747,7 +1005,7 @@ jQuery(document).ready(function($) {
 
     const quizSteps = await ensureQuizDataForCourse(course, usersInView);
 
-    $table.find(`.course-sub-cell--quizzing[data-course-idx="${courseIdx}"]`).each(function() {
+    $table.find(`.group-reporting__sub-cell--quizzing[data-course-idx="${courseIdx}"]`).each(function() {
       const userId = $(this).closest('tr').data('userId');
       const userQuizProgress = (userQuizProgressCache[course.id] || {})[userId] || {};
       $(this).html(buildQuizBars(quizSteps, userId, userQuizProgress));
@@ -757,14 +1015,14 @@ jQuery(document).ready(function($) {
   // ── Show More / lazy load ─────────────────────────────────────────────────────
 
   function updateShowMoreButton() {
-    const $btn = $block.find('.bys-show-more');
+    const $btn = $showMoreBtn;
     const hasMore = sortedUsers.length > 0
       ? displayedCount < sortedUsers.length
       : loadedOffset < allGroupUserIds.length;
     $btn.toggleClass('hidden', !hasMore);
   }
 
-  $block.on('click', '.bys-show-more', function() {
+  $block.on('click', '.group-reporting__show-more', function() {
     loadMoreUsers();
   });
 
@@ -780,9 +1038,9 @@ jQuery(document).ready(function($) {
     const courseIds = coursesInView.map(c => c.id).join(',');
     await Promise.all(newUsers.map(async (user) => {
       if (!courseIds) { userCourseProgressAll[user.id] = []; return; }
-      const progressUrl = `/wp-json/bys-groups/v1/users/${user.id}/course-progress?course_ids=${courseIds}`;
+      const endpoint = `/wp-json/bys-groups/v1/users/${user.id}/course-progress?course_ids=${courseIds}`;
       try {
-        userCourseProgressAll[user.id] = await api.get(progressUrl, true);
+        userCourseProgressAll[user.id] = await api.get(endpoint, true);
       } catch (err) {
         console.error(`Failed to fetch course progress for user ${user.id}:`, err);
         userCourseProgressAll[user.id] = [];
@@ -801,7 +1059,7 @@ jQuery(document).ready(function($) {
   }
 
   async function loadMoreUsers() {
-    const $btn = $block.find('.bys-show-more');
+    const $btn = $showMoreBtn;
 
     // Post-sort: data already in memory — just render the next page
     if (sortedUsers.length > 0 && displayedCount < sortedUsers.length) {
@@ -860,7 +1118,7 @@ jQuery(document).ready(function($) {
 
     newUsers.forEach(user => {
       const userQuizProgress = (userQuizProgressCache[course.id] || {})[user.id] || {};
-      $table.find(`tr[data-user-id="${user.id}"] .course-sub-cell--quizzing[data-course-idx="${courseIdx}"]`)
+      $table.find(`tr[data-user-id="${user.id}"] .group-reporting__sub-cell--quizzing[data-course-idx="${courseIdx}"]`)
         .html(buildQuizBars(quizSteps, user.id, userQuizProgress));
     });
   }
@@ -945,7 +1203,7 @@ jQuery(document).ready(function($) {
       const course = coursesInView[wasExpanded];
       if (course && courseQuizLoadedIdx.has(wasExpanded) && userQuizProgressCache[course.id]) {
         const quizSteps = courseQuizStepsCache[course.id] || [];
-        $table.find(`.course-sub-cell--quizzing[data-course-idx="${wasExpanded}"]`).each(function() {
+        $table.find(`.group-reporting__sub-cell--quizzing[data-course-idx="${wasExpanded}"]`).each(function() {
           const userId = $(this).closest('tr').data('userId');
           const userQuizProgress = userQuizProgressCache[course.id][userId] || {};
           $(this).html(buildQuizBars(quizSteps, userId, userQuizProgress));
@@ -960,7 +1218,7 @@ jQuery(document).ready(function($) {
   // ── Course Multiselect ────────────────────────────────────────────────────────
 
   function populateCourseMultiselect() {
-    const $ms = $block.find('#bys-multiselect-course');
+    const $ms = $msCourse;
     const $list = $ms.find('.bys-multiselect__list');
     $list.html('');
 
@@ -975,13 +1233,13 @@ jQuery(document).ready(function($) {
       const title = course.title?.rendered || course.title || '';
       const isChecked = selectedCourseIds.includes(id);
       const requiredMark = course.required
-        ? ' <span class="bys-required-badge" aria-hidden="true">*</span>'
+        ? ' <span class="group-reporting__required-badge" aria-hidden="true">*</span>'
         : '';
       $list.append(`
         <li class="bys-multiselect__option" role="option" aria-selected="${isChecked}" data-course-id="${id}">
           <label>
             <input type="checkbox" value="${id}" ${isChecked ? 'checked' : ''} />
-            <span>${escapeHtml(title)}${requiredMark}</span>
+            <span>${title}${requiredMark}</span>
           </label>
         </li>
       `);
@@ -1005,8 +1263,8 @@ jQuery(document).ready(function($) {
       const title = course.title?.rendered || course.title || '';
       $pills.append(`
         <span class="bys-multiselect__pill" data-course-id="${id}">
-          ${escapeHtml(title)}
-          <button class="bys-multiselect__pill-remove btn-unstyled" type="button" aria-label="Remove ${escapeHtml(title)}" data-course-id="${id}">
+          ${title}
+          <button class="bys-multiselect__pill-remove btn-unstyled" type="button" aria-label="Remove ${title}" data-course-id="${id}">
             <i class="fa-solid fa-xmark"></i>
           </button>
         </span>
@@ -1017,12 +1275,12 @@ jQuery(document).ready(function($) {
   // Open/close toggle
   $block.on('click', '#bys-multiselect-course .bys-multiselect__toggle', function(e) {
     e.stopPropagation();
-    toggleMultiselect($block.find('#bys-multiselect-course'));
+    toggleMultiselect($msCourse);
   });
 
   $block.on('click', '#bys-multiselect-course .bys-multiselect__control', function(e) {
     if ($(e.target).closest('.bys-multiselect__pill-remove').length) return;
-    toggleMultiselect($block.find('#bys-multiselect-course'));
+    toggleMultiselect($msCourse);
   });
 
   function toggleMultiselect($ms) {
@@ -1039,10 +1297,10 @@ jQuery(document).ready(function($) {
 
   $(document).on('click', function(e) {
     if (!$(e.target).closest('#bys-multiselect-course').length) {
-      closeMultiselect($block.find('#bys-multiselect-course'));
+      closeMultiselect($msCourse);
     }
     if (!$(e.target).closest('#bys-multiselect-users').length) {
-      closeMultiselect($block.find('#bys-multiselect-users'));
+      closeMultiselect($msUsers);
     }
   });
 
@@ -1056,7 +1314,7 @@ jQuery(document).ready(function($) {
       selectedCourseIds = selectedCourseIds.filter(x => x !== id);
       $(this).closest('li').attr('aria-selected', 'false');
     }
-    syncPills($block.find('#bys-multiselect-course'));
+    syncPills($msCourse);
     updateCourseDepFieldState();
   });
 
@@ -1067,7 +1325,7 @@ jQuery(document).ready(function($) {
     selectedCourseIds = selectedCourseIds.filter(x => x !== id);
     $block.find(`#bys-multiselect-course-dropdown input[value="${id}"]`).prop('checked', false)
       .closest('li').attr('aria-selected', 'false');
-    syncPills($block.find('#bys-multiselect-course'));
+    syncPills($msCourse);
     updateCourseDepFieldState();
   });
 
@@ -1093,7 +1351,7 @@ jQuery(document).ready(function($) {
    * Result is cached in allGroupUsers for the life of the group selection.
    */
   async function populateUserMultiselect() {
-    const $ms = $block.find('#bys-multiselect-users');
+    const $ms = $msUsers;
     const $list = $ms.find('.bys-multiselect__list');
     const $loading = $ms.find('.bys-multiselect__loading');
     const $empty = $ms.find('.bys-multiselect__empty');
@@ -1196,12 +1454,12 @@ jQuery(document).ready(function($) {
   // Open/close — users
   $block.on('click', '#bys-multiselect-users .bys-multiselect__toggle', function(e) {
     e.stopPropagation();
-    toggleMultiselect($block.find('#bys-multiselect-users'));
+    toggleMultiselect($msUsers);
   });
 
   $block.on('click', '#bys-multiselect-users .bys-multiselect__control', function(e) {
     if ($(e.target).closest('.bys-multiselect__pill-remove').length) return;
-    toggleMultiselect($block.find('#bys-multiselect-users'));
+    toggleMultiselect($msUsers);
   });
 
   // Checkbox toggle — users
@@ -1214,7 +1472,7 @@ jQuery(document).ready(function($) {
       selectedUserIds = selectedUserIds.filter(x => x !== id);
       $(this).closest('li').attr('aria-selected', 'false');
     }
-    syncUserPills($block.find('#bys-multiselect-users'));
+    syncUserPills($msUsers);
   });
 
   // Pill remove — users
@@ -1224,7 +1482,7 @@ jQuery(document).ready(function($) {
     selectedUserIds = selectedUserIds.filter(x => x !== id);
     $block.find(`#bys-multiselect-users-dropdown input[value="${id}"]`).prop('checked', false)
       .closest('li').attr('aria-selected', 'false');
-    syncUserPills($block.find('#bys-multiselect-users'));
+    syncUserPills($msUsers);
   });
 
   // Search within users dropdown
@@ -1258,28 +1516,24 @@ jQuery(document).ready(function($) {
     $block.find('#completion-date-range-dropdown').toggleClass('hidden');
   });
 
-  $(document).on('click.bys-date-range', function(e) {
-    if (!$(e.target).closest('#filters__field--enrolment-date').length) {
+  $(document).on('click.group-reporting__date-range', function(e) {
+    // Ignore clicks inside any flatpickr calendar — it's rendered as a body
+    // sibling, so .closest() against the field wrapper misses it.
+    if ($(e.target).closest('.flatpickr-calendar').length) return;
+    if (!$(e.target).closest('#group-reporting__field--enrolment-date').length) {
       $block.find('#enrolment-date-range-dropdown').addClass('hidden');
     }
-    if (!$(e.target).closest('#filters__field--completion-date').length) {
+    if (!$(e.target).closest('#group-reporting__field--completion-date').length) {
       $block.find('#completion-date-range-dropdown').addClass('hidden');
     }
   });
 
-  $block.on('change', '#filter-enrolment-date-from, #filter-enrolment-date-to', function() {
-    validateDateRange('filter-enrolment-date-from', 'filter-enrolment-date-to');
-    updateDateRangeText('filter-enrolment-date-from', 'filter-enrolment-date-to', 'enrolment-date-range-text');
-  });
-
-  $block.on('change', '#filter-completion-date-from, #filter-completion-date-to', function() {
-    validateDateRange('filter-completion-date-from', 'filter-completion-date-to');
-    updateDateRangeText('filter-completion-date-from', 'filter-completion-date-to', 'completion-date-range-text');
-  });
+  // Native change handlers retired — flatpickr's onChange (configured per
+  // instance above) handles validation and text updates.
 
   // ── Export ────────────────────────────────────────────────────────────────────
 
-  $block.on('click', '.table__actions__export a', async function(e) {
+  $exportBtn.on('click', async function(e) {
     e.preventDefault();
     if (!currentGroupId) return;
 
@@ -1293,7 +1547,7 @@ jQuery(document).ready(function($) {
     }
   });
 
-  $table.on('click', '.bys-dl-link', async function(e) {
+  $table.on('click', '.group-reporting__dl-link', async function(e) {
     e.preventDefault();
     e.stopPropagation();
     if (!currentGroupId) return;
@@ -1369,16 +1623,27 @@ jQuery(document).ready(function($) {
    * Returns the array of quiz steps (may be empty if the course has none).
    */
   async function ensureQuizDataForCourse(course, users) {
-    // ── Step 1: quiz steps (cached per course) ──────────────────────────────
+    // ── Step 1: quiz steps ──────────────────────────────────────────────────
+    // Prefer the per-course quizzes_show_in_reporting baked into /base-group-data
+    // (already in the store). Fall back to the network only if the store
+    // hasn't been populated yet for this group.
     let quizSteps = courseQuizStepsCache[course.id];
     if (!quizSteps) {
-      try {
-        quizSteps = await api.get(endpoints.courseQuizSteps(course.id)) || [];
+      const cachedCourse = (store.getCourses() || []).find((c) => c.id === course.id);
+      if (cachedCourse && Array.isArray(cachedCourse.quizzes_show_in_reporting)) {
+        console.log('[bys-store] group-reporting: HIT quizzes_show_in_reporting from store for course', course.id);
+        quizSteps = cachedCourse.quizzes_show_in_reporting;
         courseQuizStepsCache[course.id] = quizSteps;
-      } catch (err) {
-        console.error(`[group-reporting] Failed to fetch quiz steps for course ${course.id}:`, err);
-        quizSteps = [];
-        courseQuizStepsCache[course.id] = quizSteps;
+      } else {
+        try {
+          console.log('[bys-store] group-reporting: MISS — fetching courseQuizSteps for course', course.id);
+          quizSteps = await api.get(endpoints.courseQuizSteps(course.id)) || [];
+          courseQuizStepsCache[course.id] = quizSteps;
+        } catch (err) {
+          console.error(`[group-reporting] Failed to fetch quiz steps for course ${course.id}:`, err);
+          quizSteps = [];
+          courseQuizStepsCache[course.id] = quizSteps;
+        }
       }
     }
 

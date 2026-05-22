@@ -17,7 +17,7 @@ export default function Edit({ clientId, attributes, setAttributes }) {
 
 	return (
 		<div {...useBlockProps()}>
-			<div className="table-wrapper table__results">
+			<div className="table-wrapper group-reporting__results">
 				<table>
 					<thead>
 						<tr>

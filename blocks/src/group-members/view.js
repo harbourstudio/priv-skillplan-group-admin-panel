@@ -129,10 +129,10 @@ jQuery(document).ready(async ($) => {
         });
     }
 
-    $(document).on('bys:groupSelected', async (_, { groupId, isSiteEditor }) => {
+    $(document).on('bys:groupSelected', async (_, { groupId }) => {
         currentGroupId = groupId;
         showAll        = false;
-        canModify      = !isSiteEditor;
+        canModify      = window.bysGroupsAuth?.isSiteEditor !== true;
 
         $skeleton.show();
         $list.empty();

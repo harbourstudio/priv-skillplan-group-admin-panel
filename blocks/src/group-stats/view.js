@@ -1,68 +1,81 @@
 import { api, endpoints } from '../_shared/api-client.js';
-import { LOADING } from '../_shared/loading.js';
 import store from '../_shared/store.js';
 
 jQuery(document).ready(($) => {
-  const $block = $('.wp-block-bys-groups-group-stats').first(); // will only have 1 instance of this block per page
+  const $block = $('.wp-block-bys-groups-group-stats').first(); // assume one-time block usage per page
   if (!$block) return;
 
-  const $totalMembers = $block.find('[data-bys-stat="total_members"');
-  const $completedCourses = $block.find('[data-bys-stat="completed_courses"]');
-  const $incompleteCourses = $block.find('[data-bys-stat="incomplete_courses"]');
-  const $totalInactiveMembers = $block.find('[data-bys-stat="total_inactive_members"]');
+  const $totalMembers = $block.find('.total_members');
+  const $completedCourses = $block.find('.completed_courses');
+  const $incompleteCourses = $block.find('.incomplete_courses');
+  const $totalInactiveMembers = $block.find('.total_inactive_members');
+  const $allStats = $totalMembers.add($completedCourses).add($incompleteCourses).add($totalInactiveMembers);
 
-  // Show loading state immediately — stats are empty until a group loads
-  $block.find('.stat__number').addClass('stat__number--loading').html('');
+  function setStat($numberEl, value) {
+    $numberEl.html(value);
+    $numberEl.siblings('.skeleton').hide();
+  }
+
+  function showAllSkeletons() {
+    $allStats.each(function () {
+      const $n = $(this);
+      $n.html('');
+      $n.siblings('.skeleton').show();
+    });
+  }
 
   // Fast first paint: if the store already has users cached (from a prior page
-  // in this session), show total_members right away. The other stats need data
-  // we don't cache yet, so they stay in loading state until the event arrives.
+  // in this session), show total_members right away.
   const cachedUsers = store.getUsers();
   if (cachedUsers !== null) {
-    console.log('[bys-store] group-stats: HIT — pre-filling total_members from cache', cachedUsers.length);
-    $totalMembers.removeClass('stat__number--loading').html(cachedUsers.length);
-  } else {
-    console.log('[bys-store] group-stats: MISS — waiting for bys:groupSelected');
+    setStat($totalMembers, cachedUsers.length);
   }
 
   // listen for the custom jquery event triggered by group-select block
-  $(document).on('bys:groupSelected', async (_, {groupId, baseUsersStats, courses}) => {
+  $(document).on('bys:groupSelected', async (_, { groupId }) => {
 
-    // Show loading state on all numbers while data resolves
-    $block.find('.stat__number').addClass('stat__number--loading').html('');
+    showAllSkeletons();
 
-    // Base stats are already available — resolve immediately
-    $totalMembers.removeClass('stat__number--loading').html(baseUsersStats.total_members ?? 0);
-    $totalInactiveMembers.removeClass('stat__number--loading').html(baseUsersStats.total_inactive_members ?? 0);
+    const storeUsers = store.getUsers();
+    setStat($totalMembers, storeUsers ? storeUsers.length : 0);
 
-    // Calculated stats need an async fetch
-    calculateCourseStats(baseUsersStats.user_ids || [], courses || []);
+    // total_inactive_members — independent fetch
+    api.get(endpoints.baseGroupStats(groupId), true)
+      .then((stats) => setStat($totalInactiveMembers, stats?.total_inactive_members ?? 0))
+      .catch((err) => {
+        console.error('[group-stats] Failed to fetch /group-stats', err);
+        setStat($totalInactiveMembers, 0);
+      });
+
+    // Course-completion stats
+    const userIdsForStats = store.getUserIds() || [];
+    const coursesForStats = store.getCourses() || [];
+    calculateCourseStats(userIdsForStats, coursesForStats);
   });
 
   // fetch course completion stats for entire group
   async function calculateCourseStats(userIds, courses) {
     try {
       if (!courses.length || !userIds.length) {
-        $completedCourses.html(0);
-        $incompleteCourses.html(0);
+        setStat($completedCourses, 0);
+        setStat($incompleteCourses, 0);
         return;
       }
 
       const courseIds = courses.map(c => c.id).join(',');
 
-      // Fetch progress for all users in parallel through custom wrapper
       const promises = userIds.map(userId => {
-        const progressUrl = endpoints.groupUserCourseProgress(userId, courseIds);
-        return api.get(progressUrl, false);
+        const endpoint = `/wp-json/bys-groups/v1/users/${userId}/course-progress?course_ids=${courseIds}`;
+        return api.get(endpoint, false);
       });
 
-      const allProgressResults = await Promise.all(promises);
+      const allProgressStatus = await Promise.all(promises);
 
       // Count completed and incomplete courses
       let totalCompleted = 0;
       let totalIncomplete = 0;
 
-      allProgressResults.forEach(progressArray => {
+      allProgressStatus.forEach(progressArray => {
         if (!Array.isArray(progressArray)) return;
         progressArray.forEach(courseProgress => {
           if (courseProgress.progress_status === 'completed') {
@@ -73,12 +86,12 @@ jQuery(document).ready(($) => {
         });
       });
 
-      $completedCourses.removeClass('stat__number--loading').html(totalCompleted);
-      $incompleteCourses.removeClass('stat__number--loading').html(totalIncomplete);
+      setStat($completedCourses, totalCompleted);
+      setStat($incompleteCourses, totalIncomplete);
     } catch (err) {
       console.error('Failed to calculate course stats:', err);
-      $completedCourses.removeClass('stat__number--loading').html(0);
-      $incompleteCourses.removeClass('stat__number--loading').html(0);
+      setStat($completedCourses, 0);
+      setStat($incompleteCourses, 0);
     }
   }
 });
