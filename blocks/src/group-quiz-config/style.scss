@@ -49,6 +49,7 @@
             border-radius: 0.5rem;
             overflow: hidden;
             padding: var(--wp--preset--spacing--5);
+            padding-bottom: 0;
         }
 
         &__show-more {
@@ -76,25 +77,55 @@
             text-align: center;
         }
 
-        &__save-row {
+        // Wrapper for Notify + Save (sits on the right inside .gqc__actions).
+        &__action-buttons {
             margin-left: auto;
-            padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--4);
-            background: var(--wp--preset--color--primary);
+            display: flex;
+            gap: var(--wp--preset--spacing--2);
+            flex-shrink: 0;
 
-            @media (max-width: 1023px) {
-                grid-column: 1 / -1;
-                justify-self: end;
+            @media (max-width: 1279px) {
                 margin-left: 0;
+                justify-content: flex-start;
+                width: 100%;
             }
-            color: white;
+        }
+
+        // Shared button look-and-feel used by Save (primary) and Notify (outline).
+        &__btn-primary,
+        &__btn-outline {
+            padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--4);
             border-radius: 9999px;
             font-size: var(--wp--preset--font-size--small);
             font-weight: 500;
             white-space: nowrap;
-            transition: opacity 0.15s;
+            transition: opacity 0.15s, background-color 0.15s, color 0.15s;
 
-            &:hover:not(:disabled) { opacity: 0.88; }
             &:disabled { opacity: 0.4; cursor: not-allowed; }
+        }
+
+        &__btn-primary {
+            background: var(--wp--preset--color--primary);
+            color: white;
+            &:hover:not(:disabled) { opacity: 0.88; }
+        }
+
+        &__btn-outline {
+            background: white;
+            color: var(--wp--preset--color--primary);
+            border: 1px solid var(--wp--preset--color--primary);
+            &:hover:not(:disabled) {
+                background: var(--wp--preset--color--primary);
+                color: white;
+            }
+        }
+
+        // Save button-specific tweaks layered on top of the shared button styles.
+        &__save-row {
+            @media (max-width: 1279px) {
+                grid-column: 1 / -1;
+                justify-self: end;
+            }
         }
 
         // ── Course section ──────────────────────────────────────────────────────────────
@@ -110,9 +141,10 @@
         &__course-header {
             display: flex;
             justify-content: space-between;
+            gap: var(--wp--preset--spacing--2);
             width: 100%;
 
-            @media (max-width: 1023px) {
+            @media (max-width: 1279px) {
                 flex-direction: column;
                 align-items: flex-start;
                 gap: var(--wp--preset--spacing--1);
@@ -127,7 +159,7 @@
             letter-spacing: 0.04em;
             text-align: right;
 
-            @media (max-width: 1023px) {
+            @media (max-width: 1279px) {
                 text-align: left;
             }
         }
@@ -187,6 +219,17 @@
             }
         }
 
+        &__date-clear {
+            color: var(--wp--preset--color--gray-400);
+            line-height: 1;
+            padding: 4px;
+            font-size: 0.75rem;
+            flex-shrink: 0;
+
+            &:hover     { color: var(--wp--preset--color--red-500); }
+            &[hidden]   { display: none; }
+        }
+
         &__date-icon {
             font-size: 0.6rem;
             color: var(--wp--preset--color--gray-400);
@@ -210,7 +253,7 @@
             display: flex;
             gap: var(--wp--preset--spacing--2);
 
-            @media screen and (max-width: 1023px){
+            @media screen and (max-width: 1279px){
                 flex-direction: column;
             }
          }
@@ -233,7 +276,7 @@
             cursor: pointer;
             transition: opacity 0.15s;
 
-            @media screen and (max-width: 1023px){
+            @media screen and (max-width: 1279px){
                 flex-grow: 1;
                 text-align: center;
                 justify-content: center;

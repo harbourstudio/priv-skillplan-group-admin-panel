@@ -159,6 +159,13 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 'permission_callback' => fn($request) => BYS_Groups_Permissions::can_access_group($request['group_id']),
             ]);
 
+            // Broadcasts the group-level quiz access to every group user
+            register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/groups/(?P<group_id>\d+)/quizzes/(?P<quiz_id>\d+)/notify-access', [
+                'methods'             => WP_REST_Server::CREATABLE,
+                'callback'            => [$this, 'notify_group_quiz_access'],
+                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_access_group($request['group_id']),
+            ]);
+
             register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/groups/(?P<group_id>\d+)/users/(?P<user_id>\d+)/quiz-access', [
                 'methods'             => 'GET, POST',
                 'callback'            => [$this, 'user_quiz_access'],
@@ -308,7 +315,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
 
                     // Batch query: per-course grading + reporting quiz sets.
                     if (!empty($course_ids_collected)) {
-                        $quiz_meta = $this->fetch_quiz_meta_by_course($course_ids_collected);
+                        $quiz_meta = $this->fetch_quiz_meta_by_course($course_ids_collected, $group_id);
                         foreach ($courses as &$course_ref) {
                             $cid = intval($course_ref['id']);
                             $course_ref['quizzes_show_test_grading_config']  = $quiz_meta[$cid]['grading']   ?? [];
@@ -319,10 +326,15 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 }
             }
 
+            // ── 4. Group leaders — same shape as the standalone /leaders endpoint.
+            //    Lets group-leaders skip its own /leaders fetch on cold load.
+            $leaders = $this->fetch_group_leaders($group_id);
+
             return new WP_REST_Response([
                 'group_id' => $group_id,
                 'users'    => $users,
                 'courses'  => $courses,
+                'leaders'  => $leaders,
             ], 200);
         }
 
@@ -540,7 +552,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 }
 
                 if (!empty($course_ids_collected)) {
-                    $quiz_meta = $this->fetch_quiz_meta_by_course($course_ids_collected);
+                    $quiz_meta = $this->fetch_quiz_meta_by_course($course_ids_collected, $group_id);
                     foreach ($formatted_courses as &$c) {
                         $cid = intval($c['id']);
                         $c['quizzes_show_test_grading_config']  = $quiz_meta[$cid]['grading']   ?? [];
@@ -1068,7 +1080,15 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
         public function get_group_leaders($request) {
             $group_id = intval($request['group_id']);
             if (!$group_id) return new WP_Error('bad_request', 'Invalid group ID', ['status' => 400]);
+            return $this->fetch_group_leaders($group_id);
+        }
 
+        /**
+         * Return hydrated group-leader objects for a group. Shared between the
+         * standalone /groups/{id}/leaders REST endpoint and /base-group-data so
+         * both surfaces produce the exact same shape from one query path.
+         */
+        private function fetch_group_leaders($group_id) {
             $leaders = get_users([
                 'meta_key'   => 'learndash_group_leaders_' . $group_id,
                 'meta_value' => $group_id,
@@ -1085,7 +1105,6 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                     'avatar'       => get_avatar_url($leader->ID, ['size' => 64]),
                 ];
             }
-
             return $result;
         }
 
@@ -1503,6 +1522,178 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
         }
 
         /**
+         * POST /groups/{group_id}/quizzes/{quiz_id}/notify-access
+         * Broadcasts the group-level quiz access for a single quiz to group users
+         */
+        public function notify_group_quiz_access($request) {
+            $group_id = intval($request['group_id']);
+            $quiz_id  = intval($request['quiz_id']);
+            if (!$group_id || !$quiz_id) {
+                return new WP_Error('bad_request', 'Invalid group_id or quiz_id', ['status' => 400]);
+            }
+
+            $postmark_token = get_option('bys_postmark_token', '');
+            if (empty($postmark_token)) {
+                return new WP_Error('server_error', 'Postmark token not configured', ['status' => 500]);
+            }
+
+            // Group-level access window for this quiz.
+            $group_dates = BYS_Groups_Quiz_Access::get_group_quiz_access_dates($group_id);
+            $window      = $group_dates[$quiz_id] ?? [];
+            $start       = $window['start'] ?? '';
+            $end         = $window['end']   ?? '';
+
+            // Resolve recipients via LearnDash group membership.
+            $auth_header = BYS_Groups_Auth::get_auth_header();
+            if (!$auth_header) return new WP_Error('server_error', 'API credentials not configured', ['status' => 500]);
+
+            $user_ids = [];
+            $page = 1; $per_page = 100;
+            do {
+                $url = get_home_url() . "/wp-json/ldlms/v2/groups/{$group_id}/users?_fields=id&per_page={$per_page}&page={$page}";
+                $resp = wp_remote_get($url, ['headers' => ['Authorization' => $auth_header], 'sslverify' => false]);
+                if (is_wp_error($resp) || wp_remote_retrieve_response_code($resp) !== 200) break;
+                $page_users = json_decode(wp_remote_retrieve_body($resp), true);
+                if (!is_array($page_users) || empty($page_users)) break;
+                foreach ($page_users as $u) $user_ids[] = intval($u['id']);
+                $page++;
+            } while (count($page_users) === $per_page);
+
+            if (empty($user_ids)) {
+                return new WP_Error('no_recipients', 'No members in this group', ['status' => 404]);
+            }
+
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/emails/user-quiz-config.php';
+
+            $quiz_post = get_post($quiz_id);
+            $site_name = get_bloginfo('name');
+            $site_url  = home_url();
+            $quiz_url  = $quiz_post ? get_permalink($quiz_post) : home_url();
+            $quiz_ttl  = $quiz_post ? get_the_title($quiz_post) : 'your quiz';
+            $from      = get_bloginfo('admin_email');
+
+            // resolve sender_email to the leader making the request; fallback to admin
+            $sender         = wp_get_current_user();
+            $sender_email   = ($sender && !empty($sender->user_email)) ? $sender->user_email : $from;
+            $sender_user_id = ($sender && $sender->ID) ? (string) $sender->ID : '';
+
+            // shared batch_id for all recipients
+            $batch_id = wp_generate_uuid4();
+
+            // build a Postmark /email/batch payload
+            $messages = [];
+            $valid_recipient_count = 0;
+            foreach ($user_ids as $uid) {
+                $recipient = get_user_by('ID', $uid);
+                if (!$recipient || empty($recipient->user_email)) continue;
+
+                $email = bys_get_quiz_access_notification_email([
+                    'recipient_name' => !empty($recipient->display_name) ? $recipient->display_name : $recipient->user_login,
+                    'site_name'      => $site_name,
+                    'site_url'       => $site_url,
+                    'quiz_title'     => $quiz_ttl,
+                    'quiz_url'       => $quiz_url,
+                    'start'          => $start,
+                    'end'            => $end,
+                    'sender_email'   => $sender_email,
+                ]);
+
+                if (empty($email['subject']) || empty($email['html'])) continue;
+
+                $messages[] = [
+                    'From'     => $from,
+                    'To'       => $recipient->user_email,
+                    'Subject'  => $email['subject'],
+                    'HtmlBody' => $email['html'],
+                    'TextBody' => $email['plain'],
+                    'Tag'      => 'group-quiz-access',
+                    'Metadata' => [
+                        'group_id'       => (string) $group_id,
+                        'user_id'        => (string) $uid,
+                        'quiz_id'        => (string) $quiz_id,
+                        'sender_user_id' => $sender_user_id,
+                        'batch_id'       => $batch_id,
+                    ],
+                ];
+                $valid_recipient_count++;
+            }
+
+            if (empty($messages)) {
+                return new WP_Error('no_recipients', 'No deliverable recipients in this group', ['status' => 404]);
+            }
+
+            $response = wp_remote_post('https://api.postmarkapp.com/email/batch', [
+                'headers' => [
+                    'X-Postmark-Server-Token' => $postmark_token,
+                    'Content-Type'            => 'application/json',
+                    'Accept'                  => 'application/json',
+                ],
+                'body'      => wp_json_encode($messages),
+                'timeout'   => 30,
+                'sslverify' => true,
+            ]);
+
+            if (is_wp_error($response)) {
+                error_log('[bys-groups::notify_group_quiz_access] Postmark transport error: ' . $response->get_error_message());
+                return new WP_Error('postmark_transport', 'Postmark API error: ' . $response->get_error_message(), ['status' => 502]);
+            }
+
+            $status_code = wp_remote_retrieve_response_code($response);
+            if ($status_code !== 200) {
+                $body_text = wp_remote_retrieve_body($response);
+                error_log("[bys-groups::notify_group_quiz_access] Postmark rejected — status {$status_code}, body: {$body_text}");
+                return new WP_Error('postmark_rejected', 'Postmark rejected the batch', ['status' => 502]);
+            }
+
+            // Postmark /email/batch returns an array per message - count ErrorCode 0 (or no ErrorCode) as success
+            $body = json_decode(wp_remote_retrieve_body($response), true);
+            $sent_count = 0;
+            if (is_array($body)) {
+                foreach ($body as $row) {
+                    $err = isset($row['ErrorCode']) ? (int) $row['ErrorCode'] : 0;
+                    if ($err === 0) $sent_count++;
+                }
+            }
+
+            // Mirror the batch into bys_group_communication_log so quiz-access
+            // notifications surface in the group-communication-log block.
+            // prompt_type matches the Postmark Tag ('group-quiz-access')
+            global $wpdb;
+            $results = is_array($body) ? $body : [];
+            foreach ($messages as $index => $msg) {
+                $result      = $results[$index] ?? [];
+                $error_code  = isset($result['ErrorCode']) ? (int) $result['ErrorCode'] : 0;
+                $message_id  = $result['MessageID'] ?? null;
+                $status      = ($error_code === 0 && !empty($message_id)) ? 'pending' : 'failed';
+
+                $wpdb->insert(
+                    $wpdb->prefix . BYS_GROUPS_COMMS_TABLE,
+                    [
+                        'message_id'      => $message_id,
+                        'recipient_email' => $msg['To'],
+                        'group_id'        => $group_id,
+                        'sender_user_id'  => $sender_user_id !== '' ? (int) $sender_user_id : 0,
+                        'prompt_type'     => 'group-quiz-access',
+                        'batch_id'        => $batch_id,
+                        'subject'         => $msg['Subject'] ?? '',
+                        'body_html'       => $msg['HtmlBody'] ?? null,
+                        'body_text'       => $msg['TextBody'] ?? null,
+                        'delivery_status' => $status,
+                        'created_at'      => current_time('mysql'),
+                    ],
+                    ['%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s']
+                );
+            }
+
+            return [
+                'success'      => true,
+                'sent_count'   => $sent_count,
+                'failed_count' => $valid_recipient_count - $sent_count,
+                'batch_id'     => $batch_id,
+            ];
+        }
+
+        /**
          * POST /groups/{group_id}/send-communication
          * Body: { prompt_type, recipient_type, recipient_ids[], custom_subject,
          *         custom_message, scheduled_at, condition{} }
@@ -1587,7 +1778,9 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             if (!empty($result['success'])) {
                 return $result;
             }
-            return new WP_Error('bad_request', $result['error'] ?? 'Send failed', ['status' => 400]);
+            $errors  = $result['errors'] ?? [];
+            $message = !empty($errors) ? implode('; ', (array) $errors) : 'Send failed';
+            return new WP_Error('bad_request', $message, ['status' => 400]);
         }
 
         /**
@@ -1890,7 +2083,9 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                     'subject'         => $subject,
                     'sent_at'         => $display_time,
                     'prompt_type'     => $prompt_type,
-                    'badge_type'      => $prompt_type === 'custom' ? 'custom' : 'prompt',
+                    'badge_type'      => $prompt_type === 'custom'
+                        ? 'custom'
+                        : ($prompt_type === 'group-quiz-access' ? 'quiz' : 'prompt'),
                     'recipient_count' => $recipient_counts[$batch_id] ?? count($batch['message_ids']),
                     'delivery_status' => $delivery_status,
                     'sender_user_id'  => $batch['sender_user_id'],
@@ -1938,15 +2133,18 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
          */
         /**
          * Return a per-course map of quiz step data for both dashboard surfaces:
-         *   - grading[]:   int[]                          (show_test_grading_config=1)
-         *   - reporting[]: [{step_id, step_title}, ...]   (show_in_reporting=1)
+         *   - grading[]:   [{step_id, step_title, start, end}, ...]   (show_test_grading_config=1)
+         *   - reporting[]: [{step_id, step_title}, ...]               (show_in_reporting=1)
          *
          * One batched SQL query LEFT JOINs both meta keys and filters to quizzes
-         * that match at least one. The PHP loop then sorts each row into the
-         * appropriate slot per course. Used by /base-group-data and
-         * /groups/{id}/courses so neither block needs follow-up /quiz-steps calls.
+         * that match at least one. Quiz-access date windows (start/end) are
+         * merged onto each grading quiz from the group's quiz-access store so
+         * group-quiz-config can render the row's Flatpickr values without a
+         * follow-up /quiz-access fetch.
+         *
+         * The $group_id argument is required to look up the access dates.
          */
-        private function fetch_quiz_meta_by_course(array $course_ids) {
+        private function fetch_quiz_meta_by_course(array $course_ids, $group_id) {
             if (empty($course_ids)) return [];
 
             global $wpdb;
@@ -1973,17 +2171,31 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 ...array_map('intval', $course_ids)
             ));
 
+            // Group-level quiz-access dates ({ quiz_id => {start, end} }) for
+            // merging onto the grading quiz objects below. Loaded once.
+            $access_map = [];
+            if (class_exists('BYS_Groups_Quiz_Access')) {
+                $access_map = BYS_Groups_Quiz_Access::get_group_quiz_access_dates(intval($group_id)) ?: [];
+            }
+
             $out = [];
             foreach ($rows ?: [] as $row) {
-                $cid = intval($row->course_id);
+                $cid     = intval($row->course_id);
+                $quizId  = intval($row->quiz_id);
                 if (!isset($out[$cid])) $out[$cid] = ['grading' => [], 'reporting' => []];
 
                 if ($row->is_grading === '1') {
-                    $out[$cid]['grading'][] = intval($row->quiz_id);
+                    $access = $access_map[$quizId] ?? [];
+                    $out[$cid]['grading'][] = [
+                        'step_id'    => $quizId,
+                        'step_title' => $row->quiz_title,
+                        'start'      => $access['start'] ?? '',
+                        'end'        => $access['end']   ?? '',
+                    ];
                 }
                 if ($row->is_reporting === '1') {
                     $out[$cid]['reporting'][] = [
-                        'step_id'    => intval($row->quiz_id),
+                        'step_id'    => $quizId,
                         'step_title' => $row->quiz_title,
                     ];
                 }

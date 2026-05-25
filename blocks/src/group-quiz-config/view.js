@@ -56,14 +56,24 @@ const FP_SHARED = {
     },
 };
 
+function syncClearButton($btn, hasValue) {
+    if (hasValue) $btn.removeAttr('hidden');
+    else          $btn.attr('hidden', '');
+}
+
 function initRowPickers(quizId, startEl, endEl, startVal, endVal, $rowSaveBtn) {
     let startFp, endFp;
+
+    // Clear buttons live as siblings of each input inside .gqc__date-field.
+    const $startClear = jQuery(startEl).closest('.gqc__date-field').find('.gqc__date-clear[data-field-type="start"]');
+    const $endClear   = jQuery(endEl).closest('.gqc__date-field').find('.gqc__date-clear[data-field-type="end"]');
 
     startFp = flatpickr(startEl, {
         ...FP_SHARED,
         placeholder: 'No date restriction',
         onChange(_, dateStr) {
             endFp.set('minDate', dateStr || null);
+            syncClearButton($startClear, Boolean(dateStr));
             $rowSaveBtn.prop('disabled', false);
         },
     });
@@ -73,6 +83,7 @@ function initRowPickers(quizId, startEl, endEl, startVal, endVal, $rowSaveBtn) {
         placeholder: 'No date restriction',
         onChange(_, dateStr) {
             startFp.set('maxDate', dateStr || null);
+            syncClearButton($endClear, Boolean(dateStr));
             $rowSaveBtn.prop('disabled', false);
         },
     });
@@ -82,12 +93,37 @@ function initRowPickers(quizId, startEl, endEl, startVal, endVal, $rowSaveBtn) {
     if (startVal) endFp.set('minDate', startVal);
     if (endVal)   startFp.set('maxDate', endVal);
 
-    // Clicking anywhere in the date-field (icon, gap) opens the picker
+    // setDate(_, false) skips onChange — sync clear-button visibility for
+    // the initial values explicitly.
+    syncClearButton($startClear, Boolean(startVal));
+    syncClearButton($endClear,   Boolean(endVal));
+
+    // Clicking anywhere in the date-field opens the picker — except the
+    // clear button, which has its own handler below.
     jQuery(startEl).closest('.gqc__date-field').on('click', (e) => {
+        if (e.target.closest('.gqc__date-clear')) return;
         if (!e.target.classList.contains('flatpickr-alt-input')) startFp.open();
     });
     jQuery(endEl).closest('.gqc__date-field').on('click', (e) => {
+        if (e.target.closest('.gqc__date-clear')) return;
         if (!e.target.classList.contains('flatpickr-alt-input')) endFp.open();
+    });
+
+    // Clear-button handlers — clear the picker, hide the button, enable Save
+    // so the empty value can be committed to the backend.
+    $startClear.on('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        startFp.clear();
+        syncClearButton($startClear, false);
+        $rowSaveBtn.prop('disabled', false);
+    });
+    $endClear.on('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        endFp.clear();
+        syncClearButton($endClear, false);
+        $rowSaveBtn.prop('disabled', false);
     });
 
     rowPickerMap[quizId] = { startFp, endFp };
@@ -158,16 +194,18 @@ async function loadQuizData($block, groupId, courses, readOnly = false) {
     $showMore.hide();
 
     try {
-        const courseQuizData = await Promise.all(
-            courses.map(async (course) => {
-                try {
-                    const steps = await api.get(endpoints.courseQuizStepsGrading(course.id));
-                    return { course, steps: Array.isArray(steps) ? steps : [] };
-                } catch {
-                    return { course, steps: [] };
-                }
-            })
-        );
+        // Grading-flagged quizzes (and their access date windows) are pre-baked
+        // into each course's quizzes_show_test_grading_config by /base-group-data.
+        // Reading from the store eliminates both N per-course /quiz-steps?filter=grading
+        // calls AND the /quiz-access fetch on cold load.
+        const cachedCourses = store.getCourses() || [];
+        const courseQuizData = courses.map((course) => {
+            const cached = cachedCourses.find((c) => c.id === course.id);
+            const steps = Array.isArray(cached?.quizzes_show_test_grading_config)
+                ? cached.quizzes_show_test_grading_config
+                : [];
+            return { course, steps };
+        });
 
         const allQuizIds = courseQuizData.flatMap(({ steps }) => steps.map((s) => s.step_id));
 
@@ -177,12 +215,16 @@ async function loadQuizData($block, groupId, courses, readOnly = false) {
             return;
         }
 
-        const [accessDates, stats] = await Promise.all([
-            api.get(endpoints.groupQuizAccess(groupId)).catch(() => ({})),
-            api.get(endpoints.groupQuizSubmissionStats(groupId, allQuizIds)),
-        ]);
+        // Rebuild the local access-date map from the store-baked start/end values.
+        // (quiz-submission-stats is volatile — still fetched live.)
+        quizAccessDatesMap = {};
+        courseQuizData.forEach(({ steps }) => {
+            steps.forEach((q) => {
+                quizAccessDatesMap[q.step_id] = { start: q.start || '', end: q.end || '' };
+            });
+        });
 
-        quizAccessDatesMap = accessDates || {};
+        const stats = await api.get(endpoints.groupQuizSubmissionStats(groupId, allQuizIds));
         const statsMap = {};
         (Array.isArray(stats) ? stats : []).forEach((s) => { statsMap[s.quiz_id] = s; });
 
@@ -249,6 +291,24 @@ jQuery(document).ready(($) => {
         try {
             await api.post(endpoints.groupQuizAccess(currentGroupId), { quiz_id: quizId, start, end });
             quizAccessDatesMap[quizId] = { start, end };
+
+            // Mutation write-through: update the cached course shape so the
+            // new dates survive a same-tab page nav until the next
+            // /base-group-data forceRefresh.
+            const cachedCourses = store.getCourses();
+            if (Array.isArray(cachedCourses)) {
+                const updated = cachedCourses.map((c) => ({
+                    ...c,
+                    quizzes_show_test_grading_config: Array.isArray(c.quizzes_show_test_grading_config)
+                        ? c.quizzes_show_test_grading_config.map((q) =>
+                            q.step_id === quizId ? { ...q, start, end } : q
+                          )
+                        : [],
+                }));
+                store.setCourses(updated);
+            }
+
+            api.invalidate('quiz-access');
             api.invalidate('quiz-submission-stats');
             api.invalidate('quiz-attempts');
             $btn.text('Saved!');
@@ -256,6 +316,33 @@ jQuery(document).ready(($) => {
         } catch (err) {
             console.error('[quiz-config] Failed to save quiz access dates:', err);
             $btn.prop('disabled', false).text('Save');
+        }
+    });
+
+    // Notify Learners — broadcasts the group-level access window for THIS quiz
+    // to every group member. One POST → server fans out a Postmark batch.
+    $block.on('click', '.gqc__notify', async function () {
+        const $btn   = jQuery(this);
+        const $item  = $btn.closest('.gqc__item');
+        const quizId = $item.data('quiz-id');
+        if (!quizId || !currentGroupId) return;
+
+        const originalLabel = $btn.text();
+        $btn.prop('disabled', true).text('Notifying…');
+
+        try {
+            const result = await api.post(`/wp-json/bys-groups/v1/groups/${currentGroupId}/quizzes/${quizId}/notify-access`)
+            const sent = result?.sent_count ?? 0;
+            $btn.text(`Notified ${sent}`);
+            setTimeout(() => {
+                $btn.text(originalLabel).prop('disabled', false);
+            }, 2500);
+        } catch (err) {
+            console.error('[quiz-config] Failed to notify learners:', err);
+            $btn.text('Failed');
+            setTimeout(() => {
+                $btn.text(originalLabel).prop('disabled', false);
+            }, 2500);
         }
     });
 
