@@ -28,7 +28,7 @@ $detail_url = home_url( '/administrator-dashboard/user-progress-detail/' );
         </button>
     </div>
 
-    <div id="filters-box" class="group-reporting__filters-box hidden" aria-hidden="true">
+    <div class="group-reporting__filters-box hidden" aria-hidden="true">
         <form class="filters__form" method="get">
             <div class="group-reporting__fields">
                 <div class="group-reporting__field group-reporting__field--multiselect" id="group-reporting__field--course">

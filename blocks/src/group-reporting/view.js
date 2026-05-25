@@ -4,15 +4,14 @@ import flatpickr from 'flatpickr';
 import 'flatpickr/dist/flatpickr.min.css';
 
 jQuery(document).ready(function($) {
-  const $block = $('.wp-block-bys-groups-group-reporting').first();
+  const $block = $('.wp-block-bys-groups-group-reporting').first(); // assume only 1 block instance per page
   const $table = $block.find('.reporting-table');
   if (!$table.length) return;
 
-  const detailUrl = $table.data('detailUrl') || '/administrator-dashboard/user-progress-detail/';
+  const detailUrl = $table.data('detailUrl') || '/administrator-dashboard/user-progress-detail/'; // used to direct to group users' single pages 
 
-  // ── DOM lookups ─────────────────────────────────────────────────────
   const $filtersToggle      = $block.find('.group-reporting__filters-toggle');
-  const $filtersBox         = $block.find('#filters-box');
+  const $filtersBox         = $block.find('.group-reporting__filters-box');
   const $filtersForm        = $block.find('.filters__form');
   const $submitBtn          = $block.find('.group-reporting__submit');
   const $resetBtn           = $block.find('.group-reporting__reset');
@@ -40,7 +39,8 @@ jQuery(document).ready(function($) {
 
   const $showMoreBtn        = $block.find('.group-reporting__show-more');
   const $exportBtn          = $block.find('.group-reporting__export a');
-
+  
+  const PAGE_SIZE  = 10;
   let expandedIdx = null;
   let usersInView = [];         // current page of users
   let coursesInView = [];       // current courses (from bys:groupSelected)
@@ -50,7 +50,6 @@ jQuery(document).ready(function($) {
   let userQuizProgressCache   = {}; // { [courseId]: { [userId]: { [quizId]: quizData } } }
   let loadedOffset = 0;             // how many users have been loaded into the table
   let currentSort  = 'first_name_asc';
-  const PAGE_SIZE  = 10;
   let sortedUsers  = [];            // sorted order after an explicit sort; empty = use lazy-load order
   let displayedCount = 0;           // how many of sortedUsers are currently rendered
 
@@ -61,11 +60,11 @@ jQuery(document).ready(function($) {
   let allGroupUsers       = []; // full fetched user objects for the filter list (lazy-loaded)
   let allGroupUsersLoaded = false; // whether the full user list has been fetched
 
-  let activeFilters = {         // current applied filter values
-    courseIds:      [],         // array of course IDs (empty = all)
-    userIds:        [],         // array of user IDs (empty = all)
-    courseStatus:   '',         // course-level: completed | in_progress | inactive
-    userStatus:     '',         // user-level: online | offline | never
+  let activeFilters = {         
+    courseIds:      [],
+    userIds:        [],
+    courseStatus:   '',
+    userStatus:     '',
     enrolmentDate:  { from: '', to: '' },
     completionDate: { from: '', to: '' },
   };
@@ -73,11 +72,10 @@ jQuery(document).ready(function($) {
   // ── Filter panel toggle ──────────────────────────────────────────────────────
   $filtersToggle.on('click', function() {
     const $toggle = $(this);
-    const $box = $filtersBox;
     const isOpen = $toggle.attr('aria-expanded') === 'true';
     $toggle.attr('aria-expanded', !isOpen);
-    $box.attr('aria-hidden', isOpen);
-    $box.toggleClass('hidden', isOpen);
+    $filtersBox.attr('aria-hidden', isOpen);
+    $filtersBox.toggleClass('hidden', isOpen);
     if (!isOpen) {
       populateCourseMultiselect();
       populateUserMultiselect(); // lazy-fetches full user list if needed
@@ -274,6 +272,37 @@ jQuery(document).ready(function($) {
     }
   })();
 
+  /**
+   * Reset module-level state when the leader switches groups. Wipes filter
+   * selections, cached progress, sort state, and pagination offsets; resets
+   * the form UI controls. Called from the bys:groupSelected handler.
+   */
+  function resetTableStateForGroup(userIds) {
+    selectedCourseIds   = [];
+    selectedUserIds     = [];
+    allGroupUserIds     = userIds;
+    allGroupUsers       = [];
+    allGroupUsersLoaded = false;
+    activeFilters = {
+      courseIds:      [],
+      userIds:        [],
+      courseStatus:   '',
+      userStatus:     '',
+      enrolmentDate:  { from: '', to: '' },
+      completionDate: { from: '', to: '' },
+    };
+    userCourseProgressAll = {};
+    courseQuizStepsCache  = {};
+    userQuizProgressCache = {};
+    loadedOffset   = 0;
+    currentSort    = 'first_name_asc';
+    sortedUsers    = [];
+    displayedCount = 0;
+    $sortSelect.val('first_name_asc');
+    resetFilterFormUI();
+    updateCompletionSortVisibility();
+  }
+
   $(document).on('bys:groupSelected', async function(_, data) {
     const groupId = data.groupId;
     if (!groupId) return;
@@ -283,23 +312,7 @@ jQuery(document).ready(function($) {
     const userIds = store.getUserIds() || [];
     const courses = store.getCourses() || [];
 
-    // Reset filter state on group change
-    selectedCourseIds = [];
-    selectedUserIds   = [];
-    allGroupUserIds   = userIds;
-    allGroupUsers     = [];
-    allGroupUsersLoaded = false;
-    activeFilters = { courseIds: [], userIds: [], courseStatus: '', userStatus: '', enrolmentDate: { from: '', to: '' }, completionDate: { from: '', to: '' } };
-    userCourseProgressAll = {};
-    courseQuizStepsCache  = {};
-    userQuizProgressCache = {};
-    loadedOffset  = 0;
-    currentSort   = 'first_name_asc';
-    sortedUsers   = [];
-    displayedCount = 0;
-    $sortSelect.val('first_name_asc');
-    resetFilterFormUI();
-    updateCompletionSortVisibility();
+    resetTableStateForGroup(userIds);
 
     await populateTableFromAPI(groupId, userIds, courses);
   });
@@ -351,12 +364,12 @@ jQuery(document).ready(function($) {
       // Render rows now — name/email/status synchronously from usersResponse;
       // course cells start as skeletons (from the cell template) and fill in
       // per-user as each progress fetch resolves below. We re-render whenever
-      // the existing rows don't match the new user set (group switch / cold
-      // load); we keep them when the pre-render path already painted them.
+      // the rendered rows belong to a different group than the one we're now
+      // populating (group switch). On the warm path (same group, pre-render
+      // already painted), we keep the existing rows.
       const $tbody = $table.find('tbody');
-      const $existingFirstRow = $tbody.find('tr').first();
-      const existingUserId = $existingFirstRow.length ? parseInt($existingFirstRow.data('userId'), 10) : null;
-      const needsRerender = !existingUserId || !firstTenUserIds.includes(existingUserId);
+      const renderedGroupId = $tbody.data('renderedGroupId');
+      const needsRerender = !renderedGroupId || Number(renderedGroupId) !== Number(groupId);
       if (needsRerender) {
         renderUserRowsFromCache(courses, usersResponse);
         // Re-apply expanded-course visibility to freshly-rendered cells.
@@ -432,81 +445,91 @@ jQuery(document).ready(function($) {
   }
 
   /**
-   * Pure predicate: returns true if a user object passes all active row filters.
-   * Works against in-memory data — no DOM access.
+   * Build a once-per-filter-pass context: pre-parses date ranges so each user
+   * check doesn't re-construct Date objects, and stashes filter fields for fast
+   * access. Caller (applyRowFilters) calls this once before iterating users.
    */
-  function userPassesRowFilter(user) {
-    const { userIds, courseStatus, userStatus, enrolmentDate, completionDate } = activeFilters;
-    let visible = true;
-
-    if (userIds.length > 0) {
-      visible = userIds.includes(user.id);
+  function buildFilterContext(filters) {
+    function parseRange(range) {
+      if (!range.from && !range.to) return null;
+      const from = range.from ? new Date(range.from) : null;
+      let to = null;
+      if (range.to) {
+        to = new Date(range.to);
+        to.setHours(23, 59, 59, 999);
+      }
+      return { from, to };
     }
-
-    if (visible && userStatus) {
-      visible = (user.status || 'never') === userStatus;
-    }
-
-    if (visible && courseStatus) {
-      const userProgress = userCourseProgressAll[user.id] || [];
-      const coursesToCheck = activeFilters.courseIds.length > 0
-        ? userProgress.filter(p => activeFilters.courseIds.includes(p.course_id))
-        : userProgress;
-      const progressStatus = courseStatus === 'inactive' ? 'not_started' : courseStatus;
-      visible = coursesToCheck.some(p => (p.progress_status || 'not_started') === progressStatus);
-    }
-
-    if (visible && (enrolmentDate.from || enrolmentDate.to)) {
-      const userProgress = userCourseProgressAll[user.id] || [];
-      const coursesToCheck = activeFilters.courseIds.length > 0
-        ? userProgress.filter(p => activeFilters.courseIds.includes(p.course_id))
-        : userProgress;
-      visible = coursesToCheck.some(p => {
-        if (!p.enrolled_at) return false;
-        const d = new Date(p.enrolled_at);
-        if (enrolmentDate.from && d < new Date(enrolmentDate.from)) return false;
-        if (enrolmentDate.to) {
-          const to = new Date(enrolmentDate.to);
-          to.setHours(23, 59, 59, 999);
-          if (d > to) return false;
-        }
-        return true;
-      });
-    }
-
-    if (visible && (completionDate.from || completionDate.to)) {
-      const userProgress = userCourseProgressAll[user.id] || [];
-      const coursesToCheck = activeFilters.courseIds.length > 0
-        ? userProgress.filter(p => activeFilters.courseIds.includes(p.course_id))
-        : userProgress;
-      visible = coursesToCheck.some(p => {
-        if (!p.date_completed) return false;
-        const d = new Date(p.date_completed);
-        if (completionDate.from && d < new Date(completionDate.from)) return false;
-        if (completionDate.to) {
-          const to = new Date(completionDate.to);
-          to.setHours(23, 59, 59, 999);
-          if (d > to) return false;
-        }
-        return true;
-      });
-    }
-
-    return visible;
+    return {
+      courseIds:     filters.courseIds,
+      userIds:       filters.userIds,
+      courseStatus:  filters.courseStatus,
+      userStatus:    filters.userStatus,
+      enrolment:     parseRange(filters.enrolmentDate),
+      completion:    parseRange(filters.completionDate),
+    };
   }
 
   /**
-   * Show/hide rows based on user search, status, enrolment date, completion date.
-   * All filtering is against in-memory data — no re-fetch.
+   * Predicate: does a user pass all active row filters? Pure (no DOM access).
+   * Uses an already-built context so date Date() construction and the
+   * coursesToCheck derivation happen ONCE per user, not per-filter-per-user.
+   */
+  function userPassesRowFilter(user, ctx) {
+    if (ctx.userIds.length > 0 && !ctx.userIds.includes(user.id)) return false;
+    if (ctx.userStatus && (user.status || 'never') !== ctx.userStatus) return false;
+
+    const needsProgress = Boolean(ctx.courseStatus) || Boolean(ctx.enrolment) || Boolean(ctx.completion);
+    if (!needsProgress) return true;
+
+    // Compute once per user (was up to 3× before).
+    const userProgress = userCourseProgressAll[user.id] || [];
+    const coursesToCheck = ctx.courseIds.length > 0
+      ? userProgress.filter((p) => ctx.courseIds.includes(p.course_id))
+      : userProgress;
+
+    if (ctx.courseStatus) {
+      const expected = ctx.courseStatus === 'inactive' ? 'not_started' : ctx.courseStatus;
+      if (!coursesToCheck.some((p) => (p.progress_status || 'not_started') === expected)) return false;
+    }
+
+    if (ctx.enrolment) {
+      const ok = coursesToCheck.some((p) => {
+        if (!p.enrolled_at) return false;
+        const d = new Date(p.enrolled_at);
+        if (ctx.enrolment.from && d < ctx.enrolment.from) return false;
+        if (ctx.enrolment.to   && d > ctx.enrolment.to)   return false;
+        return true;
+      });
+      if (!ok) return false;
+    }
+
+    if (ctx.completion) {
+      const ok = coursesToCheck.some((p) => {
+        if (!p.date_completed) return false;
+        const d = new Date(p.date_completed);
+        if (ctx.completion.from && d < ctx.completion.from) return false;
+        if (ctx.completion.to   && d > ctx.completion.to)   return false;
+        return true;
+      });
+      if (!ok) return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Show/hide rows based on the active filters. All work against in-memory data.
+   * The --filtered class triggers display:none via CSS — no inline style needed.
    */
   function applyRowFilters() {
+    const ctx = buildFilterContext(activeFilters);
     $table.find('tbody tr.group-reporting__row').each(function() {
       const userId = parseInt($(this).data('userId'), 10);
-      const user = usersInView.find(u => u.id === userId);
+      const user = usersInView.find((u) => u.id === userId);
       if (!user) return;
-      const visible = userPassesRowFilter(user);
+      const visible = userPassesRowFilter(user, ctx);
       $(this).toggleClass('group-reporting__row--filtered', !visible);
-      $(this).css('display', visible ? '' : 'none');
     });
   }
 
@@ -590,9 +613,6 @@ jQuery(document).ready(function($) {
   });
 
   // ── Flatpickr instances ─────────────────────────────────────────────────────
-  // Shared config for filter date pickers (date-only, no time).
-  // altInput=true means flatpickr hides the original input and displays a
-  // formatted alt input; the hidden input still holds the machine value (Y-m-d).
   const FP_FILTER = {
     dateFormat:    'd-m-y',
     altInput:      true,
@@ -814,49 +834,67 @@ jQuery(document).ready(function($) {
   }
 
   /**
-   * Fast first paint: render a row per cached hydrated user using only the
-   * fields the store gives us (status, name, email). All markup comes from
-   * #group-reporting__row-template + #group-reporting__cell-template — no HTML
-   * strings are constructed in this script. Course cells stay empty until
-   * populateTableFromAPI's progress fetches resolve and rebuildTableBody runs.
+   * Build a single user's row fragment with name/email/status filled in and
+   * skeleton course cells per course. Used by both renderUserRowsFromCache
+   * (initial render — wipes then appends) and appendUserRowsToTable
+   * (load-more — appends without wiping).
    */
-  function renderUserRowsFromCache(courses, users) {
-    const $tbody       = $table.find('tbody');
+  function buildUserRowFragment(courses, user) {
     const rowTemplate  = document.getElementById('group-reporting__row-template');
     const cellTemplate = document.getElementById('group-reporting__cell-template');
 
-    $tbody.html('');
+    const $fragment = $(rowTemplate.content.cloneNode(true));
+    const $tr       = $fragment.find('tr');
 
-    users.forEach((user) => {
-      const $fragment = $(rowTemplate.content.cloneNode(true));
-      const $tr       = $fragment.find('tr');
+    $tr.attr('data-user-id', user.id);
 
-      $tr.attr('data-user-id', user.id);
+    // Status dot — toggle modifier class for online/offline/never.
+    const userStatus = user.status || 'never';
+    $tr.find('.status-badge').addClass('status-badge--' + userStatus);
 
-      // Status dot — toggle modifier class for online/offline/never.
-      const userStatus = user.status || 'never';
-      $tr.find('.status-badge').addClass('status-badge--' + userStatus);
+    // Name + detail link.
+    const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.display_name || '';
+    $tr.find('.group-reporting__name-link')
+      .attr('href', detailUrl + '?group_id=' + currentGroupId + '&user_id=' + user.id)
+      .text(fullName);
 
-      // Name + detail link. .text() escapes safely — no manual escapeHtml needed.
-      const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.display_name || '';
-      $tr.find('.group-reporting__name-link')
-        .attr('href', detailUrl + '?group_id=' + currentGroupId + '&user_id=' + user.id)
-        .text(fullName);
+    // Email
+    $tr.find('.group-reporting__col--email').text(user.email || '');
 
-      // Email
-      $tr.find('.group-reporting__col--email').text(user.email || '');
-
-      // Course cells — clone the per-course cell template once per course.
-      // Inner spans stay empty so they don't claim "Not Started" before
-      // progress data arrives.
-      courses.forEach((course, idx) => {
-        const $cells = $(cellTemplate.content.cloneNode(true));
-        $cells.find('td').attr('data-course-idx', idx);
-        $tr.append($cells);
-      });
-
-      $tbody.append($fragment);
+    // Course cells — clone the per-course cell template once per course.
+    // Inner spans carry .skeleton until applyCourseProgressToRow replaces them.
+    courses.forEach((course, idx) => {
+      const $cells = $(cellTemplate.content.cloneNode(true));
+      $cells.find('td').attr('data-course-idx', idx);
+      $tr.append($cells);
     });
+
+    return $fragment;
+  }
+
+  /**
+   * Fast first paint: replace tbody with a row per hydrated user using only
+   * the fields the store gives us (status, name, email). All markup comes from
+   * the templates in render.php — no HTML strings in this script. Course
+   * cells stay as skeletons until the trickle-in path fills them.
+   */
+  function renderUserRowsFromCache(courses, users) {
+    const $tbody = $table.find('tbody');
+    $tbody.html('');
+    users.forEach((user) => $tbody.append(buildUserRowFragment(courses, user)));
+    // Stamp which group these rows belong to. populateTableFromAPI compares
+    // this against the incoming groupId to decide whether a re-render is
+    // needed (group switch) or rows can be reused (warm path / same group).
+    $tbody.data('renderedGroupId', currentGroupId ? Number(currentGroupId) : null);
+  }
+
+  /**
+   * Append new user rows to the existing tbody (for the "Show More" path).
+   * Same shape as renderUserRowsFromCache but doesn't wipe what's already there.
+   */
+  function appendUserRowsToTable(courses, users) {
+    const $tbody = $table.find('tbody');
+    users.forEach((user) => $tbody.append(buildUserRowFragment(courses, user)));
   }
 
   function rebuildTableBody(courses, users, userCourseProgress) {
@@ -865,49 +903,57 @@ jQuery(document).ready(function($) {
   }
 
   /**
+   * Fill the five cells for one course-column (badge + 4 sub-cells) using a
+   * single user's course-progress data. $scope is any jQuery set that contains
+   * those cells — it can be an existing <tr> (in-place update via the trickle
+   * path) or a freshly-cloned cell fragment from #group-reporting__cell-template
+   * (initial render in appendTableRows). Selectors are scoped by data-course-idx
+   * so both cases resolve correctly.
+   */
+  function fillCellsForCourse($scope, idx, courseData) {
+    const progressStatus = courseData?.progress_status || 'not_started';
+    const status = progressStatus === 'completed' ? 'completed'
+                 : progressStatus === 'in_progress' ? 'in-progress'
+                 : 'not-started';
+
+    // Badge cell
+    $scope.find(`.group-reporting__cell--badge[data-course-idx="${idx}"] span`)
+      .attr('class', `completion-badge completion-badge--${status}`);
+
+    // Progress sub-cell
+    const stepsCompleted = courseData?.steps_completed || 0;
+    const stepsTotal     = courseData?.steps_total     || 0;
+    const percentage     = stepsTotal > 0 ? Math.round((stepsCompleted / stepsTotal) * 100) : 0;
+    const percentClass   = percentage === 100 ? 'complete' : percentage === 0 ? 'not-started' : 'in-progress';
+
+    $scope.find(`.group-reporting__sub-cell--progress[data-course-idx="${idx}"]`).html(`
+      <div class="group-reporting__progress-wrap"><div class="group-reporting__progress-bar" style="width:${percentage}%;"></div></div>
+      <span class="group-reporting__percent group-reporting__percent--${percentClass}">${percentage}%</span>
+    `);
+
+    // Quizzing sub-cell — loading spinner until the course column is expanded
+    // and loadQuizDataForCourse replaces it with the real bars.
+    $scope.find(`.group-reporting__sub-cell--quizzing[data-course-idx="${idx}"]`)
+      .html('<span class="group-reporting__quiz-loading"><i class="fa-regular fa-spinner-third fa-spin"></i></span>');
+
+    // Date sub-cells
+    const enrolledAt    = courseData?.enrolled_at    || '';
+    const dateCompleted = courseData?.date_completed || '';
+    $scope.find(`.group-reporting__sub-cell--enrolment[data-course-idx="${idx}"]`)
+      .html(`<span class="group-reporting__date">${enrolledAt ? formatDate(enrolledAt) : 'Not started'}</span>`);
+    $scope.find(`.group-reporting__sub-cell--completion[data-course-idx="${idx}"]`)
+      .html(`<span class="group-reporting__date">${dateCompleted ? formatDate(dateCompleted) : 'Not completed'}</span>`);
+  }
+
+  /**
    * Update one existing row's course cells in place — used by the trickle-in
    * path in populateTableFromAPI when a single user's progress fetch resolves.
-   * Mirrors the per-course cell-fill logic in appendTableRows but mutates the
-   * already-rendered cells instead of cloning the template.
    */
   function applyCourseProgressToRow($tr, courses, userProgress) {
     const progress = Array.isArray(userProgress) ? userProgress : [];
-
     courses.forEach((course, idx) => {
       const courseData = progress.find((cp) => cp.course_id === course.id);
-      const progressStatus = courseData?.progress_status || 'not_started';
-
-      let status = 'not-started';
-      if (progressStatus === 'completed') status = 'completed';
-      else if (progressStatus === 'in_progress') status = 'in-progress';
-
-      // Badge cell — replace the skeleton span's class with the completion-badge state.
-      $tr.find(`.group-reporting__cell--badge[data-course-idx="${idx}"] span`)
-        .attr('class', `completion-badge completion-badge--${status}`);
-
-      // Progress sub-cell
-      const stepsCompleted = courseData?.steps_completed || 0;
-      const stepsTotal = courseData?.steps_total || 0;
-      const percentage = stepsTotal > 0 ? Math.round((stepsCompleted / stepsTotal) * 100) : 0;
-      const percentageClass = percentage === 100 ? 'complete' : percentage === 0 ? 'not-started' : 'in-progress';
-
-      $tr.find(`.group-reporting__sub-cell--progress[data-course-idx="${idx}"]`).html(`
-        <div class="group-reporting__progress-wrap"><div class="group-reporting__progress-bar" style="width:${percentage}%;"></div></div>
-        <span class="group-reporting__percent group-reporting__percent--${percentageClass}">${percentage}%</span>
-      `);
-
-      // Quizzing sub-cell — defaults to a loading spinner until the course
-      // column is expanded and loadQuizDataForCourse fills in the real bars.
-      $tr.find(`.group-reporting__sub-cell--quizzing[data-course-idx="${idx}"]`)
-        .html('<span class="group-reporting__quiz-loading"><i class="fa-regular fa-spinner-third fa-spin"></i></span>');
-
-      // Date sub-cells
-      const enrolledAt = courseData?.enrolled_at || '';
-      const dateCompleted = courseData?.date_completed || '';
-      $tr.find(`.group-reporting__sub-cell--enrolment[data-course-idx="${idx}"]`)
-        .html(`<span class="group-reporting__date">${enrolledAt ? formatDate(enrolledAt) : 'Not started'}</span>`);
-      $tr.find(`.group-reporting__sub-cell--completion[data-course-idx="${idx}"]`)
-        .html(`<span class="group-reporting__date">${dateCompleted ? formatDate(dateCompleted) : 'Not completed'}</span>`);
+      fillCellsForCourse($tr, idx, courseData);
     });
   }
 
@@ -947,44 +993,21 @@ jQuery(document).ready(function($) {
       $row.find('.group-reporting__col--email').html(escapeHtml(user.email));
 
       courses.forEach((course, idx) => {
-        const courseData = userProgress.find(cp => cp.course_id === course.id);
-        const progressStatus = courseData?.progress_status || 'not_started';
-
-        let status = 'not-started';
-        if (progressStatus === 'completed') status = 'completed';
-        else if (progressStatus === 'in_progress') status = 'in-progress';
+        const courseData = userProgress.find((cp) => cp.course_id === course.id);
 
         const cellContent = cellTemplate.content.cloneNode(true);
         const $cells = $(cellContent);
-
         $cells.find('td').attr('data-course-idx', idx);
-        $cells.find('.group-reporting__cell--badge span').attr('class', `completion-badge completion-badge--${status}`);
 
-        const stepsCompleted = courseData?.steps_completed || 0;
-        const stepsTotal = courseData?.steps_total || 0;
-        const percentage = stepsTotal > 0 ? Math.round((stepsCompleted / stepsTotal) * 100) : 0;
-        let percentageClass = percentage === 100 ? 'complete' : percentage === 0 ? 'not-started' : 'in-progress';
-
-        $cells.find('.group-reporting__sub-cell--progress').html(`
-          <div class="group-reporting__progress-wrap"><div class="group-reporting__progress-bar" style="width:${percentage}%;"></div></div>
-          <span class="group-reporting__percent group-reporting__percent--${percentageClass}">${percentage}%</span>
-        `);
-
-        $cells.find('.group-reporting__sub-cell--quizzing').html('<span class="group-reporting__quiz-loading"><i class="fa-regular fa-spinner-third fa-spin"></i></span>');
-
-        const enrolledAt = courseData?.enrolled_at || '';
-        const dateCompleted = courseData?.date_completed || '';
-        $cells.find('.group-reporting__sub-cell--enrolment').html(`<span class="group-reporting__date">${enrolledAt ? formatDate(enrolledAt) : 'Not started'}</span>`);
-        $cells.find('.group-reporting__sub-cell--completion').html(`<span class="group-reporting__date">${dateCompleted ? formatDate(dateCompleted) : 'Not completed'}</span>`);
+        // Fill the 5 cells from the same helper used by trickle-in updates.
+        fillCellsForCourse($cells, idx, courseData);
 
         // Apply expanded-course visibility state at creation time so new rows
         // are correct immediately, without depending on a post-append fixup pass.
         if (expandedIdx !== null) {
           if (idx !== expandedIdx) {
-            // Non-expanded course: hide badge, keep sub-cells hidden (template default)
             $cells.find('.group-reporting__cell--badge').addClass('group-reporting__col--hidden');
           } else {
-            // Expanded course: show sub-cells
             $cells.find('.group-reporting__sub-cell').removeClass('group-reporting__sub-col--hidden');
           }
         }
@@ -1029,6 +1052,61 @@ jQuery(document).ready(function($) {
   /**
    * Core: fetch a specific batch of user IDs, get their progress, append rows.
    * Returns the array of newly loaded users (or empty array on failure).
+   */
+  /**
+   * Trickle-in flavour: render rows immediately with skeleton course cells,
+   * then fire per-user progress fetches in parallel without awaiting. Each
+   * row's cells fill in as its own progress lands. Used by the "Show More"
+   * click handler.
+   *
+   * Returns the new users so the caller can await the user-list fetch even
+   * though it doesn't wait for the per-user progress.
+   */
+  async function fetchAndAppendUsersTrickle(nextIds) {
+    const usersUrl = `/wp-json/bys-groups/v1/groups/${currentGroupId}/users?user_ids=${nextIds.join(',')}`;
+    const newUsers = await api.get(usersUrl, true);
+    if (!newUsers || !Array.isArray(newUsers)) return [];
+
+    // Append rows now — name/email/status synchronously; course cells are skeletons.
+    appendUserRowsToTable(coursesInView, newUsers);
+    if (expandedIdx !== null) expandCourse(expandedIdx);
+
+    usersInView = usersInView.concat(newUsers);
+    loadedOffset += newUsers.length;
+
+    // Per-user progress fetches in parallel — each .then() fills only its row.
+    const courseIds = coursesInView.map(c => c.id).join(',');
+    newUsers.forEach((user) => {
+      if (!courseIds) {
+        userCourseProgressAll[user.id] = [];
+        return;
+      }
+      const endpoint = `/wp-json/bys-groups/v1/users/${user.id}/course-progress?course_ids=${courseIds}`;
+      api.get(endpoint, true)
+        .then((progressArray) => {
+          userCourseProgressAll[user.id] = Array.isArray(progressArray) ? progressArray : [];
+          const $row = $table.find(`tr[data-user-id="${user.id}"]`);
+          if ($row.length) applyCourseProgressToRow($row, coursesInView, userCourseProgressAll[user.id]);
+          // When a course column is expanded, fill THIS row's quiz cells too —
+          // the column-level loader (loadQuizDataForNewUsers) batches a single
+          // round of cells, so the row needs its quiz fill once progress arrives.
+          if (expandedIdx !== null && courseQuizLoadedIdx.has(expandedIdx)) {
+            loadQuizDataForNewUsers(expandedIdx, [user]);
+          }
+        })
+        .catch((err) => {
+          console.error(`Failed to fetch course progress for user ${user.id}:`, err);
+          userCourseProgressAll[user.id] = [];
+        });
+    });
+
+    return newUsers;
+  }
+
+  /**
+   * Await-all flavour: fetches users + every per-user progress before returning.
+   * Used by loadAllRemainingUsers because the caller needs every row's progress
+   * data populated before applying filters / sorts that key off it.
    */
   async function fetchAndAppendUsers(nextIds) {
     const usersUrl = `/wp-json/bys-groups/v1/groups/${currentGroupId}/users?user_ids=${nextIds.join(',')}`;
@@ -1080,7 +1158,10 @@ jQuery(document).ready(function($) {
 
     $btn.prop('disabled', true).text('Loading…');
     try {
-      await fetchAndAppendUsers(nextIds);
+      // Trickle: returns once rows are appended (and per-user progress is in
+      // flight). The leader sees rows with skeleton cells immediately; cells
+      // fill as each user's fetch resolves.
+      await fetchAndAppendUsersTrickle(nextIds);
       applyFilters();
       if (expandedIdx !== null) expandCourse(expandedIdx);
       updateShowMoreButton();
@@ -1575,7 +1656,8 @@ jQuery(document).ready(function($) {
       await loadAllRemainingUsers();
     }
     const ordered = sortedUsers.length > 0 ? [...sortedUsers] : [...usersInView];
-    return ordered.filter(user => userPassesRowFilter(user));
+    const ctx = buildFilterContext(activeFilters);
+    return ordered.filter((user) => userPassesRowFilter(user, ctx));
   }
 
   /**
