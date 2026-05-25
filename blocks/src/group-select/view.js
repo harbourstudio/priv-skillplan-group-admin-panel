@@ -39,13 +39,15 @@ jQuery(document).ready(($) => {
 
     try {
       const basegroupdata = await api.get(endpoints.baseGroupData(groupId), true); // Force refresh
-      const users = Array.isArray(basegroupdata?.users) ? basegroupdata.users : [];
+      const users   = Array.isArray(basegroupdata?.users)   ? basegroupdata.users   : [];
       const courses = Array.isArray(basegroupdata?.courses) ? basegroupdata.courses : [];
+      const leaders = Array.isArray(basegroupdata?.leaders) ? basegroupdata.leaders : [];
 
-      // Populate the shared store with hydrated users + courses.
+      // Populate the shared store with hydrated users + courses + leaders.
       store.setCurrentGroup(groupId);
       store.setUsers(users);
       store.setCourses(courses);
+      store.setLeaders(leaders);
 
       // isOrgAdmin is group-specific (read from the selected <option>) so it
       // travels via the event payload. isGrader / isSiteEditor are global
