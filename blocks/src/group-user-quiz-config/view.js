@@ -477,6 +477,30 @@ jQuery(document).ready(($) => {
 
     async function loadQuizzes(courses) {
         if (!courses?.length) { allQuizzes = []; return; }
+
+        // Grading-flagged quizzes per course are pre-baked into the store.
+        // Derive allQuizzes from there — no per-course /quiz-steps fetches.
+        const cachedCourses = store.getCourses() || [];
+        const cachedById = new Map(cachedCourses.map((c) => [c.id, c]));
+        const hasCachedQuizzes = courses.every((c) =>
+            Array.isArray(cachedById.get(c.id)?.quizzes_show_test_grading_config)
+        );
+
+        if (hasCachedQuizzes) {
+            allQuizzes = courses.flatMap((course) => {
+                const cached = cachedById.get(course.id);
+                const name = courseTitle(course);
+                return (cached.quizzes_show_test_grading_config || []).map((q) => ({
+                    step_id:     q.step_id,
+                    step_title:  q.step_title,
+                    course_name: name,
+                }));
+            });
+            return;
+        }
+
+        // Cache miss (rare — would mean store hasn't been populated yet).
+        // Fall back to per-course REST.
         try {
             const results = await Promise.all(
                 courses.map(async (course) => {

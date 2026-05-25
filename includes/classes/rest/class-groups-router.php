@@ -1453,9 +1453,12 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
 
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/emails/user-quiz-config.php';
 
-            // BUG: $sender_id is never defined; preserved verbatim from legacy code.
-            $sender    = get_user_by('ID', $sender_id);
-            $quiz_post = get_post($quiz_id);
+            // Sender is the leader making the request; falls back to admin if unauth'd.
+            $sender         = wp_get_current_user();
+            $sender_user_id = ($sender && $sender->ID) ? (int) $sender->ID : 0;
+            $sender_email   = ($sender && !empty($sender->user_email)) ? $sender->user_email : get_bloginfo('admin_email');
+            $quiz_post      = get_post($quiz_id);
+            $from           = get_bloginfo('admin_email');
 
             $email = bys_get_quiz_access_notification_email([
                 'recipient_name' => !empty($recipient->display_name) ? $recipient->display_name : $recipient->user_login,
@@ -1465,12 +1468,30 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 'quiz_url'       => $quiz_post ? get_permalink($quiz_post) : home_url(),
                 'start'          => $start,
                 'end'            => $end,
-                'sender_email'   => $sender ? $sender->user_email : get_bloginfo('admin_email'),
+                'sender_email'   => $sender_email,
             ]);
 
             if (empty($email['subject']) || empty($email['html'])) {
                 return new WP_Error('server_error', 'Failed to build email', ['status' => 500]);
             }
+
+            $batch_id = wp_generate_uuid4();
+
+            $payload = [
+                'From'     => $from,
+                'To'       => $recipient->user_email,
+                'Subject'  => $email['subject'],
+                'HtmlBody' => $email['html'],
+                'TextBody' => $email['plain'],
+                'Tag'      => 'user-quiz-access',
+                'Metadata' => [
+                    'group_id'       => (string) $group_id,
+                    'user_id'        => (string) $user_id,
+                    'quiz_id'        => (string) $quiz_id,
+                    'sender_user_id' => (string) $sender_user_id,
+                    'batch_id'       => $batch_id,
+                ],
+            ];
 
             $response = wp_remote_post('https://api.postmarkapp.com/email', [
                 'headers' => [
@@ -1478,20 +1499,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                     'Content-Type'            => 'application/json',
                     'Accept'                  => 'application/json',
                 ],
-                'body' => wp_json_encode([
-                    'From'     => get_bloginfo('admin_email'),
-                    'To'       => $recipient->user_email,
-                    'Subject'  => $email['subject'],
-                    'HtmlBody' => $email['html'],
-                    'TextBody' => $email['plain'],
-                    'Tag'      => 'user-quiz-access',
-                    'Metadata' => [
-                        'group_id'       => (string) $group_id,
-                        'user_id'        => (string) $user_id,
-                        'quiz_id'        => (string) $quiz_id,
-                        'sender_user_id' => (string) $sender_id,
-                    ],
-                ]),
+                'body'      => wp_json_encode($payload),
                 'timeout'   => 30,
                 'sslverify' => true,
             ]);
@@ -1503,8 +1511,32 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
 
             $status_code   = wp_remote_retrieve_response_code($response);
             $response_body = json_decode(wp_remote_retrieve_body($response), true);
+            $accepted      = ($status_code === 200) && (!isset($response_body['ErrorCode']) || (int) $response_body['ErrorCode'] === 0);
+            $message_id    = $response_body['MessageID'] ?? null;
 
-            if ($status_code !== 200 || (isset($response_body['ErrorCode']) && (int) $response_body['ErrorCode'] !== 0)) {
+            // Log to bys_group_communication_log so the per-user notification
+            // surfaces in the group-communication-log block. prompt_type matches
+            // the Postmark Tag so the history modal can filter on it.
+            global $wpdb;
+            $wpdb->insert(
+                $wpdb->prefix . BYS_GROUPS_COMMS_TABLE,
+                [
+                    'message_id'      => $accepted ? $message_id : null,
+                    'recipient_email' => $recipient->user_email,
+                    'group_id'        => $group_id,
+                    'sender_user_id'  => $sender_user_id,
+                    'prompt_type'     => 'user-quiz-access',
+                    'batch_id'        => $batch_id,
+                    'subject'         => $email['subject'],
+                    'body_html'       => $email['html'],
+                    'body_text'       => $email['plain'],
+                    'delivery_status' => $accepted ? 'pending' : 'failed',
+                    'created_at'      => current_time('mysql'),
+                ],
+                ['%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s']
+            );
+
+            if (!$accepted) {
                 $msg = $response_body['Message'] ?? 'Unknown Postmark error';
                 error_log(sprintf(
                     '[notify_user_quiz_access] Postmark rejected — status %d, ErrorCode: %s, Message: %s',
@@ -1517,7 +1549,8 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
 
             return [
                 'success'    => true,
-                'message_id' => $response_body['MessageID'] ?? null,
+                'message_id' => $message_id,
+                'batch_id'   => $batch_id,
             ];
         }
 
@@ -2085,7 +2118,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                     'prompt_type'     => $prompt_type,
                     'badge_type'      => $prompt_type === 'custom'
                         ? 'custom'
-                        : ($prompt_type === 'group-quiz-access' ? 'quiz' : 'prompt'),
+                        : (in_array($prompt_type, ['group-quiz-access', 'user-quiz-access'], true) ? 'quiz' : 'prompt'),
                     'recipient_count' => $recipient_counts[$batch_id] ?? count($batch['message_ids']),
                     'delivery_status' => $delivery_status,
                     'sender_user_id'  => $batch['sender_user_id'],
