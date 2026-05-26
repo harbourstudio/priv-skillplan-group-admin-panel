@@ -223,13 +223,13 @@
             color: var(--wp--preset--color--gray-500);
             padding-top: 0 !important;
             font-size: var(--wp--preset--font-size--small);
-            margin-top: 0;
+            margin-bottom: var(--wp--preset--spacing--2);
         }
 
         &__upload-desc {
             font-size: var(--wp--preset--font-size--small);
             color: var(--wp--preset--color--gray-700);
-            margin-top: 0;
+            margin-bottom: var(--wp--preset--spacing--5);
         }
 
         &__template {
@@ -267,7 +267,6 @@
                 border: 1px solid var(--wp--preset--color--green-500);
                 color: var(--wp--preset--color--green-700);
                 background-color: var(--wp--preset--color--green-50);
-                font-weight: 500;
                 display: block;
             }
 
@@ -276,7 +275,6 @@
                 background: var(--wp--preset--color--red-50);
                 border: 1px solid var(--wp--preset--color--red-500);
                 color: var(--wp--preset--color--red-700);
-                font-weight: normal;
                 display: block;
             }
         }

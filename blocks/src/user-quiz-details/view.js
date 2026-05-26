@@ -2,6 +2,8 @@ import { api, endpoints } from '../_shared/api-client.js';
 import { LOADING } from '../_shared/loading.js';
 import { formatScore, formatDate, formatDateTime } from '../_shared/helpers.js';
 import { createTooltip, destroyTooltip } from '../_shared/tooltip.js';
+import flatpickr from 'flatpickr';
+import 'flatpickr/dist/flatpickr.min.css';
 
 jQuery(document).ready(($) => {
     const params = new URLSearchParams(window.location.search);
@@ -38,54 +40,87 @@ jQuery(document).ready(($) => {
         return div.innerHTML;
     };
 
-    // Date range validation and UI helpers
-    const validateDateRange = () => {
-        const $dateFrom = $block.find('#filter-date-from');
-        const $dateTo = $block.find('#filter-date-to');
-        const dateFrom = $dateFrom.val();
-        const dateTo = $dateTo.val();
+    // ── Flatpickr-backed date range filter ─────────────────────────────────
+    // dateFormat stays ISO (Y-m-d) so the existing string-compare + Date()
+    // parsing paths in renderDisplayedQuizzes() keep working unchanged.
+    const $dateFrom = $block.find('#filter-date-from');
+    const $dateTo   = $block.find('#filter-date-to');
 
-        if (dateFrom) {
-            $dateTo.attr('min', dateFrom);
-        } else {
-            $dateTo.removeAttr('min');
-        }
+    const FP_FILTER = {
+        dateFormat:    'Y-m-d',
+        altInput:      true,
+        altInputClass: 'flatpickr-input filters__datetime',
+        altFormat:     'j M Y',
+        disableMobile: true,
+        allowInput:    false,
+        onReady(_, __, fp) {
+            fp.calendarContainer.classList.add('bys-fp');
+            if (fp.altInput && fp.config.placeholder) {
+                fp.altInput.placeholder = fp.config.placeholder;
+            }
+        },
+    };
 
-        if (dateTo) {
-            $dateFrom.attr('max', dateTo);
-        } else {
-            $dateFrom.removeAttr('max');
-        }
-
-        if (dateFrom && dateTo && dateFrom > dateTo) {
-            $dateFrom.val(dateTo);
-        }
+    const syncClearButton = ($input, hasValue) => {
+        const $btn = $input.parent().find('.filters__date-clear');
+        if (hasValue) $btn.removeAttr('hidden');
+        else          $btn.attr('hidden', '');
     };
 
     const updateDateRangeText = () => {
-        const dateFrom = $block.find('#filter-date-from').val();
-        const dateTo = $block.find('#filter-date-to').val();
-
-        if (!dateFrom && !dateTo) {
-            $block.find('#date-range-text').text('Select a date range');
-        } else if (dateFrom && dateTo) {
-            $block.find('#date-range-text').text(`${dateFrom} - ${dateTo}`);
-        } else if (dateFrom) {
-            $block.find('#date-range-text').text(`From ${dateFrom}`);
-        } else {
-            $block.find('#date-range-text').text(`Until ${dateTo}`);
-        }
+        const dateFrom = $dateFrom.val();
+        const dateTo   = $dateTo.val();
+        if (!dateFrom && !dateTo)    $block.find('#date-range-text').text('Select a date range');
+        else if (dateFrom && dateTo) $block.find('#date-range-text').text(`${dateFrom} - ${dateTo}`);
+        else if (dateFrom)           $block.find('#date-range-text').text(`From ${dateFrom}`);
+        else                         $block.find('#date-range-text').text(`Until ${dateTo}`);
     };
+
+    const fpFrom = flatpickr($dateFrom[0], {
+        ...FP_FILTER,
+        placeholder: 'Pick a date',
+        onChange(_, dateStr) {
+            fpTo.set('minDate', dateStr || null);
+            syncClearButton($dateFrom, Boolean(dateStr));
+            updateDateRangeText();
+        },
+    });
+    const fpTo = flatpickr($dateTo[0], {
+        ...FP_FILTER,
+        placeholder: 'Pick a date',
+        onChange(_, dateStr) {
+            fpFrom.set('maxDate', dateStr || null);
+            syncClearButton($dateTo, Boolean(dateStr));
+            updateDateRangeText();
+        },
+    });
+
+    const fpFor = new Map([
+        [$dateFrom[0].id, fpFrom],
+        [$dateTo[0].id,   fpTo],
+    ]);
+
+    // Clear-button handler — delegated so it survives any DOM rewrites.
+    $block.on('click', '.filters__date-clear', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const fp = fpFor.get($(this).data('target'));
+        if (fp) fp.clear(); // triggers onChange → syncClearButton + updateDateRangeText
+    });
+
+    // Wrap click → open picker. flatpickr's auto click-open can fail when the
+    // original input is initialised inside a display:none parent (our dropdown
+    // starts hidden), so we wire it explicitly.
+    $block.on('click', '.filters__date-field__input', function (e) {
+        if (e.target.closest('.filters__date-clear')) return;
+        const inputId = $(this).find('input.filters__datetime').attr('id');
+        const fp = fpFor.get(inputId);
+        if (fp) fp.open();
+    });
 
     const toggleDateRangeDropdown = () => {
         $block.find('#date-range-dropdown').toggleClass('hidden');
     };
-
-    // Handle date range inputs - validation and UI updates
-    $block.find('#filter-date-from, #filter-date-to').on('change', function() {
-        validateDateRange();
-        updateDateRangeText();
-    });
 
     // Handle date range dropdown toggle
     $block.find('#date-range-trigger').on('click', function(e) {
@@ -93,8 +128,10 @@ jQuery(document).ready(($) => {
         toggleDateRangeDropdown();
     });
 
-    // Close date range dropdown when clicking outside
+    // Close date range dropdown when clicking outside.
+    // Guard against clicks inside flatpickr's body-level calendar.
     $(document).on('click', function(e) {
+        if ($(e.target).closest('.flatpickr-calendar').length) return;
         const $dateRangeField = $block.find('.filters__field--date-range');
         const dateRangeElement = $dateRangeField[0];
         if (dateRangeElement && !dateRangeElement.contains(e.target)) {
@@ -113,8 +150,11 @@ jQuery(document).ready(($) => {
     // Handle filter form reset
     $filterForm.on('reset', function() {
         setTimeout(() => {
-            validateDateRange();
-            updateDateRangeText();
+            // Native form reset clears the hidden inputs but leaves Flatpickr's
+            // internal state — explicit clear() triggers onChange so the clear
+            // buttons hide and the trigger text updates.
+            fpFrom.clear();
+            fpTo.clear();
             currentPage = 1;
             coursePages = {}; // Reset per-course pagination
             renderDisplayedQuizzes();

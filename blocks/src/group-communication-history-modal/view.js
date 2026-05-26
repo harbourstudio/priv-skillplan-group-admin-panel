@@ -318,12 +318,12 @@ jQuery(document).ready(($) => {
         }
 
         // Optimistic placeholder so something appears immediately.
-        $senderName.text(`Sent by user #${userId}`).show();
+        $senderName.text(` • Sent by user #${userId}`).show();
 
         try {
             const data = await api.get(`/wp-json/wp/v2/users/${userId}`);
             const name = data?.name || `User ${userId}`;
-            $senderName.text(`Sent by ${name}`);
+            $senderName.text(` • Sent by ${name}`);
         } catch (err) {
             console.warn('[group-communication-history-modal] Failed to load sender name:', err);
             // Leave the placeholder text in place rather than going blank.

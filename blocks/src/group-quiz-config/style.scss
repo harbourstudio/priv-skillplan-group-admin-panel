@@ -304,33 +304,6 @@
     }
 
     // ── Skeleton ──────────────────────────────────────────────────────────────
-
-    @keyframes bys-shimmer {
-        0%   { background-position: -400px 0; }
-        100% { background-position:  400px 0; }
-    }
-
-    @mixin shimmer {
-        background: linear-gradient(90deg, var(--wp--preset--color--gray-100) 25%, #e8e8e8 50%, var(--wp--preset--color--gray-100) 75%);
-        background-size: 800px 100%;
-        animation: bys-shimmer 1.4s infinite linear;
-        border-radius: 0.25rem;
-    }
-
-    .skeleton-text {
-        @include shimmer;
-        display: inline-block;
-        height: 0.75rem;
-    }
-
-    .skeleton-btn {
-        @include shimmer;
-        display: inline-block;
-        width: 70px;
-        height: 1.5rem;
-        border-radius: 0.25rem;
-    }
-
     .skeleton-quiz-row {
         display: flex;
         flex-direction: column;
@@ -340,25 +313,5 @@
         &:not(:last-of-type) {
             border-bottom: 1px solid var(--wp--preset--color--gray-100);
         }
-    }
-
-    .skeleton-quiz-row__header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        width: 100%;
-    }
-
-    .skeleton-icon {
-        @include shimmer;
-        width: 0.5rem;
-        height: 0.5rem;
-        border-radius: 50%;
-        flex-shrink: 0;
-    }
-
-    .skeleton-quiz-row__badges {
-        display: flex;
-        gap: var(--wp--preset--spacing--2);
     }
 }

@@ -14,10 +14,13 @@ jQuery(document).ready(($) => {
   async function updateAlert(groupId, courses) {
     if (!Array.isArray(courses) || !courses.length) return;
 
-    // Quiz IDs whose show_test_grading_config is true are pre-baked into each
-    // course by /base-group-data. Flatten the union — these are the only
-    // quizzes that can ever have ungraded attempts.
-    const allQuizIds = courses.flatMap((c) => Array.isArray(c.quizzes_show_test_grading_config) ? c.quizzes_show_test_grading_config : []);
+    // Each course carries an array of {step_id, step_title, start, end} for
+    // its grading-flagged quizzes (pre-baked into /base-group-data). Extract
+    // just the step_ids — these are the only quizzes that can have ungraded
+    // attempts.
+    const allQuizIds = courses
+      .flatMap((c) => Array.isArray(c.quizzes_show_test_grading_config) ? c.quizzes_show_test_grading_config : [])
+      .map((q) => q.step_id);
     if (!allQuizIds.length) return;
 
     let totalUngraded = 0;

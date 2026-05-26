@@ -47,20 +47,25 @@ $tz_offset_hours = $tz_offset_seconds / 3600;
             <?php foreach ([200, 240] as $width ) : ?>
             <div class="skeleton-quiz-row">
                 <div class="skeleton-quiz-row__header">
-                    <span class="skeleton-text" style="width:<?php echo $width; ?>px"></span>
-                    <span class="skeleton-text" style="width:80px"></span>
+                    <span class="skeleton" style="width:<?php echo $width; ?>px"></span>
+                    <span class="skeleton" style="width:80px"></span>
                 </div>
                 <div class="gqc__date-field">
-                    <span class="skeleton-icon"></span>
-                    <span class="skeleton-text" style="width:180px"></span>
+                    <span class="skeleton" style="width:180px"></span>
                 </div>
                 <div class="gqc__date-field">
-                    <span class="skeleton-icon"></span>
-                    <span class="skeleton-text" style="width:160px"></span>
+                    <span class="skeleton" style="width:160px"></span>
                 </div>
-                <div class="skeleton-quiz-row__badges">
-                    <span class="skeleton-btn"></span>
-                    <span class="skeleton-btn"></span>
+                <div class="gqc__actions">
+                    <div class="gqc__badges">
+                        <span class="skeleton" style="width: 48px;"></span>
+                        <span class="skeleton" style="width: 48px;"></span>
+                    </div>
+                    <div class="gqc__action-buttons">
+                        <span class="skeleton" style="width: 48px;"></span>
+                        <span class="skeleton" style="width: 48px;"></span>
+                    </div>
+
                 </div>
             </div>
             <?php endforeach; ?>
@@ -134,7 +139,6 @@ $tz_offset_hours = $tz_offset_seconds / 3600;
                 </div>
             </div>
         </template>
-
         <p class="gqc__empty" style="display:none;"></p>
     </div>
     <button class="gqc__show-more btn-unstyled" style="display:none;" type="button">

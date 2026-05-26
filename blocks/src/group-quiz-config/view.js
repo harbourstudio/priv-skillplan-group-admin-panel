@@ -1,5 +1,6 @@
 import { api, endpoints } from '../_shared/api-client.js';
 import store from '../_shared/store.js';
+import { convertFromUTC, convertToUTC } from '../_shared/helpers.js';
 import flatpickr from 'flatpickr';
 import 'flatpickr/dist/flatpickr.min.css';
 
@@ -10,28 +11,6 @@ let memberCount        = 0;
 let showingAllQuizzes  = false;
 let quizAccessDatesMap = {};
 let rowPickerMap       = {}; // quiz_id -> { startFp, endFp }
-
-// Convert UTC ISO 8601 string to local datetime string (dateFormat for Flatpickr)
-function convertFromUTC(utcDatetimeValue) {
-    if (!utcDatetimeValue) return '';
-    const dt = new Date(utcDatetimeValue);
-    if (isNaN(dt.getTime())) return '';
-    const Y  = dt.getFullYear();
-    const m  = String(dt.getMonth() + 1).padStart(2, '0');
-    const d  = String(dt.getDate()).padStart(2, '0');
-    const H  = String(dt.getHours()).padStart(2, '0');
-    const i  = String(dt.getMinutes()).padStart(2, '0');
-    return `${Y}-${m}-${d}T${H}:${i}`;
-}
-
-// Convert Flatpickr dateFormat string (YYYY-MM-DDTHH:mm, local) to UTC ISO 8601
-function convertToUTC(localDatetimeValue) {
-    if (!localDatetimeValue) return '';
-    const [datePart, timePart] = localDatetimeValue.split('T');
-    const [year, month, day]   = datePart.split('-').map(Number);
-    const [hours, minutes]     = timePart.split(':').map(Number);
-    return new Date(year, month - 1, day, hours, minutes).toISOString();
-}
 
 function courseTitle(course) {
     return typeof course.title === 'string'
@@ -64,7 +43,6 @@ function syncClearButton($btn, hasValue) {
 function initRowPickers(quizId, startEl, endEl, startVal, endVal, $rowSaveBtn) {
     let startFp, endFp;
 
-    // Clear buttons live as siblings of each input inside .gqc__date-field.
     const $startClear = jQuery(startEl).closest('.gqc__date-field').find('.gqc__date-clear[data-field-type="start"]');
     const $endClear   = jQuery(endEl).closest('.gqc__date-field').find('.gqc__date-clear[data-field-type="end"]');
 
@@ -98,8 +76,6 @@ function initRowPickers(quizId, startEl, endEl, startVal, endVal, $rowSaveBtn) {
     syncClearButton($startClear, Boolean(startVal));
     syncClearButton($endClear,   Boolean(endVal));
 
-    // Clicking anywhere in the date-field opens the picker — except the
-    // clear button, which has its own handler below.
     jQuery(startEl).closest('.gqc__date-field').on('click', (e) => {
         if (e.target.closest('.gqc__date-clear')) return;
         if (!e.target.classList.contains('flatpickr-alt-input')) startFp.open();
@@ -109,8 +85,7 @@ function initRowPickers(quizId, startEl, endEl, startVal, endVal, $rowSaveBtn) {
         if (!e.target.classList.contains('flatpickr-alt-input')) endFp.open();
     });
 
-    // Clear-button handlers — clear the picker, hide the button, enable Save
-    // so the empty value can be committed to the backend.
+    // Clear-button handlers
     $startClear.on('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -319,8 +294,7 @@ jQuery(document).ready(($) => {
         }
     });
 
-    // Notify Learners — broadcasts the group-level access window for THIS quiz
-    // to every group member. One POST → server fans out a Postmark batch.
+    // Notify Learners — broadcasts the group-level access for THIS quiz to group users
     $block.on('click', '.gqc__notify', async function () {
         const $btn   = jQuery(this);
         const $item  = $btn.closest('.gqc__item');
@@ -381,10 +355,7 @@ jQuery(document).ready(($) => {
         }
     });
 
-    // Fast first paint: if the store has group_id + courses cached from a prior
-    // page in this session, kick off loadQuizData immediately. The
-    // bys:groupSelected handler above will re-fire when group-select finishes
-    // its forceRefresh fetch (this is benign — loadQuizData re-renders cleanly).
+    // Read from store if available until bys:groupSelected handler above finishes its forceRefresh fetch
     const cachedGroupId = store.getCurrentGroup();
     const cachedCourses = store.getCourses();
     const cachedUsers   = store.getUsers();

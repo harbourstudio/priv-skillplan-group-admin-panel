@@ -225,13 +225,23 @@ foreach ($activity_type_filter_options as $option) {
                     </button>
 
                     <div class="filters__date-range hidden" id="date-range-dropdown" role="menu">
-                        <div>
+                        <div class="filters__date-field">
                             <label for="filter-date-from"><?php esc_html_e('From', 'bys'); ?></label>
-                            <input type="date" id="filter-date-from" name="date_from" data-date-input="from" />
+                            <div class="filters__date-field__input">
+                                <input type="text" id="filter-date-from" name="date_from" class="filters__datetime" placeholder="<?php esc_attr_e('Pick a date', 'bys'); ?>" readonly />
+                                <button type="button" class="filters__date-clear btn-unstyled" data-target="filter-date-from" aria-label="<?php esc_attr_e('Clear From date', 'bys'); ?>" hidden>
+                                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                                </button>
+                            </div>
                         </div>
-                        <div>
+                        <div class="filters__date-field">
                             <label for="filter-date-to"><?php esc_html_e('To', 'bys'); ?></label>
-                            <input type="date" id="filter-date-to" name="date_to" data-date-input="to" />
+                            <div class="filters__date-field__input">
+                                <input type="text" id="filter-date-to" name="date_to" class="filters__datetime" placeholder="<?php esc_attr_e('Pick a date', 'bys'); ?>" readonly />
+                                <button type="button" class="filters__date-clear btn-unstyled" data-target="filter-date-to" aria-label="<?php esc_attr_e('Clear To date', 'bys'); ?>" hidden>
+                                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -260,8 +270,8 @@ foreach ($activity_type_filter_options as $option) {
                 <!-- Rows rendered by view.js from REST API -->
             </tbody>
         </table>
-        <button class="bys-show-more btn-unstyled" type="button"><?php esc_html_e('Show More Results', 'bys'); ?></button>
     </div>
+    <button class="bys-show-more btn-unstyled" type="button"><?php esc_html_e('Show More Results', 'bys'); ?></button>
 
     <!-- Template for cloning activity rows -->
     <template id="user-activity-template-row">

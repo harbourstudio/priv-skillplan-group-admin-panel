@@ -7,6 +7,9 @@ let groupCourses   = [];
 let allCourses     = [];
 let selectedCourse = null;
 
+// Titles arrive pre-decoded from the server (see normalize_course_title in
+// class-groups-router.php). The client treats them as plain text — `.text()`
+// and `.attr()` re-encode at insertion time, so no XSS surface.
 function courseTitle(course) {
     return typeof course.title === 'string'
         ? course.title
@@ -17,43 +20,52 @@ function buildCourseRow(course) {
     const title    = courseTitle(course);
     const required = course.required === true;
 
-    const $row = jQuery(`
-        <div class="course-config__item" data-course-id="${course.id}">
-            <span class="course-config__name">${title}</span>
-            <div class="course-config__toggle-wrap">
-                <span class="course-config__toggle-label${required ? ' is-required' : ''}">${required ? 'Required' : 'Optional'}</span>
-                <label class="course-config__toggle">
-                    <input type="checkbox" ${required ? 'checked' : ''} />
-                    <span class="course-config__slider"></span>
-                </label>
-            </div>
-            <button class="course-config__remove btn-unstyled" type="button" aria-label="Remove course">&#x2715;</button>
-        </div>
-    `);
+    // Clone the #gcc__template-item <template> and fill
+    const template = document.getElementById('gcc__template-item');
+    const $row = jQuery(template.content.cloneNode(true)).find('.gcc__item');
 
-    $row.find('input[type="checkbox"]').on('change', async function () {
+    $row.attr('data-course-id', course.id);
+    $row.find('.gcc__name').text(title);
+
+    const $label = $row.find('.gcc__toggle-label');
+    $label.text(required ? 'Required' : 'Optional').toggleClass('is-required', required);
+
+    const $checkbox = $row.find('input[type="checkbox"]');
+    $checkbox.prop('checked', required);
+
+    $checkbox.on('change', async function () {
         const $cb         = jQuery(this);
-        const $lbl        = $row.find('.course-config__toggle-label');
         const nowRequired = $cb.prop('checked');
 
-        $lbl.text(nowRequired ? 'Required' : 'Optional').toggleClass('is-required', nowRequired);
+        $label.text(nowRequired ? 'Required' : 'Optional').toggleClass('is-required', nowRequired);
         course.required = nowRequired;
         $cb.prop('disabled', true);
 
         try {
             await api.post(endpoints.toggleRequiredCourse(currentGroupId, course.id));
             api.invalidate(`groups/${currentGroupId}/courses`);
+            // Mutation write-through: flip required flag in the cached course
+            // shape so other blocks see the new state on next page nav.
+            const cachedCourses = store.getCourses();
+            if (Array.isArray(cachedCourses)) {
+                store.setCourses(cachedCourses.map((c) =>
+                    c.id === course.id ? { ...c, required: nowRequired } : c
+                ));
+            }
         } catch (err) {
             console.error('[course-config] Toggle required failed', err);
             course.required = !nowRequired;
             $cb.prop('checked', !nowRequired);
-            $lbl.text(!nowRequired ? 'Required' : 'Optional').toggleClass('is-required', !nowRequired);
+            $label.text(!nowRequired ? 'Required' : 'Optional').toggleClass('is-required', !nowRequired);
         } finally {
             $cb.prop('disabled', false);
         }
     });
 
-    $row.find('.course-config__remove').on('click', async function () {
+    const $removeBtn = $row.find('.gcc__remove');
+    $removeBtn.attr('aria-label', `Remove ${title}`);
+
+    $removeBtn.on('click', async function () {
         const $btn = jQuery(this);
         if (!await bysConfirm(`Remove "${title}" from this group?`, 'Remove')) return;
         $btn.prop('disabled', true);
@@ -62,7 +74,12 @@ function buildCourseRow(course) {
             await api.post(endpoints.removeGroupCourse(currentGroupId, course.id));
             groupCourses = groupCourses.filter((c) => c.id !== course.id);
             api.invalidate(`groups/${currentGroupId}/courses`);
-            $row.fadeOut(200, () => $row.remove());
+            // Mutation write-through: drop the removed course from the cache.
+            const cachedCourses = store.getCourses();
+            if (Array.isArray(cachedCourses)) {
+                store.setCourses(cachedCourses.filter((c) => c.id !== course.id));
+            }
+            onRemove($row);
         } catch (err) {
             console.error('[course-config] Remove failed', err);
             $btn.prop('disabled', false);
@@ -72,25 +89,73 @@ function buildCourseRow(course) {
     return $row;
 }
 
+// Build a single suggestion <li> from the #gcc__template-suggestion template.
+function buildSuggestion(course) {
+    const template = document.getElementById('gcc__template-suggestion');
+    const $li = jQuery(template.content.cloneNode(true)).find('.gcc__suggestion');
+    $li.attr('data-course-id', course.id);
+    $li.attr('data-course-title', course.title);
+    $li.text(course.title);
+    return $li;
+}
+
+let $messageEl = null;
+
+function showMessage(text, variant) {
+    if (!$messageEl) return;
+    $messageEl
+        .removeClass('gcc__message--empty gcc__message--error')
+        .addClass(`gcc__message--${variant}`)
+        .text(text)
+        .show();
+}
+
+function hideMessage() {
+    if (!$messageEl) return;
+    $messageEl.hide().text('').removeClass('gcc__message--empty gcc__message--error');
+}
+
+// Build N row nodes into a single DocumentFragment — one reflow on insert
+// instead of one per append.
+function buildRowsFragment(courses) {
+    const frag = document.createDocumentFragment();
+    courses.forEach((c) => {
+        const $r = buildCourseRow(c);
+        frag.appendChild($r[0]);
+    });
+    return frag;
+}
+
+function onRemove($row) {
+    $row.fadeOut(200, () => {
+        $row.remove();
+        if (!groupCourses.length) {
+            showMessage('No courses added to this group yet.', 'empty');
+        }
+    });
+}
+
 jQuery(document).ready(async ($) => {
     const $block       = $('.wp-block-bys-groups-group-course-config').first();
     if (!$block.length) return;
 
-    const $skeleton    = $block.find('.course-config__skeleton');
-    const $list        = $block.find('.course-config__list');
-    const $empty       = $block.find('.course-config__empty');
-    const $search      = $block.find('.course-config__search');
-    const $addBtn      = $block.find('.course-config__add-btn');
-    const $suggestions = $block.find('.course-config__suggestions');
+    const $skeleton    = $block.find('.gcc__skeleton');
+    const $list        = $block.find('.gcc__list');
+    const $message     = $block.find('.gcc__message');
+    const $search      = $block.find('.gcc__search');
+    const $addBtn      = $block.find('.gcc__add-btn');
+    const $suggestions = $block.find('.gcc__suggestions');
+
+    $messageEl = $message;
 
     function renderList() {
         $list.empty();
         if (!groupCourses.length) {
-            $empty.text('No courses added to this group yet.').show();
+            showMessage('No courses added to this group yet.', 'empty');
             return;
         }
-        $empty.hide();
-        groupCourses.forEach((course) => $list.append(buildCourseRow(course)));
+        hideMessage();
+        $list[0].appendChild(buildRowsFragment(groupCourses));
     }
 
     // ── Autocomplete ──────────────────────────────────────────────────────────
@@ -112,15 +177,17 @@ jQuery(document).ready(async ($) => {
             .slice(0, 8);
 
         $suggestions.empty();
+
         if (!matches.length) {
-            $suggestions.append('<li class="course-suggestion course-suggestion--empty" role="option">No courses found</li>');
+            const $empty = jQuery('<li class="gcc__suggestion gcc__suggestion--empty" role="option"></li>')
+                .text('No courses found');
+            $suggestions.append($empty);
         } else {
-            matches.forEach((c) => {
-                $suggestions.append(
-                    `<li class="course-suggestion" role="option" data-course-id="${c.id}" data-course-title="${c.title.replace(/"/g, '&quot;')}">${c.title}</li>`
-                );
-            });
+            const frag = document.createDocumentFragment();
+            matches.forEach((c) => frag.appendChild(buildSuggestion(c)[0]));
+            $suggestions[0].appendChild(frag);
         }
+
         $suggestions.removeClass('hidden');
     }
 
@@ -140,7 +207,7 @@ jQuery(document).ready(async ($) => {
         showSuggestions($(this).val());
     });
 
-    $suggestions.on('mousedown', '.course-suggestion:not(.course-suggestion--empty)', function (e) {
+    $suggestions.on('mousedown', '.gcc__suggestion:not(.gcc__suggestion--empty)', function (e) {
         e.preventDefault();
         selectedCourse = {
             id:    parseInt($(this).data('courseId'), 10),
@@ -152,7 +219,7 @@ jQuery(document).ready(async ($) => {
     });
 
     $(document).on('click.courseConfig', (e) => {
-        if (!$(e.target).closest('.course-config__search-wrap').length) {
+        if (!$(e.target).closest('.gcc__search-wrap').length) {
             hideSuggestions();
             if (!selectedCourse) $search.val('');
         }
@@ -166,12 +233,17 @@ jQuery(document).ready(async ($) => {
 
         try {
             await api.post(endpoints.addGroupCourse(currentGroupId, selectedCourse.id));
+            // Re-fetch the canonical course list (includes the new course AND
+            // its baked quizzes_show_test_grading_config / _reporting fields).
             groupCourses = await api.get(endpoints.groupCourses(currentGroupId), true);
+            // Mutation write-through: replace the cache with the fresh response.
+            store.setCourses(Array.isArray(groupCourses) ? groupCourses : []);
             $search.val('');
             selectedCourse = null;
             renderList();
         } catch (err) {
             console.error('[course-config] Add course failed', err);
+            showMessage('Could not add course. Please try again.', 'error');
         } finally {
             $addBtn.prop('disabled', !selectedCourse).text('Add');
         }
@@ -192,11 +264,11 @@ jQuery(document).ready(async ($) => {
         hideSuggestions();
 
         // Show/hide the entire add-course form for site editors
-        $block.find('.course-config__add').toggle(!isSiteEditor);
+        $block.find('.gcc__add').toggle(!isSiteEditor);
 
         $skeleton.show();
         $list.empty();
-        $empty.hide();
+        hideMessage();
 
         groupCourses = Array.isArray(courses) ? courses : [];
         $skeleton.hide();
@@ -204,7 +276,7 @@ jQuery(document).ready(async ($) => {
 
         // Hide per-row remove and required toggle for site editors
         if (isSiteEditor) {
-            $list.find('.course-config__remove, .course-config__toggle').hide();
+            $list.find('.gcc__remove, .gcc__toggle').hide();
         }
     });
 
@@ -214,12 +286,9 @@ jQuery(document).ready(async ($) => {
     const cachedGroupId = store.getCurrentGroup();
     const cachedCourses = store.getCourses();
     if (cachedGroupId !== null && cachedCourses !== null) {
-        console.log('[bys-store] group-course-config: HIT — rendering courses from cache', cachedCourses);
         currentGroupId = cachedGroupId;
         groupCourses   = cachedCourses;
         renderList();
         $skeleton.hide();
-    } else {
-        console.log('[bys-store] group-course-config: MISS — waiting for bys:groupSelected');
     }
 });

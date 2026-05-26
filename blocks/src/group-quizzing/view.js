@@ -19,9 +19,20 @@ jQuery(document).ready(($) => {
       return;
     }
 
-    // Fetch quiz steps for all courses upfront (needed for count, filtering, and stats query)
+    // Grading-flagged quizzes per course are pre-baked into the store by
+    // /base-group-data — no per-course /quiz-steps?filter=grading fetches.
+    // Falls back to REST only when the store hasn't been populated for this
+    // course (rare; would mean the course array we got didn't come from the store).
+    const cachedCourses = store.getCourses() || [];
+    const cachedById = new Map(cachedCourses.map((c) => [c.id, c]));
+
     const quizStepsByCourse = {};
     await Promise.all(courses.map(async (course) => {
+      const cached = cachedById.get(course.id);
+      if (Array.isArray(cached?.quizzes_show_test_grading_config)) {
+        quizStepsByCourse[course.id] = cached.quizzes_show_test_grading_config;
+        return;
+      }
       try {
         const steps = await api.get(endpoints.courseQuizStepsGrading(course.id));
         quizStepsByCourse[course.id] = Array.isArray(steps) ? steps : [];

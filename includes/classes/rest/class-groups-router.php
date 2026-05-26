@@ -314,7 +314,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                         $shortname = $course_id ? get_post_meta($course_id, 'shortname', true) : '';
                         $courses[] = [
                             'id'        => $course_id,
-                            'title'     => $course['title'] ?? 'Untitled',
+                            'title'     => $this->normalize_course_title($course['title'] ?? null),
                             'shortname' => $shortname ?: null,
                             'required'  => $course_id ? in_array(intval($course_id), $required_ids, true) : false,
                             // Filled in below from a single batched query so blocks
@@ -554,7 +554,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                     $shortname = $course_id ? get_post_meta($course_id, 'shortname', true) : '';
                     $formatted_courses[] = [
                         'id'        => $course_id,
-                        'title'     => $course['title'] ?? 'Untitled',
+                        'title'     => $this->normalize_course_title($course['title'] ?? null),
                         'shortname' => $shortname ?: null,
                         'required'  => $course_id ? in_array(intval($course_id), $required_ids, true) : false,
                         'quizzes_show_test_grading_config'   => [],
@@ -752,7 +752,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             foreach (get_posts($args) as $course) {
                 $result[] = [
                     'id'    => $course->ID,
-                    'title' => $course->post_title,
+                    'title' => $this->normalize_course_title($course->post_title),
                 ];
             }
             return $result;
@@ -2248,6 +2248,24 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             return $out;
         }
 
+        /**
+         * Normalize a course title from the LearnDash REST API for client
+         * consumption. LD runs `the_title` filters (incl. wptexturize +
+         * entity encoding) before serializing, so payloads arrive as either
+         * "Foo &amp; Bar" or {rendered: "Foo &amp; Bar"}. The frontend treats
+         * titles as plain text via `.text()`/`.attr()` — decoding here means
+         * the client never has to.
+         *
+         * Returns the raw decoded string (e.g. "Foo & Bar", "Don't Stop").
+         */
+        private function normalize_course_title($raw) {
+            if (is_array($raw) && isset($raw['rendered'])) {
+                $raw = $raw['rendered'];
+            }
+            if (!is_string($raw) || $raw === '') return 'Untitled';
+            return html_entity_decode($raw, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
+
         private function fetch_group_courses_minimal($group_id, $auth_header) {
             $url = get_home_url() . "/wp-json/ldlms/v2/groups/{$group_id}/courses?_fields=id,title";
 
@@ -2266,13 +2284,9 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             $result = [];
             foreach ($courses as $course) {
                 if (!isset($course['id'])) continue;
-                $title = $course['title'];
-                if (is_array($title) && isset($title['rendered'])) {
-                    $title = $title['rendered'];
-                }
                 $result[] = [
                     'id'    => intval($course['id']),
-                    'title' => $title,
+                    'title' => $this->normalize_course_title($course['title'] ?? null),
                 ];
             }
 
