@@ -18,18 +18,18 @@ export default function Edit({ clientId, attributes, setAttributes }) {
 
     return (
         <div {...useBlockProps()}>
-            <div className="group-leaders__header">
-                <h5 className="group-leaders__title">{__('Group leaders', 'bys')}</h5>
-                <p className="group-leaders__description">{__('Group leaders can view reports and progress for all members in this cohort. Members only see their own learning.', 'bys')}</p>
+            <div className="gl__header">
+                <h5>{__('Group leaders', 'bys')}</h5>
+                <p className="gl__description">{__('Group leaders can view reports and progress for all members in this cohort. Members only see their own learning.', 'bys')}</p>
             </div>
-            <div className="group-leaders__card">
-                <div className="group-leaders__list">
+            <div className="gl__card">
+                <div className="gl__list">
                     {MOCK_LEADERS.map((l) => (
-                        <div key={l.id} className="group-leaders__item">
-                            <div className="group-leaders__avatar">
-                                <span className="group-leaders__avatar-initial">{l.name.charAt(0)}</span>
+                        <div key={l.id} className="gl__item">
+                            <div className="gl__avatar">
+                                <span className="gl__avatar-initial">{l.name.charAt(0)}</span>
                             </div>
-                            <span className="group-leaders__name">{l.name}</span>
+                            <span className="gl__name">{l.name}</span>
                         </div>
                     ))}
                 </div>

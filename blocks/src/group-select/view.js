@@ -49,14 +49,20 @@ jQuery(document).ready(($) => {
       store.setCourses(courses);
       store.setLeaders(leaders);
 
-      // isOrgAdmin is group-specific (read from the selected <option>) so it
-      // travels via the event payload. isGrader / isSiteEditor are global
-      // per-user flags — listeners read them straight from window.bysGroupsAuth.
-      const isOrgAdmin = $select.find(`option[value="${groupId}"]`).data('is-org-admin') === 1;
+      // Group-specific capability flags — server computes them in /me/groups
+      // and we surface them on the <option data-*>. The blocks gate UI on
+      // canManageLeaders / canManageMembers; isOrgAdmin stays for blocks that
+      // still need it (group-archive, group-add-member).
+      const $opt              = $select.find(`option[value="${groupId}"]`);
+      const isOrgAdmin        = $opt.data('is-org-admin')        === 1;
+      const canManageLeaders  = $opt.data('can-manage-leaders')  === 1;
+      const canManageMembers  = $opt.data('can-manage-members')  === 1;
 
       $(document).trigger('bys:groupSelected', {
         groupId: parseInt(groupId),
         isOrgAdmin: isOrgAdmin,
+        canManageLeaders: canManageLeaders,
+        canManageMembers: canManageMembers,
       });
 
       $spinnerWrapper.hide();

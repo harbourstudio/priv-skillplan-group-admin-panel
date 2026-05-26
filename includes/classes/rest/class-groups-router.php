@@ -17,8 +17,8 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
         }
 
         public function register_routes() {
-            // ── Cluster A: group users + stats ─────────────────────────────
 
+            // ── Cluster A: group users + stats ─────────────────────────────
             register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/groups/(?P<group_id>\d+)/base-group-data', [
                 'methods'             => WP_REST_Server::READABLE,
                 'callback'            => [$this, 'get_base_group_data'],
@@ -34,13 +34,23 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/groups/(?P<group_id>\d+)/users/(?P<user_id>\d+)/remove', [
                 'methods'             => WP_REST_Server::CREATABLE,
                 'callback'            => [$this, 'remove_group_user'],
-                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_manage_user_in_group($request['group_id'], $request['user_id']),
+                'permission_callback' => function ($request) {
+                    if (!BYS_Groups_Permissions::can_manage_members($request['group_id'])) return false;
+                    return function_exists('learndash_is_user_in_group')
+                        ? (bool) learndash_is_user_in_group($request['user_id'], $request['group_id'])
+                        : false;
+                },
             ]);
 
             register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/groups/(?P<group_id>\d+)/users/(?P<user_id>\d+)', [
                 'methods'             => WP_REST_Server::READABLE,
                 'callback'            => [$this, 'get_group_user_info'],
-                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_manage_user_in_group($request['group_id'], $request['user_id']),
+                'permission_callback' => function ($request) {
+                    if (!BYS_Groups_Permissions::can_access_group($request['group_id'])) return false;
+                    return function_exists('learndash_is_user_in_group')
+                        ? (bool) learndash_is_user_in_group($request['user_id'], $request['group_id'])
+                        : false;
+                },
             ]);
 
             register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/groups/(?P<group_id>\d+)/users', [
@@ -115,10 +125,12 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             ]);
 
             // ── Cluster E: group leaders ───────────────────────────────────
+            // Removing a leader is restricted to site admins + org admins.
+            // Graders and regular group-leaders are intentionally excluded.
             register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/groups/(?P<group_id>\d+)/leaders/(?P<user_id>\d+)', [
                 'methods'             => WP_REST_Server::DELETABLE,
                 'callback'            => [$this, 'remove_group_leader'],
-                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_access_group($request['group_id']),
+                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_manage_leaders($request['group_id']),
             ]);
 
             register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/groups/(?P<group_id>\d+)/leaders', [

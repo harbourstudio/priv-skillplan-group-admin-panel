@@ -37,7 +37,7 @@ export function skeletonRows(colCount, rowCount = 1) {
  * Carries its own ARIA — drop it straight into any container.
  */
 export const SKELETON = `
-    <div class="skeleton" role="status" aria-busy="true" aria-live="polite></div>
+    <div class="skeleton" role="status" aria-busy="true" aria-live="polite"></div>
 `;
 
 /**

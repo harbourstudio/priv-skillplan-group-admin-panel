@@ -152,6 +152,7 @@
     font-size: var(--wp--preset--font-size--x-small);
     font-weight: normal;
     cursor: pointer;
+    padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--3);
 }
 
 .bys-multiselect__option label:hover {
