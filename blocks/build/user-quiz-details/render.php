@@ -47,13 +47,23 @@ $auth_header = BYS_Groups_Auth::get_auth_header();
                     </button>
 
                     <div class="filters__date-range hidden" id="date-range-dropdown" role="menu">
-                        <div>
+                        <div class="filters__date-field">
                             <label for="filter-date-from"><?php esc_html_e('From', 'bys'); ?></label>
-                            <input type="date" id="filter-date-from" name="date_from" data-date-input="from" />
+                            <div class="filters__date-field__input">
+                                <input type="text" id="filter-date-from" name="date_from" class="filters__datetime" placeholder="<?php esc_attr_e('Pick a date', 'bys'); ?>" readonly />
+                                <button type="button" class="filters__date-clear btn-unstyled" data-target="filter-date-from" aria-label="<?php esc_attr_e('Clear From date', 'bys'); ?>" hidden>
+                                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                                </button>
+                            </div>
                         </div>
-                        <div>
+                        <div class="filters__date-field">
                             <label for="filter-date-to"><?php esc_html_e('To', 'bys'); ?></label>
-                            <input type="date" id="filter-date-to" name="date_to" data-date-input="to" />
+                            <div class="filters__date-field__input">
+                                <input type="text" id="filter-date-to" name="date_to" class="filters__datetime" placeholder="<?php esc_attr_e('Pick a date', 'bys'); ?>" readonly />
+                                <button type="button" class="filters__date-clear btn-unstyled" data-target="filter-date-to" aria-label="<?php esc_attr_e('Clear To date', 'bys'); ?>" hidden>
+                                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -116,13 +126,14 @@ $auth_header = BYS_Groups_Auth::get_auth_header();
             <tbody>
             </tbody>
         </table>
-        <button class="bys-show-more btn-unstyled" type="button"><?php esc_html_e('Show More Results', 'bys'); ?></button>
-
-
+        
+        
         <!-- Grouped view: container for course tables (hidden by default) -->
         <div id="quizzes-grouped" class="quizzes-grouped" style="display: none;">
         </div>
     </div>
+    
+    <button class="bys-show-more btn-unstyled" type="button"><?php esc_html_e('Show More Results', 'bys'); ?></button>
 
     <!-- Template: Quiz Table Row -->
     <template id="user-quiz-details_template-row">
