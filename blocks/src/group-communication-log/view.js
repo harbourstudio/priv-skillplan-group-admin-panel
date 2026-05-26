@@ -1,4 +1,5 @@
 import { api, endpoints } from '../_shared/api-client.js';
+import store from '../_shared/store.js';
 
 jQuery(document).ready(($) => {
     const $block = $('.wp-block-bys-groups-group-communication-log').first();
@@ -14,7 +15,7 @@ jQuery(document).ready(($) => {
             const data = await api.get(endpoints.groupCommunicationLog(groupId));
             renderLog(data.messages || [], false);
         } catch (err) {
-            $list.html('<p class="gcl__error">Failed to load message log.</p>');
+            $list.html('<p class="gcl__message gcl__message--error">Failed to load message log.</p>');
             console.error('[group-communication-log] Error:', err);
         }
     }
@@ -25,14 +26,14 @@ jQuery(document).ready(($) => {
     function renderLog(messages, isAppending = false) {
 
         if (!messages.length && !isAppending) {
-            $list.html('<div class="gcl__feedback"><p>No sent messages yet.</p></div>');
+            $list.html('<div class="gcl__message"><p>No sent messages yet.</p></div>');
             return;
         }
 
         // Get template
         const template = document.getElementById('gcl-item-template');
         if (!template) {
-            $list.html('<p class="gcl__error">Template not found.</p>');
+            $list.html('<p class="gcl__message gcl__message--error">Template not found.</p>');
             return;
         }
 
@@ -87,7 +88,8 @@ jQuery(document).ready(($) => {
 
             // Set badge class and text based on badge_type
             const badgeType = msg.badge_type || 'prompt';
-            const badgeLabel = badgeType === 'custom' ? 'Custom' : 'Prompt';
+            const badgeLabels = { custom: 'Custom', quiz: 'Quiz', prompt: 'Prompt' };
+            const badgeLabel = badgeLabels[badgeType] || 'Prompt';
             $button.find('.gcl__badge')
                 .addClass(`gcl__badge--${badgeType}`)
                 .text(badgeLabel);
@@ -140,7 +142,7 @@ jQuery(document).ready(($) => {
     function setupShowMore() {
         let visibleCount = 5;
         let currentOffset = 0;
-        let groupId = window.bysGroupData?.groupId;
+        let groupId = store.getCurrentGroup();
         let isLoadingMore = false;
 
         // Remove existing show-more button

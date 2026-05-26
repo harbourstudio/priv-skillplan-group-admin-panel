@@ -177,23 +177,32 @@ if (!class_exists('BYS_Groups_Permissions')) {
         }
 
         /**
-         * The current user can perform a leader action against $target_user_id within $group_id
+         * Can the current user MANAGE MEMBERS of $group_id?
+         * Passes for: site admins, org admins of this group, and group-leaders
+         * of this group
          */
-        public static function can_manage_user_in_group($group_id, $target_user_id, $user_id = null) {
-            $group_id       = (int) $group_id;
-            $target_user_id = (int) $target_user_id;
-            $user_id       = $user_id ?: get_current_user_id();
+        public static function can_manage_members($group_id, $user_id = null) {
+            $group_id = (int) $group_id;
+            $user_id  = $user_id ?: get_current_user_id();
+            if ($group_id <= 0 || !$user_id) return false;
 
-            if ($group_id <= 0 || $target_user_id <= 0 || !$user_id) return false;
+            if (self::is_site_admin($user_id)) return true;
+            if (get_user_meta($user_id, "learndash_group_leaders_{$group_id}", true)) return true;
+            return self::is_org_admin_for_group($user_id, $group_id);
+        }
 
-            if (!self::can_access_group($group_id, $user_id)) return false;
+        /**
+         * Can the current user MANAGE LEADERS of $group_id?
+         * Passes for: site admins and org admins of this group ONLY.
+         * EXCLUDES graders AND regular group-leaders.
+         */
+        public static function can_manage_leaders($group_id, $user_id = null) {
+            $group_id = (int) $group_id;
+            $user_id  = $user_id ?: get_current_user_id();
+            if ($group_id <= 0 || !$user_id) return false;
 
-            // Target must be a member of the group.
-            if (function_exists('learndash_is_user_in_group')) {
-                return (bool) learndash_is_user_in_group($target_user_id, $group_id);
-            }
-
-            return false;
+            if (self::is_site_admin($user_id)) return true;
+            return self::is_org_admin_for_group($user_id, $group_id);
         }
 
         /**

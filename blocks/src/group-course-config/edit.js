@@ -15,39 +15,41 @@ export default function Edit({ clientId, attributes, setAttributes }) {
         if (blockId !== clientId) setAttributes({ blockId: clientId });
     }, [clientId]);
 
-    return (
-        <div {...useBlockProps()}>
-            <h5 className="course-config__title">Group Courses</h5>
+    const blockProps = useBlockProps()
 
-            <div className="course-config__add">
-                <div className="course-config__search-wrap">
+    return (
+        <div { ...blockProps }>
+            <h5>Group Courses</h5>
+
+            <div className="gcc__add">
+                <div className="gcc__search-wrap">
                     <input
                         type="text"
-                        className="course-config__search"
+                        className="gcc__search"
                         placeholder="Search courses to add…"
                         readOnly
                     />
                 </div>
-                <button className="course-config__add-btn btn-unstyled" type="button" disabled>
+                <button className="gcc__add-btn btn-unstyled" type="button" disabled>
                     Add
                 </button>
             </div>
 
-            <div className="course-config__card">
-                <div className="course-config__list">
+            <div className="gcc__card">
+                <div className="gcc__list">
                     {MOCK_COURSES.map((course) => (
-                        <div key={course.id} className="course-config__item">
-                            <span className="course-config__name">{course.title}</span>
-                            <div className="course-config__toggle-wrap">
-                                <span className={`course-config__toggle-label${course.required ? ' is-required' : ''}`}>
+                        <div key={course.id} className="gcc__item">
+                            <span className="gcc__name">{course.title}</span>
+                            <div className="gcc__toggle-wrap">
+                                <span className={`gcc__toggle-label${course.required ? ' is-required' : ''}`}>
                                     {course.required ? 'Required' : 'Optional'}
                                 </span>
-                                <label className="course-config__toggle">
+                                <label className="gcc__toggle">
                                     <input type="checkbox" defaultChecked={course.required} readOnly />
-                                    <span className="course-config__slider"></span>
+                                    <span className="gcc__slider"></span>
                                 </label>
                             </div>
-                            <button className="course-config__remove btn-unstyled" type="button" aria-label="Remove course">
+                            <button className="gcc__remove btn-unstyled" type="button" aria-label="Remove course">
                                 &#x2715;
                             </button>
                         </div>

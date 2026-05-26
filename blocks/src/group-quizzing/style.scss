@@ -211,6 +211,7 @@
         font-size: var(--wp--preset--font-size--x-small);
         font-weight: 500;
         white-space: nowrap;
+        margin: var(--wp--preset--spacing--1) 0;
     }
 
         // Skeleton loader
@@ -243,24 +244,7 @@
         }
     }
 
-    .skeleton-icon {
-        width: 2rem;
-        height: 2rem;
-        border-radius: 4px;
-        flex-shrink: 0;
-        background: linear-gradient(90deg, #e8e8e8 25%, #f2f2f2 50%, #e8e8e8 75%);
-        background-size: 200% 100%;
-        animation: bys-shimmer 1.4s infinite linear;
-    }
-
-    .skeleton-text {
-        display: inline-block;
-        height: 0.85em;
-        border-radius: 4px;
-        background: linear-gradient(90deg, #e8e8e8 25%, #f2f2f2 50%, #e8e8e8 75%);
-        background-size: 200% 100%;
-        animation: bys-shimmer 1.4s infinite linear;
-    }
+    
 
     @media (max-width: 821px) {
         .accordion-toggle__date,

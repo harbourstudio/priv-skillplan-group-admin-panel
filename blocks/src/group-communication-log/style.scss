@@ -67,6 +67,11 @@
                 background: var(--wp--preset--color--blue-100);
                 color: var(--wp--preset--color--blue-700);
             }
+
+            &--quiz {
+                background: var(--wp--preset--color--green-100);
+                color: var(--wp--preset--color--green-700);
+            }
         }
     
         &__show-more {
@@ -85,21 +90,26 @@
             &:hover { background: var(--wp--preset--color--blue-100); }
         }
 
-        &__feedback {
+        &__message {
             text-align: center;
+            background-color: var(--wp--preset--color--yellow-100);
+            border: 1px solid var(--wp--preset--color--yellow-600);
+            color: var(--wp--preset--color--yellow-800);
+            border-radius: .5rem;
+            display: flex;
+            gap: var(--wp--preset--spacing--3);
+            padding: var(--wp--preset--spacing--4) var(--wp--preset--spacing--5);
+            margin: var(--wp--preset--spacing--5);
+
+            &--error {
+                background-color: var(--wp--preset--color--red-100);
+                border: 1px solid var(--wp--preset--color--red-600);
+                color: var(--wp--preset--color--red-800);
+            }
+
+            > p {
+                margin: 0;
+            }
         }
-    }
-
-    @mixin shimmer {
-        background: linear-gradient(90deg, var(--wp--preset--color--gray-100) 25%, #e8e8e8 50%, var(--wp--preset--color--gray-100) 75%);
-        background-size: 800px 100%;
-        animation: bys-shimmer 1.4s infinite linear;
-        border-radius: 0.25rem;
-    }
-
-    .skeleton {
-        @include shimmer;
-        display: inline-block;
-        height: 1.25rem;
     }
 }

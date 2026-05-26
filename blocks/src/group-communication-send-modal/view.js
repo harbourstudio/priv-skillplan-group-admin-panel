@@ -350,7 +350,7 @@ jQuery(document).ready(function($) {
         $form.attr('data-prompt-type', promptType);
 
         // Prefer the store's current group; fall back to legacy global.
-        const groupId = store.getCurrentGroup() ?? window.bysGroupData?.groupId;
+        const groupId = store.getCurrentGroup();
         if (groupId) {
             currentGroupId = groupId;
             showForm();
@@ -361,7 +361,7 @@ jQuery(document).ready(function($) {
         // Group ID not yet resolved — show skeleton and wait.
         showSkeleton();
         $(document).one('bys:groupSelected', (e, data) => {
-            currentGroupId = data?.groupId ?? window.bysGroupData?.groupId;
+            currentGroupId = data?.groupId ?? store.getCurrentGroup();
             if (!currentGroupId) {
                 console.error('[comm:open-send-modal] Group ID still unresolved after bys:groupSelected');
                 return;
@@ -441,9 +441,8 @@ jQuery(document).ready(function($) {
      * Populate group-users multiselect for 'individual' sending.
      * Fills the dropdown with one checkbox per member.
      *
-     * Uses the user_ids already cached on window.bysGroupData by group-select
-     * to avoid a duplicate (and frequently timing-out) call to the
-     * /base-user-stats endpoint.
+     * Reads user_ids from bysGroupsStore (canonical source after group-select
+     * runs). No round trip to the user/stats endpoint.
      */
     async function populateGroupUsers(groupId) {
         const $multiselect = $modal.find('#gcsm__recipient-selection');
@@ -455,18 +454,12 @@ jQuery(document).ready(function($) {
         $list.empty();
 
         try {
-            // Prefer cached user_ids from the store; fall back to the legacy
-            // window.bysGroupData global if the store hasn't been populated yet
-            // (e.g. modal opened before group-select wrote through).
-            const cachedUserIds = store.getCurrentGroup() === Number(groupId)
+            // user_ids come from the store. Modal can only be opened after a
+            // group is selected, so the store is guaranteed populated.
+            const userIds = store.getCurrentGroup() === Number(groupId)
                 ? store.getUserIds()
                 : null;
-            const userIds = cachedUserIds ?? window.bysGroupData?.baseUsersStats?.user_ids;
-            if (cachedUserIds !== null) {
-                console.log('[bys-store] send-modal: HIT — user_ids from store', cachedUserIds);
-            } else {
-                console.log('[bys-store] send-modal: MISS — user_ids from window.bysGroupData');
-            }
+            console.log('[bys-store] send-modal: user_ids from store', userIds);
 
             if (!Array.isArray(userIds) || userIds.length === 0) {
                 console.warn('[group-communication-send-modal] No group members found');

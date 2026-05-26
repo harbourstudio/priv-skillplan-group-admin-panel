@@ -477,6 +477,30 @@ jQuery(document).ready(($) => {
 
     async function loadQuizzes(courses) {
         if (!courses?.length) { allQuizzes = []; return; }
+
+        // Grading-flagged quizzes per course are pre-baked into the store.
+        // Derive allQuizzes from there — no per-course /quiz-steps fetches.
+        const cachedCourses = store.getCourses() || [];
+        const cachedById = new Map(cachedCourses.map((c) => [c.id, c]));
+        const hasCachedQuizzes = courses.every((c) =>
+            Array.isArray(cachedById.get(c.id)?.quizzes_show_test_grading_config)
+        );
+
+        if (hasCachedQuizzes) {
+            allQuizzes = courses.flatMap((course) => {
+                const cached = cachedById.get(course.id);
+                const name = courseTitle(course);
+                return (cached.quizzes_show_test_grading_config || []).map((q) => ({
+                    step_id:     q.step_id,
+                    step_title:  q.step_title,
+                    course_name: name,
+                }));
+            });
+            return;
+        }
+
+        // Cache miss (rare — would mean store hasn't been populated yet).
+        // Fall back to per-course REST.
         try {
             const results = await Promise.all(
                 courses.map(async (course) => {
@@ -500,7 +524,7 @@ jQuery(document).ready(($) => {
         }
     }
 
-    async function init(groupId, baseUsersStats, courses) {
+    async function init(groupId, userIds, courses) {
         currentGroupId = groupId;
         selectedUserId = null;
         selectedQuizId = null;
@@ -513,12 +537,12 @@ jQuery(document).ready(($) => {
         setAwaitingQuiz(false); // Fresh group → no stale quiz to invalidate.
         updateActions();
 
-        const userIds = baseUsersStats?.user_ids || [];
         await Promise.all([loadMembers(groupId, userIds), loadQuizzes(courses)]);
     }
 
-    $(document).on('bys:groupSelected', (_, { groupId, baseUsersStats, courses }) => {
-        init(groupId, baseUsersStats, Array.isArray(courses) ? courses : []);
+    $(document).on('bys:groupSelected', (_, { groupId }) => {
+        // users + courses come from the store — guaranteed populated by group-select.
+        init(groupId, store.getUserIds() || [], store.getCourses() || []);
     });
 
     // Fast first paint: if the store has group_id + courses + users cached
@@ -534,7 +558,7 @@ jQuery(document).ready(($) => {
             courses: cachedCourses.length,
             users: cachedUserIds.length,
         });
-        init(cachedGroupId, { user_ids: cachedUserIds }, cachedCourses);
+        init(cachedGroupId, cachedUserIds, cachedCourses);
     } else {
         console.log('[bys-store] group-user-quiz-config: MISS — waiting for bys:groupSelected');
     }

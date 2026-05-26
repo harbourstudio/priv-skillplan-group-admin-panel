@@ -18,21 +18,25 @@ $wrapper_attributes = get_block_wrapper_attributes();
 ?>
 
 <div <?= $wrapper_attributes; ?>>
-    <h5 class="pending-enrolments__title"><?php esc_html_e( 'Pending enrolments', 'bys' ); ?></h5>
-    <div class="pending-enrolments__card">
-        <div class="pending-enrolments__skeleton">
+    <h5 class="gpe__title"><?php esc_html_e( 'Pending enrolments', 'bys' ); ?></h5>
+    <div class="gpe__card">
+        <div class="gpe__skeleton">
             <?php foreach ( [ 180, 220, 160 ] as $w ) : ?>
-            <div class="pending-enrolments__skeleton-row">
-                <span class="skeleton-text" style="width:<?php echo $w; ?>px"></span>
-                <span class="skeleton-btn" style="width:60px"></span>
+            <div class="gpe__skeleton-row">
+                <span class="skeleton" style="width:<?php echo $w; ?>px"></span>
+                <div class="gpe__skeleton-meta">
+                    <span class="skeleton" style="width:64px;"></span>
+                    <span class="skeleton" style="width:48px;"></span>
+                    <span class="skeleton-circular" style="width:16px; height: 16px;"></span>
+                </div>
             </div>
             <?php endforeach; ?>
         </div>
-        <div class="pending-enrolments__list" style="display:none;"></div>
-        <p class="pending-enrolments__empty" style="display:none;">
+        <div class="gpe__list" style="display:none;"></div>
+        <p class="gpe__empty" style="display:none;">
             <?php esc_html_e( 'No pending enrolments.', 'bys' ); ?>
         </p>
-        <button class="pending-enrolments__show-more btn-unstyled" style="display:none;" type="button">
+        <button class="gpe__show-more btn-unstyled" style="display:none;" type="button">
             <?php esc_html_e( 'Show More', 'bys' ); ?>
         </button>
     </div>

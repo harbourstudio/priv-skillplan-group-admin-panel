@@ -170,35 +170,57 @@ if (!class_exists('BYS_Groups_Users_Router')) {
                 }
             }
 
-            // Batch-fetch completion dates from LD activity table
+            // Batch-fetch start + completion timestamps from LD activity table.
+            // No activity_status filter so we get in-progress rows too — that
+            // row's activity_started is the canonical "date_started" timestamp
+            // LD's own REST API exposes, and is the right source for enrolled_at
+            // for group-enrolled users (the learndash_course_{id}_enrolled_at
+            // user meta is only set for direct enrolment).
             global $wpdb;
-            $completion_map = [];
-            $placeholders   = implode(',', array_fill(0, count($course_ids), '%d'));
+            $activity_map = [];
+            $placeholders = implode(',', array_fill(0, count($course_ids), '%d'));
             $rows = $wpdb->get_results($wpdb->prepare(
-                "SELECT course_id, activity_completed
+                "SELECT course_id, activity_started, activity_completed
                  FROM {$wpdb->prefix}learndash_user_activity
-                 WHERE user_id = %d AND course_id IN ($placeholders) AND activity_type = 'course' AND activity_status = 1",
+                 WHERE user_id = %d AND course_id IN ($placeholders) AND activity_type = 'course'",
                 ...array_merge([$user_id], $course_ids)
             ));
             foreach ($rows ?: [] as $row) {
-                $completion_map[intval($row->course_id)] = intval($row->activity_completed);
+                $activity_map[intval($row->course_id)] = [
+                    'started'   => intval($row->activity_started),
+                    'completed' => intval($row->activity_completed),
+                ];
             }
 
             $out = [];
             foreach ($course_ids as $course_id) {
                 $cp = $progress_map[$course_id] ?? ['status' => 'not_started', 'completed' => 0, 'total' => 0];
 
-                $enrolled_ts = get_user_meta($user_id, "learndash_course_{$course_id}_enrolled_at", true);
-                $enrolled_at = $enrolled_ts ? wp_date('c', intval($enrolled_ts)) : null;
+                // Canonical step total comes from the course's live step structure,
+                // not the user's cached snapshot (which goes stale when course
+                // content changes). Matches what LD's REST API returns.
+                $steps_total = function_exists('learndash_get_course_steps_count')
+                    ? intval(learndash_get_course_steps_count($course_id))
+                    : $cp['total'];
 
-                $completed_ts       = $completion_map[$course_id] ?? null;
-                $date_completed     = $completed_ts ? wp_date('c', intval($completed_ts)) : null;
-                $date_completed_gmt = $completed_ts ? gmdate('Y-m-d H:i:s', intval($completed_ts)) : null;
+                $activity = $activity_map[$course_id] ?? null;
+                $started_ts   = $activity['started']   ?? 0;
+                $completed_ts = $activity['completed'] ?? 0;
+
+                // Prefer activity_started for enrolled_at; fall back to the
+                // user-meta enrolment timestamp (set on direct enrolment only).
+                if (!$started_ts) {
+                    $started_ts = intval(get_user_meta($user_id, "learndash_course_{$course_id}_enrolled_at", true) ?: 0);
+                }
+
+                $enrolled_at        = $started_ts   > 0 ? wp_date('c', $started_ts)              : null;
+                $date_completed     = $completed_ts > 0 ? wp_date('c', $completed_ts)            : null;
+                $date_completed_gmt = $completed_ts > 0 ? gmdate('Y-m-d H:i:s', $completed_ts)   : null;
 
                 $out[$course_id] = [
                     'progress_status'    => $cp['status'],
                     'steps_completed'    => $cp['completed'],
-                    'steps_total'        => $cp['total'],
+                    'steps_total'        => $steps_total,
                     'enrolled_at'        => $enrolled_at,
                     'date_completed'     => $date_completed,
                     'date_completed_gmt' => $date_completed_gmt,

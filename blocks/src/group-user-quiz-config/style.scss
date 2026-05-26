@@ -60,7 +60,7 @@
             grid-template-columns: 1fr 1fr;
             gap: var(--wp--preset--spacing--4);
 
-            @media (max-width: 821px) {
+            @media (max-width: 1023px) {
                 grid-template-columns: 1fr;
             }
         }
@@ -222,14 +222,14 @@
             align-items: center;
             justify-content: center;
             font-size: 0.75rem;
-            color: var(--wp--preset--color--red-500);
+            color: var(--wp--preset--color--gray-400);
             flex-shrink: 0;
             padding: 0;
             line-height: 1;
             cursor: pointer;
             transition: color 0.15s;
 
-            &:hover { color: var(--wp--preset--color--gray-700); }
+            &:hover { color: var(--wp--preset--color--red-500); }
 
             // Native `hidden` attr must win over the explicit display above.
             &[hidden] { display: none; }
@@ -245,7 +245,7 @@
             display: flex;
             gap: var(--wp--preset--spacing--3);
 
-            @media (max-width: 821px) {
+            @media (max-width: 1023px) {
                 flex-direction: column;
             }
         }
@@ -262,7 +262,7 @@
             &:hover:not(:disabled) { opacity: 0.88; }
             &:disabled { opacity: 0.4; cursor: not-allowed; }
 
-            @media (max-width: 821px) {
+            @media (max-width: 1023px) {
                 width: 100%;
             }
         }
@@ -283,7 +283,7 @@
             }
             &:disabled { opacity: 0.4; cursor: not-allowed; }
 
-            @media (max-width: 821px) {
+            @media (max-width: 1023px) {
                 width: 100%;
             }
         }

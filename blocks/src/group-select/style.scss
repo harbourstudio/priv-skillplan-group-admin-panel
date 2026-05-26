@@ -1,10 +1,12 @@
 .wp-block-bys-groups-group-select {
+    display: flex;
+    gap: var(--wp--preset--spacing--4);
 
     @media (max-width: 821px) {
         width: 100%;
     }
     
-	.group-selector{
+	.group-select {
         display: flex;
         gap: var(--wp--preset--spacing--4);
         align-items: center;

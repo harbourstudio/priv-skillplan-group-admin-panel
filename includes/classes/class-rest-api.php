@@ -3229,7 +3229,9 @@ if (!class_exists('BYS_Groups_Rest_API')) {
                     'subject' => $subject,
                     'sent_at' => $display_time,
                     'prompt_type' => $prompt_type,
-                    'badge_type' => $prompt_type === 'custom' ? 'custom' : 'prompt',
+                    'badge_type' => $prompt_type === 'custom'
+                        ? 'custom'
+                        : ($prompt_type === 'group-quiz-access' ? 'quiz' : 'prompt'),
                     'recipient_count' => $recipient_counts[$batch_id] ?? count($batch['message_ids']),
                     'delivery_status' => $delivery_status,
                     'sender_user_id' => $batch['sender_user_id'],

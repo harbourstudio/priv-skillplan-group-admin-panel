@@ -1,12 +1,13 @@
 import { api } from '../_shared/api-client.js';
+import store from '../_shared/store.js';
 
 jQuery(document).ready(($) => {
     const $block   = $('.wp-block-bys-groups-group-add-member').first();
     if (!$block.length) return;
 
-    const $input   = $block.find('#add-member-email');
-    const $enrol   = $block.find('.add-member__enrol');
-    const $message = $block.find('.add-member__message');
+    const $input   = $block.find('#gam-email');
+    const $enrol   = $block.find('.gam__enrol');
+    const $message = $block.find('.gam__message');
 
     function isValidEmail(val) {
         return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim());
@@ -15,8 +16,8 @@ jQuery(document).ready(($) => {
     function showMessage(text, type) {
         $message
             .text(text)
-            .removeClass('add-member__message--success add-member__message--error add-member__message--info')
-            .addClass(`add-member__message--${type}`)
+            .removeClass('gam__message--success gam__message--error gam__message--info')
+            .addClass(`gam__message--${type}`)
             .show();
     }
 
@@ -29,19 +30,19 @@ jQuery(document).ready(($) => {
         $enrol.prop('disabled', !isValidEmail($(this).val()));
     });
 
-    const $leaderRadio = $block.find('.add-member__radio--leader');
+    const $leaderRadio = $block.find('.gam__radio--leader');
 
     $(document).on('bys:groupSelected', (_, { isOrgAdmin }) => {
         $leaderRadio.toggleClass('is-hidden', !isOrgAdmin);
         if (!isOrgAdmin) {
-            $block.find('input[name="add-member-role"][value="learner"]').prop('checked', true);
+            $block.find('input[name="gam-role"][value="learner"]').prop('checked', true);
         }
     });
 
     $enrol.on('click', async function () {
         const email   = $input.val().trim();
-        const role    = $block.find('input[name="add-member-role"]:checked').val() || 'learner';
-        const groupId = window.bysGroupData?.groupId;
+        const role    = $block.find('input[name="gam-role"]:checked').val() || 'learner';
+        const groupId = store.getCurrentGroup();
 
         if (!isValidEmail(email) || !groupId) return;
 

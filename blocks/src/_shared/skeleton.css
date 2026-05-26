@@ -11,7 +11,9 @@
 
  /* Singular, horizontal loader */
 .skeleton {
+    display: inline-block;
     height: 0.75rem;
+    width: 100%;
     border-radius: 0.25rem;
     background: linear-gradient(
         90deg,
@@ -23,8 +25,16 @@
     animation: shimmer 1.5s linear infinite;
 }
 
+.skeleton--pill {
+    width: 2.25rem;
+    height: 1.25rem;
+    border-radius: 9999px;
+}
+
 /* Singular, circular loaders */
-.skeleton-circular {
+.skeleton-circular
+.skeleton--circular {
+    display: inline-block;
     flex-shrink: 0;
     width: 2.5rem;
     height: 2.5rem;
@@ -39,6 +49,7 @@
     animation: shimmer 1.5s infinite linear;
 }
 
+.skeleton--btn,
 .skeleton-btn {
     flex-shrink: 0;
     width: 1.5rem;

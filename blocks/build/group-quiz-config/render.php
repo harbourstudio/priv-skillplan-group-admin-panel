@@ -47,20 +47,25 @@ $tz_offset_hours = $tz_offset_seconds / 3600;
             <?php foreach ([200, 240] as $width ) : ?>
             <div class="skeleton-quiz-row">
                 <div class="skeleton-quiz-row__header">
-                    <span class="skeleton-text" style="width:<?php echo $width; ?>px"></span>
-                    <span class="skeleton-text" style="width:80px"></span>
+                    <span class="skeleton" style="width:<?php echo $width; ?>px"></span>
+                    <span class="skeleton" style="width:80px"></span>
                 </div>
                 <div class="gqc__date-field">
-                    <span class="skeleton-icon"></span>
-                    <span class="skeleton-text" style="width:180px"></span>
+                    <span class="skeleton" style="width:180px"></span>
                 </div>
                 <div class="gqc__date-field">
-                    <span class="skeleton-icon"></span>
-                    <span class="skeleton-text" style="width:160px"></span>
+                    <span class="skeleton" style="width:160px"></span>
                 </div>
-                <div class="skeleton-quiz-row__badges">
-                    <span class="skeleton-btn"></span>
-                    <span class="skeleton-btn"></span>
+                <div class="gqc__actions">
+                    <div class="gqc__badges">
+                        <span class="skeleton" style="width: 48px;"></span>
+                        <span class="skeleton" style="width: 48px;"></span>
+                    </div>
+                    <div class="gqc__action-buttons">
+                        <span class="skeleton" style="width: 48px;"></span>
+                        <span class="skeleton" style="width: 48px;"></span>
+                    </div>
+
                 </div>
             </div>
             <?php endforeach; ?>
@@ -80,11 +85,27 @@ $tz_offset_hours = $tz_offset_seconds / 3600;
                         <i class="fa-solid fa-play gqc__date-icon" aria-hidden="true"></i>
                         <input type="text" class="gqc__datetime gqc__datetime--start" aria-label="<?php esc_attr_e('Start date', 'bys'); ?>" data-field-type="start" readonly />
                         <i class="fa-regular fa-calendar gqc__calendar-icon" aria-hidden="true"></i>
+                        <button
+                            type="button"
+                            class="gqc__date-clear btn-unstyled"
+                            aria-label="<?php esc_attr_e('Clear start date', 'bys'); ?>"
+                            data-field-type="start"
+                            hidden>
+                            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                        </button>
                     </div>
                     <div class="gqc__date-field">
                         <i class="fa-solid fa-flag gqc__date-icon" aria-hidden="true"></i>
                         <input type="text" class="gqc__datetime gqc__datetime--end" aria-label="<?php esc_attr_e('End date', 'bys'); ?>" data-field-type="end" readonly />
                         <i class="fa-regular fa-calendar gqc__calendar-icon" aria-hidden="true"></i>
+                        <button
+                            type="button"
+                            class="gqc__date-clear btn-unstyled"
+                            aria-label="<?php esc_attr_e('Clear end date', 'bys'); ?>"
+                            data-field-type="end"
+                            hidden>
+                            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                        </button>
                     </div>
                 </div>
 
@@ -107,13 +128,17 @@ $tz_offset_hours = $tz_offset_seconds / 3600;
                             <span class="gqc__badge-count"></span> <?php esc_html_e('Outstanding', 'bys'); ?>
                         </button>
                     </div>
-                    <button class="gqc__save-row btn-unstyled" type="button" disabled>
-                        <?php esc_html_e( 'Save', 'bys' ); ?>
-                    </button>
+                    <div class="gqc__action-buttons">
+                        <button class="gqc__notify gqc__btn-outline btn-unstyled" type="button">
+                            <?php esc_html_e( 'Notify', 'bys' ); ?>
+                        </button>
+                        <button class="gqc__save-row gqc__btn-primary btn-unstyled" type="button" disabled>
+                            <?php esc_html_e( 'Save', 'bys' ); ?>
+                        </button>
+                    </div>
                 </div>
             </div>
         </template>
-
         <p class="gqc__empty" style="display:none;"></p>
     </div>
     <button class="gqc__show-more btn-unstyled" style="display:none;" type="button">

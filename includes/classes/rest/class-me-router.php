@@ -53,8 +53,9 @@ if (!class_exists('BYS_Groups_Me_Router')) {
             if (!$user_id) return ['groups' => []];
 
             // Site admins and graders see every published group
-            $is_grader = BYS_Groups_Permissions::is_grader($user_id);
-            if (BYS_Groups_Permissions::is_site_admin($user_id) || $is_grader) {
+            $is_grader     = BYS_Groups_Permissions::is_grader($user_id);
+            $is_site_admin = BYS_Groups_Permissions::is_site_admin($user_id);
+            if ($is_site_admin || $is_grader) {
                 $all_groups = get_posts([
                     'post_type'      => 'groups',
                     'post_status'    => 'publish',
@@ -64,10 +65,13 @@ if (!class_exists('BYS_Groups_Me_Router')) {
                 ]);
                 $user_groups = [];
                 foreach ($all_groups as $group) {
+                    // Site admins can do everything; graders can manage nothing.
                     $user_groups[] = [
-                        'id'           => $group->ID,
-                        'title'        => $group->post_title,
-                        'is_org_admin' => !$is_grader, // graders can't act as org admins
+                        'id'                 => $group->ID,
+                        'title'              => $group->post_title,
+                        'is_org_admin'       => !$is_grader, // graders can't act as org admins
+                        'can_manage_leaders' => $is_site_admin,
+                        'can_manage_members' => $is_site_admin,
                     ];
                 }
                 return ['groups' => $user_groups];
@@ -114,15 +118,22 @@ if (!class_exists('BYS_Groups_Me_Router')) {
 
             if (empty($accessible_ids)) return ['groups' => []];
 
-            // Build response — only published groups
+            // Build response — only published groups. Capability flags per group:
+            //  - can_manage_members: org-admin-of-group OR group-leader-of-group
+            //  - can_manage_leaders: org-admin-of-group ONLY (group-leaders excluded)
+            $led_set = array_flip(array_unique($led_ids));
             $user_groups = [];
             foreach ($accessible_ids as $group_id) {
                 $group = get_post($group_id);
                 if ($group && $group->post_type === 'groups' && $group->post_status === 'publish') {
+                    $is_org_admin_here   = isset($org_admin_set[$group_id]);
+                    $is_group_leader     = isset($led_set[$group_id]);
                     $user_groups[] = [
-                        'id'           => $group->ID,
-                        'title'        => $group->post_title,
-                        'is_org_admin' => isset($org_admin_set[$group_id]),
+                        'id'                 => $group->ID,
+                        'title'              => $group->post_title,
+                        'is_org_admin'       => $is_org_admin_here,
+                        'can_manage_leaders' => $is_org_admin_here, // org admins only
+                        'can_manage_members' => $is_org_admin_here || $is_group_leader,
                     ];
                 }
             }

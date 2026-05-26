@@ -1,0 +1,26 @@
+name: Deploy to Staging
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to staging via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.STG_SSH_HOST }}
+          username: ${{ secrets.STG_SSH_USER }}
+          key: ${{ secrets.STG_SSH_KEY }}
+          port: 22
+          envs: STG_WP_CONTENT_PATH
+          script: |
+            cd "$STG_WP_CONTENT_PATH"
+            git fetch origin main
+            git reset --hard origin/main
+            echo "Deployed to staging at $(date)"
+        env:
+          STG_WP_CONTENT_PATH: ${{ secrets.STG_WP_CONTENT_PATH }}

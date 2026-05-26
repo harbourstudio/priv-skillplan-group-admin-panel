@@ -35,17 +35,17 @@ $auth_header = BYS_Groups_Auth::get_auth_header();
 
         <!-- Skeleton: shown until JS populates real data -->
         <div class="group-quizzing__skeleton" id="group-quizzing-skeleton">
-            <?php foreach ( [ 200, 160, 220, 180 ] as $name_width ) : ?>
+            <?php foreach ( [ 200, 160, 220 ] as $skeleton_width ) : ?>
             <div class="skeleton-item">
                 <div class="skeleton-toggle">
                     <div class="skeleton-toggle__left">
-                        <span class="skeleton-icon"></span>
-                        <span class="skeleton-text" style="width: <?php echo $name_width; ?>px"></span>
+                        <span class="skeleton" style="width: 32px; height: 32px;"></span>
+                        <span class="skeleton" style="width: <?php echo $skeleton_width; ?>px"></span>
                     </div>
                     <div class="skeleton-toggle__right">
-                        <span class="skeleton-text" style="width: 110px"></span>
-                        <span class="skeleton-text" style="width: 130px; border-radius: 999px;"></span>
-                        <span class="skeleton-text" style="width: 55px; border-radius: 999px;"></span>
+                        <span class="skeleton" style="width: 110px"></span>
+                        <span class="skeleton" style="width: 130px;"></span>
+                        <span class="skeleton" style="width: 55px;"></span>
                     </div>
                 </div>
             </div>

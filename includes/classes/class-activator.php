@@ -15,7 +15,7 @@ if (!class_exists('BYS_Groups_Activator')) {
 
             $current_version = get_option('bys_groups_db_version');
 
-            if (version_compare((string) $current_version, BYS_GROUPS_DB_VERSION, '==')) {
+            if (version_compare((string) $current_version, BYS_GROUPS_DB_VERSION, '>=')) {
                 return;
             }
 

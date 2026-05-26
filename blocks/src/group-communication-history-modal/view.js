@@ -1,4 +1,5 @@
 import { api, endpoints } from '../_shared/api-client.js';
+import store from '../_shared/store.js';
 
 jQuery(document).ready(($) => {
     const $block      = $('.wp-block-bys-groups-group-communication-history-modal').first();
@@ -317,12 +318,12 @@ jQuery(document).ready(($) => {
         }
 
         // Optimistic placeholder so something appears immediately.
-        $senderName.text(`Sent by user #${userId}`).show();
+        $senderName.text(` • Sent by user #${userId}`).show();
 
         try {
             const data = await api.get(`/wp-json/wp/v2/users/${userId}`);
             const name = data?.name || `User ${userId}`;
-            $senderName.text(`Sent by ${name}`);
+            $senderName.text(` • Sent by ${name}`);
         } catch (err) {
             console.warn('[group-communication-history-modal] Failed to load sender name:', err);
             // Leave the placeholder text in place rather than going blank.
@@ -334,7 +335,7 @@ jQuery(document).ready(($) => {
      */
     $(document).on('comm:open-batch', async (e, data) => {
         currentBatchId = data.batchId;
-        currentGroupId = window.bysGroupData?.groupId;
+        currentGroupId = store.getCurrentGroup();
         entryMode = 'batch';
         $modal.removeClass('hidden');
         $('html').css('overflow', 'hidden');
@@ -353,7 +354,7 @@ jQuery(document).ready(($) => {
      */
     $(document).on('comm:open-history', async (e, data) => {
         currentPromptType = data.promptType;
-        currentGroupId = window.bysGroupData?.groupId;
+        currentGroupId = store.getCurrentGroup();
         entryMode = 'history';
         $modal.removeClass('hidden');
         $('html').css('overflow', 'hidden');

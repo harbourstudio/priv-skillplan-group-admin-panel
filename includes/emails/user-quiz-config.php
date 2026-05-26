@@ -45,7 +45,7 @@ function bys_get_quiz_access_notification_email(array $vars): array {
     $end            = $vars['end']            ?? '';
     $sender_email   = $vars['sender_email']   ?? get_bloginfo('admin_email');
 
-    $subject = sprintf('Quiz access window: %s', $quiz_title);
+    $subject = sprintf('Quiz access: %s', $quiz_title);
     $heading = sprintf('Access details for %s', $quiz_title);
 
     // Render the access window as a uniform "Opens / Closes" pair. Empty
@@ -66,7 +66,7 @@ function bys_get_quiz_access_notification_email(array $vars): array {
     $window_html .= '</table>';
 
     $intro = sprintf(
-        '<p style="margin:0 0 16px;color:#374151;font-size:15px;">Your group leader has set the access window for <strong>%s</strong>.</p>',
+        '<p style="margin:0 0 16px;color:#374151;font-size:15px;">Your group leader has set the access for <strong>%s</strong>.</p>',
         esc_html($quiz_title)
     );
 

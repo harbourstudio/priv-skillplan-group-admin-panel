@@ -1,4 +1,5 @@
 import { api } from '../_shared/api-client.js';
+import store from '../_shared/store.js';
 
 const PAGE_SIZE = 10;
 
@@ -6,10 +7,10 @@ jQuery(document).ready(($) => {
     const $block    = $('.wp-block-bys-groups-group-pending-enrolments').first();
     if (!$block.length) return;
 
-    const $skeleton  = $block.find('.pending-enrolments__skeleton');
-    const $list      = $block.find('.pending-enrolments__list');
-    const $empty     = $block.find('.pending-enrolments__empty');
-    const $showMore  = $block.find('.pending-enrolments__show-more');
+    const $skeleton  = $block.find('.gpe__skeleton');
+    const $list      = $block.find('.gpe__list');
+    const $empty     = $block.find('.gpe__empty');
+    const $showMore  = $block.find('.gpe__show-more');
 
     let currentGroupId = null;
     let allInvites     = [];
@@ -25,15 +26,15 @@ jQuery(document).ready(($) => {
 
     function buildRow(invite) {
         const $row = $(`
-            <div class="pending-enrolments__item" data-invite-id="${invite.id}">
-                <span class="pending-enrolments__email">${$('<span>').text(invite.email).html()}</span>
-                <span class="pending-enrolments__date">${formatDate(invite.invited_at)}</span>
-                <span class="pending-enrolments__badge">Pending</span>
-                ${canModify ? `<button class="pending-enrolments__cancel btn-unstyled" type="button" aria-label="Cancel invitation">&#x2715;</button>` : ''}
+            <div class="gpe__item" data-invite-id="${invite.id}">
+                <span class="gpe__email">${$('<span>').text(invite.email).html()}</span>
+                <span class="gpe__date">${formatDate(invite.invited_at)}</span>
+                <span class="gpe__badge">Pending</span>
+                ${canModify ? `<button class="gpe__cancel btn-unstyled" type="button" aria-label="Cancel invitation">&#x2715;</button>` : ''}
             </div>
         `);
 
-        $row.find('.pending-enrolments__cancel').on('click', async function () {
+        $row.find('.gpe__cancel').on('click', async function () {
             const $btn = $(this);
             $btn.prop('disabled', true);
 
@@ -110,7 +111,7 @@ jQuery(document).ready(($) => {
             allInvites = await api.get(`/wp-json/bys-groups/v1/groups/${groupId}/pending-invites`);
             renderList();
         } catch (err) {
-            console.error('[pending-enrolments] Failed to load invites', err);
+            console.error('[gpe] Failed to load invites', err);
             $skeleton.hide();
             $empty.text('Failed to load pending enrolments.').show();
         }
@@ -122,7 +123,8 @@ jQuery(document).ready(($) => {
         if (currentGroupId) loadInvites(currentGroupId);
     });
 
-    if (window.bysGroupData?.groupId) {
-        loadInvites(window.bysGroupData.groupId);
+    const cachedGroupId = store.getCurrentGroup();
+    if (cachedGroupId !== null) {
+        loadInvites(cachedGroupId);
     }
 });

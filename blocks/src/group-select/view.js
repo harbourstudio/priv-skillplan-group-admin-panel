@@ -6,15 +6,17 @@ jQuery(document).ready(($) => {
   if (!$block) return;
 
   const $select = $block.find('#group-select');
-  const $button = $block.find('.group-selector__button');
-  const $spinnerWrapper = $block.find('.group-selector__spinner-wrapper');
-  if (!$select.length || !$button.length) return;
+  const $submit = $block.find('.group-select__button');
+  if (!$select.length || !$submit.length) return;
+  const $spinnerWrapper = $block.find('.group-select__spinner-wrapper');
 
-  // Determine which group to select: stored > first valid > nothing
+  // Determine which group to select: stored > first valid > nothing.
+  // Exclude the placeholder "" option from $validOptions so .first() can't
+  // resolve to it.
   const storedGroupId = sessionStorage.getItem('bys_selected_group_id');
-  const $validOptions = $select.find('option.group-option');
-  const $emptyOption = $select.find('option[value=""]');
-  const storedGroupExists = storedGroupId && $select.find(`option[value="${storedGroupId}"]`).length > 0;
+  const $validOptions = $select.find('option').not('[value=""]');
+  const $emptyOption  = $select.find('option[value=""]');
+  const storedGroupExists = storedGroupId && $validOptions.filter(`[value="${storedGroupId}"]`).length > 0;
 
   let groupIdToSelect = null;
 
@@ -26,12 +28,8 @@ jQuery(document).ready(($) => {
 
   if (groupIdToSelect) {
     $select.val(groupIdToSelect);
-    // Remove the empty option now that we've selected a real group
     $emptyOption.remove();
   }
-
-  // Show loading state on page load
-  $spinnerWrapper.show();
 
   /**
    * fetch group data and trigger bys:groupSelected event
@@ -40,66 +38,56 @@ jQuery(document).ready(($) => {
     if (!groupId) return;
 
     try {
-      // call custom rest route; callback method makes the request to LD API for the data
-      // shared data will be available in the document (data payload) and can be accessed by any element listening to the bys:groupSelected event
+      const basegroupdata = await api.get(endpoints.baseGroupData(groupId), true); // Force refresh
+      const users   = Array.isArray(basegroupdata?.users)   ? basegroupdata.users   : [];
+      const courses = Array.isArray(basegroupdata?.courses) ? basegroupdata.courses : [];
+      const leaders = Array.isArray(basegroupdata?.leaders) ? basegroupdata.leaders : [];
 
-      // Fetch shared data that both group-stats and group-reporting blocks need
-      const baseUsersStats = await api.get(endpoints.groupBaseUsersStats(groupId), true); // Force refresh
-      const courses = await api.get(endpoints.groupCourses(groupId), true); // Force refresh
-
-      // Populate the shared store so other blocks can read user_ids and courses
-      // without re-fetching.
+      // Populate the shared store with hydrated users + courses + leaders.
       store.setCurrentGroup(groupId);
-      store.setUserIdsAsStubs(baseUsersStats.user_ids || []);
-      store.setCourses(Array.isArray(courses) ? courses : []);
-      console.log('[bys-store] group-select wrote users (stubs) for group', parseInt(groupId), store.getUsers());
-      console.log('[bys-store] group-select wrote courses for group', parseInt(groupId), store.getCourses());
+      store.setUsers(users);
+      store.setCourses(courses);
+      store.setLeaders(leaders);
 
-      // Read org-admin flag from the selected <option> data attribute
-      const isOrgAdmin    = $select.find(`option[value="${groupId}"]`).data('is-org-admin') === 1;
-      const isGrader      = window.bysGroupsAuth?.isGrader      === true;
-      const isSiteEditor  = window.bysGroupsAuth?.isSiteEditor  === true;
+      // Group-specific capability flags — server computes them in /me/groups
+      // and we surface them on the <option data-*>. The blocks gate UI on
+      // canManageLeaders / canManageMembers; isOrgAdmin stays for blocks that
+      // still need it (group-archive, group-add-member).
+      const $opt              = $select.find(`option[value="${groupId}"]`);
+      const isOrgAdmin        = $opt.data('is-org-admin')        === 1;
+      const canManageLeaders  = $opt.data('can-manage-leaders')  === 1;
+      const canManageMembers  = $opt.data('can-manage-members')  === 1;
 
-      // store globally for blocks to reference
-      window.bysGroupData = {
-        groupId: parseInt(groupId),
-        baseUsersStats: baseUsersStats,
-        courses: courses,
-        isOrgAdmin: isOrgAdmin,
-        isGrader: isGrader,
-        isSiteEditor: isSiteEditor,
-      };
-
-      // trigger event with all shared data
       $(document).trigger('bys:groupSelected', {
         groupId: parseInt(groupId),
-        baseUsersStats: baseUsersStats,
-        courses: courses,
         isOrgAdmin: isOrgAdmin,
-        isGrader: isGrader,
-        isSiteEditor: isSiteEditor,
-      })
+        canManageLeaders: canManageLeaders,
+        canManageMembers: canManageMembers,
+      });
 
       $spinnerWrapper.hide();
     } catch(err) {
       console.error('[group-select] Failed to fetch group data', err)
-      // Hide spinner even on error so user can retry
-      $spinnerWrapper.hide();
+      $spinnerWrapper.hide(); // hide spinner so user can retry
     }
   };
 
   // when user clicks "Show Group" button, fetch shared data from LearnDash API
-  $button.on('click', async function(e) {
+  $submit.on('click', async function(e) {
     e.preventDefault();
     const groupId = $select.val();
-    // Store the selected group to sessionStorage
+    if (!groupId) return; // empty placeholder selected — nothing to do
     sessionStorage.setItem('bys_selected_group_id', groupId);
+    $spinnerWrapper.show();
     await fetchAndTriggerGroup(groupId);
   });
 
-  // Auto-trigger the selected group on page load
+  // Auto-trigger the selected group on page load. Spinner is only shown when
+  // we're actually about to fetch — otherwise the leader can interact with
+  // the dropdown immediately (no infinite-spinner state if no group resolves).
   const groupIdToTrigger = $select.val();
   if (groupIdToTrigger) {
+    $spinnerWrapper.show();
     fetchAndTriggerGroup(groupIdToTrigger);
   }
 });

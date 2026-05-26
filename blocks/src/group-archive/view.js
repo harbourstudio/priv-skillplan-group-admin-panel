@@ -8,8 +8,9 @@ jQuery(document).ready(($) => {
     const $notice = $block.find('.group-archive__notice');
     let currentGroupId = null;
 
-    $(document).on('bys:groupSelected', (_, { groupId, isOrgAdmin, isGrader }) => {
+    $(document).on('bys:groupSelected', (_, { groupId, isOrgAdmin }) => {
         currentGroupId = groupId;
+        const isGrader = window.bysGroupsAuth?.isGrader === true;
         if (isOrgAdmin && !isGrader) {
             $button.prop('disabled', false).show();
             $notice.hide();

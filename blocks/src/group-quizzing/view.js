@@ -1,5 +1,6 @@
 import { api, endpoints } from '../_shared/api-client.js';
 import { formatDate } from '../_shared/helpers.js';
+import store from '../_shared/store.js';
 
 jQuery(document).ready(($) => {
   const $block = $('.wp-block-bys-groups-group-quizzing').first();
@@ -18,9 +19,20 @@ jQuery(document).ready(($) => {
       return;
     }
 
-    // Fetch quiz steps for all courses upfront (needed for count, filtering, and stats query)
+    // Grading-flagged quizzes per course are pre-baked into the store by
+    // /base-group-data — no per-course /quiz-steps?filter=grading fetches.
+    // Falls back to REST only when the store hasn't been populated for this
+    // course (rare; would mean the course array we got didn't come from the store).
+    const cachedCourses = store.getCourses() || [];
+    const cachedById = new Map(cachedCourses.map((c) => [c.id, c]));
+
     const quizStepsByCourse = {};
     await Promise.all(courses.map(async (course) => {
+      const cached = cachedById.get(course.id);
+      if (Array.isArray(cached?.quizzes_show_test_grading_config)) {
+        quizStepsByCourse[course.id] = cached.quizzes_show_test_grading_config;
+        return;
+      }
       try {
         const steps = await api.get(endpoints.courseQuizStepsGrading(course.id));
         quizStepsByCourse[course.id] = Array.isArray(steps) ? steps : [];
@@ -156,10 +168,13 @@ jQuery(document).ready(($) => {
   }
 
   $(document).on('bys:groupSelected', function(_, data) {
-    renderCourses(data.groupId, data.courses);
+    renderCourses(data.groupId, store.getCourses() || []);
   });
 
-  if (window.bysGroupData?.courses) {
-    renderCourses(window.bysGroupData.groupId, window.bysGroupData.courses);
+  // Fast first paint from store cache.
+  const cachedGroupId = store.getCurrentGroup();
+  const cachedCourses = store.getCourses();
+  if (cachedGroupId !== null && cachedCourses !== null) {
+    renderCourses(cachedGroupId, cachedCourses);
   }
 });

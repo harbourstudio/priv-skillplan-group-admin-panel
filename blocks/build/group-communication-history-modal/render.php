@@ -37,10 +37,10 @@ $wrapper_attributes = get_block_wrapper_attributes();
                     </button>
                     <div class="modal__header-titles">
                         <h4 id="communication-history-modal-title"><?php esc_html_e( 'Prompt History', 'bys' ); ?></h4>
-                        <div class="modal__meta">
-                            <p class="modal__prompt-name"></p>
-                            <p class="modal__sender-name" style="display:none;"></p>
-                        </div>
+                        <p class="modal__meta">
+                            <span class="modal__prompt-name"></span>
+                            <span class="modal__sender-name" style="display:none;"></span>
+                        </p>
                     </div>
                 </div>
                 <button class="modal__close btn-unstyled" aria-label="<?php esc_attr_e( 'Close', 'bys' ); ?>">
