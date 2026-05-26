@@ -1,0 +1,27 @@
+name: Deploy to Production
+on:
+  push:
+    tags: ['**']
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to production via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PROD_SSH_HOST }}
+          username: ${{ secrets.PROD_SSH_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          port: 22
+          envs: PROD_WP_CONTENT_PATH,TAG_NAME
+          script: |
+            cd "$PROD_WP_CONTENT_PATH"
+            git fetch --tags --force origin
+            git checkout --force "$TAG_NAME"
+            echo "Deployed tag $TAG_NAME to production at $(date)"
+        env:
+          PROD_WP_CONTENT_PATH: ${{ secrets.PROD_WP_CONTENT_PATH }}
+          TAG_NAME: ${{ github.ref_name }}
