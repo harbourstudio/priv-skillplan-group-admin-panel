@@ -5,8 +5,6 @@ jQuery(document).ready(($) => {
   const $block = $('.wp-block-bys-groups-group-select').first(); // will only have 1 instance of this block per page
   if (!$block) return;
 
-  console.log('[TEMP] test for deploy workflows');
-
   const $select = $block.find('#group-select');
   const $submit = $block.find('.group-select__button');
   if (!$select.length || !$submit.length) return;
