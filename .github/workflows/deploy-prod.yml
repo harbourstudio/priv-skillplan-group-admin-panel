@@ -3,6 +3,10 @@ on:
   push:
     tags: ['**']
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to deploy to production (e.g. v1.0.1)'
+        required: true
 
 jobs:
   deploy:
@@ -19,9 +23,14 @@ jobs:
           envs: PROD_WP_CONTENT_PATH,TAG_NAME
           script: |
             cd "$PROD_WP_CONTENT_PATH"
-            git fetch --tags --force origin
-            git checkout --force "$TAG_NAME"
-            echo "Deployed tag $TAG_NAME to production at $(date)"
+            git fetch --tags --force --prune origin
+            if git rev-parse -q --verify "refs/tags/$TAG_NAME" >/dev/null; then
+              git checkout --force "$TAG_NAME"
+              echo "Deployed tag $TAG_NAME to production at $(date)"
+            else
+              echo "ERROR: '$TAG_NAME' is not a tag. Production only deploys tags." >&2
+              exit 1
+            fi
         env:
           PROD_WP_CONTENT_PATH: ${{ secrets.PROD_WP_CONTENT_PATH }}
-          TAG_NAME: ${{ github.ref_name }}
+          TAG_NAME: ${{ github.event.inputs.tag || github.ref_name }}
