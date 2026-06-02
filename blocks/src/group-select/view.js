@@ -50,19 +50,23 @@ jQuery(document).ready(($) => {
       store.setLeaders(leaders);
 
       // Group-specific capability flags — server computes them in /me/groups
-      // and we surface them on the <option data-*>. The blocks gate UI on
-      // canManageLeaders / canManageMembers; isOrgAdmin stays for blocks that
-      // still need it (group-archive, group-add-member).
+      // and we surface them on the <option data-*>. Blocks gate UI on
+      // canManageLeaders / canManageMembers / canManageGroup; isOrgAdmin
+      // stays for blocks that still need it (group-add-member).
       const $opt              = $select.find(`option[value="${groupId}"]`);
       const isOrgAdmin        = $opt.data('is-org-admin')        === 1;
       const canManageLeaders  = $opt.data('can-manage-leaders')  === 1;
       const canManageMembers  = $opt.data('can-manage-members')  === 1;
+      const canManageGroup    = $opt.data('can-manage-group')    === 1;
+      const groupTitle        = ($opt.text() || '').trim();
 
       $(document).trigger('bys:groupSelected', {
         groupId: parseInt(groupId),
+        groupTitle: groupTitle,
         isOrgAdmin: isOrgAdmin,
         canManageLeaders: canManageLeaders,
         canManageMembers: canManageMembers,
+        canManageGroup: canManageGroup,
       });
 
       $spinnerWrapper.hide();

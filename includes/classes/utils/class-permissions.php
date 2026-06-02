@@ -192,6 +192,56 @@ if (!class_exists('BYS_Groups_Permissions')) {
         }
 
         /**
+         * Returns true if the group is associated to at least one org (ACF 'groups' field). 
+         */
+        public static function is_group_in_any_org($group_id) {
+            $group_id = (int) $group_id;
+            if ($group_id <= 0 || !function_exists('get_field')) return false;
+
+            $orgs = get_posts([
+                'post_type'      => 'organization',
+                'post_status'    => 'publish',
+                'posts_per_page' => -1,
+            ]);
+
+            foreach ($orgs as $org) {
+                $raw_groups = get_field('groups', $org->ID);
+                foreach ((array) $raw_groups as $g) {
+                    $g_id = $g instanceof \WP_Post ? $g->ID : intval($g);
+                    if ($g_id === $group_id) return true;
+                }
+            }
+
+            return false;
+        }
+
+        /**
+         * Can the current user take ADMIN-level actions on $group_id
+         * (archive, unarchive, rename)?
+         *
+         * Matrix:
+         *  - Site admin: always.
+         *  - Org admin of an org containing this group: always.
+         *  - Group leader: ONLY if the group is standalone (not in any org).
+         *    If an org owns the group, the org admin tier exists and group
+         *    leaders defer to it.
+         */
+        public static function can_manage_group($group_id, $user_id = null) {
+            $group_id = (int) $group_id;
+            $user_id  = $user_id ?: get_current_user_id();
+            if ($group_id <= 0 || !$user_id) return false;
+
+            if (self::is_site_admin($user_id)) return true;
+            if (self::is_org_admin_for_group($user_id, $group_id)) return true;
+
+            // Group is in an org → only org admins (handled above) can act.
+            if (self::is_group_in_any_org($group_id)) return false;
+
+            // Standalone group → group leaders can act.
+            return (bool) get_user_meta($user_id, "learndash_group_leaders_{$group_id}", true);
+        }
+
+        /**
          * Can the current user MANAGE LEADERS of $group_id?
          * Passes for: site admins and org admins of this group ONLY.
          * EXCLUDES graders AND regular group-leaders.

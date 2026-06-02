@@ -8,10 +8,13 @@ jQuery(document).ready(($) => {
     const $notice = $block.find('.group-archive__notice');
     let currentGroupId = null;
 
-    $(document).on('bys:groupSelected', (_, { groupId, isOrgAdmin }) => {
+    // canManageGroup is the matrix the archive REST endpoint enforces:
+    // site admin OR org admin of the containing org OR (group leader AND
+    // group is standalone). Group leaders of org-owned groups see the
+    // notice; group leaders of standalone groups see the button.
+    $(document).on('bys:groupSelected', (_, { groupId, canManageGroup }) => {
         currentGroupId = groupId;
-        const isGrader = window.bysGroupsAuth?.isGrader === true;
-        if (isOrgAdmin && !isGrader) {
+        if (canManageGroup) {
             $button.prop('disabled', false).show();
             $notice.hide();
         } else {

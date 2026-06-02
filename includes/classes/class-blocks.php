@@ -29,6 +29,7 @@ if (!class_exists('BYS_Groups_Blocks')) {
             'group-quizzing',
             'group-reporting',
             'group-select',
+            'group-settings',
             'group-stats',
             'group-tabs',
             'group-unarchive',

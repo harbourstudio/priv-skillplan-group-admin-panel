@@ -92,7 +92,7 @@ if ( $has_full_access ) {
 }
 
 // gate the Groups tab: not rendered unless current user is site admin or an org admin
-if ( !$is_site_admin || !$is_org_admin ) {
+if ( !$is_site_admin && !$is_org_admin ) {
     $tabs = array_values( array_filter( $tabs, fn( $tab ) => $tab['id'] !== 'groups' ) );
 }
 ?>

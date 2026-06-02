@@ -72,6 +72,7 @@ if (!class_exists('BYS_Groups_Me_Router')) {
                         'is_org_admin'       => !$is_grader, // graders can't act as org admins
                         'can_manage_leaders' => $is_site_admin,
                         'can_manage_members' => $is_site_admin,
+                        'can_manage_group'   => $is_site_admin,
                     ];
                 }
                 return ['groups' => $user_groups];
@@ -121,6 +122,9 @@ if (!class_exists('BYS_Groups_Me_Router')) {
             // Build response — only published groups. Capability flags per group:
             //  - can_manage_members: org-admin-of-group OR group-leader-of-group
             //  - can_manage_leaders: org-admin-of-group ONLY (group-leaders excluded)
+            //  - can_manage_group:   org-admin-of-group, OR (group-leader AND
+            //                        group is standalone — no org owns it).
+            //                        Used for archive/unarchive/rename UI gating.
             $led_set = array_flip(array_unique($led_ids));
             $user_groups = [];
             foreach ($accessible_ids as $group_id) {
@@ -128,12 +132,19 @@ if (!class_exists('BYS_Groups_Me_Router')) {
                 if ($group && $group->post_type === 'groups' && $group->post_status === 'publish') {
                     $is_org_admin_here   = isset($org_admin_set[$group_id]);
                     $is_group_leader     = isset($led_set[$group_id]);
+                    // For non-org-admins, can_manage_group requires the group
+                    // to NOT belong to any org (standalone) AND user to be a
+                    // group leader of it.
+                    $can_manage_group = $is_org_admin_here
+                        || ($is_group_leader && !BYS_Groups_Permissions::is_group_in_any_org($group_id));
+
                     $user_groups[] = [
                         'id'                 => $group->ID,
                         'title'              => $group->post_title,
                         'is_org_admin'       => $is_org_admin_here,
                         'can_manage_leaders' => $is_org_admin_here, // org admins only
                         'can_manage_members' => $is_org_admin_here || $is_group_leader,
+                        'can_manage_group'   => $can_manage_group,
                     ];
                 }
             }
@@ -280,39 +291,121 @@ if (!class_exists('BYS_Groups_Me_Router')) {
          */
         public function get_current_user_archived_groups($request) {
             $user_id = intval($request->get_param('user_id')) ?: get_current_user_id();
+            if (!$user_id) return ['groups' => []];
 
-            if (!$user_id) {
-                return ['groups' => []];
-            }
+            $is_site_admin = BYS_Groups_Permissions::is_site_admin($user_id);
 
-            $led_group_ids = [];
-            foreach (get_user_meta($user_id) as $meta_key => $meta_values) {
-                if (strpos($meta_key, 'learndash_group_leaders_') === 0) {
-                    $group_id = intval(str_replace('learndash_group_leaders_', '', $meta_key));
-                    if ($group_id > 0) {
-                        $led_group_ids[] = $group_id;
+            // Build the set of group IDs this user is allowed to SEE.
+            // - Site admin: every archived group on the site
+            // - Org admin of org X: every group in org X (transitively all of
+            //   their orgs)
+            // - Group leader of group G in org X: every group in org X
+            //   (so they see the whole org's archived set, not just G), plus
+            //   any standalone groups they directly lead
+            //
+            // The `can_unarchive` flag emitted per row is stricter — only
+            // site admins and org admins of the containing org can flip
+            // the post_status back to 'publish'. Group leaders see the row
+            // read-only.
+            $visible_ids = [];
+
+            if ($is_site_admin) {
+                $visible_ids = get_posts([
+                    'post_type'      => 'groups',
+                    'post_status'    => 'draft',
+                    'posts_per_page' => -1,
+                    'fields'         => 'ids',
+                ]);
+            } else {
+                $led_ids = [];
+                foreach (get_user_meta($user_id) as $meta_key => $_meta_values) {
+                    if (strpos($meta_key, 'learndash_group_leaders_') === 0) {
+                        $g_id = intval(str_replace('learndash_group_leaders_', '', $meta_key));
+                        if ($g_id > 0) $led_ids[] = $g_id;
                     }
                 }
-            }
 
-            $archived_groups = [];
-            foreach ($led_group_ids as $group_id) {
-                $group = get_post($group_id);
-                if (!$group || $group->post_type !== 'groups' || $group->post_status !== 'draft') {
-                    continue;
+                // Walk every org once. If the user is either an admin of the
+                // org OR leads any group in it, they see the whole org's
+                // groups. Capture per-org admin flag so we can mark
+                // can_unarchive correctly below.
+                $orgs = get_posts([
+                    'post_type'      => 'organization',
+                    'post_status'    => 'publish',
+                    'posts_per_page' => -1,
+                ]);
+
+                $org_admin_group_ids = []; // groups in orgs the user administers
+                foreach ($orgs as $org) {
+                    $raw_admins = get_field('administrators', $org->ID);
+                    $admin_ids  = [];
+                    foreach ((array) $raw_admins as $admin) {
+                        $admin_ids[] = $admin instanceof \WP_User ? $admin->ID : intval($admin);
+                    }
+                    $is_org_admin_here = in_array($user_id, $admin_ids, true);
+
+                    $raw_groups = get_field('groups', $org->ID);
+                    $org_group_ids = [];
+                    foreach ((array) $raw_groups as $g) {
+                        $g_id = $g instanceof \WP_Post ? $g->ID : intval($g);
+                        if ($g_id > 0) $org_group_ids[] = $g_id;
+                    }
+
+                    $leads_any_in_org = !empty(array_intersect($led_ids, $org_group_ids));
+
+                    if ($is_org_admin_here) {
+                        // Org admins see and can unarchive all groups in the org.
+                        $visible_ids        = array_merge($visible_ids, $org_group_ids);
+                        $org_admin_group_ids = array_merge($org_admin_group_ids, $org_group_ids);
+                    } elseif ($leads_any_in_org) {
+                        // Group leaders see all groups in their org (read-only).
+                        $visible_ids = array_merge($visible_ids, $org_group_ids);
+                    }
                 }
 
-                $archived_date = get_post_meta($group_id, '_bys_archived_date', true);
-                if (!$archived_date) {
-                    $archived_date = get_post_modified_time('U', false, $group_id);
+                // Standalone groups the user leads (not in any org)
+                $visible_ids = array_merge($visible_ids, $led_ids);
+                $visible_ids = array_values(array_unique(array_map('intval', $visible_ids)));
+
+                $unarchive_set = array_flip(array_unique($org_admin_group_ids));
+            }
+
+            // Filter to actually-archived groups and shape the response.
+            // can_unarchive uses the same matrix as can_manage_group:
+            // site admin OR org admin of the containing org OR (group leader
+            // AND group is standalone). Group leaders viewing org-owned
+            // groups see them read-only.
+            $archived_groups = [];
+            foreach ($visible_ids as $group_id) {
+                $group = get_post($group_id);
+                if (!$group || $group->post_type !== 'groups' || $group->post_status !== 'draft') continue;
+
+                $archived_date = get_post_meta($group_id, '_bys_archived_date', true)
+                    ?: get_post_modified_time('U', false, $group_id);
+
+                $can_unarchive = $is_site_admin;
+                if (!$can_unarchive && isset($unarchive_set[$group_id])) {
+                    $can_unarchive = true; // org admin of the containing org
+                }
+                if (!$can_unarchive && !$is_site_admin) {
+                    // Standalone-group fallback: a group leader of a group
+                    // that no org claims may unarchive it.
+                    $is_leader_here = (bool) get_user_meta($user_id, "learndash_group_leaders_{$group_id}", true);
+                    if ($is_leader_here && !BYS_Groups_Permissions::is_group_in_any_org($group_id)) {
+                        $can_unarchive = true;
+                    }
                 }
 
                 $archived_groups[] = [
                     'id'            => $group->ID,
                     'title'         => $group->post_title,
                     'archived_date' => (int) $archived_date,
+                    'can_unarchive' => $can_unarchive,
                 ];
             }
+
+            // Sort newest-first by archive date for consistent ordering.
+            usort($archived_groups, fn($a, $b) => $b['archived_date'] <=> $a['archived_date']);
 
             return ['groups' => $archived_groups];
         }

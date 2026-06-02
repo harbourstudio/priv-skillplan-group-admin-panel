@@ -111,17 +111,27 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 'permission_callback' => fn($request) => BYS_Groups_Permissions::can_access_group($request['group_id']),
             ]);
 
-            // ── Cluster D: group archive ───────────────────────────────────
+            // ── Cluster D: group archive / rename ──────────────────────────
+            // Archive, unarchive, and rename all share the "can_manage_group"
+            // matrix: site admin OR org admin of the group's org OR (group
+            // leader AND group is standalone). See class-permissions.php for
+            // the rationale.
             register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/groups/(?P<group_id>\d+)/archive', [
                 'methods'             => WP_REST_Server::CREATABLE,
                 'callback'            => [$this, 'archive_group'],
-                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_access_group($request['group_id']),
+                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_manage_group($request['group_id']),
             ]);
 
             register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/groups/(?P<group_id>\d+)/unarchive', [
                 'methods'             => WP_REST_Server::CREATABLE,
                 'callback'            => [$this, 'unarchive_group'],
-                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_access_group($request['group_id']),
+                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_manage_group($request['group_id']),
+            ]);
+
+            register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/groups/(?P<group_id>\d+)/rename', [
+                'methods'             => WP_REST_Server::CREATABLE,
+                'callback'            => [$this, 'rename_group'],
+                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_manage_group($request['group_id']),
             ]);
 
             // ── Cluster E: group leaders ───────────────────────────────────
@@ -1078,6 +1088,42 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             delete_post_meta($group_id, '_bys_archived_date');
 
             return ['success' => true, 'group_id' => $group_id];
+        }
+
+        /**
+         * POST /groups/{group_id}/rename
+         * Updates the group's post_title. Permission gate (set on the route)
+         * is can_manage_leaders — site admins and org admins only, no group
+         * leaders. Group leaders see the settings block but the input/button
+         * stay disabled (mirrors the archive block's UX).
+         */
+        public function rename_group($request) {
+            $group_id = intval($request->get_param('group_id'));
+            $name     = sanitize_text_field((string) $request->get_param('name'));
+
+            if (trim($name) === '') {
+                return new WP_Error('bad_request', 'Group name is required', ['status' => 400]);
+            }
+
+            $group = get_post($group_id);
+            if (!$group || $group->post_type !== 'groups') {
+                return new WP_Error('not_found', 'Group not found', ['status' => 404]);
+            }
+
+            $result = wp_update_post([
+                'ID'         => $group_id,
+                'post_title' => $name,
+            ], true);
+
+            if (is_wp_error($result)) {
+                return new WP_Error('server_error', $result->get_error_message(), ['status' => 500]);
+            }
+
+            return [
+                'success'  => true,
+                'group_id' => $group_id,
+                'name'     => get_post($group_id)->post_title,
+            ];
         }
 
         // ─── REST callbacks: Cluster E ──────────────────────────────────────
