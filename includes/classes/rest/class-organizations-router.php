@@ -3,9 +3,10 @@
  * Organizations Router
  *
  * Endpoints for managing organizations and their groups:
- *   POST /organizations                       — create a new organization (site admin only)
  *   POST /organizations/{org_id}/groups       — create a new LD group under an organization
  *                                                (site admin OR admin of the organization)
+ *
+ * Note: organization CPTs themselves are created via wp-admin, not the REST API.
  *
  * @package BYS_Groups
  * @since 1.1.0
@@ -20,12 +21,6 @@ if (!class_exists('BYS_Groups_Organizations_Router')) {
         }
 
         public function register_routes() {
-            register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/organizations', [
-                'methods'             => WP_REST_Server::CREATABLE,
-                'callback'            => [$this, 'create_organization'],
-                'permission_callback' => [BYS_Groups_Permissions::class, 'is_site_admin'],
-            ]);
-
             register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/organizations/(?P<org_id>\d+)/groups', [
                 'methods'             => WP_REST_Server::CREATABLE,
                 'callback'            => [$this, 'create_organization_group'],
@@ -34,32 +29,6 @@ if (!class_exists('BYS_Groups_Organizations_Router')) {
         }
 
         // ─── REST callbacks ─────────────────────────────────────────────────
-
-        /**
-         * POST /organizations
-         * Creates a new organization post.
-         */
-        public function create_organization($request) {
-            $name = sanitize_text_field($request->get_param('name'));
-            if (empty($name)) return new WP_Error('bad_request', 'Organization name is required', ['status' => 400]);
-
-            $org_id = wp_insert_post([
-                'post_type'   => 'organization',
-                'post_status' => 'publish',
-                'post_title'  => $name,
-                'post_author' => get_current_user_id(),
-            ], true);
-
-            if (is_wp_error($org_id)) return new WP_Error('server_error', $org_id->get_error_message(), ['status' => 500]);
-
-            return new WP_REST_Response([
-                'id'              => $org_id,
-                'name'            => get_the_title($org_id),
-                'is_admin'        => true,
-                'groups'          => [],
-                'archived_groups' => [],
-            ], 201);
-        }
 
         /**
          * POST /organizations/{org_id}/groups

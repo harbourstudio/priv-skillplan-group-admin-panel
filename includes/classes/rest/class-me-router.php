@@ -242,10 +242,11 @@ if (!class_exists('BYS_Groups_Me_Router')) {
                 ];
             }
 
-            // Groups not belonging to any organization
+            // Groups not belonging to any organization — site-admin-only.
+            // Org admins and group leaders never receive this list (the client
+            // also hides the "Other Groups" section when the array is empty).
             $ungrouped = [];
-            if ($is_site_admin || $is_grader) {
-                // Site admins and graders see all published groups not claimed by an org
+            if ($is_site_admin) {
                 $all_groups = get_posts([
                     'post_type'      => 'groups',
                     'post_status'    => 'publish',
@@ -255,13 +256,6 @@ if (!class_exists('BYS_Groups_Me_Router')) {
                 foreach (array_diff($all_groups, $claimed_ids) as $g_id) {
                     $g_post = get_post($g_id);
                     if ($g_post) {
-                        $ungrouped[] = ['id' => $g_id, 'name' => $g_post->post_title];
-                    }
-                }
-            } else {
-                foreach (array_diff($all_led_ids, $claimed_ids) as $g_id) {
-                    $g_post = get_post($g_id);
-                    if ($g_post && $g_post->post_type === 'groups' && $g_post->post_status === 'publish') {
                         $ungrouped[] = ['id' => $g_id, 'name' => $g_post->post_title];
                     }
                 }

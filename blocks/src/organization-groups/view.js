@@ -279,51 +279,6 @@ jQuery(document).ready(async ($) => {
     const $skeleton  = $block.find('.org-groups__skeleton');
     const $list      = $block.find('.org-groups__list');
     const $search    = $block.find('.org-groups__search');
-    const $newOrgBtn = $block.find('.org-groups__new-org-btn');
-    const $newOrgForm = $block.find('.org-groups__new-org-form');
-
-    if ($newOrgBtn.length) {
-        const $input   = $newOrgForm.find('.org-groups__new-org-input');
-        const $submit  = $newOrgForm.find('.org-groups__new-org-submit');
-        const $cancel  = $newOrgForm.find('.org-groups__new-org-cancel');
-
-        function openOrgForm() {
-            $newOrgBtn.addClass('is-hidden');
-            $newOrgForm.addClass('is-open');
-            $input.val('').trigger('focus');
-        }
-
-        function closeOrgForm() {
-            $newOrgForm.removeClass('is-open');
-            $newOrgBtn.removeClass('is-hidden');
-        }
-
-        $newOrgBtn.on('click', openOrgForm);
-        $cancel.on('click', closeOrgForm);
-        $input.on('keydown', function (e) {
-            if (e.key === 'Enter') $submit.trigger('click');
-            if (e.key === 'Escape') closeOrgForm();
-        });
-
-        $submit.on('click', async function () {
-            const name = $input.val().trim();
-            if (!name) { $input.trigger('focus'); return; }
-
-            $submit.prop('disabled', true).text('Creating…');
-            $cancel.prop('disabled', true);
-
-            try {
-                const org = await api.post(endpoints.createOrganization(), { name });
-                closeOrgForm();
-                $list.append(buildOrgSection(org));
-            } catch (err) {
-                console.error('[org-groups] Failed to create organization', err);
-            } finally {
-                $submit.prop('disabled', false).text('Create');
-                $cancel.prop('disabled', false);
-            }
-        });
-    }
 
     try {
         const data          = await api.get(endpoints.currentUserOrganizations());

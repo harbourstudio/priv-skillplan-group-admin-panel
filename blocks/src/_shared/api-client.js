@@ -54,7 +54,6 @@ export const endpoints = {
   currentUserOrganizations: () => '/wp-json/bys-groups/v1/me/organizations',
   
   // /organizations/* routes
-  createOrganization: () => '/wp-json/bys-groups/v1/organizations',
   createOrganizationGroup: (orgId) => `/wp-json/bys-groups/v1/organizations/${orgId}/groups`,
 
   // /courses/* routes
