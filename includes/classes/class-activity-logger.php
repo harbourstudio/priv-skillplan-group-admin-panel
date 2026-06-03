@@ -10,21 +10,101 @@ if (!defined('ABSPATH')) exit;
 
 if (!class_exists('BYS_Groups_Activity_Logger')) {
     class BYS_Groups_Activity_Logger {
+
+        /**
+         * Session-presence tracker — NOT a wp_login event tracker.
+         *
+         * `wp_login` only fires when a user submits the login form, so any
+         * meta written from it goes stale the moment the user becomes
+         * cookie-authenticated. We refresh this key on every authenticated
+         * request instead — see track_user_session_activity() for the write
+         * and get_last_active_ts() for the read.
+         */
+        const ACTIVE_META_KEY         = 'bys_last_active_ts';
+        const ACTIVE_THROTTLE_SECONDS = 300; // 5 min
+
         public function __construct() {
             $this->register_hooks();
         }
 
         private function register_hooks() {
             // System events
-            add_action('wp_login', [$this, 'on_user_login'], 10, 2);
+            add_action('wp_login',  [$this, 'on_user_login'],  10, 2);
             add_action('wp_logout', [$this, 'on_user_logout'], 1); // Priority 1 (before default 10) to capture before session destroyed
-
+            // Session-presence tracker (see ACTIVE_META_KEY docblock above).
+            add_action('init', [$this, 'track_user_session_activity']);
             // Learndash events
-            add_action('learndash_course_completed', [$this, 'on_certificate_earned'], 10, 1);
-            add_action('template_redirect', [$this, 'on_page_view'], 10);
-            add_action('learndash_update_course_access', [$this, 'on_course_access_update'], 10, 4);
+            add_action('learndash_course_completed',      [$this, 'on_certificate_earned'],   10, 1);
+            add_action('template_redirect',               [$this, 'on_page_view'],            10);
+            add_action('learndash_update_course_access',  [$this, 'on_course_access_update'], 10, 4);
 
             // (visit counter is now incremented directly in on_page_view)
+        }
+
+        /**
+         * Hook handler for `init`. Skips background contexts (cron, CLI)
+         * and stamps ACTIVE_META_KEY for the current user, throttled to
+         * one write per ACTIVE_THROTTLE_SECONDS.
+         */
+        public function track_user_session_activity() {
+            if (wp_doing_cron()) return;
+            if (defined('WP_CLI') && WP_CLI) return;
+
+            $user_id = get_current_user_id();
+            if (!$user_id) return;
+
+            $now  = time();
+            $last = (int) get_user_meta($user_id, self::ACTIVE_META_KEY, true);
+            if ($now - $last < self::ACTIVE_THROTTLE_SECONDS) return;
+
+            update_user_meta($user_id, self::ACTIVE_META_KEY, $now);
+        }
+
+        /**
+         * Plugin-wide "when was this user last active" reader. Returns the
+         * max() across three sources, in descending order of reliability:
+         *
+         *   1. ACTIVE_META_KEY  — session-presence tracker (written by
+         *      track_user_session_activity() on every authenticated request).
+         *   2. learndash_user_activity table — real LD engagement events
+         *      (survives cookie-auth, but only LD-context interactions).
+         *   3. Legacy wp_login-fired meta union — can be very stale; kept
+         *      as last resort so pre-tracker accounts still register SOME
+         *      signal.
+         *
+         * Returns 0 when no source has any data for this user.
+         */
+        public static function get_last_active_ts($user_id) {
+            $user_id = (int) $user_id;
+            if ($user_id <= 0) return 0;
+
+            return max(
+                (int) get_user_meta($user_id, self::ACTIVE_META_KEY, true),
+                self::get_ld_activity_ts($user_id),
+                // fallback — wp_login-fired keys
+                (int) get_user_meta($user_id, '_ld_notifications_last_login', true),
+                (int) get_user_meta($user_id, 'learndash-last-login',         true),
+                (int) get_user_meta($user_id, 'last_login',                   true)
+            );
+        }
+
+        /**
+         * Internal: max() of activity_started / _updated / _completed for
+         * this user in learndash_user_activity. One indexed query.
+         */
+        private static function get_ld_activity_ts($user_id) {
+            global $wpdb;
+            $ts = $wpdb->get_var($wpdb->prepare(
+                "SELECT GREATEST(
+                    COALESCE(MAX(activity_started),   0),
+                    COALESCE(MAX(activity_updated),   0),
+                    COALESCE(MAX(activity_completed), 0)
+                 )
+                 FROM {$wpdb->prefix}learndash_user_activity
+                 WHERE user_id = %d",
+                (int) $user_id
+            ));
+            return (int) $ts;
         }
 
 

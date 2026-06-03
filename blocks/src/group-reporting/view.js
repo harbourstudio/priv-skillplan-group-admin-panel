@@ -137,6 +137,13 @@ jQuery(document).ready(function($) {
     if (userId) window.location.href = detailUrl + '?user_id=' + userId + '&group_id=' + currentGroupId;
   });
 
+  // ── Status badge ─────────────────────────────────────────────────────────────
+  // shared handler for rendering the .status-badge cell
+  function applyStatusBadge($badge, user) {
+    const userStatus = user.status || 'never';
+    $badge.attr('class', `status-badge status-badge--${userStatus}`);
+  }
+
   // ── Tooltips ─────────────────────────────────────────────────────────────────
   function createAndShowTooltip($trigger) {
     const tipData = $trigger.data('tip');
@@ -223,14 +230,6 @@ jQuery(document).ready(function($) {
   });
 
   $table.on('mouseleave', '.group-reporting__quiz-icon', function() {
-    destroyTooltip();
-  });
-
-  $table.on('mouseenter', '.status-badge__icon[data-tip]', function() {
-    createAndShowTooltip($(this));
-  });
-
-  $table.on('mouseleave', '.status-badge__icon', function() {
     destroyTooltip();
   });
 
@@ -848,9 +847,11 @@ jQuery(document).ready(function($) {
 
     $tr.attr('data-user-id', user.id);
 
-    // Status dot — toggle modifier class for online/offline/never.
-    const userStatus = user.status || 'never';
-    $tr.find('.status-badge').addClass('status-badge--' + userStatus);
+    // Status dot — toggle modifier class for online/offline/never AND
+    // wrap the icon with the "Last checked" tooltip. Must use the same
+    // helper as appendTableRows() so both render paths stay in sync
+    // (fast first paint vs full rebuild after fetch).
+    applyStatusBadge($tr.find('.status-badge'), user);
 
     // Name + detail link.
     const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.display_name || '';
@@ -971,18 +972,7 @@ jQuery(document).ready(function($) {
 
       $row.find('tr').attr('data-user-id', user.id).removeClass('group-reporting__row--loading');
 
-      const userStatus = user.status || 'never';
-      const statusClass = `status-badge--${userStatus}`;
-
-      let statusBadge = `<i class="fa-solid fa-circle"></i>`;
-      if (user.last_login) {
-        const readableDateTime = formatDate(user.last_login);
-        const unixTimestamp = user.last_login_unix || '';
-        const tooltipText = `Last login: ${readableDateTime} (${unixTimestamp})`;
-        statusBadge = `<span class="status-badge__icon" data-tip="${escapeHtml(tooltipText)}"><i class="fa-solid fa-circle"></i></span>`;
-      }
-
-      $row.find('.status-badge').attr('class', `status-badge ${statusClass}`).html(statusBadge);
+      applyStatusBadge($row.find('.status-badge'), user);
 
       const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.display_name || '';
       $row.find('.group-reporting__col--name').html(`

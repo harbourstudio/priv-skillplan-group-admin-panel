@@ -1,4 +1,6 @@
 import { endpoints, api } from '../_shared/api-client.js';
+import { formatDateTime } from '../_shared/helpers.js';
+import { createTooltip, destroyTooltip } from '../_shared/tooltip.js';
 
 jQuery(document).ready(async ($) => {
   // Get user_id from URL parameters
@@ -57,9 +59,23 @@ jQuery(document).ready(async ($) => {
     $block.find('.user-email').text(user.email);
     $block.find('.user-enrolled-date').text(enrolledDate);
     $block.find('.user-last-login-date').text(lastLoginDate);
-    $block.find('.user-status-item').addClass(`user-info__meta-item--${statusClass}`);
+    const $statusItem = $block.find('.user-info__meta-status');
+    $statusItem.addClass(`user-info__meta-status--${statusClass}`);
     $block.find('.user-status-text').text(statusText);
+
+    // display "Last checked" on hover so the leader knows how fresh this status is
+    if (user.status_checked_at) {
+      $statusItem.attr('data-tooltip', `Last checked: ${formatDateTime(user.status_checked_at)}`);
+    }
   }
+
+  // used shared tooltip handlers
+  jQuery(document).on('mouseenter', '.user-info__meta-item.user-info__meta-status[data-tooltip]', function () {
+    createTooltip(jQuery(this), jQuery(this).attr('data-tooltip'));
+  });
+  jQuery(document).on('mouseleave', '.user-info__meta-item.user-info__meta-status[data-tooltip]', function () {
+    destroyTooltip();
+  });
 
   function formatUnixTimestamp(timestamp) {
     if (!timestamp) return '';
