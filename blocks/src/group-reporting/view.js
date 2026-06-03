@@ -299,6 +299,7 @@ jQuery(document).ready(function($) {
     displayedCount = 0;
     $sortSelect.val('first_name_asc');
     resetFilterFormUI();
+    updateCourseDepFieldState();
     updateCompletionSortVisibility();
   }
 
@@ -314,6 +315,12 @@ jQuery(document).ready(function($) {
     resetTableStateForGroup(userIds);
 
     await populateTableFromAPI(groupId, userIds, courses);
+
+    // if filters panel is currently open, re-render the multiselects so they reflect the newly selected group
+    if ($filtersBox.length && !$filtersBox.hasClass('hidden')) {
+      populateCourseMultiselect();
+      populateUserMultiselect();
+    }
   });
 
   // ── Table population ──────────────────────────────────────────────────────────
