@@ -931,7 +931,9 @@ jQuery(document).ready(function($) {
     // Progress sub-cell
     const stepsCompleted = courseData?.steps_completed || 0;
     const stepsTotal     = courseData?.steps_total     || 0;
-    const percentage     = stepsTotal > 0 ? Math.round((stepsCompleted / stepsTotal) * 100) : 0;
+    const percentage     = typeof courseData?.percent_complete === 'number'
+      ? courseData.percent_complete
+      : (stepsTotal > 0 ? Math.min(100, Math.round((stepsCompleted / stepsTotal) * 100)) : 0);
     const percentClass   = percentage === 100 ? 'complete' : percentage === 0 ? 'not-started' : 'in-progress';
 
     $scope.find(`.group-reporting__sub-cell--progress[data-course-idx="${idx}"]`).html(`
@@ -1685,9 +1687,12 @@ jQuery(document).ready(function($) {
   function courseProgressCells(courseData) {
     const progressLabel = { completed: 'Completed', in_progress: 'In Progress', not_started: 'Not Started' };
     const progressStatus = courseData?.progress_status || 'not_started';
+    // mirrors the progress sub-cell
     const stepsCompleted = courseData?.steps_completed || 0;
     const stepsTotal = courseData?.steps_total || 0;
-    const percentage = stepsTotal > 0 ? Math.round((stepsCompleted / stepsTotal) * 100) : 0;
+    const percentage = typeof courseData?.percent_complete === 'number'
+      ? courseData.percent_complete
+      : (stepsTotal > 0 ? Math.min(100, Math.round((stepsCompleted / stepsTotal) * 100)) : 0);
     return [
       progressLabel[progressStatus] || progressStatus,
       `${percentage}%`,
