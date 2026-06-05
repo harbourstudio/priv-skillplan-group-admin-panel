@@ -1,4 +1,5 @@
 @use '../_shared/flatpickr';
+@use '../_shared/alert';
 
 .wp-block-bys-groups-group-quiz-config {
     .gqc {
@@ -91,9 +92,8 @@
             }
         }
 
-        // Shared button look-and-feel used by Save (primary) and Notify (outline).
-        &__btn-primary,
-        &__btn-outline {
+        &__save-row,
+        &__notify {
             padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--4);
             border-radius: 9999px;
             font-size: var(--wp--preset--font-size--small);
@@ -104,14 +104,14 @@
             &:disabled { opacity: 0.4; cursor: not-allowed; }
         }
 
-        &__btn-primary {
+        &__save-row {
             background: var(--wp--preset--color--primary);
             color: white;
             &:hover:not(:disabled) { opacity: 0.88; }
         }
 
-        &__btn-outline {
-            background: white;
+        &__notify {
+            background: var(--wp--preset--color--blue-100);
             color: var(--wp--preset--color--primary);
             border: 1px solid var(--wp--preset--color--primary);
             &:hover:not(:disabled) {

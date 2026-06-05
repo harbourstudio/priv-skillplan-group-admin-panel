@@ -129,11 +129,11 @@ $tz_offset_hours = $tz_offset_seconds / 3600;
                         </button>
                     </div>
                     <div class="gqc__action-buttons">
-                        <button class="gqc__notify gqc__btn-outline btn-unstyled" type="button">
-                            <?php esc_html_e( 'Notify', 'bys' ); ?>
-                        </button>
-                        <button class="gqc__save-row gqc__btn-primary btn-unstyled" type="button" disabled>
+                        <button class="gqc__save-row btn-unstyled" type="button" disabled>
                             <?php esc_html_e( 'Save', 'bys' ); ?>
+                        </button>
+                        <button class="gqc__notify btn-unstyled" type="button">
+                            <?php esc_html_e( 'Notify', 'bys' ); ?>
                         </button>
                     </div>
                 </div>
