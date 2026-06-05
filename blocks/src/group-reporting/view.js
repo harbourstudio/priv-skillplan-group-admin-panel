@@ -1838,9 +1838,22 @@ jQuery(document).ready(function($) {
     const users = Array.isArray(response?.users) ? response.users : [];
     const courseTitle = response?.course_title || course.title?.rendered || course.title || `course-${course.id}`;
 
+    // Course has no certificate configured - abandon download
+    if (response?.has_certificate_template === false) {
+      bysAlert(`"${courseTitle}" has no certificate configured.`);
+      // console.warn('[group-reporting] Course has no certificate template:', course.id);
+      return;
+    }
+
     if (!users.length) {
       bysAlert('No group members to download certificates for.')
-      console.warn('[group-reporting] No group members to download certificates for.');
+      // console.warn('[group-reporting] No group members to download certificates for.');
+      return;
+    }
+    // no group-users have achieved completion yet
+    if (!users.some((u) => !!u.certificate_url)) {
+      bysAlert(`No group members have completed "${courseTitle}".`);
+      // console.warn('[group-reporting] No completers for course:', course.id);
       return;
     }
 

@@ -710,6 +710,22 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 return new WP_Error('not_found', 'Course not found', ['status' => 404]);
             }
 
+            /**
+             * check if course has no certificate configured at all. learndash_get_course_certificate_link() returns '' for both "no template" AND "user hasn't completed", so use a inform the block
+             */
+            $cert_template_id = function_exists('learndash_get_setting')
+                ? intval(learndash_get_setting($course_id, 'certificate'))
+                : 0;
+
+            if (!$cert_template_id) {
+                return [
+                    'course_id'                => $course_id,
+                    'course_title'             => $this->normalize_course_title(get_the_title($course_id)),
+                    'has_certificate_template' => false,
+                    'users'                    => [],
+                ];
+            }
+
             $user_ids = function_exists('learndash_get_groups_user_ids')
                 ? (array) learndash_get_groups_user_ids($group_id)
                 : [];
@@ -738,9 +754,10 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             }
 
             return [
-                'course_id'    => $course_id,
-                'course_title' => get_the_title($course_id),
-                'users'        => $users,
+                'course_id'                => $course_id,
+                'course_title'             => $this->normalize_course_title(get_the_title($course_id)),
+                'has_certificate_template' => true,
+                'users'                    => $users,
             ];
         }
 
