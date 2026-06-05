@@ -28,7 +28,7 @@ jQuery(document).ready(function($) {
     const $conditionalRecipientsTable = $modal.find('.gcsm__recipients-preview-table');
     const $conditionalRecipientsEmpty = $modal.find('.gcsm__hint--recipients-empty');
     const $conditionalRecipientsSkeleton = $modal.find('.gcsm__recipients-preview .gcsm__skeleton');
-    const $subject = $modal.find('#gcsm__subject');
+    const $subjectInput = $modal.find('#gcsm__subject');
     const $message = $modal.find('#gcsm__message');
     const $preview = $modal.find('#gcsm__preview');
     const $submitBtn = $modal.find('.gcsm__form-submit');
@@ -53,6 +53,18 @@ jQuery(document).ready(function($) {
         registered_for_days:  { days: true,  course: false, quiz: false },
         enrolled_for_days:    { days: true,  course: true,  quiz: false },
         course_completed:     { days: false, course: true,  quiz: false },
+    };
+
+    // Conditions allowed per prompt type. Use null to mean "no restriction"
+    // (every condition is selectable — used by 'custom'). Unknown prompt
+    // types fall through to the no-restriction default so a future prompt
+    // doesn't silently lose its conditions before this map is updated.
+    const PROMPT_TYPE_CONDITIONS = {
+        'password-reset':      ['outstanding_login'],
+        'course-progress':     ['outstanding_login', 'inactive_days', 'outstanding_course_access', 'outstanding_course_completed', 'outstanding_quiz_completed'],
+        'assessment-deadline': ['outstanding_course_access', 'outstanding_quiz_completed'],
+        'welcome-reminder':    ['outstanding_course_access', 'outstanding_login'],
+        'custom':              null,
     };
 
     // ── Flatpickr init ────────────────────────────────────────────────────────
@@ -127,6 +139,9 @@ jQuery(document).ready(function($) {
         } else {
             resetConditionState();
         }
+        // Switching to/from 'condition' changes whether the condition's
+        // course_id contributes to the CTA URL; re-render the preview.
+        refreshPreviewForCurrentSelection();
     });
 
     // Condition select — toggle which sub-inputs are visible and trigger resolve
@@ -145,6 +160,9 @@ jQuery(document).ready(function($) {
         validateDaysInput(); // re-runs against the now-empty field, hides any stale error
 
         scheduleResolveRecipients();
+        // Condition change resets $conditionCourse to '' — preview should
+        // revert to the template's default URL until a course is picked.
+        refreshPreviewForCurrentSelection();
     });
 
     // Sub-input bindings — debounced resolve
@@ -158,6 +176,9 @@ jQuery(document).ready(function($) {
             await loadCourseQuizzes(parseInt($(this).val(), 10) || 0);
         }
         scheduleResolveRecipients();
+        // Deep-link the CTA in the preview to the newly picked course
+        // (or revert to the template default if the course was cleared).
+        refreshPreviewForCurrentSelection();
     });
     $conditionQuiz.on('change', scheduleResolveRecipients);
 
@@ -170,6 +191,55 @@ jQuery(document).ready(function($) {
         $conditionalRecipientsTable.hide();
         $conditionalRecipientsSkeleton.hide();
         $conditionalRecipientsEmpty.text('Select a condition to preview recipients.').show();
+    }
+
+    // Format a server-supplied `details` payload (see attach_details in
+    // class-conditional-emails.php) into the single string the table cell
+    // shows. The server emits `since_at` as ISO 8601 UTC; we render it in
+    // the LEADER's browser timezone (with TZ abbreviation) so the moment
+    // is unambiguous and doesn't depend on the site's gmt_offset.
+    //
+    // Returns an em-dash when the anchor timestamp wasn't available — e.g.
+    // user has never logged in for inactive_days.
+    function formatDetails(details) {
+        if (!details || !details.kind || !details.since_at) return '—';
+
+        const LABELS = {
+            inactive:   'Last active',
+            registered: 'Registered',
+            enrolled:   'Enrolled',
+        };
+        const label = LABELS[details.kind];
+        if (!label) return '';
+
+        // `new Date(isoUtcString)` parses the offset correctly and produces
+        // a Date in browser-local time; toLocaleString respects that.
+        const fmt = new Date(details.since_at).toLocaleString('en-US', {
+            year:         'numeric',
+            month:        'short',
+            day:          'numeric',
+            hour:         'numeric',
+            minute:       '2-digit',
+            timeZoneName: 'short',
+        });
+        return `${label}: ${fmt}`;
+    }
+
+    // Same moment as formatDetails(), rendered in UTC. Used as the hover
+    // tooltip so the leader can disambiguate without any mental TZ math
+    // (and so a screenshotted preview is portable between leaders in
+    // different timezones).
+    function formatDetailsUtcTooltip(sinceAt) {
+        if (!sinceAt) return '';
+        return new Date(sinceAt).toLocaleString('en-US', {
+            year:         'numeric',
+            month:        'short',
+            day:          'numeric',
+            hour:         'numeric',
+            minute:       '2-digit',
+            timeZone:     'UTC',
+            timeZoneName: 'short',
+        });
     }
 
     // Returns true when the days input is empty OR a positive integer.
@@ -304,12 +374,22 @@ jQuery(document).ready(function($) {
                 return;
             }
 
+            // Toggle the Details column on for day-based conditions.
+            // The class controls both the grid layout and per-cell visibility.
+            const hasDetails = recipients.some(r => r.details && r.details.kind);
+            $conditionalRecipientsTable.toggleClass('gcsm__recipients-preview-table--with-details', hasDetails);
+
             const rowTpl = $block.find('template.gcsm__template-recipient-row')[0];
             recipients.forEach(r => {
                 const $row = $(rowTpl.content.firstElementChild.cloneNode(true));
                 $row.find('[data-field="name"]').text(r.display_name);
                 $row.find('[data-field="email"]').text(r.email);
                 $row.find('[data-field="user-id"]').text(r.user_id);
+
+                const $detailsLine = $row.find('[data-field="details"] .gcsm__details-line');
+                $detailsLine.text(formatDetails(r.details));
+                $detailsLine.attr('title', formatDetailsUtcTooltip(r.details?.since_at));
+
                 $conditionalRecipientsList.append($row);
             });
             $conditionalRecipientsTable.show();
@@ -387,17 +467,54 @@ jQuery(document).ready(function($) {
         scheduleFp.clear();
         $feedback.hide();
 
-        // Subject row stays visible for all prompt types; only its editable state changes.
-        if (promptType === 'custom') {
-            $subject.prop('disabled', false).removeClass('disabled');
-            $message.show().prop('readonly', false);
-            $preview.hide();
-        } else {
-            $subject.prop('disabled', true).addClass('disabled');
-            await loadPromptTemplate(promptType, currentGroupId);
-        }
-
         await populateGroupUsers(currentGroupId);
+        await loadPromptTemplate(promptType, currentGroupId);
+        applyConditionFilterForPrompt(promptType);
+    }
+
+    /**
+     * Narrow #gcsm__condition's option list to the conditions relevant to
+     * the active prompt type. Non-allowed options are both hidden (so they
+     * don't render in the dropdown) AND disabled (so keyboard navigation
+     * skips them). The empty placeholder is always preserved.
+     *
+     * Called from setupForm — re-applied on every modal open because the
+     * prompt type can change between opens. PROMPT_TYPE_CONDITIONS[type] of
+     * null (or an unknown type) means "no restriction" and re-enables every
+     * option, which matters when switching from a restrictive prompt back
+     * to 'custom' on the same page load.
+     */
+    function applyConditionFilterForPrompt(promptType) {
+        const allowed = PROMPT_TYPE_CONDITIONS[promptType];
+        $conditionSelect.find('option').each(function () {
+            const $opt = $(this);
+            const value = $opt.attr('value');
+            if (value === '') return; // never hide the placeholder
+            const visible = !allowed || allowed.includes(value);
+            $opt.prop('hidden', !visible).prop('disabled', !visible);
+        });
+    }
+
+    /**
+     * Re-render the preview pane to match the leader's current selection.
+     *
+     * Called whenever a control that the mailer's CTA-URL logic depends on
+     * changes (recipient mode, condition select, course select). Reads the
+     * live state, derives the course_id to send to the template endpoint,
+     * and delegates to loadPromptTemplate.
+     *
+     * Mirrors the server's send-time rule: course_id only matters when
+     * recipient mode is 'condition'. For 'group' and 'individual' modes the
+     * mailer ignores any picked course, so the preview should fall back to
+     * the template's default URL too.
+     */
+    async function refreshPreviewForCurrentSelection() {
+        if (!currentPromptType || !currentGroupId) return;
+        const recipientMode = $modal.find('input[name="recipient"]:checked').val();
+        const courseId = (recipientMode === 'condition')
+            ? (parseInt($conditionCourse.val(), 10) || 0)
+            : 0;
+        await loadPromptTemplate(currentPromptType, currentGroupId, courseId);
     }
 
     // The prompts block dispatches both a jQuery custom event and a native
@@ -408,32 +525,54 @@ jQuery(document).ready(function($) {
     });
 
     /**
-     * Load and display prompt template preview from REST API
+     * Populate the modal's subject + body UI for the selected prompt.
+     *
+     * Subjects are now fixed per prompt type (see bys_get_*_email helpers
+     * in includes/emails/group-comms.php) — including the 'custom' prompt
+     * which uses the fixed line "Build Your Skills | You have received a
+     * message from your group leader". The leader never edits the subject
+     * directly; the disabled input reflects what the server will send.
+     *
+     * Body UI branches on prompt type:
+     *  - 'custom': textarea visible so the leader writes the message body;
+     *    preview pane hidden (rendering the template with an empty body
+     *    would only show the wrapper chrome, which is misleading).
+     *  - any other prompt: textarea hidden, preview pane shows the
+     *    server-rendered HTML with the group's name + site context already
+     *    substituted in.
      */
-    async function loadPromptTemplate(promptType, groupId) {
+    async function loadPromptTemplate(promptType, groupId, courseId = 0) {
         try {
-            const url = `/wp-json/bys-groups/v1/groups/${groupId}/template/${promptType}`;
+            // courseId > 0 deep-links the CTA button to that course's page —
+            // mirrors what the mailer does at send time when the chosen
+            // condition has a course_id. Server ignores the param for
+            // templates without a navigational CTA (password-reset, custom).
+            let url = `/wp-json/bys-groups/v1/groups/${groupId}/template/${promptType}`;
+            if (courseId > 0) url += `?course_id=${courseId}`;
             const response = await api.get(url);
 
-            if (response && response.subject && response.html) {
-                // Set subject field
-                $subject.val(response.subject);
-
-                // Hide textarea and show preview
-                $message.hide();
-                $preview.show();
-                $preview.html(response.html);
-            } else {
-                console.error('[group-communication-send-modal] Invalid response:', response);
+            if (!response || !response.subject) {
+                console.error('[group-communication-send-modal] Invalid template response:', response);
+                $subjectInput.val('');
                 $preview.hide();
-                $message.show();
-                $message.val('Template preview unavailable.');
+                $message.show().val('').prop('disabled', false);
+                return;
+            }
+
+            $subjectInput.val(response.subject);
+
+            if (promptType === 'custom') {
+                $preview.hide().empty();
+                $message.show().val('').prop('disabled', false);
+            } else {
+                $message.hide().val('');
+                $preview.show().html(response.html || '');
             }
         } catch (err) {
-            console.error('[group-communication-send-modal] Error:', err);
+            console.error('[group-communication-send-modal] Template fetch failed:', err);
+            $subjectInput.val('');
             $preview.hide();
-            $message.show();
-            $message.val('Error loading template preview.');
+            $message.show().val('Error loading template preview.').prop('disabled', true);
         }
     }
 
@@ -587,7 +726,6 @@ jQuery(document).ready(function($) {
 
         try {
             const recipientType = $form.find('input[name="recipient"]:checked').val();
-            const customSubject = $subject.val();
             const customMessage = currentPromptType === 'custom' ? $message.val() : '';
 
             // Get selected recipient IDs for individual type
@@ -625,7 +763,6 @@ jQuery(document).ready(function($) {
                 prompt_type: currentPromptType,
                 recipient_type: recipientType,
                 recipient_ids: recipientIds,
-                custom_subject: customSubject,
                 custom_message: customMessage,
                 scheduled_at: scheduledAt,
             };

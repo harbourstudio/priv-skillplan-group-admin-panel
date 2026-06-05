@@ -213,13 +213,27 @@
             gap: var(--wp--preset--spacing--4);
         }
 
-        // ── Conditional extra fields wrapper ────────────────────────────────────────────────────
+        // ── Conditional fields ────────────────────────────────────────────────────
         &__condition-fields {
             display: flex;
-            gap: var(--wp--preset--spacing--4);
+            flex-direction: column;
+            gap: var(--wp--preset--spacing--2);
+            margin-top: var(--wp--preset--spacing--2);
 
-            > div {
-                margin-top: var(--wp--preset--spacing--2);
+            
+            @media screen and (min-width: 768px) {
+                flex-direction: row;
+            }
+        }
+        
+        &__condition-field {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            
+            select {
+                width: 100%;
+                flex-grow: 1;
             }
         }
     
@@ -268,13 +282,15 @@
 
         &__recipients-preview-header {
             display: grid;
-            grid-template-columns: 5fr 6fr 1fr;
+            grid-template-columns: 1fr 1fr 15%;
             gap: var(--wp--preset--spacing--2);
             padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--3);
             background: var(--wp--preset--color--gray-50);
             font-weight: 500;
             font-size: var(--wp--preset--font-size--x-small);
             border-bottom: 1px solid var(--wp--preset--color--gray-200);
+
+            [data-col="details"] { display: none; }
         }
 
         &__recipients-preview-list {
@@ -287,7 +303,7 @@
 
         &__recipients-preview-row {
             display: grid;
-            grid-template-columns: 5fr 6fr 1fr;
+            grid-template-columns: 1fr 1fr 15%;
             gap: var(--wp--preset--spacing--2);
             padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--3);
             border-bottom: 1px solid var(--wp--preset--color--gray-100);
@@ -299,9 +315,33 @@
                 white-space: nowrap;
             }
 
+            [data-field="details"] { display: none; }
+
             &:last-child {
                 border-bottom: none;
             }
+        }
+
+        // Based on the condition set, the preview table may get a --with-details modifier for Details columm
+        &__recipients-preview-table--with-details {
+            .gcsm__recipients-preview-header,
+            .gcsm__recipients-preview-row {
+                grid-template-columns: 1fr 1fr 15% 20%;
+            }
+
+            .gcsm__recipients-preview-header [data-col="details"],
+            .gcsm__recipients-preview-row [data-field="details"] {
+                display: flex;
+                flex-direction: column;
+                line-height: 1.25;
+            }
+        }
+
+        &__details-line {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: var(--wp--preset--color--gray-500);
+            white-space: wrap;
         }
 
         // ── Schedule ──────────────────────────────────────────────────────────────
