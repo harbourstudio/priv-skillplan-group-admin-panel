@@ -70,7 +70,7 @@ if (!class_exists('BYS_Groups_Scheduled_Emails')) {
 
             // Load email template functions
             if (!function_exists('bys_get_comm_email')) {
-                require_once BYS_GROUPS_PLUGIN_DIR . 'includes/emails/group-comms.php';
+                require_once BYS_GROUPS_PLUGIN_DIR . 'includes/emails/general.php';
             }
 
             if (!function_exists('bys_get_comm_email')) {
@@ -118,7 +118,7 @@ if (!class_exists('BYS_Groups_Scheduled_Emails')) {
 
                 // Add to batch
                 $message = array(
-                    'From' => get_bloginfo('admin_email'),
+                    'From' => BYS_Groups_Postmark::get_from_email(),
                     'To' => $recipient_email,
                     'Subject' => $email_content['subject'],
                     'HtmlBody' => $email_content['html'],

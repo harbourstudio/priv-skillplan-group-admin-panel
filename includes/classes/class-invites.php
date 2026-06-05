@@ -90,8 +90,14 @@ if ( ! class_exists( 'BYS_Groups_Invites' ) ) {
 
             $email_data = bys_get_invite_email( $group_name, $register_url, $invited_by, $site_name, $site_url );
 
-            // Send as HTML
-            $headers = array( 'Content-Type: text/html; charset=UTF-8' );
+            // Send as HTML. From header forces wp_mail to use the configured
+            // Postmark sender signature instead of WordPress' default
+            // (wordpress@<host>), which Postmark would reject as unverified.
+            $from_email = BYS_Groups_Postmark::get_from_email();
+            $headers    = array(
+                'Content-Type: text/html; charset=UTF-8',
+                'From: ' . $site_name . ' <' . $from_email . '>',
+            );
 
             $sent = wp_mail( $email, $email_data['subject'], $email_data['html'], $headers );
 

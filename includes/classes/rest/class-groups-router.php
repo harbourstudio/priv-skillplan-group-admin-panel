@@ -89,6 +89,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 'callback'            => [$this, 'get_group_course_completion_stats'],
                 'permission_callback' => fn($request) => BYS_Groups_Permissions::can_access_group($request['group_id']),
             ]);
+
             /**
              * Group Users Bulk certificate download (specified course)
              * REturns certficate URL per group-user (null if no cert available for a user)
@@ -218,7 +219,6 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                     'prompt_type'    => ['type' => 'string', 'required' => true],
                     'recipient_type' => ['type' => 'string', 'required' => true],
                     'recipient_ids'  => ['type' => 'array',  'required' => false],
-                    'custom_subject' => ['type' => 'string', 'required' => false],
                     'custom_message' => ['type' => 'string', 'required' => false],
                 ],
             ]);
@@ -268,6 +268,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 $url = get_home_url() . "/wp-json/ldlms/v2/groups/{$group_id}/users?_fields=id&per_page={$per_page}&page={$page}";
                 $response = wp_remote_get($url, [
                     'headers'   => ['Authorization' => $auth_header],
+                    'timeout'   => 30,
                     'sslverify' => false,
                 ]);
 
@@ -319,6 +320,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             $courses_url = get_home_url() . "/wp-json/ldlms/v2/groups/{$group_id}/courses?_fields=id,title";
             $courses_response = wp_remote_get($courses_url, [
                 'headers'   => ['Authorization' => $auth_header],
+                'timeout'   => 30,
                 'sslverify' => false,
             ]);
             // Source of truth for "is this course required for this group" lives
@@ -386,6 +388,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 $url = get_home_url() . "/wp-json/ldlms/v2/groups/{$group_id}/users?_fields=id&per_page={$per_page}&page={$page}";
                 $response = wp_remote_get($url, [
                     'headers'   => ['Authorization' => $auth_header],
+                    'timeout'   => 30,
                     'sslverify' => false,
                 ]);
                 if (is_wp_error($response)) return new WP_Error('server_error', $response->get_error_message(), ['status' => 500]);
@@ -553,6 +556,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             $url = get_home_url() . "/wp-json/ldlms/v2/groups/{$group_id}/courses?_fields=id,title";
             $response = wp_remote_get($url, [
                 'headers'   => ['Authorization' => $auth_header],
+                'timeout'   => 30,
                 'sslverify' => false,
             ]);
 
@@ -690,6 +694,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 'total_incomplete' => $total_incomplete,
             ];
         }
+        
         /**
          * GET /groups/{group_id}/courses/{course_id}/certificate-urls
          *
@@ -1592,14 +1597,14 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 return new WP_Error('server_error', 'Postmark token not configured', ['status' => 500]);
             }
 
-            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/emails/user-quiz-config.php';
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/emails/general.php';
 
             // Sender is the leader making the request; falls back to admin if unauth'd.
             $sender         = wp_get_current_user();
             $sender_user_id = ($sender && $sender->ID) ? (int) $sender->ID : 0;
             $sender_email   = ($sender && !empty($sender->user_email)) ? $sender->user_email : get_bloginfo('admin_email');
             $quiz_post      = get_post($quiz_id);
-            $from           = get_bloginfo('admin_email');
+            $from           = BYS_Groups_Postmark::get_from_email();
 
             $email = bys_get_quiz_access_notification_email([
                 'recipient_name' => !empty($recipient->display_name) ? $recipient->display_name : $recipient->user_login,
@@ -1725,7 +1730,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             $page = 1; $per_page = 100;
             do {
                 $url = get_home_url() . "/wp-json/ldlms/v2/groups/{$group_id}/users?_fields=id&per_page={$per_page}&page={$page}";
-                $resp = wp_remote_get($url, ['headers' => ['Authorization' => $auth_header], 'sslverify' => false]);
+                $resp = wp_remote_get($url, ['headers' => ['Authorization' => $auth_header], 'timeout' => 30, 'sslverify' => false]);
                 if (is_wp_error($resp) || wp_remote_retrieve_response_code($resp) !== 200) break;
                 $page_users = json_decode(wp_remote_retrieve_body($resp), true);
                 if (!is_array($page_users) || empty($page_users)) break;
@@ -1737,14 +1742,14 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 return new WP_Error('no_recipients', 'No members in this group', ['status' => 404]);
             }
 
-            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/emails/user-quiz-config.php';
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/emails/general.php';
 
             $quiz_post = get_post($quiz_id);
             $site_name = get_bloginfo('name');
             $site_url  = home_url();
             $quiz_url  = $quiz_post ? get_permalink($quiz_post) : home_url();
             $quiz_ttl  = $quiz_post ? get_the_title($quiz_post) : 'your quiz';
-            $from      = get_bloginfo('admin_email');
+            $from      = BYS_Groups_Postmark::get_from_email();
 
             // resolve sender_email to the leader making the request; fallback to admin
             $sender         = wp_get_current_user();
@@ -1869,7 +1874,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
 
         /**
          * POST /groups/{group_id}/send-communication
-         * Body: { prompt_type, recipient_type, recipient_ids[], custom_subject,
+         * Body: { prompt_type, recipient_type, recipient_ids[],
          *         custom_message, scheduled_at, condition{} }
          *
          * Delegates to BYS_Groups_Mailer::send_group_communication which handles
@@ -1890,7 +1895,6 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                     'prompt_type'    => $request->get_param('prompt_type'),
                     'recipient_type' => $request->get_param('recipient_type'),
                     'recipient_ids'  => $request->get_param('recipient_ids'),
-                    'custom_subject' => $request->get_param('custom_subject'),
                     'custom_message' => $request->get_param('custom_message'),
                     'scheduled_at'   => $request->get_param('scheduled_at'),
                     'condition'      => $request->get_param('condition'),
@@ -1902,7 +1906,6 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             $recipient_ids  = isset($body['recipient_ids']) && is_array($body['recipient_ids'])
                                 ? array_map('intval', $body['recipient_ids'])
                                 : [];
-            $custom_subject = sanitize_text_field($body['custom_subject'] ?? '');
             $custom_message = wp_kses_post($body['custom_message'] ?? '');
             $scheduled_at   = sanitize_text_field($body['scheduled_at'] ?? '');
 
@@ -1920,9 +1923,9 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 return new WP_Error('bad_request', 'Missing prompt_type or recipient_type', ['status' => 400]);
             }
 
-            // Custom prompts must include both subject and message
-            if ($prompt_type === 'custom' && (empty($custom_subject) || empty($custom_message))) {
-                return new WP_Error('bad_request', 'Custom prompts require both subject and message', ['status' => 400]);
+            // Custom prompts must include message
+            if ($prompt_type === 'custom' && empty($custom_message)) {
+                return new WP_Error('bad_request', 'Custom prompts require message', ['status' => 400]);
             }
 
             // Conditional sends must include resolved recipients + a condition type
@@ -1943,7 +1946,6 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 $prompt_type,
                 $recipient_type,
                 $recipient_ids,
-                $custom_subject,
                 $custom_message,
                 $scheduled_at,
                 $condition
@@ -1975,13 +1977,25 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 return new WP_Error('not_found', 'Invalid group ID', ['status' => 404]);
             }
 
-            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/emails/group-comms.php';
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/emails/general.php';
+
+            // Optional ?course_id=N — when the send-modal's chosen condition
+            // has a course attached, the client passes it here so the preview
+            // pane reflects the same deep-link the mailer will use. Templates
+            // without a CTA button (password-reset, custom) ignore it.
+            $course_id_for_cta = intval($request->get_param('course_id'));
+            $cta_url_override  = '';
+            if ($course_id_for_cta > 0) {
+                $maybe_url = get_permalink($course_id_for_cta);
+                if ($maybe_url) $cta_url_override = $maybe_url;
+            }
 
             $email = bys_get_comm_email($prompt_type, [
-                'group_name'   => $group->post_title,
-                'site_name'    => get_bloginfo('name'),
-                'site_url'     => home_url(),
-                'sender_email' => get_bloginfo('admin_email'),
+                'group_name'       => $group->post_title,
+                'site_name'        => get_bloginfo('name'),
+                'site_url'         => home_url(),
+                'sender_email'     => get_bloginfo('admin_email'),
+                'cta_url_override' => $cta_url_override,
             ]);
 
             if (empty($email['subject']) || empty($email['html'])) {
@@ -2038,7 +2052,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                     'X-Postmark-Server-Token' => $token,
                     'Accept'                  => 'application/json',
                 ],
-                'timeout'   => 15,
+                'timeout'   => 30,
                 'sslverify' => true,
             ]);
 

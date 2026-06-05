@@ -23,7 +23,6 @@ if (!class_exists('BYS_Groups_Mailer')) {
          * @param string $prompt_type Prompt type (password-reset, course-progress, assessment-deadline, welcome-reminder, custom)
          * @param string $recipient_type Recipient filter (group, individual, condition)
          * @param array $recipient_ids User IDs for 'individual' type, empty for others
-         * @param string $custom_subject Custom subject for 'custom' prompt type
          * @param string $custom_message Custom message body for 'custom' prompt type
          * @return array Array with 'success', 'sent_count', 'errors' keys
          */
@@ -32,7 +31,6 @@ if (!class_exists('BYS_Groups_Mailer')) {
             $prompt_type,
             $recipient_type,
             $recipient_ids = array(),
-            $custom_subject = '',
             $custom_message = '',
             $scheduled_at = '',
             $condition = array()
@@ -93,9 +91,23 @@ if (!class_exists('BYS_Groups_Mailer')) {
             }
 
             // Load email template functions
-            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/emails/group-comms.php';
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/emails/general.php';
 
             $has_condition_meta = ($recipient_type === 'condition' && !empty($condition['type']));
+
+            // When the sender picked a condition tied to a specific course
+            // (e.g. outstanding_course_access, outstanding_course_completed,
+            // outstanding_quiz_completed, enrolled_for_days, course_completed),
+            // deep-link the CTA button to that course rather than the generic
+            // dashboard. Empty string means "no override" — templates fall back
+            // to their default URL.
+            $cta_url_override = '';
+            if (!empty($condition['course_id'])) {
+                $maybe_url = get_permalink(intval($condition['course_id']));
+                if ($maybe_url) {
+                    $cta_url_override = $maybe_url;
+                }
+            }
 
             // Generate batch ID for this send
             $batch_id = wp_generate_uuid4();
@@ -107,18 +119,18 @@ if (!class_exists('BYS_Groups_Mailer')) {
                 $recipient_email = $recipient['email'];
                 $recipient_name = $recipient['name'];
 
-                // Get email content based on prompt type
-                if ($prompt_type === 'custom') {
-                    $email = bys_get_custom_email($custom_subject, $custom_message);
-                } else {
-                    $email = bys_get_comm_email($prompt_type, array(
-                        'group_name' => $group_name,
-                        'recipient_name' => $recipient_name,
-                        'site_name' => get_bloginfo('name'),
-                        'site_url' => home_url(),
-                        'sender_email' => $sender_email,
-                    ));
-                }
+                // Get email content. Non-custom promptTypes ignore custom_message;
+                // cta_url_override is used by templates with a dashboard CTA to
+                // deep-link to a specific course (see $cta_url_override above).
+                $email = bys_get_comm_email($prompt_type, array(
+                    'group_name'       => $group_name,
+                    'recipient_name'   => $recipient_name,
+                    'site_name'        => get_bloginfo('name'),
+                    'site_url'         => home_url(),
+                    'sender_email'     => $sender_email,
+                    'custom_message'   => $custom_message,
+                    'cta_url_override' => $cta_url_override,
+                ));
 
                 // Validate email template
                 if (empty($email['subject']) || empty($email['html'])) {
@@ -127,7 +139,7 @@ if (!class_exists('BYS_Groups_Mailer')) {
 
                 // Add to batch
                 $messages[] = array(
-                    'From' => get_bloginfo('admin_email'),
+                    'From' => BYS_Groups_Postmark::get_from_email(),
                     'To' => $recipient_email,
                     'Subject' => $email['subject'],
                     'HtmlBody' => $email['html'],
@@ -258,16 +270,24 @@ if (!class_exists('BYS_Groups_Mailer')) {
 
                 if (!$wpdb->last_error) {
                     $logged_count++;
+                } else {
+                    // Postmark already accepted the send; logging failures
+                    // are downstream bookkeeping and must NOT fail the
+                    // request. Capture the actual DB error so we can fix
+                    // the schema/length/whatever caused the row to drop.
+                    error_log('[BYS_Groups_Mailer] comms-log insert failed: ' . $wpdb->last_error . ' — recipient: ' . ($msg['To'] ?? '?') . ', batch: ' . $batch_id);
                 }
             }
 
             // sent_count reflects the recipient selection size, NOT individual delivery success
             $sent_count = count($recipients_data);
 
+            // Postmark accepted the batch (we're past the !200 guard above) —
+            // success reflects THAT, not whether every log row landed.
             return array(
-                'success' => $logged_count > 0,
+                'success'    => true,
                 'sent_count' => $sent_count,
-                'errors' => array(),
+                'errors'     => array(),
             );
         }
 
