@@ -1,7 +1,9 @@
 import { api, endpoints } from '../_shared/api-client.js';
 import store from '../_shared/store.js';
+import { bysAlert } from '../_shared/alert.js';
 import flatpickr from 'flatpickr';
 import 'flatpickr/dist/flatpickr.min.css';
+import JSZip from 'jszip';
 
 jQuery(document).ready(function($) {
   const $block = $('.wp-block-bys-groups-group-reporting').first(); // assume only 1 block instance per page
@@ -804,7 +806,7 @@ jQuery(document).ready(function($) {
       if (course.required) {
         $headers.find('.group-reporting__required-badge').removeClass('hidden');
       }
-      $headers.find('.group-reporting__dl-link').attr('title', `Download ${courseTitle}`).attr('data-course-idx', idx);
+      $headers.find('.group-reporting__download').attr('data-course-idx', idx);
 
       $headers.children().each(function() {
         headerRow.appendChild(this);
@@ -1627,7 +1629,7 @@ jQuery(document).ready(function($) {
     }
   });
 
-  $table.on('click', '.group-reporting__dl-link', async function(e) {
+  $table.on('click', '.group-reporting__download', async function(e) {
     e.preventDefault();
     e.stopPropagation();
     if (!currentGroupId) return;
@@ -1640,7 +1642,10 @@ jQuery(document).ready(function($) {
     $link.addClass('is-loading').html('<i class="fa-regular fa-spinner fa-spin"></i>');
 
     try {
-      await exportCourseToCsv(course);
+      await downloadCourseCertificates(course);
+    } catch (err) {
+      bysAlert('Bulk certificate download failed.');
+      console.error('[group-reporting] Bulk certificate download failed', err);
     } finally {
       $link.removeClass('is-loading').html('<i class="fa-regular fa-download"></i>');
     }
@@ -1813,28 +1818,91 @@ jQuery(document).ready(function($) {
     downloadCsv(rows, `group-report-${currentGroupId}-${today}.csv`);
   }
 
-  async function exportCourseToCsv(course) {
-    const filteredUsers = await getExportUsers();
-    const quizSteps = await ensureQuizDataForCourse(course, filteredUsers);
+  /**
+   * Bundle LD certs for every group-user achieved course-compltion into a ZIP
+   * 
+   * Cert URLs come from learndash_get_course_certificate_link()
+   * server-side and carry a per-(course, target_user, viewing_user) nonce,
+   * so each URL only renders for the user that requested the bulk download.
+   * fetch() runs with credentials: 'include' to carry the session cookie.
+   * 
+   * NOTE: summary of non-complete
+   */
+  async function downloadCourseCertificates(course) {
 
-    const title = course.shortname || course.title?.rendered || course.title || '';
-    const req = course.required ? ' (Required)' : '';
+    // get cert data
+    const response = await api.get(
+      `/wp-json/bys-groups/v1/groups/${currentGroupId}/courses/${course.id}/certificate-urls`,
+      true // forceRefresh - never serve a stale list
+    );
+    const users = Array.isArray(response?.users) ? response.users : [];
+    const courseTitle = response?.course_title || course.title?.rendered || course.title || `course-${course.id}`;
 
-    const headers = ['Name', 'Email', `${title}${req} - Course Status`, `${title}${req} - Progress`, `${title}${req} - Enrolled`, `${title}${req} - Completed`];
-    quizSteps.forEach(quiz => headers.push(`${title}${req} - ${quiz.step_title}`));
+    if (!users.length) {
+      bysAlert('No group members to download certificates for.')
+      console.warn('[group-reporting] No group members to download certificates for.');
+      return;
+    }
 
-    const rows = [headers];
-    filteredUsers.forEach(user => {
-      const userProgress = userCourseProgressAll[user.id] || [];
-      const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.display_name || '';
-      const userQuizProgress = (userQuizProgressCache[course.id] || {})[user.id] || {};
-      const quizCells = quizSteps.map(quiz => quizProgressCell(quiz, userQuizProgress));
-      rows.push([fullName, user.email || '', ...courseProgressCells(userProgress.find(cp => cp.course_id === course.id)), ...quizCells]);
-    });
+    // create a new ZIP file container
+    const zip = new JSZip();
 
-    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    // Sanitise once — used for both the per-PDF filename and the outer
+    // ZIP filename. Filesystems differ on what they tolerate; the
+    // intersection of safe chars is conservative.
+    const safe = (str) => String(str).replace(/[^a-zA-Z0-9-_.]+/g, '_').replace(/^_+|_+$/g, '');
+
+    // Cap concurrency so the server doesn't get overloaded by large download at once 
+    const PARALLEL = 5;
+    const summaryRows = [['Email', 'User ID', 'Name', 'Certificate Included']];
+
+    let cursor = 0;
+    async function worker() {
+      while (cursor < users.length) {
+        const user = users[cursor++];
+        const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.display_name || '';
+        let included = false;
+
+        if (user.certificate_url) {
+          try {
+            const resp = await fetch(user.certificate_url, { credentials: 'include' });
+            if (resp.ok) {
+              const buf = await resp.arrayBuffer();
+              const filename = `${safe(user.user_id + '_' + fullName)}.pdf`;
+              zip.file(filename, buf);
+              included = true;
+            }
+          } catch (err) {
+            console.warn('[group-reporting] Failed to fetch certificate for user', user.user_id, err);
+          }
+        }
+
+        summaryRows.push([user.email || '', user.user_id, fullName, included ? 'Yes' : 'No']);
+      }
+    }
+    await Promise.all(Array.from({ length: PARALLEL }, worker));
+
+    // Summary CSV at the root of the ZIP. UTF-8 BOM for Excel compatibility,
+    // matching downloadCsv's behaviour for the table-level export.
+    const summaryFile = summaryRows.map((row) =>
+      row.map((cell) => {
+        const str = String(cell ?? '');
+        return /[,"\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+      }).join(',')
+    ).join('\n');
+    zip.file('_summary.csv', '﻿' + summaryFile);
+
+    // make the ZIP a downloadable file and trigger browser download by simulating a click on a hidden link 
+    const blob = await zip.generateAsync({ type: 'blob' });
     const today = new Date().toISOString().split('T')[0];
-    downloadCsv(rows, `course-report-${slug}-${today}.csv`);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${currentGroupId}-certificates-${safe(courseTitle)}-${today}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 
   // ── Utilities ─────────────────────────────────────────────────────────────────

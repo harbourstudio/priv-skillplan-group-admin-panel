@@ -1,4 +1,5 @@
 @use '../_shared/flatpickr';
+@use '../_shared/alert';
 
 .wp-block-bys-groups-group-reporting {
 
@@ -328,12 +329,6 @@
                 gap: var(--wp--preset--spacing--1);
             }
 
-            &-meta {
-                display: flex;
-                align-items: center;
-                gap: var(--wp--preset--spacing--1);
-            }
-
             &--expanded {
                 border-left: 2px solid rgba(255, 255, 255, 0.3);
             }
@@ -351,7 +346,7 @@
                     animation: shimmer 1.4s infinite linear;
                 }
 
-                .group-reporting__dl-link--skeleton {
+                .group-reporting__download--skeleton {
                     display: block;
                     width: 0.85em;
                     height: 0.85em;
@@ -359,6 +354,23 @@
                     background: rgba(255, 255, 255, 0.3);
                 }
             }
+        }
+
+        &__course-header-inner {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: var(--wp--preset--spacing--1);
+        }
+
+        &__course-header-meta {
+            display: flex;
+            align-items: center;
+            gap: var(--wp--preset--spacing--1);
+            line-height: 1;
+            color: white;
+            font-size: var(--wp--preset--font-size--x-small);
+            padding-top: var(--wp--preset--spacing--1);
         }
 
         // Course toggle button — vertical text, 2-column wrap, JS ellipsis
@@ -383,16 +395,6 @@
                 text-decoration: underline;
                 opacity: 0.9;
             }
-        }
-
-        &__required-badge {
-            font-size: var(--wp--preset--font-size--x-small);
-            line-height: 1;
-            color: white;
-        }
-
-        &__dl-link {
-            font-size: var(--wp--preset--font-size--x-small);
         }
 
         // ── Sub-columns / sub-cells (per-course detail) ───────────────────
