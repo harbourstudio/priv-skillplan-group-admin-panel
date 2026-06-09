@@ -93,7 +93,7 @@ jQuery(document).ready(async ($) => {
         });
     }
 
-    $(document).on('bys:groupSelected', async (_, { groupId, canManageLeaders }) => {
+    $(document).on('bys:groupSelected', async (_, { groupId, canManageGroup }) => {
         $skeleton.show();
         $list.empty();
         hideMessage();
@@ -120,7 +120,7 @@ jQuery(document).ready(async ($) => {
                 return;
             }
 
-            $list[0].appendChild(buildRowsFragment(allLeaders, groupId, !!canManageLeaders));
+            $list[0].appendChild(buildRowsFragment(allLeaders, groupId, !!canManageGroup));
         } catch (err) {
             console.error('[group-leaders] Failed to fetch leaders', err);
             $skeleton.hide();

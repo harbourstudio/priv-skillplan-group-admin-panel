@@ -24,7 +24,9 @@ if (!class_exists('BYS_Groups_Organizations_Router')) {
             register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/organizations/(?P<org_id>\d+)/groups', [
                 'methods'             => WP_REST_Server::CREATABLE,
                 'callback'            => [$this, 'create_organization_group'],
-                'permission_callback' => fn($request) => BYS_Groups_Permissions::is_org_admin($request['org_id']),
+                'permission_callback' => fn($request) =>
+                    BYS_Groups_Permissions::is_site_admin()
+                    || BYS_Groups_Permissions::is_org_admin($request['org_id']),
             ]);
         }
 

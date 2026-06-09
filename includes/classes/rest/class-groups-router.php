@@ -146,12 +146,13 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             ]);
 
             // ── Cluster E: group leaders ───────────────────────────────────
-            // Removing a leader is restricted to site admins + org admins.
-            // Graders and regular group-leaders are intentionally excluded.
+            // Removing a leader uses the same matrix as can_manage_group:
+            // site admins, org admins of the containing org, or group-leaders
+            // of a standalone group. Graders are excluded.
             register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/groups/(?P<group_id>\d+)/leaders/(?P<user_id>\d+)', [
                 'methods'             => WP_REST_Server::DELETABLE,
                 'callback'            => [$this, 'remove_group_leader'],
-                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_manage_leaders($request['group_id']),
+                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_manage_group($request['group_id']),
             ]);
 
             register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/groups/(?P<group_id>\d+)/leaders', [
@@ -161,16 +162,20 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             ]);
 
             // ── Cluster F: group invites ───────────────────────────────────
+            // Write actions (invite, bulk-invite, cancel) are gated by
+            // can_manage_members — consistent with the remove endpoint above.
+            // Read-only pending-invites listing stays on can_access_group so
+            // any viewer with group access can see invite state for context.
             register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/groups/(?P<group_id>\d+)/invite-bulk', [
                 'methods'             => WP_REST_Server::CREATABLE,
                 'callback'            => [$this, 'bulk_user_addition'],
-                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_access_group($request['group_id']),
+                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_manage_members($request['group_id']),
             ]);
 
             register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/groups/(?P<group_id>\d+)/invites/(?P<invite_id>\d+)/cancel', [
                 'methods'             => WP_REST_Server::CREATABLE,
                 'callback'            => [$this, 'cancel_invite'],
-                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_access_group($request['group_id']),
+                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_manage_members($request['group_id']),
             ]);
 
             register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/groups/(?P<group_id>\d+)/pending-invites', [
@@ -182,7 +187,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/groups/(?P<group_id>\d+)/invite', [
                 'methods'             => WP_REST_Server::CREATABLE,
                 'callback'            => [$this, 'invite_member'],
-                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_access_group($request['group_id']),
+                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_manage_members($request['group_id']),
             ]);
 
             // ── Cluster G: group quiz-access + communications ──────────────
@@ -1181,9 +1186,10 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
         /**
          * POST /groups/{group_id}/rename
          * Updates the group's post_title. Permission gate (set on the route)
-         * is can_manage_leaders — site admins and org admins only, no group
-         * leaders. Group leaders see the settings block but the input/button
-         * stay disabled (mirrors the archive block's UX).
+         * is can_manage_group — site admins, org admins of the containing
+         * org, or group-leaders of a standalone group. Group leaders of
+         * org-owned groups see the settings block but the input/button stay
+         * disabled (mirrors the archive block's UX).
          */
         public function rename_group($request) {
             $group_id = intval($request->get_param('group_id'));
