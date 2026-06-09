@@ -24,9 +24,24 @@ jQuery(document).ready(($) => {
     const $modalInner= $modal.find('.gaam__inner');
 
     let currentGroupId = null;
+    let currentRole = 'learner'; // Set by bys:bulkAddOpened broadcast from group-add-member
     let validEmails = [];
     let invalidEmails = [];
     let previewData = null; // Stores dry_run response; ensures user reviews before confirming
+
+    const $title = $modal.find('.gaam__title');
+    const $defaultTitleText = $title.text();
+    const $roleValue = $modal.find('.gaam__role-value');
+
+    function syncTitleToRole() {
+        if (currentRole === 'leader') {
+            $title.text('Bulk Upload Group Leaders');
+            $roleValue.text('Group Leader');
+        } else {
+            $title.text($defaultTitleText);
+            $roleValue.text('Learner');
+        }
+    }
 
     function closeModal() {
         // Remove Preline's open class and add hidden
@@ -195,46 +210,32 @@ jQuery(document).ready(($) => {
         invalidEmails = [];
     }
 
-    // Review button — fetch dry_run preview and current group members
+    // Review button — fetch dry_run preview alongside the "already in role"
+    // ID set (members for learner uploads, leaders for leader uploads).
+    // Used client-side to bucket existing users into "newly added" vs
+    // "already in this role" on the review screen.
     $reviewBtn.on('click', async () => {
         if (!currentGroupId || validEmails.length === 0) return;
 
         $reviewBtn.prop('disabled', true).text('Loading...');
 
         try {
-            // Use cached user_ids from the store if available; otherwise fetch.
-            // user_ids are only used client-side to split "already a member" from
-            // "newly enrolled" in the review screen — a minor display distinction
-            // — so reading from cache is safe.
-            const cachedUserIds = store.getCurrentGroup() === Number(currentGroupId)
-                ? store.getUserIds()
-                : null;
+            const alreadyInRolePromise = fetchAlreadyInRoleIds(currentGroupId, currentRole);
 
-            let groupStatsPromise;
-            if (cachedUserIds !== null) {
-                console.log('[bys-store] add-member-modal: HIT — using cached user_ids', cachedUserIds);
-                groupStatsPromise = Promise.resolve({ user_ids: cachedUserIds });
-            } else {
-                console.log('[bys-store] add-member-modal: MISS — fetching base-user-stats');
-                groupStatsPromise = api.get(endpoints.groupBaseUsersStats(currentGroupId));
-            }
-
-            // Fetch dry_run preview and current group member IDs in parallel
-            const [response, groupStatsResp] = await Promise.all([
+            const [response, alreadyInRoleIds] = await Promise.all([
                 api.post(endpoints.groupInviteBulk(currentGroupId), {
                     emails: validEmails,
-                    role: 'learner',
+                    role: currentRole,
                     dry_run: true,
                 }),
-                groupStatsPromise
+                alreadyInRolePromise,
             ]);
 
-            // Store both response and group member IDs for later use in results
             previewData = {
                 ...response,
-                groupMemberIds: groupStatsResp?.user_ids || []
+                alreadyInRoleIds, // array; rebuilt as a Set at each consumer
             };
-            populateReviewScreen(response, groupStatsResp);
+            populateReviewScreen(response, new Set(alreadyInRoleIds));
             showScreen('review');
             $reviewBtn.text('Review Results');
         } catch (err) {
@@ -246,7 +247,33 @@ jQuery(document).ready(($) => {
         }
     });
 
-    function populateReviewScreen(data, groupMembersResp) {
+    /**
+     * Returns the set of user IDs currently in `role` for `groupId` as an
+     * array. Reads from the shared store cache when possible, falls back to
+     * REST. For role='leader' the response shape from /leaders is an array
+     * of leader objects with `.id`; for role='learner' base-user-stats
+     * returns `.user_ids`.
+     */
+    async function fetchAlreadyInRoleIds(groupId, role) {
+        const cachedGroup = store.getCurrentGroup() === Number(groupId);
+
+        if (role === 'leader') {
+            const cachedLeaders = cachedGroup ? store.getLeaders() : null;
+            if (cachedLeaders) {
+                return cachedLeaders.map((l) => l.id);
+            }
+            const leaders = await api.get(endpoints.groupLeaders(groupId));
+            return (Array.isArray(leaders) ? leaders : []).map((l) => l.id);
+        }
+
+        const cachedUserIds = cachedGroup ? store.getUserIds() : null;
+        if (cachedUserIds) return cachedUserIds;
+
+        const stats = await api.get(endpoints.groupBaseUsersStats(groupId));
+        return stats?.user_ids || [];
+    }
+
+    function populateReviewScreen(data, alreadyInRoleIds) {
         // Cache all DOM selectors once
         const $listAdd = $screenReview.find('.gaam__review--add');
         const $listAlreadyMember = $screenReview.find('.gaam__review--already-member');
@@ -266,6 +293,10 @@ jQuery(document).ready(($) => {
         const $countAlreadyInvited = $screenReview.find('.gaam__review-count--already-invited');
         const $countInvalid = $screenReview.find('.gaam__review-count--invalid');
 
+        // Swap the "Already ___" label to match the upload role.
+        $screenReview.find('.gaam__review-label--already-member')
+            .text(currentRole === 'leader' ? 'Already leaders' : 'Already members');
+
         // Clear lists once
         $listAdd.empty();
         $listAlreadyMember.empty();
@@ -273,15 +304,12 @@ jQuery(document).ready(($) => {
         $listAlreadyInvited.empty();
         $listInvalid.empty();
 
-        // Build set of current group member IDs for quick lookup
-        const currentGroupMemberIds = new Set(groupMembersResp?.user_ids || []);
-
-        // Separate enrolled: those already in group vs those being added
+        // Separate enrolled: those already in this role vs those being added
         const newlyEnrolled = [];
-        const alreadyMembers = [];
+        const alreadyInRole = [];
         (data.enrolled || []).forEach((item) => {
-            if (currentGroupMemberIds.has(item.user_id)) {
-                alreadyMembers.push(item);
+            if (alreadyInRoleIds.has(item.user_id)) {
+                alreadyInRole.push(item);
             } else {
                 newlyEnrolled.push(item);
             }
@@ -305,9 +333,9 @@ jQuery(document).ready(($) => {
         });
 
         const totalInvalidCount = clientSideInvalidCount + Object.keys(serverSideInvalidEmails).length;
-        const totalCount = newlyEnrolled.length + alreadyMembers.length + invitedCount + alreadyInvitedCount + totalInvalidCount;
+        const totalCount = newlyEnrolled.length + alreadyInRole.length + invitedCount + alreadyInvitedCount + totalInvalidCount;
 
-        // Render newly enrolled users (existing users being added to group)
+        // Render newly enrolled users (existing users being added to the role)
         if (newlyEnrolled.length > 0) {
             const addHtml = newlyEnrolled.map(item => `<li>${item.email}</li>`).join('');
             $listAdd.html(addHtml);
@@ -315,13 +343,14 @@ jQuery(document).ready(($) => {
         $countAdd.text(`(${newlyEnrolled.length})`);
         $sectionAdd.toggle(newlyEnrolled.length > 0);
 
-        // Render already members (users who are already in the group)
-        if (alreadyMembers.length > 0) {
-            const alreadyHtml = alreadyMembers.map(item => `<li>${item.email}</li>`).join('');
+        // Render already-in-role users (already members for learner uploads,
+        // already leaders for leader uploads).
+        if (alreadyInRole.length > 0) {
+            const alreadyHtml = alreadyInRole.map(item => `<li>${item.email}</li>`).join('');
             $listAlreadyMember.html(alreadyHtml);
         }
-        $countAlreadyMember.text(`(${alreadyMembers.length})`);
-        $sectionAlreadyMember.toggle(alreadyMembers.length > 0);
+        $countAlreadyMember.text(`(${alreadyInRole.length})`);
+        $sectionAlreadyMember.toggle(alreadyInRole.length > 0);
 
         // Render invited users (new users getting invitations)
         if (invitedCount > 0) {
@@ -389,20 +418,18 @@ jQuery(document).ready(($) => {
         try {
             const response = await api.post(endpoints.groupInviteBulk(currentGroupId), {
                 emails: validEmails,
-                role: 'learner',
+                role: currentRole,
                 dry_run: false,
             });
 
-            // Categorize results using the same logic as the review screen
-            // Get current group member IDs (stored during preview)
-            const currentGroupMemberIds = new Set(previewData?.groupMemberIds || []);
+            // Re-bucket against the "already in this role" set captured at preview time.
+            const alreadyInRoleIds = new Set(previewData?.alreadyInRoleIds || []);
 
-            // Separate enrolled: newly added vs already members
             const newlyAdded = [];
-            const alreadyMembers = [];
+            const alreadyInRole = [];
             (response.enrolled || []).forEach((item) => {
-                if (currentGroupMemberIds.has(item.user_id)) {
-                    alreadyMembers.push(item);
+                if (alreadyInRoleIds.has(item.user_id)) {
+                    alreadyInRole.push(item);
                 } else {
                     newlyAdded.push(item);
                 }
@@ -414,14 +441,16 @@ jQuery(document).ready(($) => {
             const invitedCount = (response.invited?.length || 0) + pendingInvites;
 
             const newlyAddedCount = newlyAdded.length;
-            const alreadyMembersCount = alreadyMembers.length;
-            const total = newlyAddedCount + alreadyMembersCount + invitedCount + actualFailures;
+            const alreadyInRoleCount = alreadyInRole.length;
+            const total = newlyAddedCount + alreadyInRoleCount + invitedCount + actualFailures;
+
+            const alreadyLabel = currentRole === 'leader' ? 'already leader(s)' : 'already member(s)';
 
             let summary = `Processed ${total} email(s): `;
             if (newlyAddedCount > 0) summary += `${newlyAddedCount} added`;
-            if (alreadyMembersCount > 0) summary += `${newlyAddedCount > 0 ? ', ' : ''}${alreadyMembersCount} already member(s)`;
-            if (invitedCount > 0) summary += `${newlyAddedCount > 0 || alreadyMembersCount > 0 ? ', ' : ''}${invitedCount} invited`;
-            if (actualFailures > 0) summary += `${newlyAddedCount > 0 || alreadyMembersCount > 0 || invitedCount > 0 ? ', ' : ''}${actualFailures} failed`;
+            if (alreadyInRoleCount > 0) summary += `${newlyAddedCount > 0 ? ', ' : ''}${alreadyInRoleCount} ${alreadyLabel}`;
+            if (invitedCount > 0) summary += `${newlyAddedCount > 0 || alreadyInRoleCount > 0 ? ', ' : ''}${invitedCount} invited`;
+            if (actualFailures > 0) summary += `${newlyAddedCount > 0 || alreadyInRoleCount > 0 || invitedCount > 0 ? ', ' : ''}${actualFailures} failed`;
 
             $modal.find('.gaam__alert--results').removeClass('gaam__alert--error').text(summary);
             showScreen('results');
@@ -448,6 +477,14 @@ jQuery(document).ready(($) => {
     // Track group selection
     $(document).on('bys:groupSelected', (_, { groupId }) => {
         currentGroupId = groupId;
+    });
+
+    // Track the role chosen in the parent group-add-member block — fires
+    // when the user clicks "Bulk Upload" so we know whether they're
+    // uploading learners or leaders. Backend accepts either role.
+    $(document).on('bys:bulkAddOpened', (_, { role }) => {
+        currentRole = (role === 'leader') ? 'leader' : 'learner';
+        syncTitleToRole();
     });
 
     // Modal close

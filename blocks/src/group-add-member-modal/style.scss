@@ -130,6 +130,17 @@
 
         
 
+        &__role {
+            margin: 0 0 var(--wp--preset--spacing--3);
+            font-size: var(--wp--preset--font-size--small);
+            color: var(--wp--preset--color--gray-600);
+
+            .gaam__role-value {
+                font-weight: 600;
+                color: var(--wp--preset--color--gray-900);
+            }
+        }
+
         &__review-group {
             h6 {
                 font-size: var(--wp--preset--font-size--small);

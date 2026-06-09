@@ -57,20 +57,20 @@ if ( ! class_exists( 'BYS_Groups_Invites' ) ) {
 
         /**
          * Add a user to a LearnDash group with the given role.
-         * role = 'learner' → standard member enrollment
-         * role = 'leader'  → group leader assignment
+         * role = 'learner' → standard group-member enrollment only
+         * role = 'leader'  → group-leader assignment only
          */
         public static function add_to_group( int $user_id, int $group_id, string $role = 'learner' ): void {
-            // Always enroll as a group member first
-            ld_update_group_access( $user_id, $group_id, false );
-
             if ( $role === 'leader' ) {
-                // Set the LearnDash group leader meta
                 $leaders   = (array) get_post_meta( $group_id, 'learndash_group_leaders', true );
                 $leaders[] = $user_id;
                 update_post_meta( $group_id, 'learndash_group_leaders', array_unique( $leaders ) );
                 update_user_meta( $user_id, "learndash_group_leaders_{$group_id}", $group_id );
+                return;
             }
+
+            // Default: learner / group-member enrollment.
+            ld_update_group_access( $user_id, $group_id, false );
         }
 
         /**
