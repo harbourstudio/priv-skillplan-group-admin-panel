@@ -15,6 +15,21 @@ if (!class_exists('BYS_Groups_Postmark')) {
     class BYS_Groups_Postmark {
 
         /**
+         * Resolve the From address used on outbound email from this
+         * plugin. Reads the `bys_postmark_from_email` option (set via the
+         * BYS Groups settings page); fallback to site's admin
+         * NOTE: The value MUST be a verified Sender Signature in
+         * the Postmark server, otherwise a 400 ErrorCode will be thrown.
+         */
+        public static function get_from_email() {
+            $from = trim((string) get_option('bys_postmark_from_email', ''));
+            if ($from !== '' && is_email($from)) {
+                return $from;
+            }
+            return get_bloginfo('admin_email');
+        }
+
+        /**
          * Fetch message details from the Postmark Messages API.
          * Returns the decoded response or null on any error.
          */

@@ -1,1 +1,550 @@
-(()=>{"use strict";function o(){return window.bysGroupsAuth&&window.bysGroupsAuth.header?window.bysGroupsAuth.header:null}const n=window.bysGroupsApi||{_cache:new Map,_pending:new Map,async get(n,r=!1){if(!r&&this._cache.has(n))return this._cache.get(n);if(this._pending.has(n))return this._pending.get(n);const s={},e=o();e&&(s.Authorization=e),window.bysGroupsAuth?.nonce&&(s["X-WP-Nonce"]=window.bysGroupsAuth.nonce);const t=jQuery.ajax({url:n,type:"GET",headers:s,dataType:"json"}).done((o,r,s)=>{console.log(`Success for ${n}:`,{status:s.status,data:o})}).then(o=>(this._cache.set(n,o),o)).catch((o,r,s)=>{throw console.error(`API request failed for ${n}:`,{status:o.status,statusText:o.statusText,responseText:o.responseText?.substring(0,500),textStatus:r,errorThrown:s?.message}),new Error(`API request failed: ${o.status} ${o.statusText} - ${o.responseText?.substring(0,100)}`)}).always(()=>{this._pending.delete(n)});return this._pending.set(n,t),t},post(n,r={}){const s={"Content-Type":"application/json"},e=o();return e&&(s.Authorization=e),window.bysGroupsAuth?.nonce&&(s["X-WP-Nonce"]=window.bysGroupsAuth.nonce),jQuery.ajax({url:n,type:"POST",headers:s,data:JSON.stringify(r),dataType:"json"}).catch(o=>{throw console.error(`POST failed for ${n}:`,o.status,o.responseText?.substring(0,200)),new Error(`POST failed: ${o.status} ${o.responseText?.substring(0,100)}`)})},delete(n){const r={},s=o();return s&&(r.Authorization=s),window.bysGroupsAuth?.nonce&&(r["X-WP-Nonce"]=window.bysGroupsAuth.nonce),jQuery.ajax({url:n,type:"DELETE",headers:r,dataType:"json"}).catch(o=>{throw console.error(`DELETE failed for ${n}:`,o.status,o.responseText?.substring(0,200)),new Error(`DELETE failed: ${o.status} ${o.responseText?.substring(0,100)}`)})},invalidate(o){for(const n of this._cache.keys())n.includes(o)&&this._cache.delete(n)},clear(){this._cache.clear()}};window.bysGroupsApi=n;const r=n;function s(o){const n=jQuery(`\n        <div class="org-groups__item" data-group-id="${o.id}">\n            <span class="org-groups__group-name">${o.name}</span>\n            <button class="org-groups__manage-btn btn-unstyled" type="button">\n                Manage <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>\n            </button>\n        </div>\n    `);return n.find(".org-groups__manage-btn").on("click",function(){sessionStorage.setItem("bys_selected_group_id",o.id),window.location.href="/administrator-dashboard"}),n}function e(o){const n=o.groups.length,e=`${n} group${1!==n?"s":""}`,i=jQuery(`\n        <div class="org-groups__section" data-org-id="${o.id}">\n            <div class="org-groups__org-header">\n                <h3 class="org-groups__org-name">${o.name}</h3>\n                <span class="org-groups__org-meta">${e}</span>\n            </div>\n            <div class="org-groups__card">\n                <div class="org-groups__items"></div>\n                ${n?"":'<p class="org-groups__empty">No groups yet — create one below.</p>'}\n            </div>\n        </div>\n    `);if(o.groups.forEach(o=>{i.find(".org-groups__items").append(s(o))}),o.is_admin&&i.find(".org-groups__card").append(function(o,n){const e=jQuery('\n        <div class="org-groups__new-group">\n            <button class="org-groups__new-group-btn btn-unstyled" type="button">\n                <i class="fa-solid fa-plus" aria-hidden="true"></i> New group\n            </button>\n            <div class="org-groups__new-group-form">\n                <input\n                    class="org-groups__new-group-input"\n                    type="text"\n                    placeholder="Group name…"\n                    maxlength="100"\n                />\n                <button class="org-groups__new-group-submit btn-unstyled" type="button">Create</button>\n                <button class="org-groups__new-group-cancel btn-unstyled" type="button">Cancel</button>\n            </div>\n            <div class="org-groups__created-confirm">\n                <i class="fa-solid fa-circle-check" aria-hidden="true"></i>\n                <span class="org-groups__created-name"></span> created.\n                <button class="org-groups__go-to-group btn-unstyled" type="button">\n                    Manage group <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>\n                </button>\n            </div>\n        </div>\n    '),i=e.find(".org-groups__new-group-btn"),a=e.find(".org-groups__new-group-form"),g=e.find(".org-groups__new-group-input"),u=e.find(".org-groups__new-group-submit"),d=e.find(".org-groups__new-group-cancel"),p=e.find(".org-groups__created-confirm"),c=e.find(".org-groups__go-to-group");function l(){a.removeClass("is-open"),i.removeClass("is-hidden")}return i.on("click",function(){i.addClass("is-hidden"),a.addClass("is-open"),g.val("").trigger("focus")}),d.on("click",l),g.on("keydown",function(o){"Enter"===o.key&&u.trigger("click"),"Escape"===o.key&&l()}),u.on("click",async function(){const e=g.val().trim();if(e){u.prop("disabled",!0).text("Creating…"),d.prop("disabled",!0);try{const i=await r.post((o=>`/wp-json/bys-groups/v1/organizations/${o}/groups`)(o),{name:e}),g=n.closest(".wp-block-bys-groups-organization-groups");g.find(".org-groups__search").val(""),t(g,""),n.find(".org-groups__items").append(s(i)),n.find(".org-groups__empty").remove();const u=n.find(".org-groups__item").length;n.find(".org-groups__org-meta").text(`${u} group${1!==u?"s":""}`),a.removeClass("is-open"),p.find(".org-groups__created-name").text(`"${i.name}"`),p.addClass("is-open"),c.on("click",function(){sessionStorage.setItem("bys_selected_group_id",i.id),window.location.href="/administrator-dashboard"})}catch(o){console.error("[org-groups] Failed to create group",o),u.prop("disabled",!1).text("Create"),d.prop("disabled",!1)}}else g.trigger("focus")}),e}(o.id,i)),o.is_admin&&o.archived_groups&&o.archived_groups.length){const n=jQuery(`\n            <div class="org-groups__archived-section">\n                <button class="org-groups__archived-toggle btn-unstyled" type="button">\n                    <i class="fa-solid fa-chevron-right org-groups__archived-chevron" aria-hidden="true"></i>\n                    Archived groups\n                    <span class="org-groups__archived-badge">${o.archived_groups.length}</span>\n                </button>\n                <div class="org-groups__archived-list"></div>\n            </div>\n        `),s=n.find(".org-groups__archived-toggle"),e=n.find(".org-groups__archived-list"),t=n.find(".org-groups__archived-chevron");o.archived_groups.forEach(o=>{e.append(function(o,n){const s=jQuery(`\n        <div class="org-groups__archived-item" data-group-id="${o.id}">\n            <div class="org-groups__archived-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">\n    <polyline points="21 8 21 21 3 21 3 8"></polyline>\n    <rect x="1" y="3" width="22" height="5"></rect>\n    <line x1="10" y1="12" x2="14" y2="12"></line>\n</svg></div>\n            <div class="org-groups__archived-info">\n                <span class="org-groups__archived-name">${o.name}</span>\n                <span class="org-groups__archived-date">${e=o.archived_date,"Archived "+new Date(1e3*e).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</span>\n            </div>\n            <button class="org-groups__unarchive-btn btn-unstyled" type="button">Unarchive</button>\n        </div>\n    `);var e;return s.find(".org-groups__unarchive-btn").on("click",async function(){const e=jQuery(this);e.prop("disabled",!0).text("Unarchiving…");try{await r.post((t=o.id,`/wp-json/bys-groups/v1/groups/${t}/unarchive`)),s.fadeOut(300,()=>{s.remove(),n.find(".org-groups__archived-item").length||n.hide()})}catch(o){console.error("[org-groups] Failed to unarchive group",o),e.prop("disabled",!1).text("Unarchive")}var t}),s}(o,e))}),s.on("click",function(){const o=e.hasClass("is-open");e.toggleClass("is-open",!o),t.toggleClass("is-rotated",!o)}),i.append(n)}return i}function t(o,n){const r=n.toLowerCase().trim();o.find(".org-groups__section").each(function(){const o=jQuery(this),n=o.find(".org-groups__org-name").first().text().toLowerCase(),s=!r||n.includes(r);let e=0;o.find(".org-groups__item").each(function(){const o=jQuery(this),n=o.find(".org-groups__group-name").text().toLowerCase(),t=!r||s||n.includes(r);o.toggleClass("is-hidden",!t),t&&e++}),o.toggleClass("is-hidden",!s&&0===e&&!!r);const t=o.find(".org-groups__search-empty");r&&!s&&0===e?t.length||o.find(".org-groups__items").after('<p class="org-groups__search-empty">No groups match your search.</p>'):t.remove()})}jQuery(document).ready(async o=>{const n=o(".wp-block-bys-groups-organization-groups").first();if(!n.length)return;const i=n.find(".org-groups__skeleton"),a=n.find(".org-groups__list"),g=n.find(".org-groups__search"),u=n.find(".org-groups__new-org-btn"),d=n.find(".org-groups__new-org-form");if(u.length){const p=d.find(".org-groups__new-org-input"),c=d.find(".org-groups__new-org-submit"),l=d.find(".org-groups__new-org-cancel");function _(){u.addClass("is-hidden"),d.addClass("is-open"),p.val("").trigger("focus")}function h(){d.removeClass("is-open"),u.removeClass("is-hidden")}u.on("click",_),l.on("click",h),p.on("keydown",function(o){"Enter"===o.key&&c.trigger("click"),"Escape"===o.key&&h()}),c.on("click",async function(){const o=p.val().trim();if(o){c.prop("disabled",!0).text("Creating…"),l.prop("disabled",!0);try{const n=await r.post("/wp-json/bys-groups/v1/organizations",{name:o});h(),a.append(e(n))}catch(o){console.error("[org-groups] Failed to create organization",o)}finally{c.prop("disabled",!1).text("Create"),l.prop("disabled",!1)}}else p.trigger("focus")})}try{const f=await r.get("/wp-json/bys-groups/v1/me/organizations"),v=f.organizations||[],y=f.ungrouped_groups||[];if(i.hide(),!v.length&&!y.length)return void a.html('<p class="org-groups__no-orgs">You have no groups to manage.</p>');v.forEach(o=>a.append(e(o))),y.length&&a.append(function(o){const n=jQuery(`\n        <div class="org-groups__section org-groups__section--ungrouped">\n            <div class="org-groups__org-header">\n                <h3 class="org-groups__org-name">Other Groups</h3>\n                <span class="org-groups__org-meta">${o.length} group${1!==o.length?"s":""}</span>\n            </div>\n            <div class="org-groups__card">\n                <div class="org-groups__items"></div>\n            </div>\n        </div>\n    `);return o.forEach(o=>{n.find(".org-groups__items").append(s(o))}),n}(y)),g.on("input",function(){t(n,jQuery(this).val())})}catch(w){console.error("[org-groups] Failed to load organizations",w),i.hide(),a.html('<p class="org-groups__no-orgs">Could not load groups.</p>')}})})();
+/******/ (() => { // webpackBootstrap
+/******/ 	"use strict";
+/******/ 	var __webpack_modules__ = ({
+
+/***/ "./src/_shared/api-client.js"
+/*!***********************************!*\
+  !*** ./src/_shared/api-client.js ***!
+  \***********************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   api: () => (/* binding */ api),
+/* harmony export */   endpoints: () => (/* binding */ endpoints)
+/* harmony export */ });
+/**
+ * Shared API client with in-memory caching and request deduplication.
+ * Prevents duplicate requests when multiple blocks fetch the same data.
+ * Uses basic auth via Authorization header (from plugin settings).
+ */
+
+// Get basic auth credentials from WP
+function getAuthorizationHeader() {
+  if (window.bysGroupsAuth && window.bysGroupsAuth.header) {
+    return window.bysGroupsAuth.header;
+  }
+  return null;
+}
+
+// custom API endpoint definitions
+const endpoints = {
+  // /groups/* routes
+  baseGroupData: groupId => `/wp-json/bys-groups/v1/groups/${groupId}/base-group-data`,
+  baseGroupStats: groupId => `/wp-json/bys-groups/v1/groups/${groupId}/group-stats`,
+  groupLeaders: groupId => `/wp-json/bys-groups/v1/groups/${groupId}/leaders`,
+  groupUsers: (groupId, userIds) => `/wp-json/bys-groups/v1/groups/${groupId}/users?user_ids=${userIds}`,
+  groupUserInfo: (groupId, userId) => `/wp-json/bys-groups/v1/groups/${groupId}/users/${userId}`,
+  groupCourses: groupId => `/wp-json/bys-groups/v1/groups/${groupId}/courses`,
+  groupCourseCompletionStats: groupId => `/wp-json/bys-groups/v1/groups/${groupId}/course-completion-stats`,
+  groupQuizSubmissionStats: (groupId, quizIds) => `/wp-json/bys-groups/v1/groups/${groupId}/quiz-submission-stats?quiz_ids=${quizIds.join(',')}`,
+  groupQuizAttempts: (groupId, quizId) => `/wp-json/bys-groups/v1/groups/${groupId}/quizzes/${quizId}/attempts`,
+  removeGroupLeader: (groupId, userId) => `/wp-json/bys-groups/v1/groups/${groupId}/leaders/${userId}`,
+  allCourses: () => '/wp-json/bys-groups/v1/all-courses',
+  addGroupCourse: (groupId, courseId) => `/wp-json/bys-groups/v1/groups/${groupId}/courses/${courseId}/add`,
+  removeGroupCourse: (groupId, courseId) => `/wp-json/bys-groups/v1/groups/${groupId}/courses/${courseId}/remove`,
+  toggleRequiredCourse: (groupId, courseId) => `/wp-json/bys-groups/v1/groups/${groupId}/courses/${courseId}/toggle-required`,
+  removeGroupUser: (groupId, userId) => `/wp-json/bys-groups/v1/groups/${groupId}/users/${userId}/remove`,
+  archiveGroup: groupId => `/wp-json/bys-groups/v1/groups/${groupId}/archive`,
+  unarchiveGroup: groupId => `/wp-json/bys-groups/v1/groups/${groupId}/unarchive`,
+  archivedGroups: () => {
+    const userId = window.bysGroupsAuth?.userId ?? '';
+    return `/wp-json/bys-groups/v1/me/archived-groups${userId ? `?user_id=${userId}` : ''}`;
+  },
+  groupQuizAccess: groupId => `/wp-json/bys-groups/v1/groups/${groupId}/quiz-access`,
+  userQuizAccess: (groupId, userId) => `/wp-json/bys-groups/v1/groups/${groupId}/users/${userId}/quiz-access`,
+  notifyUserQuizAccess: (groupId, userId) => `/wp-json/bys-groups/v1/groups/${groupId}/users/${userId}/notify-quiz-access`,
+  groupInviteBulk: groupId => `/wp-json/bys-groups/v1/groups/${groupId}/invite-bulk`,
+  groupCommunicationLog: (groupId, count = 25, offset = 0) => `/wp-json/bys-groups/v1/groups/${groupId}/communication-log?count=${count}&offset=${offset}`,
+  communicationRecipients: batchId => `/wp-json/bys-groups/v1/communications/batch/${batchId}/recipients`,
+  communicationDetail: messageId => `/wp-json/bys-groups/v1/communications/${messageId}/detail`,
+  conditionalRecipients: groupId => `/wp-json/bys-groups/v1/groups/${groupId}/conditional-recipients`,
+  // /me/* routes
+  currentUserGroups: () => '/wp-json/bys-groups/v1/me/groups',
+  currentUserOrganizations: () => '/wp-json/bys-groups/v1/me/organizations',
+  // /organizations/* routes
+  createOrganizationGroup: orgId => `/wp-json/bys-groups/v1/organizations/${orgId}/groups`,
+  // /courses/* routes
+  courseHierarchialBreakdown: courseId => `/wp-json/bys-groups/v1/courses/${courseId}/steps`,
+  courseQuizSteps: courseId => `/wp-json/bys-groups/v1/courses/${courseId}/quiz-steps`,
+  courseQuizzes: courseId => `/wp-json/bys-groups/v1/courses/${courseId}/quizzes`,
+  courseQuizStepsGrading: courseId => `/wp-json/bys-groups/v1/courses/${courseId}/quiz-steps?filter=grading`,
+  courseQuizProgressBatch: (courseId, userIds) => `/wp-json/bys-groups/v1/courses/${courseId}/quiz-progress-batch?user_ids=${userIds}`,
+  // /users/* routes
+  userCoursesWithProgress: userId => `/wp-json/bys-groups/v1/users/${userId}/courses?include=progress`,
+  userQuizProgress: userId => `/wp-json/bys-groups/v1/users/${userId}/quiz-progress`,
+  userQuizAttemptsDetails: (userId, quizId) => `/wp-json/bys-groups/v1/users/${userId}/quiz-attempts/${quizId}`,
+  userActivity: userId => `/wp-json/bys-groups/v1/users/${userId}/activity`,
+  userCourseActivity: (userId, courseId) => `/wp-json/bys-groups/v1/users/${userId}/activity?course_id=${courseId}`,
+  userCourseStepsProgress: (userId, courseId) => `/wp-json/bys-groups/v1/users/${userId}/course-progress-steps/${courseId}`,
+  // /attempts/* routes
+  attemptDetail: activityId => `/wp-json/bys-groups/v1/attempts/${activityId}`,
+  attemptQuestions: activityId => `/wp-json/bys-groups/v1/attempts/${activityId}/questions`
+};
+
+// Singleton anchored on `window` so every block bundle shares one cache
+const apiSingleton = window.bysGroupsApi || {
+  _cache: new Map(),
+  _pending: new Map(),
+  /**
+   * Fetch data with automatic caching and deduplication.
+   */
+  async get(url, forceRefresh = false) {
+    // Return cached response if available
+    if (!forceRefresh && this._cache.has(url)) {
+      return this._cache.get(url);
+    }
+
+    // Return existing pending request if existing
+    if (this._pending.has(url)) {
+      return this._pending.get(url);
+    }
+
+    // Send request and cache the result
+    const headers = {};
+    const authHeader = getAuthorizationHeader();
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
+    }
+    // Always include the WP REST nonce so cookie-based auth works and
+    // get_current_user_id() resolves to the actual logged-in user.
+    if (window.bysGroupsAuth?.nonce) {
+      headers['X-WP-Nonce'] = window.bysGroupsAuth.nonce;
+    }
+    const promise = jQuery.ajax({
+      url: url,
+      type: 'GET',
+      headers: headers,
+      dataType: 'json'
+    }).done((data, textStatus, jqXHR) => {
+      console.log(`Success for ${url}:`, {
+        status: jqXHR.status,
+        data
+      });
+    }).then(data => {
+      this._cache.set(url, data);
+      return data;
+    }).catch((jqXHR, textStatus, errorThrown) => {
+      console.error(`API request failed for ${url}:`, {
+        status: jqXHR.status,
+        statusText: jqXHR.statusText,
+        responseText: jqXHR.responseText?.substring(0, 500),
+        textStatus: textStatus,
+        errorThrown: errorThrown?.message
+      });
+      throw new Error(`API request failed: ${jqXHR.status} ${jqXHR.statusText} - ${jqXHR.responseText?.substring(0, 100)}`);
+    }).always(() => {
+      this._pending.delete(url);
+    });
+    this._pending.set(url, promise);
+    return promise;
+  },
+  /**
+   * Fire-and-forget POST. Does not cache. Auth header included automatically.
+   */
+  post(url, body = {}) {
+    const headers = {
+      'Content-Type': 'application/json'
+    };
+    const authHeader = getAuthorizationHeader();
+    if (authHeader) headers['Authorization'] = authHeader;
+    if (window.bysGroupsAuth?.nonce) headers['X-WP-Nonce'] = window.bysGroupsAuth.nonce;
+    return jQuery.ajax({
+      url,
+      type: 'POST',
+      headers,
+      data: JSON.stringify(body),
+      dataType: 'json'
+    }).catch(jqXHR => {
+      console.error(`POST failed for ${url}:`, jqXHR.status, jqXHR.responseText?.substring(0, 200));
+      throw new Error(`POST failed: ${jqXHR.status} ${jqXHR.responseText?.substring(0, 100)}`);
+    });
+  },
+  /**
+   * Fire-and-forget DELETE.
+   */
+  delete(url) {
+    const headers = {};
+    const authHeader = getAuthorizationHeader();
+    if (authHeader) headers['Authorization'] = authHeader;
+    if (window.bysGroupsAuth?.nonce) headers['X-WP-Nonce'] = window.bysGroupsAuth.nonce;
+    return jQuery.ajax({
+      url,
+      type: 'DELETE',
+      headers,
+      dataType: 'json'
+    }).catch(jqXHR => {
+      console.error(`DELETE failed for ${url}:`, jqXHR.status, jqXHR.responseText?.substring(0, 200));
+      throw new Error(`DELETE failed: ${jqXHR.status} ${jqXHR.responseText?.substring(0, 100)}`);
+    });
+  },
+  /**
+   * Invalidate cached responses
+   */
+  invalidate(keyFragment) {
+    for (const key of this._cache.keys()) {
+      if (key.includes(keyFragment)) {
+        this._cache.delete(key);
+      }
+    }
+  },
+  /**
+   * Clear all cached data
+   */
+  clear() {
+    this._cache.clear();
+  }
+};
+window.bysGroupsApi = apiSingleton;
+const api = apiSingleton;
+
+/***/ }
+
+/******/ 	});
+/************************************************************************/
+/******/ 	// The module cache
+/******/ 	var __webpack_module_cache__ = {};
+/******/ 	
+/******/ 	// The require function
+/******/ 	function __webpack_require__(moduleId) {
+/******/ 		// Check if module is in cache
+/******/ 		var cachedModule = __webpack_module_cache__[moduleId];
+/******/ 		if (cachedModule !== undefined) {
+/******/ 			return cachedModule.exports;
+/******/ 		}
+/******/ 		// Create a new module (and put it into the cache)
+/******/ 		var module = __webpack_module_cache__[moduleId] = {
+/******/ 			// no module.id needed
+/******/ 			// no module.loaded needed
+/******/ 			exports: {}
+/******/ 		};
+/******/ 	
+/******/ 		// Execute the module function
+/******/ 		if (!(moduleId in __webpack_modules__)) {
+/******/ 			delete __webpack_module_cache__[moduleId];
+/******/ 			var e = new Error("Cannot find module '" + moduleId + "'");
+/******/ 			e.code = 'MODULE_NOT_FOUND';
+/******/ 			throw e;
+/******/ 		}
+/******/ 		__webpack_modules__[moduleId](module, module.exports, __webpack_require__);
+/******/ 	
+/******/ 		// Return the exports of the module
+/******/ 		return module.exports;
+/******/ 	}
+/******/ 	
+/************************************************************************/
+/******/ 	/* webpack/runtime/define property getters */
+/******/ 	(() => {
+/******/ 		// define getter functions for harmony exports
+/******/ 		__webpack_require__.d = (exports, definition) => {
+/******/ 			for(var key in definition) {
+/******/ 				if(__webpack_require__.o(definition, key) && !__webpack_require__.o(exports, key)) {
+/******/ 					Object.defineProperty(exports, key, { enumerable: true, get: definition[key] });
+/******/ 				}
+/******/ 			}
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/hasOwnProperty shorthand */
+/******/ 	(() => {
+/******/ 		__webpack_require__.o = (obj, prop) => (Object.prototype.hasOwnProperty.call(obj, prop))
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/make namespace object */
+/******/ 	(() => {
+/******/ 		// define __esModule on exports
+/******/ 		__webpack_require__.r = (exports) => {
+/******/ 			if(typeof Symbol !== 'undefined' && Symbol.toStringTag) {
+/******/ 				Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
+/******/ 			}
+/******/ 			Object.defineProperty(exports, '__esModule', { value: true });
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/************************************************************************/
+var __webpack_exports__ = {};
+// This entry needs to be wrapped in an IIFE because it needs to be isolated against other modules in the chunk.
+(() => {
+/*!*****************************************!*\
+  !*** ./src/organization-groups/view.js ***!
+  \*****************************************/
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../_shared/api-client.js */ "./src/_shared/api-client.js");
+
+const ARCHIVE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <polyline points="21 8 21 21 3 21 3 8"></polyline>
+    <rect x="1" y="3" width="22" height="5"></rect>
+    <line x1="10" y1="12" x2="14" y2="12"></line>
+</svg>`;
+function formatArchivedDate(timestamp) {
+  const date = new Date(timestamp * 1000);
+  return 'Archived ' + date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  });
+}
+function buildGroupRow(group) {
+  const $row = jQuery(`
+        <div class="org-groups__item" data-group-id="${group.id}">
+            <span class="org-groups__group-name">${group.name}</span>
+            <button class="org-groups__manage-btn btn-unstyled" type="button">
+                Manage <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+            </button>
+        </div>
+    `);
+  $row.find('.org-groups__manage-btn').on('click', function () {
+    sessionStorage.setItem('bys_selected_group_id', group.id);
+    window.location.href = '/administrator-dashboard';
+  });
+  return $row;
+}
+function buildArchivedRow(group, $archivedSection) {
+  const $row = jQuery(`
+        <div class="org-groups__archived-item" data-group-id="${group.id}">
+            <div class="org-groups__archived-icon">${ARCHIVE_ICON}</div>
+            <div class="org-groups__archived-info">
+                <span class="org-groups__archived-name">${group.name}</span>
+                <span class="org-groups__archived-date">${formatArchivedDate(group.archived_date)}</span>
+            </div>
+            <button class="org-groups__unarchive-btn btn-unstyled" type="button">Unarchive</button>
+        </div>
+    `);
+  $row.find('.org-groups__unarchive-btn').on('click', async function () {
+    const $btn = jQuery(this);
+    $btn.prop('disabled', true).text('Unarchiving…');
+    try {
+      await _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.api.post(_shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.endpoints.unarchiveGroup(group.id));
+      $row.fadeOut(300, () => {
+        $row.remove();
+        // Hide the whole archived section if nothing left
+        if (!$archivedSection.find('.org-groups__archived-item').length) {
+          $archivedSection.hide();
+        }
+      });
+    } catch (err) {
+      console.error('[org-groups] Failed to unarchive group', err);
+      $btn.prop('disabled', false).text('Unarchive');
+    }
+  });
+  return $row;
+}
+function buildNewGroupFooter(orgId, $section) {
+  const $footer = jQuery(`
+        <div class="org-groups__new-group">
+            <button class="org-groups__new-group-btn btn-unstyled" type="button">
+                <i class="fa-solid fa-plus" aria-hidden="true"></i> New group
+            </button>
+            <div class="org-groups__new-group-form">
+                <input
+                    class="org-groups__new-group-input"
+                    type="text"
+                    placeholder="Group name…"
+                    maxlength="100"
+                />
+                <button class="org-groups__new-group-submit btn-unstyled" type="button">Create</button>
+                <button class="org-groups__new-group-cancel btn-unstyled" type="button">Cancel</button>
+            </div>
+            <div class="org-groups__created-confirm">
+                <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+                <span class="org-groups__created-name"></span> created.
+                <button class="org-groups__go-to-group btn-unstyled" type="button">
+                    Manage group <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                </button>
+            </div>
+        </div>
+    `);
+  const $btn = $footer.find('.org-groups__new-group-btn');
+  const $form = $footer.find('.org-groups__new-group-form');
+  const $input = $footer.find('.org-groups__new-group-input');
+  const $submit = $footer.find('.org-groups__new-group-submit');
+  const $cancel = $footer.find('.org-groups__new-group-cancel');
+  const $confirm = $footer.find('.org-groups__created-confirm');
+  const $goBtn = $footer.find('.org-groups__go-to-group');
+  function openForm() {
+    $btn.addClass('is-hidden');
+    $form.addClass('is-open');
+    $input.val('').trigger('focus');
+  }
+  function closeForm() {
+    $form.removeClass('is-open');
+    $btn.removeClass('is-hidden');
+  }
+  $btn.on('click', openForm);
+  $cancel.on('click', closeForm);
+  $input.on('keydown', function (e) {
+    if (e.key === 'Enter') $submit.trigger('click');
+    if (e.key === 'Escape') closeForm();
+  });
+  $submit.on('click', async function () {
+    const name = $input.val().trim();
+    if (!name) {
+      $input.trigger('focus');
+      return;
+    }
+    $submit.prop('disabled', true).text('Creating…');
+    $cancel.prop('disabled', true);
+    try {
+      const group = await _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.api.post(_shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.endpoints.createOrganizationGroup(orgId), {
+        name
+      });
+
+      // Clear search so the new group is always visible
+      const $parentBlock = $section.closest('.wp-block-bys-groups-organization-groups');
+      $parentBlock.find('.org-groups__search').val('');
+      applySearch($parentBlock, '');
+
+      // Add the new row to the active items list
+      const $items = $section.find('.org-groups__items');
+      $items.append(buildGroupRow(group));
+      $section.find('.org-groups__empty').remove();
+
+      // Update group count label
+      const count = $section.find('.org-groups__item').length;
+      $section.find('.org-groups__org-meta').text(`${count} group${count !== 1 ? 's' : ''}`);
+
+      // Show confirmation
+      $form.removeClass('is-open');
+      $confirm.find('.org-groups__created-name').text(`"${group.name}"`);
+      $confirm.addClass('is-open');
+      $goBtn.on('click', function () {
+        sessionStorage.setItem('bys_selected_group_id', group.id);
+        window.location.href = '/administrator-dashboard';
+      });
+    } catch (err) {
+      console.error('[org-groups] Failed to create group', err);
+      $submit.prop('disabled', false).text('Create');
+      $cancel.prop('disabled', false);
+    }
+  });
+  return $footer;
+}
+function buildOrgSection(org) {
+  const groupCount = org.groups.length;
+  const countLabel = `${groupCount} group${groupCount !== 1 ? 's' : ''}`;
+  const $section = jQuery(`
+        <div class="org-groups__section" data-org-id="${org.id}">
+            <div class="org-groups__org-header">
+                <h3 class="org-groups__org-name">${org.name}</h3>
+                <span class="org-groups__org-meta">${countLabel}</span>
+            </div>
+            <div class="org-groups__card">
+                <div class="org-groups__items"></div>
+                ${!groupCount ? '<p class="org-groups__empty">No groups yet — create one below.</p>' : ''}
+            </div>
+        </div>
+    `);
+  org.groups.forEach(group => {
+    $section.find('.org-groups__items').append(buildGroupRow(group));
+  });
+  if (org.is_admin) {
+    $section.find('.org-groups__card').append(buildNewGroupFooter(org.id, $section));
+  }
+
+  // Archived groups section — only rendered for org admins with archived groups
+  if (org.is_admin && org.archived_groups && org.archived_groups.length) {
+    const $archived = jQuery(`
+            <div class="org-groups__archived-section">
+                <button class="org-groups__archived-toggle btn-unstyled" type="button">
+                    <i class="fa-solid fa-chevron-right org-groups__archived-chevron" aria-hidden="true"></i>
+                    Archived groups
+                    <span class="org-groups__archived-badge">${org.archived_groups.length}</span>
+                </button>
+                <div class="org-groups__archived-list"></div>
+            </div>
+        `);
+    const $toggle = $archived.find('.org-groups__archived-toggle');
+    const $list = $archived.find('.org-groups__archived-list');
+    const $chevron = $archived.find('.org-groups__archived-chevron');
+    org.archived_groups.forEach(group => {
+      $list.append(buildArchivedRow(group, $list));
+    });
+    $toggle.on('click', function () {
+      const isOpen = $list.hasClass('is-open');
+      $list.toggleClass('is-open', !isOpen);
+      $chevron.toggleClass('is-rotated', !isOpen);
+    });
+    $section.append($archived);
+  }
+  return $section;
+}
+function buildUngroupedSection(groups) {
+  const $section = jQuery(`
+        <div class="org-groups__section org-groups__section--ungrouped">
+            <div class="org-groups__org-header">
+                <h3 class="org-groups__org-name">Other Groups</h3>
+                <span class="org-groups__org-meta">${groups.length} group${groups.length !== 1 ? 's' : ''}</span>
+            </div>
+            <div class="org-groups__card">
+                <div class="org-groups__items"></div>
+            </div>
+        </div>
+    `);
+  groups.forEach(group => {
+    $section.find('.org-groups__items').append(buildGroupRow(group));
+  });
+  return $section;
+}
+function applySearch($block, query) {
+  const q = query.toLowerCase().trim();
+  $block.find('.org-groups__section').each(function () {
+    const $section = jQuery(this);
+    const orgName = $section.find('.org-groups__org-name').first().text().toLowerCase();
+    const orgMatch = !q || orgName.includes(q);
+    let visibleCount = 0;
+    $section.find('.org-groups__item').each(function () {
+      const $row = jQuery(this);
+      const groupName = $row.find('.org-groups__group-name').text().toLowerCase();
+      // Show group if: no query, org name matches, or group name matches
+      const match = !q || orgMatch || groupName.includes(q);
+      $row.toggleClass('is-hidden', !match);
+      if (match) visibleCount++;
+    });
+
+    // Hide the section only when neither the org nor any group matched
+    $section.toggleClass('is-hidden', !orgMatch && visibleCount === 0 && !!q);
+
+    // Inline empty message when the org matched but has no groups (edge case)
+    const $empty = $section.find('.org-groups__search-empty');
+    if (q && !orgMatch && visibleCount === 0) {
+      if (!$empty.length) {
+        $section.find('.org-groups__items').after('<p class="org-groups__search-empty">No groups match your search.</p>');
+      }
+    } else {
+      $empty.remove();
+    }
+  });
+}
+jQuery(document).ready(async $ => {
+  const $block = $('.wp-block-bys-groups-organization-groups').first();
+  if (!$block.length) return;
+  const $skeleton = $block.find('.org-groups__skeleton');
+  const $list = $block.find('.org-groups__list');
+  const $search = $block.find('.org-groups__search');
+  try {
+    const data = await _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.api.get(_shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.endpoints.currentUserOrganizations());
+    const organizations = data.organizations || [];
+    const ungrouped = data.ungrouped_groups || [];
+    $skeleton.hide();
+    if (!organizations.length && !ungrouped.length) {
+      $list.html('<p class="org-groups__no-orgs">You have no groups to manage.</p>');
+      return;
+    }
+    organizations.forEach(org => $list.append(buildOrgSection(org)));
+    if (ungrouped.length) {
+      $list.append(buildUngroupedSection(ungrouped));
+    }
+    $search.on('input', function () {
+      applySearch($block, jQuery(this).val());
+    });
+  } catch (err) {
+    console.error('[org-groups] Failed to load organizations', err);
+    $skeleton.hide();
+    $list.html('<p class="org-groups__no-orgs">Could not load groups.</p>');
+  }
+});
+})();
+
+/******/ })()
+;
+//# sourceMappingURL=view.js.map

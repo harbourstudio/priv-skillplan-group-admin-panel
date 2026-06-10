@@ -53,11 +53,78 @@ if (!class_exists('BYS_Groups_Conditional_Emails')) {
             }
 
             $recipients = self::resolve_recipients($group_id, $condition, $args);
+            // For day-based conditions, enrich each row with a `details` payload for the preview table to use
+            $recipients = self::attach_details($recipients, $condition, $args);
 
             return new \WP_REST_Response(array(
                 'recipients' => $recipients,
                 'count'      => count($recipients),
             ), 200);
+        }
+
+        /**
+         * Adds a `details` field to each recipient so the preview table can show context
+         */
+        private static function attach_details($recipients, $condition, $args) {
+            if (empty($recipients)) return $recipients;
+
+            $now = time();
+
+            switch ($condition) {
+                case 'inactive_days':
+                    foreach ($recipients as &$r) {
+                        $uid  = intval($r['user_id']);
+                        $last = BYS_Groups_Activity_Logger::get_last_active_ts($uid);
+                        $r['details'] = self::build_details_display('inactive', $last, $now);
+                    }
+                    unset($r);
+                    break;
+
+                case 'registered_for_days':
+                    foreach ($recipients as &$r) {
+                        $u = get_userdata(intval($r['user_id']));
+                        $ts = ($u && !empty($u->user_registered))
+                            ? (int) strtotime($u->user_registered . ' UTC')
+                            : 0;
+                        $r['details'] = self::build_details_display('registered', $ts, $now);
+                    }
+                    unset($r);
+                    break;
+
+                case 'enrolled_for_days':
+                    $course_id = intval($args['course_id'] ?? 0);
+                    $uids   = array_map(fn($r) => intval($r['user_id']), $recipients);
+                    $ts_map = self::get_enrollment_timestamps($uids, $course_id);
+                    foreach ($recipients as &$r) {
+                        $ts = intval($ts_map[intval($r['user_id'])] ?? 0);
+                        $r['details'] = self::build_details_display('enrolled', $ts, $now);
+                    }
+                    unset($r);
+                    break;
+
+                default:
+                    foreach ($recipients as &$r) {
+                        $r['details'] = null;
+                    }
+                    unset($r);
+                    break;
+            }
+
+            return $recipients;
+        }
+
+        private static function build_details_display($kind, $ts, $now) {
+            if ($ts <= 0) {
+                return ['kind' => $kind, 'since_at' => null];
+            }
+            return [
+                'kind' => $kind,
+                // ISO 8601 UTC. The client renders this in the leader's
+                // browser timezone via Date.toLocaleString, so each leader
+                // sees the moment on their own clock — independent of the
+                // site's gmt_offset, which could differ from the leader's.
+                'since_at' => gmdate('c', $ts),
+            ];
         }
 
         /**
@@ -110,7 +177,7 @@ if (!class_exists('BYS_Groups_Conditional_Emails')) {
         private static function filter_outstanding_login($user_ids) {
             $matched = array();
             foreach ($user_ids as $uid) {
-                if (self::get_last_login_ts($uid) === 0) {
+                if (BYS_Groups_Activity_Logger::get_last_active_ts($uid) === 0) {
                     $matched[] = $uid;
                 }
             }
@@ -119,11 +186,13 @@ if (!class_exists('BYS_Groups_Conditional_Emails')) {
 
         private static function filter_inactive_days($user_ids, $days) {
             if ($days < 1) return array();
-            $now = current_time('timestamp');
+            $now = time();
             $threshold = $days * DAY_IN_SECONDS;
             $matched = array();
             foreach ($user_ids as $uid) {
-                $last = self::get_last_login_ts($uid);
+                // Session-presence tracker — refreshed on every authenticated
+                // request, NOT just login submits; fallback to user metadata updated when wp_login fires
+                $last = BYS_Groups_Activity_Logger::get_last_active_ts($uid);
                 if ($last === 0 || ($now - $last) > $threshold) {
                     $matched[] = $uid;
                 }
@@ -198,7 +267,7 @@ if (!class_exists('BYS_Groups_Conditional_Emails')) {
 
         private static function filter_enrolled_for_days($user_ids, $course_id, $days) {
             if (!$course_id || $days < 1 || empty($user_ids)) return array();
-            $now = current_time('timestamp');
+            $now = time();
             $cutoff = $now - ($days * DAY_IN_SECONDS);
             $enrolled_ts = self::get_enrollment_timestamps($user_ids, $course_id);
 
@@ -281,17 +350,6 @@ if (!class_exists('BYS_Groups_Conditional_Emails')) {
             }
             $ids = learndash_get_groups_user_ids($group_id);
             return is_array($ids) ? array_map('intval', $ids) : array();
-        }
-
-        /**
-         * Mirrors the 3-key max pattern from class-rest-api.php:75-84.
-         */
-        private static function get_last_login_ts($user_id) {
-            return max(
-                intval(get_user_meta($user_id, '_ld_notifications_last_login', true) ?: 0),
-                intval(get_user_meta($user_id, 'learndash-last-login', true) ?: 0),
-                intval(get_user_meta($user_id, 'last_login', true) ?: 0)
-            );
         }
 
         private static function hydrate_users($user_ids) {

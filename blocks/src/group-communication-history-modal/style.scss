@@ -179,6 +179,11 @@
         font-size: var(--wp--preset--font-size--x-small);
         font-weight: 500;
 
+        &--pending {
+            background: var(--wp--preset--color--gray-100);
+            color: var(--wp--preset--color--gray-700);
+        }
+
         &--delivered {
             background: var(--wp--preset--color--green-100);
             color: var(--wp--preset--color--green-700);

@@ -20,8 +20,11 @@ $wrapper_attributes = get_block_wrapper_attributes();
 <div <?= $wrapper_attributes; ?>>
     <div class="gl__card">
         <div class="gl__header">
-            <h5><?php esc_html_e( 'Group leaders', 'bys' ); ?></h5>
+            <h5><?php esc_html_e( 'Group Leaders', 'bys' ); ?></h5>
             <p class="gl__description"><?php esc_html_e( 'Group leaders can view reports and progress for all members in this cohort.', 'bys' ); ?></p>
+            <p class="gl__note-permission" style="display:none;">
+                <?php esc_html_e( 'Only organization admins can add or remove group leaders.', 'bys' ); ?>
+            </p>
         </div>
         <div class="gl__skeleton">
             <?php foreach ( [ 90, 120, 75 ] as $tw ) : ?>

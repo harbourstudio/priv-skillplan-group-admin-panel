@@ -30,13 +30,29 @@ jQuery(document).ready(($) => {
         $enrol.prop('disabled', !isValidEmail($(this).val()));
     });
 
-    const $leaderRadio = $block.find('.gam__radio--leader');
+    const $leaderRadio    = $block.find('.gam__radio--leader');
+    const $bulkBtn        = $block.find('.gam__bulk');
+    const $permissionNote = $block.find('.gam__note-permission');
 
-    $(document).on('bys:groupSelected', (_, { isOrgAdmin }) => {
-        $leaderRadio.toggleClass('is-hidden', !isOrgAdmin);
-        if (!isOrgAdmin) {
+    /**
+     * Visibility of the 'leader' radio choice depends on canManageGroup. It's always visible for users that satisfies canManageGroup (EG group-leaders of standalone groups, site-admins, group/org-admins...).
+     * 
+     * Permission note only shows for group-leaders of org-associated groups. Anyone that satisfies canManageGroup (as described above) won't see the note.
+     * 
+     * Bulk Upload supports both 'learner' and 'leader' role.
+     */
+    $(document).on('bys:groupSelected', (_, { canManageGroup, canManageMembers }) => {
+        $leaderRadio.toggleClass('is-hidden', !canManageGroup);
+        if (!canManageGroup) {
             $block.find('input[name="gam-role"][value="learner"]').prop('checked', true);
         }
+        $permissionNote.toggle(!!canManageMembers && !canManageGroup);
+    });
+
+    // broadcast the selected role when 'Bulk Upload' button is clicked so group-add-member-modal block knows which role to process
+    $bulkBtn.on('click', function () {
+        const role = $block.find('input[name="gam-role"]:checked').val() || 'learner';
+        $(document).trigger('bys:bulkAddOpened', { role });
     });
 
     $enrol.on('click', async function () {

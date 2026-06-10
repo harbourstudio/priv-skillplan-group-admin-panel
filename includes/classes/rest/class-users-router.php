@@ -217,10 +217,35 @@ if (!class_exists('BYS_Groups_Users_Router')) {
                 $date_completed     = $completed_ts > 0 ? wp_date('c', $completed_ts)            : null;
                 $date_completed_gmt = $completed_ts > 0 ? gmdate('Y-m-d H:i:s', $completed_ts)   : null;
 
+                /**
+                 * We rely on LD's own learndash_course_get_completed_steps()
+                 * for step-completion counts. It walks the course's
+                 * CURRENT step structure and counts those marked complete in _sfwd-course_progress user meta
+                 */
+                $steps_completed_out = function_exists('learndash_course_get_completed_steps')
+                    ? (int) learndash_course_get_completed_steps(
+                        $user_id,
+                        $course_id,
+                        is_array($progress_data[$course_id] ?? null) ? $progress_data[$course_id] : array()
+                    )
+                    : intval($cp['completed']);
+                $percent_complete = $steps_total > 0
+                    ? min(100, (int) round(($steps_completed_out / $steps_total) * 100))
+                    : 0;
+
+                if (function_exists('learndash_course_completed') && learndash_course_completed($user_id, $course_id)) {
+                    $progress_status_out = 'completed';
+                } elseif ($steps_completed_out > 0) {
+                    $progress_status_out = 'in_progress';
+                } else {
+                    $progress_status_out = 'not_started';
+                }
+
                 $out[$course_id] = [
-                    'progress_status'    => $cp['status'],
-                    'steps_completed'    => $cp['completed'],
+                    'progress_status'    => $progress_status_out,
+                    'steps_completed'    => $steps_completed_out,
                     'steps_total'        => $steps_total,
+                    'percent_complete'   => $percent_complete,
                     'enrolled_at'        => $enrolled_at,
                     'date_completed'     => $date_completed,
                     'date_completed_gmt' => $date_completed_gmt,

@@ -32,6 +32,7 @@ export const endpoints = {
   removeGroupUser: (groupId, userId) => `/wp-json/bys-groups/v1/groups/${groupId}/users/${userId}/remove`,
   archiveGroup: (groupId) => `/wp-json/bys-groups/v1/groups/${groupId}/archive`,
   unarchiveGroup: (groupId) => `/wp-json/bys-groups/v1/groups/${groupId}/unarchive`,
+  renameGroup: (groupId) => `/wp-json/bys-groups/v1/groups/${groupId}/rename`,
   archivedGroups: () => {
     const userId = window.bysGroupsAuth?.userId ?? '';
     return `/wp-json/bys-groups/v1/me/archived-groups${userId ? `?user_id=${userId}` : ''}`;
@@ -54,7 +55,6 @@ export const endpoints = {
   currentUserOrganizations: () => '/wp-json/bys-groups/v1/me/organizations',
   
   // /organizations/* routes
-  createOrganization: () => '/wp-json/bys-groups/v1/organizations',
   createOrganizationGroup: (orgId) => `/wp-json/bys-groups/v1/organizations/${orgId}/groups`,
 
   // /courses/* routes

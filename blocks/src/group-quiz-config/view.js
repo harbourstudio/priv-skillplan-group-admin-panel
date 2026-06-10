@@ -1,6 +1,7 @@
 import { api, endpoints } from '../_shared/api-client.js';
 import store from '../_shared/store.js';
 import { convertFromUTC, convertToUTC } from '../_shared/helpers.js';
+import { bysAlert } from '../_shared/alert.js';
 import flatpickr from 'flatpickr';
 import 'flatpickr/dist/flatpickr.min.css';
 
@@ -252,49 +253,63 @@ jQuery(document).ready(($) => {
     const $block = $('.wp-block-bys-groups-group-quiz-config').first();
     if (!$block.length) return;
 
+    /**
+     * Persist a row's start/end window — pure data op, throws on failure
+     * so callers decide the UI response. Shared by the explicit Save
+     * click AND the auto-save embedded in the Notify click (leaders
+     * routinely change dates and forget to save before notifying).
+     */
+    async function persistRowAccessDates($item, quizId) {
+        const start = convertToUTC($item.find('.gqc__datetime--start').val() || '');
+        const end   = convertToUTC($item.find('.gqc__datetime--end').val()   || '');
+
+        await api.post(endpoints.groupQuizAccess(currentGroupId), { quiz_id: quizId, start, end });
+        quizAccessDatesMap[quizId] = { start, end };
+
+        // Mutation write-through: update the cached course shape so the
+        // new dates survive a same-tab page nav until the next
+        // /base-group-data forceRefresh.
+        const cachedCourses = store.getCourses();
+        if (Array.isArray(cachedCourses)) {
+            const updated = cachedCourses.map((c) => ({
+                ...c,
+                quizzes_show_test_grading_config: Array.isArray(c.quizzes_show_test_grading_config)
+                    ? c.quizzes_show_test_grading_config.map((q) =>
+                        q.step_id === quizId ? { ...q, start, end } : q
+                      )
+                    : [],
+            }));
+            store.setCourses(updated);
+        }
+
+        api.invalidate('quiz-access');
+        api.invalidate('quiz-submission-stats');
+        api.invalidate('quiz-attempts');
+    }
+
     $block.on('click', '.gqc__save-row', async function () {
         const $btn   = jQuery(this);
         const $item  = $btn.closest('.gqc__item');
         const quizId = $item.data('quiz-id');
         if (!quizId || !currentGroupId) return;
 
-        const start = convertToUTC($item.find('.gqc__datetime--start').val() || '');
-        const end   = convertToUTC($item.find('.gqc__datetime--end').val()   || '');
-
         $btn.prop('disabled', true).text('Saving…');
 
         try {
-            await api.post(endpoints.groupQuizAccess(currentGroupId), { quiz_id: quizId, start, end });
-            quizAccessDatesMap[quizId] = { start, end };
-
-            // Mutation write-through: update the cached course shape so the
-            // new dates survive a same-tab page nav until the next
-            // /base-group-data forceRefresh.
-            const cachedCourses = store.getCourses();
-            if (Array.isArray(cachedCourses)) {
-                const updated = cachedCourses.map((c) => ({
-                    ...c,
-                    quizzes_show_test_grading_config: Array.isArray(c.quizzes_show_test_grading_config)
-                        ? c.quizzes_show_test_grading_config.map((q) =>
-                            q.step_id === quizId ? { ...q, start, end } : q
-                          )
-                        : [],
-                }));
-                store.setCourses(updated);
-            }
-
-            api.invalidate('quiz-access');
-            api.invalidate('quiz-submission-stats');
-            api.invalidate('quiz-attempts');
+            await persistRowAccessDates($item, quizId);
             $btn.text('Saved!');
             setTimeout(() => { $btn.text('Save'); }, 2000);
         } catch (err) {
             console.error('[quiz-config] Failed to save quiz access dates:', err);
             $btn.prop('disabled', false).text('Save');
+            bysAlert('Failed to save the quiz access window. Please try again.');
         }
     });
 
-    // Notify Learners — broadcasts the group-level access for THIS quiz to group users
+    // Notify Learners — broadcasts the group-level access for THIS quiz to group users.
+    // Auto-saves the row's start/end first so the email reflects what's
+    // currently in the inputs (leaders often edit dates then click Notify
+    // without explicitly hitting Save).
     $block.on('click', '.gqc__notify', async function () {
         const $btn   = jQuery(this);
         const $item  = $btn.closest('.gqc__item');
@@ -305,6 +320,8 @@ jQuery(document).ready(($) => {
         $btn.prop('disabled', true).text('Notifying…');
 
         try {
+            await persistRowAccessDates($item, quizId);
+
             const result = await api.post(`/wp-json/bys-groups/v1/groups/${currentGroupId}/quizzes/${quizId}/notify-access`)
             const sent = result?.sent_count ?? 0;
             $btn.text(`Notified ${sent}`);
@@ -312,11 +329,12 @@ jQuery(document).ready(($) => {
                 $btn.text(originalLabel).prop('disabled', false);
             }, 2500);
         } catch (err) {
-            console.error('[quiz-config] Failed to notify learners:', err);
+            console.error('[quiz-config] Failed to save + notify:', err);
             $btn.text('Failed');
             setTimeout(() => {
                 $btn.text(originalLabel).prop('disabled', false);
             }, 2500);
+            bysAlert('Failed to save the quiz access window and notify learners. Please try again.');
         }
     });
 

@@ -1,0 +1,54 @@
+// Custom alert dialog — appended to <body>, so styles are top-level (not block-scoped)
+.bys-groups-alert {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+
+    &--open {
+        opacity: 1;
+        pointer-events: auto;
+
+        .bys-groups-alert__dialog {
+            transform: scale(1);
+        }
+    }
+
+    &__close {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        width: 1.5rem;
+        height: 1.5rem;
+        border-radius: 999px;
+        font-size: var(--wp--preset--font-size--x-small);
+
+        &:hover {
+            background-color: var(--wp--preset--color--gray-50);
+        }
+    }
+
+    &__dialog {
+        background: white;
+        border-radius: 0.75rem;
+        padding: var(--wp--preset--spacing--6) var(--wp--preset--spacing--5);
+        width: 90%;
+        max-width: 22.5rem;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        transform: scale(0.95);
+        transition: transform 0.15s ease;
+    }
+
+    &__message {
+        font-size: var(--wp--preset--font-size--small);
+        color: var(--wp--preset--color--gray-800);
+        margin: 0;
+        line-height: 1.5;
+    }
+}

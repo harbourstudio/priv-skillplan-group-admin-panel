@@ -24,11 +24,21 @@ jQuery(document).ready(($) => {
     });
   }
 
-  // Fast first paint: if the store already has users cached (from a prior page
-  // in this session), show total_members right away.
+  /**
+   * Data that the block needs to count inactive members are available through the store
+   * Read from store first, then send a request to /group-stats as fallback 
+   * 
+   */
+  function paintMembershipStats(users) {
+    setStat($totalMembers, users.length);
+    const inactive = users.filter((u) => u.last_login === null).length;
+    setStat($totalInactiveMembers, inactive);
+  }
+
+  // if the store already has users cached (from prior page session), show both stats right away
   const cachedUsers = store.getUsers();
-  if (cachedUsers !== null) {
-    setStat($totalMembers, cachedUsers.length);
+  if (Array.isArray(cachedUsers)) {
+    paintMembershipStats(cachedUsers);
   }
 
   // listen for the custom jquery event triggered by group-select block
@@ -37,15 +47,17 @@ jQuery(document).ready(($) => {
     showAllSkeletons();
 
     const storeUsers = store.getUsers();
-    setStat($totalMembers, storeUsers ? storeUsers.length : 0);
-
-    // total_inactive_members — independent fetch
-    api.get(endpoints.baseGroupStats(groupId), true)
-      .then((stats) => setStat($totalInactiveMembers, stats?.total_inactive_members ?? 0))
-      .catch((err) => {
-        console.error('[group-stats] Failed to fetch /group-stats', err);
-        setStat($totalInactiveMembers, 0);
-      });
+    if (Array.isArray(storeUsers)) {
+      paintMembershipStats(storeUsers);
+    } else {
+      setStat($totalMembers, 0);
+      api.get(endpoints.baseGroupStats(groupId), true)
+        .then((stats) => setStat($totalInactiveMembers, stats?.total_inactive_members ?? 0))
+        .catch((err) => {
+          console.error('[group-stats] Failed to fetch /group-stats', err);
+          setStat($totalInactiveMembers, 0);
+        });
+    }
 
     // Course-completion stats
     const userIdsForStats = store.getUserIds() || [];

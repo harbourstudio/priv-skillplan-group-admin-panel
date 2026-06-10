@@ -81,12 +81,16 @@ function bys_get_invite_email( string $group_name, string $register_url, string 
                 </tr>
               </table>
 
-              <p style="margin:0;font-size:13px;color:#9ca3af;text-align:center;">
+              <p style="margin:0 0 24px;font-size:13px;color:#9ca3af;text-align:center;">
                 Or copy this link into your browser:<br />
                 <a href="<?php echo esc_url( $register_url ); ?>"
                    style="color:#1d4ed8;word-break:break-all;">
                   <?php echo esc_url( $register_url ); ?>
                 </a>
+              </p>
+
+              <p style="margin:0;font-size:13px;color:#9ca3af;text-align:center;">
+                If you weren't expecting this invitation, you can safely ignore this email.
               </p>
 
             </td>
@@ -96,8 +100,7 @@ function bys_get_invite_email( string $group_name, string $register_url, string 
           <tr>
             <td style="padding-top:24px;text-align:center;">
               <p style="margin:0;font-size:12px;color:#9ca3af;">
-                &copy; <?php echo date('Y'); ?> <?php echo esc_html( $site_name ); ?>.
-                If you weren't expecting this invitation, you can safely ignore this email.
+                &copy; <?php echo date('Y'); ?> <?php echo esc_html( $site_name ); ?>. Questions? Contact <a href="mailto:learn@skillplan.ca">learn@skillplan.ca</a>
               </p>
             </td>
           </tr>

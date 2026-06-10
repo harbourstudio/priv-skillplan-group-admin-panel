@@ -12,23 +12,32 @@ function formatArchivedDate(timestamp) {
 }
 
 function buildGroupRow(group) {
+    // Group leaders see the row read-only — the server emits can_unarchive
+    // per row (true only for site admins and the org admin of the
+    // containing org), and we render the action button accordingly.
     const $row = jQuery(`
         <div class="archived-groups__item" data-group-id="${group.id}">
             <div class="archived-groups__icon">${ARCHIVE_ICON}</div>
             <div class="archived-groups__info">
-                <span class="archived-groups__name">${group.title}</span>
-                <span class="archived-groups__date">${formatArchivedDate(group.archived_date)}</span>
+                <span class="archived-groups__name"></span>
+                <span class="archived-groups__date"></span>
             </div>
-            <button class="archived-groups__button" type="button" data-group-id="${group.id}">
-                Unarchive
-            </button>
         </div>
     `);
 
-    $row.find('.archived-groups__button').on('click', async function () {
-        const $btn = jQuery(this);
-        const groupId = $btn.data('group-id');
+    $row.find('.archived-groups__name').text(group.title);
+    $row.find('.archived-groups__date').text(formatArchivedDate(group.archived_date));
 
+    if (!group.can_unarchive) {
+        return $row;
+    }
+
+    const $btn = jQuery(
+        '<button class="archived-groups__button" type="button">Unarchive</button>'
+    ).attr('data-group-id', group.id);
+
+    $btn.on('click', async function () {
+        const groupId = $btn.data('group-id');
         $btn.prop('disabled', true).text('Unarchiving…');
 
         try {
@@ -41,6 +50,7 @@ function buildGroupRow(group) {
         }
     });
 
+    $row.append($btn);
     return $row;
 }
 

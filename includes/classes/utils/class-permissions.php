@@ -35,17 +35,12 @@ if (!class_exists('BYS_Groups_Permissions')) {
         }
 
         /**
-         * Checks if the user is an administrator of a specific organization.
-         *
-         * Site admins (manage_options) always pass. Otherwise the user must be
-         * listed in the organization's ACF 'administrators' field.
+         * Checks if the user is an 'administrators' (ACF) of an 'organization' post
          */
         public static function is_org_admin($org_id, $user_id = null) {
             $org_id  = (int) $org_id;
             $user_id = $user_id ?: get_current_user_id();
             if (!$org_id || !$user_id) return false;
-
-            if (self::is_site_admin($user_id)) return true;
 
             if (!function_exists('get_field')) return false;
 
@@ -62,16 +57,39 @@ if (!class_exists('BYS_Groups_Permissions')) {
         }
 
         /**
-         * Checks if the user is an administrator of any organization.
-         * Used for render-time visibility gates where no specific org/group
-         * is known yet (the block decides what to render before the user
-         * selects a group).
+         * Iterate 'organization' posts to find one that contains $group_id,
+         * then delegate to is_org_admin() for the actual admin check
+         */
+        private static function is_org_admin_for_group($user_id, $group_id) {
+            if (!function_exists('get_field')) return false;
+
+            $orgs = get_posts(array(
+                'post_type'      => 'organization',
+                'post_status'    => 'publish',
+                'posts_per_page' => -1,
+                'fields'         => 'ids',
+            ));
+
+            foreach ($orgs as $org_id) {
+                $raw_groups = get_field('groups', $org_id);
+                foreach ((array) $raw_groups as $g) {
+                    $g_id = $g instanceof \WP_Post ? $g->ID : intval($g);
+                    if ($g_id === $group_id) {
+                        return self::is_org_admin($org_id, $user_id);
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        /**
+         * Checks if the user is an 'administrator' of any published 'organization' post
+         * Used for render-time visibility gates where no specific org/group is known yet
          */
         public static function is_any_org_admin($user_id = null) {
             $user_id = $user_id ?: get_current_user_id();
             if (!$user_id) return false;
-
-            if (self::is_site_admin($user_id)) return true;
 
             if (!function_exists('get_field')) return false;
 
@@ -93,41 +111,9 @@ if (!class_exists('BYS_Groups_Permissions')) {
             return false;
         }
 
-        /**
-         * Org-admin check: iterate ACF 'organization' posts and verify the
-         * group is contained AND the user is an admin
-         */
-        private static function is_org_admin_for_group($user_id, $group_id) {
-            if (!function_exists('get_field')) return false;
-
-            $orgs = get_posts(array(
-                'post_type'      => 'organization',
-                'post_status'    => 'publish',
-                'posts_per_page' => -1,
-            ));
-
-            foreach ($orgs as $org) {
-                $raw_groups = get_field('groups', $org->ID);
-                $group_ids  = array_map(function ($g) {
-                    return $g instanceof \WP_Post ? $g->ID : intval($g);
-                }, (array) $raw_groups);
-
-                if (!in_array($group_id, $group_ids, true)) continue;
-
-                $raw_admins = get_field('administrators', $org->ID);
-                $admin_ids  = array_map(function ($a) {
-                    return $a instanceof \WP_User ? $a->ID : intval($a);
-                }, (array) $raw_admins);
-
-                if (in_array($user_id, $admin_ids, true)) return true;
-            }
-
-            return false;
-        }
-
 
         /**
-         * Checks if the user can read or manage the current group
+         * Checks if the user can read the current group
          */
         public static function can_access_group($group_id, $user_id = null) {
             $group_id = (int) $group_id;
@@ -136,14 +122,11 @@ if (!class_exists('BYS_Groups_Permissions')) {
             $user_id = $user_id ?: get_current_user_id();
             if (!$user_id) return false;
 
-            $user = get_userdata($user_id);
-            if($user && in_array('grader', (array) $user->roles, true)) return true; // 'grader' role passes
+            if (self::is_site_admin($user_id)) return true; // side-admins pass
+            if (self::is_grader($user_id)) return true; // graders pass
+            if (get_user_meta($user_id, "learndash_group_leaders_{$group_id}", true)) return true; // group-leader of this group passes
 
-            if (self::is_site_admin($user_id)) return true; // site_admin passes
-
-            if (get_user_meta($user_id, "learndash_group_leaders_{$group_id}", true)) return true; //  group leaders passes
-
-            return self::is_org_admin_for_group($user_id, $group_id); // if the user administers an org that contains this group, pass if so
+            return self::is_org_admin_for_group($user_id, $group_id); 
         }
 
         /**
@@ -151,23 +134,25 @@ if (!class_exists('BYS_Groups_Permissions')) {
          * is provided by the URL (e.g. /users/{user_id}/* endpoints).
          *
          * Allows access when:
-         *  - current user IS the target (self-access always passes), OR
          *  - current user is a site admin, OR
          *  - current user shares at least one group with the target — either as a leader
          *    of that group or as an admin of an organization containing it
          *    (delegated to can_access_group per matched group).
+         *
+         * NOTE: no self-access bypass. This plugin's data is scoped to staff
+         * (site admins, org admins, group leaders, graders); a learner reading
+         * their own data via these endpoints is not a supported access path.
          */
         public static function can_access_user($target_user_id, $user_id = null) {
             $target_user_id = (int) $target_user_id;
             $user_id       = $user_id ?: get_current_user_id();
-
             if (!$target_user_id || !$user_id) return false;
 
-            if ($user_id === $target_user_id) return true; // self always passes
-            if (self::is_site_admin($user_id)) return true; // site admins always pass
+            if (self::is_site_admin($user_id)) return true; // site-admins pass
 
             if (!function_exists('learndash_get_users_group_ids')) return false;
 
+            // checks if the current user can access ANY group the target belongs to.
             $target_group_ids = (array) learndash_get_users_group_ids($target_user_id);
             foreach ($target_group_ids as $group_id) {
                 if (self::can_access_group($group_id, $user_id)) return true;
@@ -177,32 +162,97 @@ if (!class_exists('BYS_Groups_Permissions')) {
         }
 
         /**
-         * Can the current user MANAGE MEMBERS of $group_id?
-         * Passes for: site admins, org admins of this group, and group-leaders
-         * of this group
+         * Can the current user MANAGE users of $group_id?
+         * Gate for member-write actions on a group: add/invite, remove,
+         * cancel pending invite.
+         *
+         * Passes for: site admins, group-leaders of this group, and org admins
+         * of the org containing this group.
+         *
+         * NOTE: graders are deliberately EXCLUDED here. Grading quiz attempts
+         * is a separate capability handled by /attempts/{id}/grade with its
+         * own gate (is_site_admin || is_grader). Graders need to grade, not
+         * add/remove members.
          */
         public static function can_manage_members($group_id, $user_id = null) {
             $group_id = (int) $group_id;
             $user_id  = $user_id ?: get_current_user_id();
             if ($group_id <= 0 || !$user_id) return false;
 
-            if (self::is_site_admin($user_id)) return true;
-            if (get_user_meta($user_id, "learndash_group_leaders_{$group_id}", true)) return true;
-            return self::is_org_admin_for_group($user_id, $group_id);
+            if (self::is_site_admin($user_id)) return true; // site admins pass
+
+            if (get_user_meta($user_id, "learndash_group_leaders_{$group_id}", true)) return true; // group-leader of this group passes
+            
+            return self::is_org_admin_for_group($user_id, $group_id); // org admin of the org containing this group passes
         }
 
         /**
-         * Can the current user MANAGE LEADERS of $group_id?
-         * Passes for: site admins and org admins of this group ONLY.
-         * EXCLUDES graders AND regular group-leaders.
+         * Returns true if the user is a group-leader of at least one group
+         * (org-associated or standalone). Used by nav gates (e.g. the Groups
+         * tab) so any leader can reach the dashboard to manage their group(s).
          */
-        public static function can_manage_leaders($group_id, $user_id = null) {
+        public static function leads_any_group($user_id = null) {
+            $user_id = $user_id ?: get_current_user_id();
+            if (!$user_id) return false;
+
+            foreach (get_user_meta($user_id) as $meta_key => $_) {
+                if (strpos($meta_key, 'learndash_group_leaders_') === 0) {
+                    $g_id = (int) substr($meta_key, strlen('learndash_group_leaders_'));
+                    if ($g_id > 0) return true;
+                }
+            }
+
+            return false;
+        }
+
+        /**
+         * Returns true if the group is associated to at least one organization
+         */
+        public static function is_group_in_any_org($group_id) {
+            $group_id = (int) $group_id;
+            if ($group_id <= 0 || !function_exists('get_field')) return false;
+
+            $orgs = get_posts([
+                'post_type'      => 'organization',
+                'post_status'    => 'publish',
+                'posts_per_page' => -1,
+            ]);
+
+            foreach ($orgs as $org) {
+                $raw_groups = get_field('groups', $org->ID);
+                foreach ((array) $raw_groups as $g) {
+                    $g_id = $g instanceof \WP_Post ? $g->ID : intval($g);
+                    if ($g_id === $group_id) return true;
+                }
+            }
+
+            return false;
+        }
+
+        /**
+         * Can the current user take ADMIN-level actions on $group_id
+         * (archive, unarchive, rename)?
+         *
+         * Matrix:
+         *  - Site admin: always.
+         *  - Org admin of an org containing this group: always.
+         *  - Group leader: ONLY if the group is standalone (not in any org).
+         *    If an org owns the group, the org admin tier exists and group
+         *    leaders defer to it.
+         */
+        public static function can_manage_group($group_id, $user_id = null) {
             $group_id = (int) $group_id;
             $user_id  = $user_id ?: get_current_user_id();
             if ($group_id <= 0 || !$user_id) return false;
 
-            if (self::is_site_admin($user_id)) return true;
-            return self::is_org_admin_for_group($user_id, $group_id);
+            if (self::is_site_admin($user_id)) return true; // site-admins passes
+            if (self::is_org_admin_for_group($user_id, $group_id)) return true; // org-admin/group-admin passes
+
+            // if group is in an org, only org admins (handled above) passes
+            if (self::is_group_in_any_org($group_id)) return false;
+
+            // if standalone group, group-leader passes
+            return (bool) get_user_meta($user_id, "learndash_group_leaders_{$group_id}", true);
         }
 
         /**

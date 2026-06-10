@@ -136,11 +136,11 @@ $tz_offset_hours = $tz_offset_seconds / 3600;
         </div>
 
         <div class="guqc__actions">
-            <button class="guqc__save guqc__btn-primary btn-unstyled" type="button">
-                <?php esc_html_e( 'Save Changes', 'bys' ); ?>
-            </button>
-            <button class="guqc__notify guqc__btn-outline btn-unstyled" type="button">
+            <button class="guqc__notify btn-unstyled" type="button">
                 <?php esc_html_e( 'Notify Learner', 'bys' ); ?>
+            </button>
+            <button class="guqc__save btn-unstyled" type="button">
+                <?php esc_html_e( 'Save Changes', 'bys' ); ?>
             </button>
         </div>
     </div>

@@ -10,6 +10,15 @@
             color: var(--wp--preset--color--gray-500);
             margin: 0;
         }
+
+        &__note-permission {
+            display: flex;
+            align-items: center;
+            gap: var(--wp--preset--spacing--2);
+            margin: var(--wp--preset--spacing--2) 0 0;
+            font-size: var(--wp--preset--font-size--small);
+            color: var(--wp--preset--color--gray-500);
+            font-style: italic;        }
     
         &__card {
             background: var(--wp--preset--color--white);

@@ -90,6 +90,17 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 'permission_callback' => fn($request) => BYS_Groups_Permissions::can_access_group($request['group_id']),
             ]);
 
+            /**
+             * Group Users Bulk certificate download (specified course)
+             * REturns certficate URL per group-user (null if no cert available for a user)
+             * packs cert PDFs into a ZIP with summary csv 
+             */
+            register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/groups/(?P<group_id>\d+)/courses/(?P<course_id>\d+)/certificate-urls', [
+                'methods'             => WP_REST_Server::READABLE,
+                'callback'            => [$this, 'get_group_course_certificates'],
+                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_access_group($request['group_id']),
+            ]);
+
             // Sibling route — not group-scoped. Autocomplete picker over all
             // published LD courses; any authenticated user can use it.
             register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/all-courses', [
@@ -111,26 +122,37 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 'permission_callback' => fn($request) => BYS_Groups_Permissions::can_access_group($request['group_id']),
             ]);
 
-            // ── Cluster D: group archive ───────────────────────────────────
+            // ── Cluster D: group archive / rename ──────────────────────────
+            // Archive, unarchive, and rename all share the "can_manage_group"
+            // matrix: site admin OR org admin of the group's org OR (group
+            // leader AND group is standalone). See class-permissions.php for
+            // the rationale.
             register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/groups/(?P<group_id>\d+)/archive', [
                 'methods'             => WP_REST_Server::CREATABLE,
                 'callback'            => [$this, 'archive_group'],
-                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_access_group($request['group_id']),
+                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_manage_group($request['group_id']),
             ]);
 
             register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/groups/(?P<group_id>\d+)/unarchive', [
                 'methods'             => WP_REST_Server::CREATABLE,
                 'callback'            => [$this, 'unarchive_group'],
-                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_access_group($request['group_id']),
+                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_manage_group($request['group_id']),
+            ]);
+
+            register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/groups/(?P<group_id>\d+)/rename', [
+                'methods'             => WP_REST_Server::CREATABLE,
+                'callback'            => [$this, 'rename_group'],
+                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_manage_group($request['group_id']),
             ]);
 
             // ── Cluster E: group leaders ───────────────────────────────────
-            // Removing a leader is restricted to site admins + org admins.
-            // Graders and regular group-leaders are intentionally excluded.
+            // Removing a leader uses the same matrix as can_manage_group:
+            // site admins, org admins of the containing org, or group-leaders
+            // of a standalone group. Graders are excluded.
             register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/groups/(?P<group_id>\d+)/leaders/(?P<user_id>\d+)', [
                 'methods'             => WP_REST_Server::DELETABLE,
                 'callback'            => [$this, 'remove_group_leader'],
-                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_manage_leaders($request['group_id']),
+                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_manage_group($request['group_id']),
             ]);
 
             register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/groups/(?P<group_id>\d+)/leaders', [
@@ -140,16 +162,20 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             ]);
 
             // ── Cluster F: group invites ───────────────────────────────────
+            // Write actions (invite, bulk-invite, cancel) are gated by
+            // can_manage_members — consistent with the remove endpoint above.
+            // Read-only pending-invites listing stays on can_access_group so
+            // any viewer with group access can see invite state for context.
             register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/groups/(?P<group_id>\d+)/invite-bulk', [
                 'methods'             => WP_REST_Server::CREATABLE,
                 'callback'            => [$this, 'bulk_user_addition'],
-                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_access_group($request['group_id']),
+                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_manage_members($request['group_id']),
             ]);
 
             register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/groups/(?P<group_id>\d+)/invites/(?P<invite_id>\d+)/cancel', [
                 'methods'             => WP_REST_Server::CREATABLE,
                 'callback'            => [$this, 'cancel_invite'],
-                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_access_group($request['group_id']),
+                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_manage_members($request['group_id']),
             ]);
 
             register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/groups/(?P<group_id>\d+)/pending-invites', [
@@ -161,7 +187,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/groups/(?P<group_id>\d+)/invite', [
                 'methods'             => WP_REST_Server::CREATABLE,
                 'callback'            => [$this, 'invite_member'],
-                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_access_group($request['group_id']),
+                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_manage_members($request['group_id']),
             ]);
 
             // ── Cluster G: group quiz-access + communications ──────────────
@@ -198,7 +224,6 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                     'prompt_type'    => ['type' => 'string', 'required' => true],
                     'recipient_type' => ['type' => 'string', 'required' => true],
                     'recipient_ids'  => ['type' => 'array',  'required' => false],
-                    'custom_subject' => ['type' => 'string', 'required' => false],
                     'custom_message' => ['type' => 'string', 'required' => false],
                 ],
             ]);
@@ -248,6 +273,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 $url = get_home_url() . "/wp-json/ldlms/v2/groups/{$group_id}/users?_fields=id&per_page={$per_page}&page={$page}";
                 $response = wp_remote_get($url, [
                     'headers'   => ['Authorization' => $auth_header],
+                    'timeout'   => 30,
                     'sslverify' => false,
                 ]);
 
@@ -278,6 +304,8 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 $last_login_timestamp = max($meta_values);
                 $last_login_timestamp = $last_login_timestamp > 0 ? $last_login_timestamp : null;
 
+                $last_active_ts = BYS_Groups_Activity_Logger::get_last_active_ts($user_id);
+
                 $enrolled_at_raw = get_user_meta($user_id, "learndash_group_{$group_id}_enrolled_at", true);
 
                 $users[] = [
@@ -289,7 +317,9 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                     'avatar'       => get_avatar_url($user_id, ['size' => 64]),
                     'enrolled_at'  => $enrolled_at_raw ? wp_date('c', (int) $enrolled_at_raw) : null,
                     'last_login'   => $last_login_timestamp ? wp_date('c', $last_login_timestamp) : null,
-                    'status'       => $this->get_user_online_status($user_id),
+                    'last_active'  => $last_active_ts ? wp_date('c', $last_active_ts) : null,
+                    'status'       => $this->get_user_active_status($user_id),
+                    'status_checked_at' => gmdate('c'),
                 ];
             }
 
@@ -298,6 +328,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             $courses_url = get_home_url() . "/wp-json/ldlms/v2/groups/{$group_id}/courses?_fields=id,title";
             $courses_response = wp_remote_get($courses_url, [
                 'headers'   => ['Authorization' => $auth_header],
+                'timeout'   => 30,
                 'sslverify' => false,
             ]);
             // Source of truth for "is this course required for this group" lives
@@ -365,6 +396,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 $url = get_home_url() . "/wp-json/ldlms/v2/groups/{$group_id}/users?_fields=id&per_page={$per_page}&page={$page}";
                 $response = wp_remote_get($url, [
                     'headers'   => ['Authorization' => $auth_header],
+                    'timeout'   => 30,
                     'sslverify' => false,
                 ]);
                 if (is_wp_error($response)) return new WP_Error('server_error', $response->get_error_message(), ['status' => 500]);
@@ -435,6 +467,8 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 $last_login_timestamp = max($meta_values);
                 $last_login_timestamp = $last_login_timestamp > 0 ? $last_login_timestamp : null;
 
+                $last_active_ts = BYS_Groups_Activity_Logger::get_last_active_ts($user_id);
+
                 $enrolled_at_raw = get_user_meta($user_id, "learndash_group_{$group_id}_enrolled_at", true);
 
                 $users[] = [
@@ -446,7 +480,9 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                     'avatar'       => get_avatar_url($user_id, ['size' => 64]),
                     'enrolled_at'  => $enrolled_at_raw ? wp_date('c', (int) $enrolled_at_raw) : null,
                     'last_login'   => $last_login_timestamp ? wp_date('c', $last_login_timestamp) : null,
-                    'status'       => $this->get_user_online_status($user_id),
+                    'last_active'  => $last_active_ts ? wp_date('c', $last_active_ts) : null,
+                    'status'       => $this->get_user_active_status($user_id),
+                    'status_checked_at' => gmdate('c'),
                 ];
             }
 
@@ -478,15 +514,19 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             $last_login_timestamp = max($meta_values);
             $last_login_timestamp = $last_login_timestamp > 0 ? $last_login_timestamp : null;
 
+            $last_active_ts = BYS_Groups_Activity_Logger::get_last_active_ts($user_id);
+
             return [
                 'id'                  => $user->ID,
                 'first_name'          => $user->first_name,
                 'last_name'           => $user->last_name,
                 'display_name'        => $user->display_name,
                 'email'               => $user->user_email,
-                'status'              => $this->get_user_online_status($user_id),
+                'status'              => $this->get_user_active_status($user_id),
+                'status_checked_at'   => gmdate('c'),
                 'group_enrolled_date' => $group_enrolled_date ?: null,
                 'last_login'          => $last_login_timestamp,
+                'last_active'         => $last_active_ts ? wp_date('c', $last_active_ts) : null,
                 'avatar_url'          => get_avatar_url($user_id, ['size' => 80]),
             ];
         }
@@ -530,6 +570,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             $url = get_home_url() . "/wp-json/ldlms/v2/groups/{$group_id}/courses?_fields=id,title";
             $response = wp_remote_get($url, [
                 'headers'   => ['Authorization' => $auth_header],
+                'timeout'   => 30,
                 'sslverify' => false,
             ]);
 
@@ -665,6 +706,77 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             return [
                 'total_completed'  => $total_completed,
                 'total_incomplete' => $total_incomplete,
+            ];
+        }
+        
+        /**
+         * GET /groups/{group_id}/courses/{course_id}/certificate-urls
+         *
+         * Returns one row per group-user with a cert URL if the user has completed the course AND cert is configured, null otherwise
+         * NOTE: cert URL is generated by LD's own helper, which embeds
+         * a per-(course, target user, viewing user) nonce; the URL is only
+         * fetchable by the same user that requested this endpoint.
+         */
+        public function get_group_course_certificates($request) {
+            $group_id  = intval($request['group_id']);
+            $course_id = intval($request['course_id']);
+            if (!$group_id || !$course_id) {
+                return new WP_Error('bad_request', 'Invalid group_id or course_id', ['status' => 400]);
+            }
+
+            $course = get_post($course_id);
+            if (!$course || $course->post_type !== 'sfwd-courses') {
+                return new WP_Error('not_found', 'Course not found', ['status' => 404]);
+            }
+
+            /**
+             * check if course has no certificate configured at all. learndash_get_course_certificate_link() returns '' for both "no template" AND "user hasn't completed", so use a inform the block
+             */
+            $cert_template_id = function_exists('learndash_get_setting')
+                ? intval(learndash_get_setting($course_id, 'certificate'))
+                : 0;
+
+            if (!$cert_template_id) {
+                return [
+                    'course_id'                => $course_id,
+                    'course_title'             => $this->normalize_course_title(get_the_title($course_id)),
+                    'has_certificate_template' => false,
+                    'users'                    => [],
+                ];
+            }
+
+            $user_ids = function_exists('learndash_get_groups_user_ids')
+                ? (array) learndash_get_groups_user_ids($group_id)
+                : [];
+
+            $users = [];
+            foreach ($user_ids as $uid) {
+                $uid  = (int) $uid;
+                $user = get_userdata($uid);
+                if (!$user) continue;
+
+                /**
+                 * LDs learndash_get_course_certificate_link() returns '' for users that hasn't achieved completion, courses without a configured cert, or invalid args, so normalize to null
+                 */
+                $cert_url = function_exists('learndash_get_course_certificate_link')
+                    ? (string) learndash_get_course_certificate_link($course_id, $uid)
+                    : '';
+
+                $users[] = [
+                    'user_id'         => $uid,
+                    'email'           => $user->user_email,
+                    'display_name'    => $user->display_name,
+                    'first_name'      => (string) $user->first_name,
+                    'last_name'       => (string) $user->last_name,
+                    'certificate_url' => $cert_url !== '' ? $cert_url : null,
+                ];
+            }
+
+            return [
+                'course_id'                => $course_id,
+                'course_title'             => $this->normalize_course_title(get_the_title($course_id)),
+                'has_certificate_template' => true,
+                'users'                    => $users,
             ];
         }
 
@@ -1080,6 +1192,43 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             return ['success' => true, 'group_id' => $group_id];
         }
 
+        /**
+         * POST /groups/{group_id}/rename
+         * Updates the group's post_title. Permission gate (set on the route)
+         * is can_manage_group — site admins, org admins of the containing
+         * org, or group-leaders of a standalone group. Group leaders of
+         * org-owned groups see the settings block but the input/button stay
+         * disabled (mirrors the archive block's UX).
+         */
+        public function rename_group($request) {
+            $group_id = intval($request->get_param('group_id'));
+            $name     = sanitize_text_field((string) $request->get_param('name'));
+
+            if (trim($name) === '') {
+                return new WP_Error('bad_request', 'Group name is required', ['status' => 400]);
+            }
+
+            $group = get_post($group_id);
+            if (!$group || $group->post_type !== 'groups') {
+                return new WP_Error('not_found', 'Group not found', ['status' => 404]);
+            }
+
+            $result = wp_update_post([
+                'ID'         => $group_id,
+                'post_title' => $name,
+            ], true);
+
+            if (is_wp_error($result)) {
+                return new WP_Error('server_error', $result->get_error_message(), ['status' => 500]);
+            }
+
+            return [
+                'success'  => true,
+                'group_id' => $group_id,
+                'name'     => get_post($group_id)->post_title,
+            ];
+        }
+
         // ─── REST callbacks: Cluster E ──────────────────────────────────────
 
         /**
@@ -1463,14 +1612,14 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 return new WP_Error('server_error', 'Postmark token not configured', ['status' => 500]);
             }
 
-            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/emails/user-quiz-config.php';
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/emails/general.php';
 
             // Sender is the leader making the request; falls back to admin if unauth'd.
             $sender         = wp_get_current_user();
             $sender_user_id = ($sender && $sender->ID) ? (int) $sender->ID : 0;
             $sender_email   = ($sender && !empty($sender->user_email)) ? $sender->user_email : get_bloginfo('admin_email');
             $quiz_post      = get_post($quiz_id);
-            $from           = get_bloginfo('admin_email');
+            $from           = BYS_Groups_Postmark::get_from_email();
 
             $email = bys_get_quiz_access_notification_email([
                 'recipient_name' => !empty($recipient->display_name) ? $recipient->display_name : $recipient->user_login,
@@ -1596,7 +1745,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             $page = 1; $per_page = 100;
             do {
                 $url = get_home_url() . "/wp-json/ldlms/v2/groups/{$group_id}/users?_fields=id&per_page={$per_page}&page={$page}";
-                $resp = wp_remote_get($url, ['headers' => ['Authorization' => $auth_header], 'sslverify' => false]);
+                $resp = wp_remote_get($url, ['headers' => ['Authorization' => $auth_header], 'timeout' => 30, 'sslverify' => false]);
                 if (is_wp_error($resp) || wp_remote_retrieve_response_code($resp) !== 200) break;
                 $page_users = json_decode(wp_remote_retrieve_body($resp), true);
                 if (!is_array($page_users) || empty($page_users)) break;
@@ -1608,14 +1757,14 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 return new WP_Error('no_recipients', 'No members in this group', ['status' => 404]);
             }
 
-            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/emails/user-quiz-config.php';
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/emails/general.php';
 
             $quiz_post = get_post($quiz_id);
             $site_name = get_bloginfo('name');
             $site_url  = home_url();
             $quiz_url  = $quiz_post ? get_permalink($quiz_post) : home_url();
             $quiz_ttl  = $quiz_post ? get_the_title($quiz_post) : 'your quiz';
-            $from      = get_bloginfo('admin_email');
+            $from      = BYS_Groups_Postmark::get_from_email();
 
             // resolve sender_email to the leader making the request; fallback to admin
             $sender         = wp_get_current_user();
@@ -1740,7 +1889,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
 
         /**
          * POST /groups/{group_id}/send-communication
-         * Body: { prompt_type, recipient_type, recipient_ids[], custom_subject,
+         * Body: { prompt_type, recipient_type, recipient_ids[],
          *         custom_message, scheduled_at, condition{} }
          *
          * Delegates to BYS_Groups_Mailer::send_group_communication which handles
@@ -1761,7 +1910,6 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                     'prompt_type'    => $request->get_param('prompt_type'),
                     'recipient_type' => $request->get_param('recipient_type'),
                     'recipient_ids'  => $request->get_param('recipient_ids'),
-                    'custom_subject' => $request->get_param('custom_subject'),
                     'custom_message' => $request->get_param('custom_message'),
                     'scheduled_at'   => $request->get_param('scheduled_at'),
                     'condition'      => $request->get_param('condition'),
@@ -1773,7 +1921,6 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             $recipient_ids  = isset($body['recipient_ids']) && is_array($body['recipient_ids'])
                                 ? array_map('intval', $body['recipient_ids'])
                                 : [];
-            $custom_subject = sanitize_text_field($body['custom_subject'] ?? '');
             $custom_message = wp_kses_post($body['custom_message'] ?? '');
             $scheduled_at   = sanitize_text_field($body['scheduled_at'] ?? '');
 
@@ -1791,9 +1938,9 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 return new WP_Error('bad_request', 'Missing prompt_type or recipient_type', ['status' => 400]);
             }
 
-            // Custom prompts must include both subject and message
-            if ($prompt_type === 'custom' && (empty($custom_subject) || empty($custom_message))) {
-                return new WP_Error('bad_request', 'Custom prompts require both subject and message', ['status' => 400]);
+            // Custom prompts must include message
+            if ($prompt_type === 'custom' && empty($custom_message)) {
+                return new WP_Error('bad_request', 'Custom prompts require message', ['status' => 400]);
             }
 
             // Conditional sends must include resolved recipients + a condition type
@@ -1814,7 +1961,6 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 $prompt_type,
                 $recipient_type,
                 $recipient_ids,
-                $custom_subject,
                 $custom_message,
                 $scheduled_at,
                 $condition
@@ -1846,13 +1992,25 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 return new WP_Error('not_found', 'Invalid group ID', ['status' => 404]);
             }
 
-            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/emails/group-comms.php';
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/emails/general.php';
+
+            // Optional ?course_id=N — when the send-modal's chosen condition
+            // has a course attached, the client passes it here so the preview
+            // pane reflects the same deep-link the mailer will use. Templates
+            // without a CTA button (password-reset, custom) ignore it.
+            $course_id_for_cta = intval($request->get_param('course_id'));
+            $cta_url_override  = '';
+            if ($course_id_for_cta > 0) {
+                $maybe_url = get_permalink($course_id_for_cta);
+                if ($maybe_url) $cta_url_override = $maybe_url;
+            }
 
             $email = bys_get_comm_email($prompt_type, [
-                'group_name'   => $group->post_title,
-                'site_name'    => get_bloginfo('name'),
-                'site_url'     => home_url(),
-                'sender_email' => get_bloginfo('admin_email'),
+                'group_name'       => $group->post_title,
+                'site_name'        => get_bloginfo('name'),
+                'site_url'         => home_url(),
+                'sender_email'     => get_bloginfo('admin_email'),
+                'cta_url_override' => $cta_url_override,
             ]);
 
             if (empty($email['subject']) || empty($email['html'])) {
@@ -1909,7 +2067,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                     'X-Postmark-Server-Token' => $token,
                     'Accept'                  => 'application/json',
                 ],
-                'timeout'   => 15,
+                'timeout'   => 30,
                 'sslverify' => true,
             ]);
 
@@ -2153,20 +2311,20 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
          *   'offline' — no active session but has a recorded login timestamp
          *   'never'   — no active session and no recorded login timestamp
          */
-        private function get_user_online_status($user_id) {
-            $sessions = WP_Session_Tokens::get_instance($user_id)->get_all();
-            $now      = time();
-            foreach ($sessions as $session) {
-                if (!empty($session['expiration']) && $session['expiration'] > $now) {
-                    return 'online';
-                }
-            }
+        /**
+         * Source of truth: BYS_Groups_Activity_Logger::get_last_active_ts(),
+         * which max()es across the custom system-activity tracker (frontend
+         * page loads, group-members only), the LD activity table (quiz /
+         * lesson / topic events), and legacy approach of reading
+         * wp_login-dependent user meta
+         */
+        private function get_user_active_status($user_id) {
+            $last_active = BYS_Groups_Activity_Logger::get_last_active_ts($user_id);
+            if ($last_active === 0) return 'never';
 
-            $meta_values = [
-                intval(get_user_meta($user_id, '_ld_notifications_last_login', true) ?: 0),
-                intval(get_user_meta($user_id, 'learndash-last-login',          true) ?: 0),
-            ];
-            return max($meta_values) > 0 ? 'offline' : 'never';
+            if (time() - $last_active < BYS_Groups_Activity_Logger::ACTIVE_WINDOW_SECONDS) return 'online';
+
+            return 'offline';
         }
 
         /**

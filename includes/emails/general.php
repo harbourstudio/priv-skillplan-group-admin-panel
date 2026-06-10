@@ -1,11 +1,16 @@
 <?php
 /**
- * Group Communication Email Templates
+ * General Email Templates
  *
- * bys_build_email_template() — builds general email template
- * bys_get_comm_email() — dispatcher for communication prompt email templates
-
-* All functions return an array:
+ * Hosts the shared HTML template builder and every transactional email
+ * helper in this plugin EXCEPT the invitation email (see invite.php).
+ *
+ * bys_build_email_template()              — shared HTML template builder
+ * bys_get_comm_email()                    — dispatcher for group-communication prompt emails
+ * bys_get_quiz_access_notification_email() — per-user quiz-access notification
+ * bys_format_local_datetime()             — UTC → local datetime helper
+ *
+ * All template functions return an array:
  *   'subject' => the email subject line
  *   'html'    => the full HTML email body (used when wp_mail sends HTML)
  *   'plain'   => plain-text fallback
@@ -122,7 +127,7 @@ function bys_build_email_template(
  * Get group communication email template by prompt type
  *
  * @param string $prompt_type Prompt type (password-reset, course-progress, assessment-deadline, welcome-reminder, custom)
- * @param array $vars Template variables (group_name, recipient_name, site_name, site_url, sender_email, custom_subject, custom_message)
+ * @param array $vars Template variables (group_name, recipient_name, site_name, site_url, custom_message)
  * @return array Array with 'subject', 'html', 'plain' keys
  */
 function bys_get_comm_email(string $prompt_type, array $vars): array {
@@ -130,21 +135,26 @@ function bys_get_comm_email(string $prompt_type, array $vars): array {
 	$recipient_name = $vars['recipient_name'] ?? 'Learner';
 	$site_name = $vars['site_name'] ?? 'SkillPlan';
 	$site_url = $vars['site_url'] ?? home_url();
-	$sender_email = $vars['sender_email'] ?? get_bloginfo('admin_email');
+	// Optional CTA deep-link override. Mailer sets this to a course
+	// permalink when the chosen condition has a course_id; templates with
+	// a navigational CTA use it instead of the dashboard URL. Empty string
+	// means "no override" — keep the template's default.
+	$cta_url_override = $vars['cta_url_override'] ?? '';
 
 	switch ($prompt_type) {
 		case 'password-reset':
-			return bys_get_password_reset_email($group_name, $recipient_name, $site_name, $site_url, $sender_email);
+			// CTA is the password-reset link, never a course — override ignored.
+			return bys_get_password_reset_email($group_name, $recipient_name, $site_name, $site_url);
 		case 'course-progress':
-			return bys_get_course_nudge_email($group_name, $recipient_name, $site_name, $site_url, $sender_email);
+			return bys_get_course_nudge_email($group_name, $recipient_name, $site_name, $site_url, $cta_url_override);
 		case 'assessment-deadline':
-			return bys_get_assessment_deadline_email($group_name, $recipient_name, $site_name, $site_url, $sender_email);
+			return bys_get_assessment_deadline_email($group_name, $recipient_name, $site_name, $site_url, $cta_url_override);
 		case 'welcome-reminder':
-			return bys_get_welcome_reminder_email($group_name, $recipient_name, $site_name, $site_url, $sender_email);
+			return bys_get_welcome_reminder_email($group_name, $recipient_name, $site_name, $site_url, $cta_url_override);
 		case 'custom':
-			$custom_subject = $vars['custom_subject'] ?? '';
+			// Leader-authored body; no CTA button — override doesn't apply.
 			$custom_message = $vars['custom_message'] ?? '';
-			return bys_get_custom_email($custom_subject, $custom_message);
+			return bys_get_custom_email($group_name, $custom_message);
 		default:
 			return array('subject' => '', 'html' => '', 'plain' => '');
 	}
@@ -157,18 +167,14 @@ function bys_get_comm_email(string $prompt_type, array $vars): array {
  * @param string $recipient_name Name of the recipient
  * @param string $site_name Site name
  * @param string $site_url Site URL
- * @param string $sender_email Email address of the sender
  * @return array Array with 'subject', 'html', 'plain' keys
  */
-function bys_get_password_reset_email(string $group_name, string $recipient_name, string $site_name, string $site_url, string $sender_email): array {
+function bys_get_password_reset_email(string $group_name, string $recipient_name, string $site_name, string $site_url): array {
 	$subject = "Password reset for {$site_name}";
 	$reset_url = wp_login_url() . '?action=lostpassword';
 	$heading = "Password Reset";
 	$content = "<p>You have been added to the group <strong>" . esc_html( $group_name ) . "</strong>. Please reset your password to complete your account setup.</p>";
-	$footer_text = '';
-	if (!empty($sender_email)) {
-		$footer_text = "If you have any questions, please contact <a href=\"mailto:" . esc_attr($sender_email) . "\">" . esc_html($sender_email) . "</a>.";
-	}
+	$footer_text = 'Questions? Contact <a href="mailto:learn@skillplan.ca">learn@skillplan.ca</a>';
 
 	return bys_build_email_template(
 		$subject,
@@ -191,18 +197,15 @@ function bys_get_password_reset_email(string $group_name, string $recipient_name
  * @param string $recipient_name Name of the recipient
  * @param string $site_name Site name
  * @param string $site_url Site URL
- * @param string $sender_email Email address of the sender
  * @return array Array with 'subject', 'html', 'plain' keys
  */
-function bys_get_course_nudge_email(string $group_name, string $recipient_name, string $site_name, string $site_url, string $sender_email): array {
+function bys_get_course_nudge_email(string $group_name, string $recipient_name, string $site_name, string $site_url, string $cta_url_override = ''): array {
 	$subject = "Course progress update";
-	$dashboard_url = $site_url . '/dashboard/';
+	$dashboard_url = !empty($cta_url_override) ? $cta_url_override : $site_url . '/dashboard/';
 	$heading = "Course Progress Update";
-	$content = "<p>We noticed you haven't been active in your courses recently. Click the link below to continue with your progress.</p>";
-	$footer_text = '';
-	if (!empty($sender_email)) {
-		$footer_text = "If you have any questions, please contact <a href=\"mailto:" . esc_attr($sender_email) . "\">" . esc_html($sender_email) . "</a>.";
-	}
+	$content = "<p>Your learning resources are ready and available for you. Click the link below to get started or continue your progress.</p>";
+	$footer_text = 'Questions? Contact <a href="mailto:learn@skillplan.ca">learn@skillplan.ca</a>';
+
 
 	return bys_build_email_template(
 		$subject,
@@ -224,18 +227,14 @@ function bys_get_course_nudge_email(string $group_name, string $recipient_name, 
  * @param string $recipient_name Name of the recipient
  * @param string $site_name Site name
  * @param string $site_url Site URL
- * @param string $sender_email Email address of the sender
  * @return array Array with 'subject', 'html', 'plain' keys
  */
-function bys_get_assessment_deadline_email(string $group_name, string $recipient_name, string $site_name, string $site_url, string $sender_email): array {
+function bys_get_assessment_deadline_email(string $group_name, string $recipient_name, string $site_name, string $site_url, string $cta_url_override = ''): array {
 	$subject = "Assessment deadline reminder";
-	$dashboard_url = $site_url . '/dashboard/';
+	$dashboard_url = !empty($cta_url_override) ? $cta_url_override : $site_url . '/dashboard/';
 	$heading = "Assessment Deadline Reminder";
 	$content = "<p>This is a reminder that you have a required assessment coming up in <strong>" . esc_html($group_name) . "</strong>. Please complete it before the deadline to stay on track with your learning.</p>";
-	$footer_text = '';
-	if (!empty($sender_email)) {
-		$footer_text = "If you have any questions, please contact <a href=\"mailto:" . esc_attr($sender_email) . "\">" . esc_html($sender_email) . "</a>.";
-	}
+	$footer_text = 'Questions? Contact <a href="mailto:learn@skillplan.ca">learn@skillplan.ca</a>';
 
 	return bys_build_email_template(
 		$subject,
@@ -259,15 +258,12 @@ function bys_get_assessment_deadline_email(string $group_name, string $recipient
  * @param string $site_url Site URL
  * @return array Array with 'subject', 'html', 'plain' keys
  */
-function bys_get_welcome_reminder_email(string $group_name, string $recipient_name, string $site_name, string $site_url, string $sender_email): array {
+function bys_get_welcome_reminder_email(string $group_name, string $recipient_name, string $site_name, string $site_url, string $cta_url_override = ''): array {
 	$subject = "Welcome to {$group_name}";
-	$dashboard_url = $site_url . '/dashboard/';
+	$dashboard_url = !empty($cta_url_override) ? $cta_url_override : $site_url . '/dashboard/';
 	$heading = "Welcome to " . esc_html($group_name) . "!";
-	$content = "<p>Welcome to <strong>" . esc_html($group_name) . "</strong>! We're excited to have you join our learning community. Log in to get started with your courses and begin your learning journey today.</p>";
-	$footer_text = '';
-	if (!empty($sender_email)) {
-		$footer_text = "If you have any questions, please contact <a href=\"mailto:" . esc_attr($sender_email) . "\">" . esc_html($sender_email) . "</a>.";
-	}
+	$content = "<p>You’ve been invited to the <strong>". esc_html($group_name) ."</strong> training group. Log in today to get started!</p>";
+	$footer_text = 'Questions? Contact <a href="mailto:learn@skillplan.ca">learn@skillplan.ca</a>';
 
 	return bys_build_email_template(
 		$subject,
@@ -286,12 +282,11 @@ function bys_get_welcome_reminder_email(string $group_name, string $recipient_na
 /**
  * Custom email template
  *
- * @param string $custom_subject The email subject
  * @param string $custom_message The custom message body (HTML or plain text)
  * @return array Array with 'subject', 'html', 'plain' keys
  */
-function bys_get_custom_email(string $custom_subject, string $custom_message): array {
-	$subject = $custom_subject;
+function bys_get_custom_email(string $group_name, string $custom_message): array {
+	$subject = "Build Your Skills | You have received a message from your group leader";
 	$site_name = get_bloginfo('name');
 	$site_url = home_url();
 
@@ -319,15 +314,18 @@ function bys_get_custom_email(string $custom_subject, string $custom_message): a
 						</tr>
 						<tr>
 							<td style="background:#ffffff;border-radius:12px;padding:40px 40px 32px;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
-								<div style="font-size:15px;color:#374151;line-height:1.6;">
+								<h1 style="margin:0 0 24px;font-size:22px;font-weight:700;color:#111827;">
+									<?php echo esc_html($group_name); ?> has sent you the following message:
+								</h1>
+								<p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.6;">
 									<?php echo wp_kses_post($custom_message); ?>
-								</div>
+								</p>
 							</td>
 						</tr>
 						<tr>
 							<td style="padding-top:24px;text-align:center;">
 								<p style="margin:0;font-size:12px;color:#9ca3af;">
-									&copy; <?php echo date('Y'); ?> <?php echo esc_html($site_name); ?>.
+									&copy; <?php echo date('Y'); ?> <?php echo esc_html($site_name); ?>. Questions? Contact <a href="mailto:learn@skillplan.ca">learn@skillplan.ca</a>
 								</p>
 							</td>
 						</tr>
@@ -344,4 +342,85 @@ function bys_get_custom_email(string $custom_subject, string $custom_message): a
 	$plain = wp_strip_all_tags($custom_message);
 
 	return compact('subject', 'html', 'plain');
+}
+
+/**
+ * Build the per-user quiz-access notification email.
+ *
+ * Sent by the group-user-quiz-config block when a group leader clicks
+ * "Notify Learner" to inform a single learner about the start/end access
+ * window set for them on a specific quiz.
+ *
+ * @param array $vars {
+ *     @type string $recipient_name Learner's display name.
+ *     @type string $site_name      Site name (header brand).
+ *     @type string $site_url       Site URL.
+ *     @type string $quiz_title     The quiz the access window applies to.
+ *     @type string $quiz_url       Permalink to the quiz (used as CTA).
+ *     @type string $start          UTC ISO-8601 datetime when access opens, or ''.
+ *     @type string $end            UTC ISO-8601 datetime when access closes, or ''.
+ * }
+ * @return array { subject, html, plain }
+ */
+function bys_get_quiz_access_notification_email(array $vars): array {
+    $recipient_name = $vars['recipient_name'] ?? 'Learner';
+    $site_name      = $vars['site_name']      ?? get_bloginfo('name');
+    $site_url       = $vars['site_url']       ?? home_url();
+    $quiz_title     = $vars['quiz_title']     ?? 'your quiz';
+    $quiz_url       = $vars['quiz_url']       ?? $site_url;
+    $start          = $vars['start']          ?? '';
+    $end            = $vars['end']            ?? '';
+
+    $subject = sprintf('Quiz access: %s', $quiz_title);
+    $heading = sprintf('Access details for %s', $quiz_title);
+
+    // Render the access window as a uniform "Opens / Closes" pair. Empty
+    // bounds are surfaced as plain-language fallbacks rather than being
+    // hidden, so the learner always sees both rows.
+    $start_display = $start ? bys_format_local_datetime($start) : 'Accessible now';
+    $end_display   = $end   ? bys_format_local_datetime($end)   : 'Accessible indefinitely';
+
+    $window_html  = '<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;border-collapse:collapse;">';
+    $window_html .= sprintf(
+        '<tr><td style="padding:4px 16px 4px 0;color:#6b7280;font-size:13px;">Opens: </td><td style="padding:4px 0;color:#111827;font-weight:600;font-size:14px;">%s</td></tr>',
+        esc_html($start_display)
+    );
+    $window_html .= sprintf(
+        '<tr><td style="padding:4px 16px 4px 0;color:#6b7280;font-size:13px;">Closes: </td><td style="padding:4px 0;color:#111827;font-weight:600;font-size:14px;">%s</td></tr>',
+        esc_html($end_display)
+    );
+    $window_html .= '</table>';
+
+    $intro = sprintf(
+        '<p style="margin:0 0 16px;color:#374151;font-size:15px;">Your group leader has set the access for <strong>%s</strong>.</p>',
+        esc_html($quiz_title)
+    );
+
+    $content = $intro . $window_html;
+
+    $footer_text = 'Questions? Contact <a href="mailto:learn@skillplan.ca">learn@skillplan.ca</a>';
+
+    return bys_build_email_template(
+        $subject,
+        $heading,
+        $content,
+        $site_name,
+        $site_url,
+        $recipient_name,
+        $quiz_url,
+        sprintf('Open %s', $quiz_title),
+        $footer_text
+    );
+}
+
+/**
+ * Format a UTC datetime string in the site's timezone for human-readable
+ * email display. Falls back to the raw input if parsing fails.
+ */
+function bys_format_local_datetime(string $utc_iso): string {
+    $ts = strtotime($utc_iso);
+    if (!$ts) {
+        return $utc_iso;
+    }
+    return wp_date('j M Y, H:i', $ts);
 }

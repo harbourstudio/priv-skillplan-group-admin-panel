@@ -93,10 +93,18 @@ jQuery(document).ready(async ($) => {
         });
     }
 
-    $(document).on('bys:groupSelected', async (_, { groupId, canManageLeaders }) => {
+    const $permissionNote = $block.find('.gl__note-permission');
+
+    $(document).on('bys:groupSelected', async (_, { groupId, canManageGroup, canManageMembers }) => {
         $skeleton.show();
         $list.empty();
         hideMessage();
+
+        // Show note to group-leaders of org-associated groups — they can view
+        // and manage members but defer leader management to org admins.
+        // Site admins, org admins, and standalone-group leaders all satisfy
+        // canManageGroup, so they don't see it.
+        $permissionNote.toggle(!!canManageMembers && !canManageGroup);
 
         try {
 
@@ -120,7 +128,7 @@ jQuery(document).ready(async ($) => {
                 return;
             }
 
-            $list[0].appendChild(buildRowsFragment(allLeaders, groupId, !!canManageLeaders));
+            $list[0].appendChild(buildRowsFragment(allLeaders, groupId, !!canManageGroup));
         } catch (err) {
             console.error('[group-leaders] Failed to fetch leaders', err);
             $skeleton.hide();

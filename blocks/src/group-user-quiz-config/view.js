@@ -1,5 +1,6 @@
 import { api, endpoints } from '../_shared/api-client.js';
 import store from '../_shared/store.js';
+import { bysAlert } from '../_shared/alert.js';
 import flatpickr from 'flatpickr';
 import 'flatpickr/dist/flatpickr.min.css';
 
@@ -382,25 +383,34 @@ jQuery(document).ready(($) => {
 
     // ── Save ──────────────────────────────────────────────────────────────────
 
+    /**
+     * Persist the current learner/quiz window — pure data op, throws on
+     * failure so callers decide the UI response. Shared by the explicit
+     * Save click AND the auto-save embedded in the Notify click (leaders
+     * routinely change dates and forget to save before notifying).
+     */
+    async function persistUserAccessDates() {
+        // Read from the hidden inputs Flatpickr writes its dateFormat value to
+        const startValue = $block.find('.guqc__datetime[data-field-type="start"]').val() || '';
+        const endValue   = $block.find('.guqc__datetime[data-field-type="end"]').val()   || '';
+        const start      = convertToUTC(startValue);
+        const end        = convertToUTC(endValue);
+
+        await api.post(
+            endpoints.userQuizAccess(currentGroupId, selectedUserId),
+            { quiz_id: selectedQuizId, start, end }
+        );
+
+        userQuizAccessDatesMap[selectedQuizId] = { start, end };
+    }
+
     $saveBtn.on('click', async function () {
         if (!selectedUserId || !selectedQuizId || !currentGroupId) return;
 
         $saveBtn.prop('disabled', true).text('Saving...');
 
         try {
-            // Read from the hidden inputs Flatpickr writes its dateFormat value to
-            const startValue = $block.find('.guqc__datetime[data-field-type="start"]').val() || '';
-            const endValue   = $block.find('.guqc__datetime[data-field-type="end"]').val()   || '';
-            const start      = convertToUTC(startValue);
-            const end        = convertToUTC(endValue);
-
-            await api.post(
-                endpoints.userQuizAccess(currentGroupId, selectedUserId),
-                { quiz_id: selectedQuizId, start, end }
-            );
-
-            userQuizAccessDatesMap[selectedQuizId] = { start, end };
-
+            await persistUserAccessDates();
             $saveBtn.prop('disabled', true).text('Changes saved!');
             setTimeout(() => {
                 $saveBtn.text('Save Changes');
@@ -409,7 +419,7 @@ jQuery(document).ready(($) => {
         } catch (err) {
             console.error('[uqc] Failed to save changes:', err);
             $saveBtn.prop('disabled', false).text('Save Changes');
-            alert('Failed to save changes. Please try again.');
+            bysAlert('Failed to save the learner\'s quiz access window. Please try again.');
         }
     });
 
@@ -425,6 +435,11 @@ jQuery(document).ready(($) => {
         $notifyBtn.prop('disabled', true).text('Notifying...');
 
         try {
+            // Auto-save the current window first so the email reflects
+            // what's in the inputs (leaders often edit dates then click
+            // Notify without explicitly hitting Save Changes).
+            await persistUserAccessDates();
+
             await api.post(
                 endpoints.notifyUserQuizAccess(currentGroupId, selectedUserId),
                 { quiz_id: selectedQuizId }
@@ -435,12 +450,13 @@ jQuery(document).ready(($) => {
                 updateActions();
             }, 2000);
         } catch (err) {
-            console.error('[uqc] Failed to notify learner:', err);
+            console.error('[uqc] Failed to save + notify:', err);
             $notifyBtn.text('Failed — try again');
             setTimeout(() => {
                 $notifyBtn.text(originalLabel);
                 updateActions();
             }, 2500);
+            bysAlert('Failed to save the learner\'s quiz access window and notify them. Please try again.');
         }
     });
 

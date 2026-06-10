@@ -1,7 +1,11 @@
 import { api, endpoints } from '../_shared/api-client.js';
 import store from '../_shared/store.js';
+import { bysAlert } from '../_shared/alert.js';
+import { formatDateTime } from '../_shared/helpers.js';
+import { createTooltip as createSharedTooltip, destroyTooltip as destroySharedTooltip } from '../_shared/tooltip.js';
 import flatpickr from 'flatpickr';
 import 'flatpickr/dist/flatpickr.min.css';
+import JSZip from 'jszip';
 
 jQuery(document).ready(function($) {
   const $block = $('.wp-block-bys-groups-group-reporting').first(); // assume only 1 block instance per page
@@ -137,6 +141,35 @@ jQuery(document).ready(function($) {
     if (userId) window.location.href = detailUrl + '?user_id=' + userId + '&group_id=' + currentGroupId;
   });
 
+  // ── Status badge ─────────────────────────────────────────────────────────────
+  // Shared handler for rendering the .status-badge cell. Also stashes the
+  // raw `last_active` / `status_checked_at` timestamps as data attributes so
+  // the mouseenter handler below can build a tooltip ("Last active: X" /
+  // "Checked at Y") without needing the full user object.
+  function applyStatusBadge($badge, user) {
+    const userStatus = user.status || 'never';
+    $badge.attr('class', `status-badge status-badge--${userStatus}`);
+    if (user.last_active)       $badge.attr('data-last-active', user.last_active);       else $badge.removeAttr('data-last-active');
+    if (user.status_checked_at) $badge.attr('data-status-checked-at', user.status_checked_at); else $badge.removeAttr('data-status-checked-at');
+  }
+
+  // Status-badge tooltip — only renders the Last active line. The
+  // data-status-checked-at attribute is still stashed on the badge by
+  // applyStatusBadge() for future use / debugging, just not displayed.
+  // Uses the shared tooltip helper (not the local createAndShowTooltip
+  // below, which is wired to quiz-icon data).
+  $table.on('mouseenter', '.status-badge', function () {
+    const $badge     = jQuery(this);
+    const lastActive = $badge.attr('data-last-active');
+
+    createSharedTooltip($badge, {
+      title: lastActive ? `Last active: ${formatDateTime(lastActive)}` : 'Never active',
+    });
+  });
+  $table.on('mouseleave', '.status-badge', function () {
+    destroySharedTooltip();
+  });
+
   // ── Tooltips ─────────────────────────────────────────────────────────────────
   function createAndShowTooltip($trigger) {
     const tipData = $trigger.data('tip');
@@ -226,14 +259,6 @@ jQuery(document).ready(function($) {
     destroyTooltip();
   });
 
-  $table.on('mouseenter', '.status-badge__icon[data-tip]', function() {
-    createAndShowTooltip($(this));
-  });
-
-  $table.on('mouseleave', '.status-badge__icon', function() {
-    destroyTooltip();
-  });
-
   $table.on('click', '[data-tip]', function(e) {
     e.stopPropagation();
     createAndShowTooltip($(this));
@@ -300,6 +325,7 @@ jQuery(document).ready(function($) {
     displayedCount = 0;
     $sortSelect.val('first_name_asc');
     resetFilterFormUI();
+    updateCourseDepFieldState();
     updateCompletionSortVisibility();
   }
 
@@ -315,6 +341,12 @@ jQuery(document).ready(function($) {
     resetTableStateForGroup(userIds);
 
     await populateTableFromAPI(groupId, userIds, courses);
+
+    // if filters panel is currently open, re-render the multiselects so they reflect the newly selected group
+    if ($filtersBox.length && !$filtersBox.hasClass('hidden')) {
+      populateCourseMultiselect();
+      populateUserMultiselect();
+    }
   });
 
   // ── Table population ──────────────────────────────────────────────────────────
@@ -798,7 +830,7 @@ jQuery(document).ready(function($) {
       if (course.required) {
         $headers.find('.group-reporting__required-badge').removeClass('hidden');
       }
-      $headers.find('.group-reporting__dl-link').attr('title', `Download ${courseTitle}`).attr('data-course-idx', idx);
+      $headers.find('.group-reporting__download').attr('data-course-idx', idx);
 
       $headers.children().each(function() {
         headerRow.appendChild(this);
@@ -848,9 +880,11 @@ jQuery(document).ready(function($) {
 
     $tr.attr('data-user-id', user.id);
 
-    // Status dot — toggle modifier class for online/offline/never.
-    const userStatus = user.status || 'never';
-    $tr.find('.status-badge').addClass('status-badge--' + userStatus);
+    // Status dot — toggle modifier class for online/offline/never AND
+    // wrap the icon with the "Last checked" tooltip. Must use the same
+    // helper as appendTableRows() so both render paths stay in sync
+    // (fast first paint vs full rebuild after fetch).
+    applyStatusBadge($tr.find('.status-badge'), user);
 
     // Name + detail link.
     const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.display_name || '';
@@ -923,7 +957,9 @@ jQuery(document).ready(function($) {
     // Progress sub-cell
     const stepsCompleted = courseData?.steps_completed || 0;
     const stepsTotal     = courseData?.steps_total     || 0;
-    const percentage     = stepsTotal > 0 ? Math.round((stepsCompleted / stepsTotal) * 100) : 0;
+    const percentage     = typeof courseData?.percent_complete === 'number'
+      ? courseData.percent_complete
+      : (stepsTotal > 0 ? Math.min(100, Math.round((stepsCompleted / stepsTotal) * 100)) : 0);
     const percentClass   = percentage === 100 ? 'complete' : percentage === 0 ? 'not-started' : 'in-progress';
 
     $scope.find(`.group-reporting__sub-cell--progress[data-course-idx="${idx}"]`).html(`
@@ -971,18 +1007,7 @@ jQuery(document).ready(function($) {
 
       $row.find('tr').attr('data-user-id', user.id).removeClass('group-reporting__row--loading');
 
-      const userStatus = user.status || 'never';
-      const statusClass = `status-badge--${userStatus}`;
-
-      let statusBadge = `<i class="fa-solid fa-circle"></i>`;
-      if (user.last_login) {
-        const readableDateTime = formatDate(user.last_login);
-        const unixTimestamp = user.last_login_unix || '';
-        const tooltipText = `Last login: ${readableDateTime} (${unixTimestamp})`;
-        statusBadge = `<span class="status-badge__icon" data-tip="${escapeHtml(tooltipText)}"><i class="fa-solid fa-circle"></i></span>`;
-      }
-
-      $row.find('.status-badge').attr('class', `status-badge ${statusClass}`).html(statusBadge);
+      applyStatusBadge($row.find('.status-badge'), user);
 
       const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.display_name || '';
       $row.find('.group-reporting__col--name').html(`
@@ -1628,7 +1653,7 @@ jQuery(document).ready(function($) {
     }
   });
 
-  $table.on('click', '.group-reporting__dl-link', async function(e) {
+  $table.on('click', '.group-reporting__download', async function(e) {
     e.preventDefault();
     e.stopPropagation();
     if (!currentGroupId) return;
@@ -1641,7 +1666,10 @@ jQuery(document).ready(function($) {
     $link.addClass('is-loading').html('<i class="fa-regular fa-spinner fa-spin"></i>');
 
     try {
-      await exportCourseToCsv(course);
+      await downloadCourseCertificates(course);
+    } catch (err) {
+      bysAlert('Bulk certificate download failed.');
+      console.error('[group-reporting] Bulk certificate download failed', err);
     } finally {
       $link.removeClass('is-loading').html('<i class="fa-regular fa-download"></i>');
     }
@@ -1688,9 +1716,12 @@ jQuery(document).ready(function($) {
   function courseProgressCells(courseData) {
     const progressLabel = { completed: 'Completed', in_progress: 'In Progress', not_started: 'Not Started' };
     const progressStatus = courseData?.progress_status || 'not_started';
+    // mirrors the progress sub-cell
     const stepsCompleted = courseData?.steps_completed || 0;
     const stepsTotal = courseData?.steps_total || 0;
-    const percentage = stepsTotal > 0 ? Math.round((stepsCompleted / stepsTotal) * 100) : 0;
+    const percentage = typeof courseData?.percent_complete === 'number'
+      ? courseData.percent_complete
+      : (stepsTotal > 0 ? Math.min(100, Math.round((stepsCompleted / stepsTotal) * 100)) : 0);
     return [
       progressLabel[progressStatus] || progressStatus,
       `${percentage}%`,
@@ -1811,28 +1842,104 @@ jQuery(document).ready(function($) {
     downloadCsv(rows, `group-report-${currentGroupId}-${today}.csv`);
   }
 
-  async function exportCourseToCsv(course) {
-    const filteredUsers = await getExportUsers();
-    const quizSteps = await ensureQuizDataForCourse(course, filteredUsers);
+  /**
+   * Bundle LD certs for every group-user achieved course-compltion into a ZIP
+   * 
+   * Cert URLs come from learndash_get_course_certificate_link()
+   * server-side and carry a per-(course, target_user, viewing_user) nonce,
+   * so each URL only renders for the user that requested the bulk download.
+   * fetch() runs with credentials: 'include' to carry the session cookie.
+   * 
+   * NOTE: summary of non-complete
+   */
+  async function downloadCourseCertificates(course) {
 
-    const title = course.shortname || course.title?.rendered || course.title || '';
-    const req = course.required ? ' (Required)' : '';
+    // get cert data
+    const response = await api.get(
+      `/wp-json/bys-groups/v1/groups/${currentGroupId}/courses/${course.id}/certificate-urls`,
+      true // forceRefresh - never serve a stale list
+    );
+    const users = Array.isArray(response?.users) ? response.users : [];
+    const courseTitle = response?.course_title || course.title?.rendered || course.title || `course-${course.id}`;
 
-    const headers = ['Name', 'Email', `${title}${req} - Course Status`, `${title}${req} - Progress`, `${title}${req} - Enrolled`, `${title}${req} - Completed`];
-    quizSteps.forEach(quiz => headers.push(`${title}${req} - ${quiz.step_title}`));
+    // Course has no certificate configured - abandon download
+    if (response?.has_certificate_template === false) {
+      bysAlert(`"${courseTitle}" has no certificate configured.`);
+      // console.warn('[group-reporting] Course has no certificate template:', course.id);
+      return;
+    }
 
-    const rows = [headers];
-    filteredUsers.forEach(user => {
-      const userProgress = userCourseProgressAll[user.id] || [];
-      const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.display_name || '';
-      const userQuizProgress = (userQuizProgressCache[course.id] || {})[user.id] || {};
-      const quizCells = quizSteps.map(quiz => quizProgressCell(quiz, userQuizProgress));
-      rows.push([fullName, user.email || '', ...courseProgressCells(userProgress.find(cp => cp.course_id === course.id)), ...quizCells]);
-    });
+    if (!users.length) {
+      bysAlert('No group members to download certificates for.')
+      // console.warn('[group-reporting] No group members to download certificates for.');
+      return;
+    }
+    // no group-users have achieved completion yet
+    if (!users.some((u) => !!u.certificate_url)) {
+      bysAlert(`No group members have completed "${courseTitle}".`);
+      // console.warn('[group-reporting] No completers for course:', course.id);
+      return;
+    }
 
-    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    // create a new ZIP file container
+    const zip = new JSZip();
+
+    // Sanitise once — used for both the per-PDF filename and the outer
+    // ZIP filename. Filesystems differ on what they tolerate; the
+    // intersection of safe chars is conservative.
+    const safe = (str) => String(str).replace(/[^a-zA-Z0-9-_.]+/g, '_').replace(/^_+|_+$/g, '');
+
+    // Cap concurrency so the server doesn't get overloaded by large download at once 
+    const PARALLEL = 5;
+    const summaryRows = [['Email', 'User ID', 'Name', 'Certificate Included']];
+
+    let cursor = 0;
+    async function worker() {
+      while (cursor < users.length) {
+        const user = users[cursor++];
+        const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.display_name || '';
+        let included = false;
+
+        if (user.certificate_url) {
+          try {
+            const resp = await fetch(user.certificate_url, { credentials: 'include' });
+            if (resp.ok) {
+              const buf = await resp.arrayBuffer();
+              const filename = `${safe(user.user_id + '_' + fullName)}.pdf`;
+              zip.file(filename, buf);
+              included = true;
+            }
+          } catch (err) {
+            console.warn('[group-reporting] Failed to fetch certificate for user', user.user_id, err);
+          }
+        }
+
+        summaryRows.push([user.email || '', user.user_id, fullName, included ? 'Yes' : 'No']);
+      }
+    }
+    await Promise.all(Array.from({ length: PARALLEL }, worker));
+
+    // Summary CSV at the root of the ZIP. UTF-8 BOM for Excel compatibility,
+    // matching downloadCsv's behaviour for the table-level export.
+    const summaryFile = summaryRows.map((row) =>
+      row.map((cell) => {
+        const str = String(cell ?? '');
+        return /[,"\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+      }).join(',')
+    ).join('\n');
+    zip.file('_summary.csv', '﻿' + summaryFile);
+
+    // make the ZIP a downloadable file and trigger browser download by simulating a click on a hidden link 
+    const blob = await zip.generateAsync({ type: 'blob' });
     const today = new Date().toISOString().split('T')[0];
-    downloadCsv(rows, `course-report-${slug}-${today}.csv`);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${currentGroupId}-certificates-${safe(courseTitle)}-${today}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 
   // ── Utilities ─────────────────────────────────────────────────────────────────

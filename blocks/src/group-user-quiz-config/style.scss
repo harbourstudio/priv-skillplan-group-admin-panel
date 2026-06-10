@@ -1,4 +1,5 @@
 @use '../_shared/flatpickr';
+@use '../_shared/alert';
 
 .wp-block-bys-groups-group-user-quiz-config {
     .guqc {
@@ -250,7 +251,7 @@
             }
         }
 
-        &__btn-primary {
+        &__save {
             padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--5);
             background: var(--wp--preset--color--primary);
             color: white;
@@ -267,7 +268,7 @@
             }
         }
 
-        &__btn-outline {
+        &__notify {
             padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--5);
             background: var(--wp--preset--color--blue-50);
             color: var(--wp--preset--color--primary);
