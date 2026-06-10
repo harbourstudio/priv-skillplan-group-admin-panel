@@ -304,6 +304,8 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 $last_login_timestamp = max($meta_values);
                 $last_login_timestamp = $last_login_timestamp > 0 ? $last_login_timestamp : null;
 
+                $last_active_ts = BYS_Groups_Activity_Logger::get_last_active_ts($user_id);
+
                 $enrolled_at_raw = get_user_meta($user_id, "learndash_group_{$group_id}_enrolled_at", true);
 
                 $users[] = [
@@ -315,6 +317,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                     'avatar'       => get_avatar_url($user_id, ['size' => 64]),
                     'enrolled_at'  => $enrolled_at_raw ? wp_date('c', (int) $enrolled_at_raw) : null,
                     'last_login'   => $last_login_timestamp ? wp_date('c', $last_login_timestamp) : null,
+                    'last_active'  => $last_active_ts ? wp_date('c', $last_active_ts) : null,
                     'status'       => $this->get_user_active_status($user_id),
                     'status_checked_at' => gmdate('c'),
                 ];
@@ -464,6 +467,8 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 $last_login_timestamp = max($meta_values);
                 $last_login_timestamp = $last_login_timestamp > 0 ? $last_login_timestamp : null;
 
+                $last_active_ts = BYS_Groups_Activity_Logger::get_last_active_ts($user_id);
+
                 $enrolled_at_raw = get_user_meta($user_id, "learndash_group_{$group_id}_enrolled_at", true);
 
                 $users[] = [
@@ -475,6 +480,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                     'avatar'       => get_avatar_url($user_id, ['size' => 64]),
                     'enrolled_at'  => $enrolled_at_raw ? wp_date('c', (int) $enrolled_at_raw) : null,
                     'last_login'   => $last_login_timestamp ? wp_date('c', $last_login_timestamp) : null,
+                    'last_active'  => $last_active_ts ? wp_date('c', $last_active_ts) : null,
                     'status'       => $this->get_user_active_status($user_id),
                     'status_checked_at' => gmdate('c'),
                 ];
@@ -508,6 +514,8 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             $last_login_timestamp = max($meta_values);
             $last_login_timestamp = $last_login_timestamp > 0 ? $last_login_timestamp : null;
 
+            $last_active_ts = BYS_Groups_Activity_Logger::get_last_active_ts($user_id);
+
             return [
                 'id'                  => $user->ID,
                 'first_name'          => $user->first_name,
@@ -518,6 +526,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 'status_checked_at'   => gmdate('c'),
                 'group_enrolled_date' => $group_enrolled_date ?: null,
                 'last_login'          => $last_login_timestamp,
+                'last_active'         => $last_active_ts ? wp_date('c', $last_active_ts) : null,
                 'avatar_url'          => get_avatar_url($user_id, ['size' => 80]),
             ];
         }
@@ -2303,29 +2312,17 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
          *   'never'   — no active session and no recorded login timestamp
          */
         /**
-         * Status tier for the user's "system activity" badge in group-reporting
-         * (and the user-info / group-members surfaces that share this shape).
-         *
          * Source of truth: BYS_Groups_Activity_Logger::get_last_active_ts(),
-         * which prefers our session-presence tracker (refreshed on every
-         * authenticated request), falls back to the LD activity table, and
-         * finally to legacy wp_login meta. Replaces the old logic that
-         * mis-reported "online" for anyone with a non-expired session cookie
-         * (default 14 days with remember-me — gave false-positive online for
-         * users who logged in once and never came back).
-         *
-         *  - 'online'  : last active within the last 15 minutes. The tracker
-         *                throttles writes to once / 5 min, so a 15-min window
-         *                gives a 2-throttle-cycle buffer for users actively
-         *                browsing right now.
-         *  - 'offline' : has been active at some point, just not recently.
-         *  - 'never'   : no signal in any source — truly never present.
+         * which max()es across the custom system-activity tracker (frontend
+         * page loads, group-members only), the LD activity table (quiz /
+         * lesson / topic events), and legacy approach of reading
+         * wp_login-dependent user meta
          */
         private function get_user_active_status($user_id) {
             $last_active = BYS_Groups_Activity_Logger::get_last_active_ts($user_id);
             if ($last_active === 0) return 'never';
 
-            if (time() - $last_active < 15 * MINUTE_IN_SECONDS) return 'online';
+            if (time() - $last_active < BYS_Groups_Activity_Logger::ACTIVE_WINDOW_SECONDS) return 'online';
 
             return 'offline';
         }

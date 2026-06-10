@@ -1,6 +1,8 @@
 import { api, endpoints } from '../_shared/api-client.js';
 import store from '../_shared/store.js';
 import { bysAlert } from '../_shared/alert.js';
+import { formatDateTime } from '../_shared/helpers.js';
+import { createTooltip as createSharedTooltip, destroyTooltip as destroySharedTooltip } from '../_shared/tooltip.js';
 import flatpickr from 'flatpickr';
 import 'flatpickr/dist/flatpickr.min.css';
 import JSZip from 'jszip';
@@ -140,11 +142,33 @@ jQuery(document).ready(function($) {
   });
 
   // ── Status badge ─────────────────────────────────────────────────────────────
-  // shared handler for rendering the .status-badge cell
+  // Shared handler for rendering the .status-badge cell. Also stashes the
+  // raw `last_active` / `status_checked_at` timestamps as data attributes so
+  // the mouseenter handler below can build a tooltip ("Last active: X" /
+  // "Checked at Y") without needing the full user object.
   function applyStatusBadge($badge, user) {
     const userStatus = user.status || 'never';
     $badge.attr('class', `status-badge status-badge--${userStatus}`);
+    if (user.last_active)       $badge.attr('data-last-active', user.last_active);       else $badge.removeAttr('data-last-active');
+    if (user.status_checked_at) $badge.attr('data-status-checked-at', user.status_checked_at); else $badge.removeAttr('data-status-checked-at');
   }
+
+  // Status-badge tooltip — only renders the Last active line. The
+  // data-status-checked-at attribute is still stashed on the badge by
+  // applyStatusBadge() for future use / debugging, just not displayed.
+  // Uses the shared tooltip helper (not the local createAndShowTooltip
+  // below, which is wired to quiz-icon data).
+  $table.on('mouseenter', '.status-badge', function () {
+    const $badge     = jQuery(this);
+    const lastActive = $badge.attr('data-last-active');
+
+    createSharedTooltip($badge, {
+      title: lastActive ? `Last active: ${formatDateTime(lastActive)}` : 'Never active',
+    });
+  });
+  $table.on('mouseleave', '.status-badge', function () {
+    destroySharedTooltip();
+  });
 
   // ── Tooltips ─────────────────────────────────────────────────────────────────
   function createAndShowTooltip($trigger) {

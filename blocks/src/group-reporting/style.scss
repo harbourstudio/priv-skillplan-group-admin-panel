@@ -515,9 +515,16 @@
     //    so colour overrides don't leak to other blocks using the badge)
     .status-badge {
         font-size: var(--wp--preset--font-size--x-small);
-        &--online  { color: var(--wp--preset--color--green-500); }
-        &--offline { color: var(--wp--preset--color--gray-300); }
-        &--never   { color: var(--wp--preset--color--red-500);  }
+
+        &--online  {
+            color: var(--wp--preset--color--green-500);
+        }
+        &--offline {
+            color: var(--wp--preset--color--gray-300);
+        }
+        &--never   {
+            color: var(--wp--preset--color--red-500); 
+        }
     }
 
     // ── Shared completion-badge (also used by user-progress) ──────────────

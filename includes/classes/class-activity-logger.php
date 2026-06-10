@@ -12,16 +12,38 @@ if (!class_exists('BYS_Groups_Activity_Logger')) {
     class BYS_Groups_Activity_Logger {
 
         /**
-         * Session-presence tracker — NOT a wp_login event tracker.
+         * Group-member system-activity tracker.
          *
-         * `wp_login` only fires when a user submits the login form, so any
-         * meta written from it goes stale the moment the user becomes
-         * cookie-authenticated. We refresh this key on every authenticated
-         * request instead — see track_user_session_activity() for the write
-         * and get_last_active_ts() for the read.
+         * Activity badges in the dashboard (group-reporting, user-info, etc.)
+         * answer "was this group member active in the last 15 minutes?"
+         * Reads aggregate `max()` across three sources via get_last_active_ts():
+         *
+         *   1. ACTIVE_META_KEY (this constant) — written by
+         *      track_group_member_sys_activity() when a group member loads
+         *      ANY frontend page that isn't already covered by the LD activity
+         *      table. Catches non-LD system activity (homepage, custom landers,
+         *      /all-courses/, /account/*).
+         *   2. learndash_user_activity table — populated by LD itself on
+         *      quiz/lesson/topic interactions. Primary source for LD-content
+         *      activity.
+         *   3. Legacy wp_login-fired meta — last-resort fallback for old
+         *      accounts with no system-activity signal in #1 or #2.
+         *
+         * Scope is intentional. We only write for users who are members of at
+         * least one LD group (the only users whose system activity is ever
+         * read). Staff who aren't also group members never write — their
+         * system activity is never displayed anyway. Throttled to one write
+         * per ACTIVE_THROTTLE_SECONDS per user.
+         *
+         * The "online" status window (ACTIVE_WINDOW_SECONDS, consumed by
+         * get_user_active_status() in class-groups-router.php) is sized at 2×
+         * the throttle so a continuously-active user gets up to two write
+         * opportunities inside any window — preventing false-offline flips
+         * during a live session.
          */
         const ACTIVE_META_KEY         = 'bys_last_active_ts';
-        const ACTIVE_THROTTLE_SECONDS = 300; // 5 min
+        const ACTIVE_THROTTLE_SECONDS = 900;  // 15 min — min interval between writes per user
+        const ACTIVE_WINDOW_SECONDS   = 1800; // 30 min — "online" status window (2× throttle for buffer)
 
         public function __construct() {
             $this->register_hooks();
@@ -31,8 +53,11 @@ if (!class_exists('BYS_Groups_Activity_Logger')) {
             // System events
             add_action('wp_login',  [$this, 'on_user_login'],  10, 2);
             add_action('wp_logout', [$this, 'on_user_logout'], 1); // Priority 1 (before default 10) to capture before session destroyed
-            // Session-presence tracker (see ACTIVE_META_KEY docblock above).
-            add_action('init', [$this, 'track_user_session_activity']);
+            // Group-member system-activity tracker (see ACTIVE_META_KEY docblock above).
+            // Fires on every frontend page load; the handler short-circuits
+            // unless the current user is a group member and the throttle
+            // window has elapsed.
+            add_action('template_redirect', [$this, 'track_group_member_sys_activity'], 5);
             // Learndash events
             add_action('learndash_course_completed',      [$this, 'on_certificate_earned'],   10, 1);
             add_action('template_redirect',               [$this, 'on_page_view'],            10);
@@ -42,13 +67,21 @@ if (!class_exists('BYS_Groups_Activity_Logger')) {
         }
 
         /**
-         * Hook handler for `init`. Skips background contexts (cron, CLI)
-         * and stamps ACTIVE_META_KEY for the current user, throttled to
-         * one write per ACTIVE_THROTTLE_SECONDS.
+         * Stamp ACTIVE_META_KEY for the current user when they load a frontend
+         * page, provided they're a member of at least one LD group. Captures
+         * non-LD system activity (homepage, custom landers, /all-courses/,
+         * /account/*); LD-page system activity is already covered by the
+         * learndash_user_activity table, but this handler still writes on LD
+         * pages — the read path just takes max() across sources, so a
+         * redundant fresh stamp is harmless.
+         *
+         * Throttled to one write per ACTIVE_THROTTLE_SECONDS per user. The
+         * membership check (cheap but non-trivial) only runs AFTER the
+         * throttle check passes, so most page loads short-circuit before any
+         * database query.
          */
-        public function track_user_session_activity() {
-            if (wp_doing_cron()) return;
-            if (defined('WP_CLI') && WP_CLI) return;
+        public function track_group_member_sys_activity() {
+            if (is_admin() || wp_doing_cron() || (defined('WP_CLI') && WP_CLI)) return;
 
             $user_id = get_current_user_id();
             if (!$user_id) return;
@@ -57,20 +90,32 @@ if (!class_exists('BYS_Groups_Activity_Logger')) {
             $last = (int) get_user_meta($user_id, self::ACTIVE_META_KEY, true);
             if ($now - $last < self::ACTIVE_THROTTLE_SECONDS) return;
 
+            // Throttle would have permitted a write; only proceed if the
+            // user is a group member (the only audience whose system
+            // activity is ever read by the dashboard).
+            if (!function_exists('learndash_get_users_group_ids')) return;
+            $group_ids = (array) learndash_get_users_group_ids($user_id);
+            if (empty($group_ids)) return;
+
             update_user_meta($user_id, self::ACTIVE_META_KEY, $now);
         }
 
         /**
          * Plugin-wide "when was this user last active" reader. Returns the
-         * max() across three sources, in descending order of reliability:
+         * `max()` across the sources below — there is NO priority/fallback,
+         * the freshest timestamp from any source wins regardless of which
+         * source it came from:
          *
-         *   1. ACTIVE_META_KEY  — session-presence tracker (written by
-         *      track_user_session_activity() on every authenticated request).
-         *   2. learndash_user_activity table — real LD engagement events
-         *      (survives cookie-auth, but only LD-context interactions).
-         *   3. Legacy wp_login-fired meta union — can be very stale; kept
-         *      as last resort so pre-tracker accounts still register SOME
-         *      signal.
+         *   1. ACTIVE_META_KEY — written by track_group_member_sys_activity()
+         *      when a group member loads any frontend page. Tracks
+         *      system activity in non-LD context (homepage, custom landers,
+         *      /all-courses/, /account/*).
+         *   2. learndash_user_activity table — LD-interaction events.
+         *      Primary source for LD-content activity.
+         *   3. Legacy wp_login-fired meta — last-resort source. Tends to be
+         *      stale for cookie-authenticated users (`wp_login` only fires on
+         *      form submit), but still folded into the max() so old accounts
+         *      with no signal in #1 or #2 register SOMETHING.
          *
          * Returns 0 when no source has any data for this user.
          */
