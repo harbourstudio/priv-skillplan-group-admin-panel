@@ -15,7 +15,7 @@ export default function Edit({ clientId, attributes, setAttributes }) {
 			<div className="group-settings__card">
 				<h5 className="group-settings__title">{__('Rename Group', 'bys')}</h5>
 				<p className="group-settings__description">
-					{__('Change the display name of the currently selected group. The new name will appear everywhere this group is referenced.', 'bys')}
+					{__('Change the display name of the currently selected group.', 'bys')}
 				</p>
 				<div className="group-settings__field">
 					<input

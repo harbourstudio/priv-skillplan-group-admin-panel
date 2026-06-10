@@ -20,7 +20,7 @@ $wrapper_attributes = get_block_wrapper_attributes();
 <div <?= $wrapper_attributes; ?>>
     <div class="group-settings__card">
         <h5 class="group-settings__title"><?php esc_html_e( 'Rename Group', 'bys' ); ?></h5>
-        <p class="group-settings__description"><?php esc_html_e( 'Change the display name of the currently selected group. The new name will appear everywhere this group is referenced.', 'bys' ); ?></p>
+        <p class="group-settings__description"><?php esc_html_e( 'Change the display name of the currently selected group.', 'bys' ); ?></p>
         <div class="group-settings__field">
             <input
                 class="group-settings__input"
