@@ -45,7 +45,9 @@ if ( $is_site_editor ) return;
                     <p class="gaam__upload-desc">
                         <?php esc_html_e( 'First, ', 'bys' ); ?>
                         <a href="#" class="gaam__template"><?php esc_html_e( 'download the CSV template', 'bys' ); ?></a>
-                        <?php esc_html_e( ' to populate.', 'bys' ); ?>
+                        <?php esc_html_e(' to populate.', 'bys'); ?>
+                        <?php esc_html_e('Please note that the \'email\' column is required to process the file.', 'bys'); ?>
+
                     </p>
                     <div class="gaam__dropzone">
                         <i class="fa-solid fa-file-csv"></i>
@@ -61,6 +63,10 @@ if ( $is_site_editor ) return;
                 <!-- Screen 2: Review -->
                 <div class="gaam__screen gaam__screen--review" style="display:none;">
                     <div>
+                        <p class="gaam__role">
+                            <?php esc_html_e( 'Adding as:', 'bys' ); ?>
+                            <span class="gaam__role-value"><?php esc_html_e( 'Learner', 'bys' ); ?></span>
+                        </p>
                         <div class="gaam__review-group gaam__review-group--add">
                             <h6>
                                 <?php esc_html_e( 'Will be added', 'bys' ); ?>
@@ -70,7 +76,7 @@ if ( $is_site_editor ) return;
                         </div>
                         <div class="gaam__review-group gaam__review-group--already-member" style="display:none;">
                             <h6>
-                                <?php esc_html_e( 'Already members', 'bys' ); ?>
+                                <span class="gaam__review-label--already-member"><?php esc_html_e( 'Already members', 'bys' ); ?></span>
                                 <span class="gaam__review-count--already-member">(0)</span>
                             </h6>
                             <ul class="gaam__review--already-member"></ul>

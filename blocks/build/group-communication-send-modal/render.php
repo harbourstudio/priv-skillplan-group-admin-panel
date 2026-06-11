@@ -180,11 +180,13 @@ $wrapper_attributes = get_block_wrapper_attributes();
                         />
                     </div>
 
-                    <label for="gcsm__message">
-                        <?php esc_html_e('Message', 'bys'); ?>
-                        <textarea id="gcsm__message" rows="5" placeholder="<?php esc_attr_e('Write your message here…', 'bys'); ?>"></textarea>
-                    </label>
-                    <div id="gcsm__preview" class="gcsm__preview" style="display:none;"></div>
+                    <div>
+                        <label for="gcsm__message">
+                            <?php esc_html_e('Message', 'bys'); ?>
+                            <textarea id="gcsm__message" rows="5" placeholder="<?php esc_attr_e('Write your message here…', 'bys'); ?>"></textarea>
+                        </label>
+                        <div id="gcsm__preview" class="gcsm__preview" style="display:none;"></div>
+                    </div>
 
                     <div class="gcsm__recipients-preview" style="display:none;">
                         <h6><?php esc_html_e('Recipients', 'bys'); ?></h6>
@@ -201,6 +203,7 @@ $wrapper_attributes = get_block_wrapper_attributes();
                                 <span role="columnheader"><?php esc_html_e('Name', 'bys'); ?></span>
                                 <span role="columnheader"><?php esc_html_e('Email', 'bys'); ?></span>
                                 <span role="columnheader"><?php esc_html_e('User ID', 'bys'); ?></span>
+                                <span role="columnheader" data-col="details"><?php esc_html_e('Details', 'bys'); ?></span>
                             </div>
                             <ul class="gcsm__recipients-preview-list" role="rowgroup"></ul>
 
@@ -209,6 +212,9 @@ $wrapper_attributes = get_block_wrapper_attributes();
                                     <span role="cell" data-field="name"></span>
                                     <span role="cell" data-field="email"></span>
                                     <span role="cell" data-field="user-id"></span>
+                                    <span role="cell" data-field="details">
+                                        <span class="gcsm__details-line"></span>
+                                    </span>
                                 </li>
                             </template>
                         </div>

@@ -37,7 +37,6 @@ require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-auth.php';
 						class="group-option"
 						value="<?php echo $group['id']; ?>"
 						data-is-org-admin="<?php echo !empty($group['is_org_admin']) ? '1' : '0'; ?>"
-						data-can-manage-leaders="<?php echo !empty($group['can_manage_leaders']) ? '1' : '0'; ?>"
 						data-can-manage-members="<?php echo !empty($group['can_manage_members']) ? '1' : '0'; ?>"
 						data-can-manage-group="<?php echo !empty($group['can_manage_group']) ? '1' : '0'; ?>"
 					>

@@ -235,7 +235,7 @@ $detail_url = home_url( '/administrator-dashboard/user-progress-detail/' );
                     <div class="group-reporting__course-header-inner">
                         <span class="group-reporting__course-toggle--skeleton"></span>
                         <div class="group-reporting__course-header-meta">
-                            <span class="group-reporting__dl-link--skeleton"></span>
+                            <span class="group-reporting__download--skeleton"></span>
                         </div>
                     </div>
                 </th>
@@ -250,7 +250,7 @@ $detail_url = home_url( '/administrator-dashboard/user-progress-detail/' );
                         </button>
                         <div class="group-reporting__course-header-meta">
                             <span class="group-reporting__required-badge hidden" aria-label="<?php esc_attr_e('Required', 'bys'); ?>" title="<?php esc_attr_e('Required', 'bys'); ?>"><i class="fa-regular fa-circle-exclamation"></i></span>
-                            <a class="group-reporting__dl-link" href="#" title="">
+                            <a class="group-reporting__download" href="#" title="Bulk certificate download">
                                 <i class="fa-regular fa-download"></i>
                             </a>
                         </div>

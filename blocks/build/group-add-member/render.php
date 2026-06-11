@@ -39,11 +39,12 @@ if ( $is_site_editor ) return;
                 <span><?php esc_html_e( 'Group leader', 'bys' ); ?></span>
             </label>
         </div>
+
         <div class="gam__actions">
             <button class="gam__enrol btn-unstyled" type="button" disabled>
                 <?php esc_html_e( 'Enrol', 'bys' ); ?>
             </button>
-            <button class="gam__bulk btn-unstyled" type="button" data-hs-overlay="#gam-modal">
+            <button class="gam__bulk btn-unstyled" type="button" data-hs-overlay="#add-member-modal">
                 <?php esc_html_e( 'Bulk Upload', 'bys' ); ?>
             </button>
         </div>
@@ -53,6 +54,9 @@ if ( $is_site_editor ) return;
             <p class="gam__note">
                 <strong><?php esc_html_e( 'Existing accounts:', 'bys' ); ?></strong>
                 <?php esc_html_e( ' If this email is already registered, the user will be enrolled immediately. Otherwise, an invitation email is sent and they will be enrolled once they register.', 'bys' ); ?>
+            </p>
+            <p class="gam__note-permission" style="display:none;">
+                <?php esc_html_e( 'Only organization admins can add group leaders.', 'bys' ); ?>
             </p>
         </div>
     </div>

@@ -42,9 +42,9 @@ $auth_header = BYS_Groups_Auth::get_auth_header();
                     <i class="fa-solid fa-calendar"></i> Enrolled: <span class="user-enrolled-date"></span>
                 </li>
                 <li class="user-info__meta-item">
-                    <i class="fa-solid fa-clock"></i> Last Login: <span class="user-last-login-date"></span>
+                    <i class="fa-solid fa-clock"></i> Last Active: <span class="user-last-login-date"></span>
                 </li>
-                <li class="user-info__meta-item user-status-item">
+                <li class="user-info__meta-item user-info__meta-status">
                     <i class="fa-solid fa-circle"></i> <span class="user-status-text"></span>
                 </li>
             </ul>

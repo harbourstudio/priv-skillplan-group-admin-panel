@@ -21,27 +21,27 @@ $prompts = [
     [
         'type'        => 'password-reset',
         'title'       => __('Password reset', 'bys'),
-        'description' => __('Lorem ipsum dolor sit amet consectetur. Maecenas etiam at dignissim urna risus quis.', 'bys' ),
+        'description' => __('Send a secure password reset link to learners who are unable to access their account.', 'bys' ),
     ],
     [
         'type'        => 'course-progress',
         'title'       => __('Course progress nudge', 'bys'),
-        'description' => __("Sent to inactive learners who haven't logged in within 14 days. Links to last active course.", 'bys' ),
+        'description' => __(" Send a reminder to inactive learners to access their courses.", 'bys' ),
     ],
     [
         'type'        => 'assessment-deadline',
         'title'       => __('Assessment deadline warning', 'bys'),
-        'description' => __("7-day warning for learners who haven't completed a required assessment before the access close date.", 'bys'),
+        'description' => __("Send a reminder to learners about an upcoming assessment.", 'bys'),
     ],
     [
         'type'        => 'welcome-reminder',
         'title'       => __('Welcome/login reminder', 'bys'),
-        'description' => __('Lorem ipsum dolor sit amet consectetur. Maecenas etiam at dignissim urna risus quis.', 'bys'),
+        'description' => __('Send a welcome message with login information to new group members.', 'bys'),
     ],
     [
         'type'        => 'custom',
         'title'       => __('Custom message', 'bys'),
-        'description' => __('Lorem ipsum dolor sit amet consectetur. Maecenas etiam at dignissim urna risus quis.', 'bys'),
+        'description' => __('Create and send a personalized message.', 'bys'),
     ],
 ];
 ?>
@@ -52,7 +52,7 @@ $prompts = [
             <?php esc_html_e( 'Learner prompts', 'bys' ); ?>
         </h5>
         <p class="gcp__subtitle">
-            <?php esc_html_e( 'Pre-configured nudges defined by SkillPlan. Select a template, choose recipients, and send.', 'bys' ); ?>
+            <?php esc_html_e( 'Ready-to-send learner engagement messages. Choose a template, select recipients, and send.', 'bys' ); ?>
         </p>
     </div>
 

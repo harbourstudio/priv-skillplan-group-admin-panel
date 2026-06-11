@@ -73,7 +73,7 @@ $auth_header = BYS_Groups_Auth::get_auth_header();
                         </span>
                         <span class="accordion-toggle__progress">
                             <span class="course-steps-completed">0</span>/<span class="course-steps-total">0</span>
-                            <?php esc_html_e('Lessons', 'bys'); ?>
+                            <?php esc_html_e('Steps', 'bys'); ?>
                         </span>
                     </div>
                 </button>

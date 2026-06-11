@@ -47,6 +47,7 @@ const endpoints = {
   removeGroupUser: (groupId, userId) => `/wp-json/bys-groups/v1/groups/${groupId}/users/${userId}/remove`,
   archiveGroup: groupId => `/wp-json/bys-groups/v1/groups/${groupId}/archive`,
   unarchiveGroup: groupId => `/wp-json/bys-groups/v1/groups/${groupId}/unarchive`,
+  renameGroup: groupId => `/wp-json/bys-groups/v1/groups/${groupId}/rename`,
   archivedGroups: () => {
     const userId = window.bysGroupsAuth?.userId ?? '';
     return `/wp-json/bys-groups/v1/me/archived-groups${userId ? `?user_id=${userId}` : ''}`;
@@ -299,7 +300,7 @@ function buildGroupRow(group) {
   });
   return $row;
 }
-function buildArchivedRow(group, $archivedSection) {
+function buildArchivedRow(group, $archivedSection, canUnarchive) {
   const $row = jQuery(`
         <div class="org-groups__archived-item" data-group-id="${group.id}">
             <div class="org-groups__archived-icon">${ARCHIVE_ICON}</div>
@@ -307,9 +308,10 @@ function buildArchivedRow(group, $archivedSection) {
                 <span class="org-groups__archived-name">${group.name}</span>
                 <span class="org-groups__archived-date">${formatArchivedDate(group.archived_date)}</span>
             </div>
-            <button class="org-groups__unarchive-btn btn-unstyled" type="button">Unarchive</button>
+            ${canUnarchive ? '<button class="org-groups__unarchive-btn btn-unstyled" type="button">Unarchive</button>' : ''}
         </div>
     `);
+  if (!canUnarchive) return $row;
   $row.find('.org-groups__unarchive-btn').on('click', async function () {
     const $btn = jQuery(this);
     $btn.prop('disabled', true).text('Unarchiving…');
@@ -329,7 +331,7 @@ function buildArchivedRow(group, $archivedSection) {
   });
   return $row;
 }
-function buildNewGroupFooter(orgId, $section) {
+function buildNewGroupFooter(createFn, $section) {
   const $footer = jQuery(`
         <div class="org-groups__new-group">
             <button class="org-groups__new-group-btn btn-unstyled" type="button">
@@ -385,9 +387,7 @@ function buildNewGroupFooter(orgId, $section) {
     $submit.prop('disabled', true).text('Creating…');
     $cancel.prop('disabled', true);
     try {
-      const group = await _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.api.post(_shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.endpoints.createOrganizationGroup(orgId), {
-        name
-      });
+      const group = await createFn(name);
 
       // Clear search so the new group is always visible
       const $parentBlock = $section.closest('.wp-block-bys-groups-organization-groups');
@@ -438,11 +438,16 @@ function buildOrgSection(org) {
     $section.find('.org-groups__items').append(buildGroupRow(group));
   });
   if (org.is_admin) {
-    $section.find('.org-groups__card').append(buildNewGroupFooter(org.id, $section));
+    $section.find('.org-groups__card').append(buildNewGroupFooter(name => _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.api.post(_shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.endpoints.createOrganizationGroup(org.id), {
+      name
+    }), $section));
   }
 
-  // Archived groups section — only rendered for org admins with archived groups
-  if (org.is_admin && org.archived_groups && org.archived_groups.length) {
+  // Archived groups section — rendered whenever the server returned any.
+  // The server only includes archived groups for users entitled to see them
+  // (org admins, site admins, graders, or leaders of any group in the org).
+  // Unarchive is org-admin-only, so the button is hidden for non-admins.
+  if (org.archived_groups && org.archived_groups.length) {
     const $archived = jQuery(`
             <div class="org-groups__archived-section">
                 <button class="org-groups__archived-toggle btn-unstyled" type="button">
@@ -457,7 +462,7 @@ function buildOrgSection(org) {
     const $list = $archived.find('.org-groups__archived-list');
     const $chevron = $archived.find('.org-groups__archived-chevron');
     org.archived_groups.forEach(group => {
-      $list.append(buildArchivedRow(group, $list));
+      $list.append(buildArchivedRow(group, $list, !!org.is_admin));
     });
     $toggle.on('click', function () {
       const isOpen = $list.hasClass('is-open');
@@ -468,21 +473,52 @@ function buildOrgSection(org) {
   }
   return $section;
 }
-function buildUngroupedSection(groups) {
+function buildUngroupedSection(groups, archivedGroups) {
+  const groupCount = groups.length;
+  const countLabel = `${groupCount} group${groupCount !== 1 ? 's' : ''}`;
   const $section = jQuery(`
         <div class="org-groups__section org-groups__section--ungrouped">
             <div class="org-groups__org-header">
                 <h3 class="org-groups__org-name">Other Groups</h3>
-                <span class="org-groups__org-meta">${groups.length} group${groups.length !== 1 ? 's' : ''}</span>
+                <span class="org-groups__org-meta">${countLabel}</span>
             </div>
             <div class="org-groups__card">
                 <div class="org-groups__items"></div>
+                ${!groupCount ? '<p class="org-groups__empty">No standalone groups.</p>' : ''}
             </div>
         </div>
     `);
   groups.forEach(group => {
     $section.find('.org-groups__items').append(buildGroupRow(group));
   });
+
+  // Standalone archived groups — site-admin-only (the server only returns
+  // ungrouped_archived_groups when the requester is a site admin), so
+  // anyone seeing rows here can unarchive them.
+  if (archivedGroups && archivedGroups.length) {
+    const $archived = jQuery(`
+            <div class="org-groups__archived-section">
+                <button class="org-groups__archived-toggle btn-unstyled" type="button">
+                    <i class="fa-solid fa-chevron-right org-groups__archived-chevron" aria-hidden="true"></i>
+                    Archived groups
+                    <span class="org-groups__archived-badge">${archivedGroups.length}</span>
+                </button>
+                <div class="org-groups__archived-list"></div>
+            </div>
+        `);
+    const $toggle = $archived.find('.org-groups__archived-toggle');
+    const $list = $archived.find('.org-groups__archived-list');
+    const $chevron = $archived.find('.org-groups__archived-chevron');
+    archivedGroups.forEach(group => {
+      $list.append(buildArchivedRow(group, $list, true));
+    });
+    $toggle.on('click', function () {
+      const isOpen = $list.hasClass('is-open');
+      $list.toggleClass('is-open', !isOpen);
+      $chevron.toggleClass('is-rotated', !isOpen);
+    });
+    $section.append($archived);
+  }
   return $section;
 }
 function applySearch($block, query) {
@@ -491,22 +527,53 @@ function applySearch($block, query) {
     const $section = jQuery(this);
     const orgName = $section.find('.org-groups__org-name').first().text().toLowerCase();
     const orgMatch = !q || orgName.includes(q);
-    let visibleCount = 0;
+    let visibleActiveCount = 0;
+    let visibleArchivedCount = 0;
+
+    // Published groups
     $section.find('.org-groups__item').each(function () {
       const $row = jQuery(this);
       const groupName = $row.find('.org-groups__group-name').text().toLowerCase();
-      // Show group if: no query, org name matches, or group name matches
       const match = !q || orgMatch || groupName.includes(q);
       $row.toggleClass('is-hidden', !match);
-      if (match) visibleCount++;
+      if (match) visibleActiveCount++;
     });
 
-    // Hide the section only when neither the org nor any group matched
-    $section.toggleClass('is-hidden', !orgMatch && visibleCount === 0 && !!q);
+    // Archived groups — filter the same way; auto-expand the subsection
+    // when a query is present so matches aren't hidden behind the toggle.
+    const $archivedSection = $section.find('.org-groups__archived-section');
+    if ($archivedSection.length) {
+      $archivedSection.find('.org-groups__archived-item').each(function () {
+        const $row = jQuery(this);
+        const groupName = $row.find('.org-groups__archived-name').text().toLowerCase();
+        const match = !q || orgMatch || groupName.includes(q);
+        $row.toggleClass('is-hidden', !match);
+        if (match) visibleArchivedCount++;
+      });
+      const $list = $archivedSection.find('.org-groups__archived-list');
+      const $chevron = $archivedSection.find('.org-groups__archived-chevron');
+      if (q) {
+        // Hide the whole archived subsection if nothing matches; otherwise
+        // open it so matches are immediately visible.
+        $archivedSection.toggleClass('is-hidden', visibleArchivedCount === 0 && !orgMatch);
+        $list.toggleClass('is-open', visibleArchivedCount > 0);
+        $chevron.toggleClass('is-rotated', visibleArchivedCount > 0);
+      } else {
+        // Reset to default collapsed state when search is cleared.
+        $archivedSection.removeClass('is-hidden');
+        $list.removeClass('is-open');
+        $chevron.removeClass('is-rotated');
+      }
+    }
 
-    // Inline empty message when the org matched but has no groups (edge case)
+    // Section is hidden only when neither org name, any published row,
+    // nor any archived row matched.
+    const sectionHasMatch = orgMatch || visibleActiveCount > 0 || visibleArchivedCount > 0;
+    $section.toggleClass('is-hidden', !sectionHasMatch && !!q);
+
+    // Inline empty message when the section header matched but no rows did.
     const $empty = $section.find('.org-groups__search-empty');
-    if (q && !orgMatch && visibleCount === 0) {
+    if (q && !orgMatch && visibleActiveCount === 0 && visibleArchivedCount === 0) {
       if (!$empty.length) {
         $section.find('.org-groups__items').after('<p class="org-groups__search-empty">No groups match your search.</p>');
       }
@@ -525,14 +592,15 @@ jQuery(document).ready(async $ => {
     const data = await _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.api.get(_shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.endpoints.currentUserOrganizations());
     const organizations = data.organizations || [];
     const ungrouped = data.ungrouped_groups || [];
+    const ungroupedArchived = data.ungrouped_archived_groups || [];
     $skeleton.hide();
-    if (!organizations.length && !ungrouped.length) {
+    if (!organizations.length && !ungrouped.length && !ungroupedArchived.length) {
       $list.html('<p class="org-groups__no-orgs">You have no groups to manage.</p>');
       return;
     }
     organizations.forEach(org => $list.append(buildOrgSection(org)));
-    if (ungrouped.length) {
-      $list.append(buildUngroupedSection(ungrouped));
+    if (ungrouped.length || ungroupedArchived.length) {
+      $list.append(buildUngroupedSection(ungrouped, ungroupedArchived));
     }
     $search.on('input', function () {
       applySearch($block, jQuery(this).val());

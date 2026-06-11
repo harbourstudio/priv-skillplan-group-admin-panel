@@ -15,13 +15,14 @@ if (!class_exists('BYS_Groups_Activator')) {
 
             $current_version = get_option('bys_groups_db_version');
 
-            if (version_compare((string) $current_version, BYS_GROUPS_DB_VERSION, '>=')) {
-                return;
+            if (version_compare((string) $current_version, BYS_GROUPS_DB_VERSION, '<')) {
+                self::create_tables();
+                update_option('bys_groups_db_version', BYS_GROUPS_DB_VERSION, true);
             }
 
-            self::create_tables();
-
-            update_option('bys_groups_db_version', BYS_GROUPS_DB_VERSION, true);
+            // Flag a rewrite flush so new CPTs are recognised on the next load.
+            // Checked and cleared in BYS_Groups_Core::init() after all CPTs register.
+            update_option('bys_flush_rewrite_rules', true, true);
         }
 
     

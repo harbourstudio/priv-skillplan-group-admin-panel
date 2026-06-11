@@ -18,7 +18,7 @@ $wrapper_attributes = get_block_wrapper_attributes();
 ?>
 
 <div <?= $wrapper_attributes; ?>>
-    <h5 class="gpe__title"><?php esc_html_e( 'Pending enrolments', 'bys' ); ?></h5>
+    <h5 class="gpe__title"><?php esc_html_e( 'Pending Enrolments', 'bys' ); ?></h5>
     <div class="gpe__card">
         <div class="gpe__skeleton">
             <?php foreach ( [ 180, 220, 160 ] as $w ) : ?>

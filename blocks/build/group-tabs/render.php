@@ -21,11 +21,12 @@ $wrapper_attributes = get_block_wrapper_attributes();
 $user    = wp_get_current_user();
 $user_id = $user->ID;
 
-$is_site_admin   = BYS_Groups_Permissions::is_site_admin( $user_id );
-$is_org_admin    = BYS_Groups_Permissions::is_any_org_admin( $user_id );
-$is_site_editor  = in_array( 'editor', (array) $user->roles, true );
+$is_site_admin   = BYS_Groups_Permissions::is_site_admin($user_id);
+$is_org_admin    = BYS_Groups_Permissions::is_any_org_admin($user_id);
+$is_grader       = BYS_Groups_Permissions::is_grader($user_id);
+$leads_any_group = BYS_Groups_Permissions::leads_any_group($user_id);
 
-$has_full_access = $is_site_admin || $is_org_admin;
+$has_full_access = $is_site_admin || $is_org_admin || $is_grader;
 
 // Regular LD group leaders (not org admins, not site admins) also get the
 // management tabs — they need Enrolment/Curriculum/etc to run their group.
@@ -85,14 +86,14 @@ $tabs = [
 
 if ( $has_full_access ) {
     // All tabs visible — no filtering needed
-} elseif ( $is_site_editor ) {
-    $tabs = array_values( array_filter( $tabs, fn( $tab ) => ! in_array( $tab['id'], $editor_hidden_tab_ids, true ) ) );
 } else {
     $tabs = array_values( array_filter( $tabs, fn( $tab ) => ! in_array( $tab['id'], $restricted_tab_ids, true ) ) );
 }
 
-// gate the Groups tab: not rendered unless current user is site admin or an org admin
-if ( !$is_site_admin && !$is_org_admin ) {
+// gate the Groups tab: site admins, org admins, graders, and any group leader
+// (org-affiliated leaders see sibling groups in their org; standalone leaders
+// see their own group in the Other Groups section).
+if ( ! $is_site_admin && ! $is_org_admin && ! $is_grader && ! $leads_any_group ) {
     $tabs = array_values( array_filter( $tabs, fn( $tab ) => $tab['id'] !== 'groups' ) );
 }
 ?>
