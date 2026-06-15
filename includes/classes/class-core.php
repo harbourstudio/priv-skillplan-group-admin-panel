@@ -80,7 +80,11 @@ if (!class_exists('BYS_Groups_Core')) {
         }
 
         public function enqueue_certificate_tracker() {
-            // Enqueue link tracker on all pages (to intercept certificate link clicks)
+
+            if (!is_user_logged_in()) {
+                return;
+            }
+
             wp_enqueue_script(
                 'bys-view-certificate',
                 BYS_GROUPS_PLUGIN_URL . 'assets/js/view-certificate.js',
@@ -89,13 +93,8 @@ if (!class_exists('BYS_Groups_Core')) {
                 true
             );
 
-            // Localize user ID, auth header, and REST nonce for JS access.
-            // The nonce enables cookie-based REST auth so get_current_user_id() resolves
-            // correctly in GET requests (the Basic auth header is a service-account credential,
-            // not a WP Application Password, so it cannot resolve a user on its own).
             wp_localize_script('bys-view-certificate', 'bysGroupsAuth', array(
                 'userId' => get_current_user_id(),
-                'header' => BYS_Groups_Auth::get_auth_header(),
                 'nonce'  => wp_create_nonce('wp_rest'),
             ));
         }

@@ -6,7 +6,7 @@
  * Plugin Name: SkillPlan BYS Group Administrator Plugin
  * Description: Custom plugin for Skillplan BYS for group management on the frontend
  * Author: The West Harbour
- * Version: 1.0.0
+ * Version: 2.0.1
  * License: GPL-2.0+
  * License URI: http://www.gnu.org/licenses/gpl-2.0.txt
  * Text Domain: bys
@@ -18,7 +18,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define constants
-define( 'BYS_GROUPS_VERSION', '1.0.0' );
+define( 'BYS_GROUPS_VERSION', '2.0.1' );
 define( 'BYS_GROUPS_DB_VERSION', '1.1.0' );
 define( 'BYS_GROUPS_PLUGIN_FILE', __FILE__);
 define( 'BYS_GROUPS_PLUGIN_DIR', plugin_dir_path( __FILE__ ));
