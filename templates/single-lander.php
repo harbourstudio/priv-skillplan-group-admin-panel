@@ -191,6 +191,9 @@ if ($org_id) {
     gap: var(--wp--preset--spacing--5, 1.5rem);
     grid-template-columns: repeat(2, 1fr);
 }
+.bys-lander-completion-alert p{
+    margin-bottom: 0 !important;
+}
 @media (min-width: 1024px) {
     .bys-lander-courses .courses__row {
         grid-template-columns: repeat(3, 1fr);
@@ -328,6 +331,58 @@ if ($org_id) {
                 <?php endforeach; ?>
             </div>
 
+        </div>
+    </section>
+    <?php endif; ?>
+
+    <!-- ── Completion alert ──────────────────────────────────────────────── -->
+    <?php
+    $locked_text   = get_field('completion_locked_text',   $lander_id);
+    $unlocked_text = get_field('completion_unlocked_text', $lander_id);
+    $cta_label     = get_field('completion_cta_label',     $lander_id);
+    $cta_url       = get_field('completion_cta_url',       $lander_id);
+
+    $cta_open_modal = get_field('completion_cta_open_modal', $lander_id);
+
+    if ( $locked_text && !empty($lander_courses) ) :
+        $all_complete = $user_id && array_reduce(
+            $lander_courses,
+            fn($carry, $cid) => $carry && learndash_course_status($cid, $user_id) === 'Completed',
+            true
+        );
+        $alert_text = $all_complete ? $unlocked_text : $locked_text;
+    ?>
+    <section class="bys-lander-courses" style="padding-top:2rem;padding-bottom:3rem;">
+        <div class="container">
+            <div class="bys-lander-completion-alert flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-sm border p-5 <?php echo $all_complete ? 'bg-green-50 border-green-200 text-green-700' : 'bg-yellow-100 border-yellow-300 text-yellow-800'; ?>">
+                <div class="flex items-start gap-3">
+                    <i class="fa-solid <?php echo $all_complete ? 'fa-circle-check text-green-500' : 'fa-lock text-yellow-600'; ?> mt-1" aria-hidden="true"></i>
+                    <p class="!mb-0 text-sm"><?php echo wp_kses_post($alert_text); ?></p>
+                </div>
+                <?php if ($cta_label) : ?>
+                    <?php if ($all_complete) : ?>
+                        <?php if ($cta_open_modal && $cta_url) : ?>
+                            <button type="button"
+                                    class="btn btn-primary whitespace-nowrap flex-shrink-0 !bg-green-500 !border-green-500 locked-btn is-modal-button"
+                                    aria-haspopup="dialog"
+                                    aria-expanded="false"
+                                    aria-controls="<?php echo esc_attr(ltrim($cta_url, '#')); ?>"
+                                    data-overlay="<?php echo esc_attr($cta_url); ?>">
+                                <?php echo esc_html($cta_label); ?>
+                            </button>
+                        <?php elseif ($cta_url) : ?>
+                            <a href="<?php echo esc_attr($cta_url); ?>" class="btn btn-primary whitespace-nowrap flex-shrink-0 !bg-green-500 !border-green-500 locked-btn">
+                                <?php echo esc_html($cta_label); ?>
+                            </a>
+                        <?php endif; ?>
+                    <?php else : ?>
+                        <button type="button" class="btn btn-secondary opacity-50 cursor-not-allowed flex-shrink-0 locked-btn" disabled aria-disabled="true">
+                            <i class="fa-solid fa-lock fa-xs" aria-hidden="true"></i>
+                            <?php echo esc_html($cta_label); ?>
+                        </button>
+                    <?php endif; ?>
+                <?php endif; ?>
+            </div>
         </div>
     </section>
     <?php endif; ?>
