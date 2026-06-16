@@ -385,14 +385,10 @@ jQuery(document).ready(($) => {
           }
 
           try {
-            const authHeader = window.bysGroupsAuth && window.bysGroupsAuth.header
-              ? window.bysGroupsAuth.header
-              : null;
-            const nonce = window.bysGradingNonce || null;
+            const nonce = window.bysGradingNonce || window.bysGroupsAuth?.nonce || null;
 
             const headers = {};
-            if (authHeader) headers['Authorization'] = authHeader;
-            if (nonce)      headers['X-WP-Nonce']    = nonce;
+            if (nonce) headers['X-WP-Nonce'] = nonce;
 
             await $.ajax({
               url:         `/wp-json/bys-groups/v1/attempts/${activityId}/grade`,

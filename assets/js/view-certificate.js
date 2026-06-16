@@ -5,10 +5,8 @@
 
 jQuery(document).ready(function($) {
   // console.log('[BYS] Certificate link tracker loaded');
-
-  // Get user ID from window object (set by PHP)
   const userId = window.bysGroupsAuth?.userId;
-  const authHeader = window.bysGroupsAuth?.header || null;
+  const nonce = window.bysGroupsAuth?.nonce || null;
 
   if (!userId) {
     console.warn('[BYS] No user ID available');
@@ -38,8 +36,9 @@ jQuery(document).ready(function($) {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              ...(authHeader ? { 'Authorization': authHeader } : {}),
+              ...(nonce ? { 'X-WP-Nonce': nonce } : {}),
             },
+            credentials: 'same-origin',
             body: JSON.stringify({ course_id: courseId }),
           }
         );

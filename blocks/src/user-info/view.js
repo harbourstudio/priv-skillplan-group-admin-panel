@@ -13,8 +13,7 @@ jQuery(document).ready(async ($) => {
     return;
   }
 
-  // Wait for auth header to be available
-  await waitForAuthHeader();
+  await waitForAuth();
 
   try {
     // Fetch user details from custom endpoint 
@@ -25,10 +24,10 @@ jQuery(document).ready(async ($) => {
     console.error('Failed to fetch user details:', err);
   }
 
-  async function waitForAuthHeader() {
+  async function waitForAuth() {
     return new Promise((resolve) => {
       const checkAuth = () => {
-        if (window.bysGroupsAuth && window.bysGroupsAuth.header) {
+        if (window.bysGroupsAuth && window.bysGroupsAuth.nonce) {
           resolve();
         } else {
           setTimeout(checkAuth, 100);

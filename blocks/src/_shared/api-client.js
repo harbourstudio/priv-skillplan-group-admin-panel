@@ -1,16 +1,10 @@
 /**
  * Shared API client with in-memory caching and request deduplication.
  * Prevents duplicate requests when multiple blocks fetch the same data.
- * Uses basic auth via Authorization header (from plugin settings).
+ *
+ * Authentication: the WP auth cookie + nonce. Per-route
+ * auth is enforced server-side by each route's permission_callback.
  */
-
-// Get basic auth credentials from WP
-function getAuthorizationHeader() {
-  if (window.bysGroupsAuth && window.bysGroupsAuth.header) {
-    return window.bysGroupsAuth.header;
-  }
-  return null;
-}
 
 // custom API endpoint definitions
 export const endpoints = {
@@ -96,14 +90,8 @@ const apiSingleton = window.bysGroupsApi || {
       return this._pending.get(url);
     }
 
-    // Send request and cache the result
+    // Send request and cache the result.
     const headers = {};
-    const authHeader = getAuthorizationHeader();
-    if (authHeader) {
-      headers['Authorization'] = authHeader;
-    }
-    // Always include the WP REST nonce so cookie-based auth works and
-    // get_current_user_id() resolves to the actual logged-in user.
     if (window.bysGroupsAuth?.nonce) {
       headers['X-WP-Nonce'] = window.bysGroupsAuth.nonce;
     }
@@ -145,8 +133,6 @@ const apiSingleton = window.bysGroupsApi || {
    */
   post(url, body = {}) {
     const headers = { 'Content-Type': 'application/json' };
-    const authHeader = getAuthorizationHeader();
-    if (authHeader) headers['Authorization'] = authHeader;
     if (window.bysGroupsAuth?.nonce) headers['X-WP-Nonce'] = window.bysGroupsAuth.nonce;
 
     return jQuery.ajax({
@@ -166,8 +152,6 @@ const apiSingleton = window.bysGroupsApi || {
    */
   delete(url) {
     const headers = {};
-    const authHeader = getAuthorizationHeader();
-    if (authHeader) headers['Authorization'] = authHeader;
     if (window.bysGroupsAuth?.nonce) headers['X-WP-Nonce'] = window.bysGroupsAuth.nonce;
 
     return jQuery.ajax({
