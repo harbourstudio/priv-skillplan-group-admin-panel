@@ -86,7 +86,27 @@ if ( ! class_exists( 'BYS_Groups_Invites' ) ) {
             $invited_by     = $inviter ? $inviter->display_name : get_bloginfo( 'name' );
             $site_name      = get_bloginfo( 'name' );
             $site_url       = home_url();
-            $register_url   = home_url( '/register/' );
+            // Use the org-specific registration URL if this group belongs to an org.
+            $register_url = home_url( '/register/' );
+            if ( function_exists( 'get_field' ) ) {
+                $orgs = get_posts( [
+                    'post_type'      => 'organization',
+                    'post_status'    => 'publish',
+                    'posts_per_page' => -1,
+                    'fields'         => 'ids',
+                ] );
+                foreach ( $orgs as $oid ) {
+                    $org_group_ids = array_map(
+                        fn( $g ) => $g instanceof \WP_Post ? $g->ID : intval( $g ),
+                        (array) get_field( 'groups', $oid )
+                    );
+                    if ( in_array( $group_id, $org_group_ids, true ) ) {
+                        $org_slug     = get_post_field( 'post_name', $oid );
+                        $register_url = home_url( '/register/?organization=' . rawurlencode( $org_slug ) );
+                        break;
+                    }
+                }
+            }
 
             $email_data = bys_get_invite_email( $group_name, $register_url, $invited_by, $site_name, $site_url );
 

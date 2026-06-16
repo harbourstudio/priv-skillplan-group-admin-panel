@@ -21,6 +21,10 @@ if (!class_exists('BYS_Groups_Core')) {
         }
 
         private function includes() {
+            // Post types and field groups
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-organization.php';
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-lander.php';
+
             // Utilities (load first — referenced by routers and feature classes)
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/utils/class-permissions.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/utils/class-postmark.php';
@@ -41,6 +45,7 @@ if (!class_exists('BYS_Groups_Core')) {
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-admin-settings.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-activity-logger.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-required-courses.php';
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-prerequisites.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-invites.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-quiz-access.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-scheduled-emails.php';
@@ -57,11 +62,16 @@ if (!class_exists('BYS_Groups_Core')) {
             // Run Activator class with the create_tables() method. Safety net that ensures the cusotm tables exist on every load
             BYS_Groups_Activator::activate();
 
+            // Post types and field groups
+            new BYS_Groups_Organization();
+            new BYS_Groups_Lander();
+
             // Initialize classes
             new BYS_Groups_Admin_Settings();
             new BYS_Groups_Blocks();
             new BYS_Groups_Activity_Logger();
             new BYS_Required_Courses();
+            new BYS_Groups_Prerequisites();
             new BYS_Groups_Invites();
             new BYS_Groups_Quiz_Access();
             new BYS_Groups_Scheduled_Emails();
@@ -74,6 +84,12 @@ if (!class_exists('BYS_Groups_Core')) {
             new BYS_Groups_Communications_Router();
             new BYS_Groups_Courses_Router();
             new BYS_Groups_Groups_Router();
+
+            // Flush rewrite rules once after activation so new CPTs are reachable.
+            if (get_option('bys_flush_rewrite_rules')) {
+                flush_rewrite_rules();
+                delete_option('bys_flush_rewrite_rules');
+            }
 
             // Enqueue certificate tracking script on certificate pages
             add_action('wp_enqueue_scripts', array($this, 'enqueue_certificate_tracker'));

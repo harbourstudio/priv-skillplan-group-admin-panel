@@ -92,6 +92,14 @@ if (!class_exists('BYS_Groups_Admin_Settings')) {
                     });
                 }
             }
+
+            if (isset($_POST['action']) && $_POST['action'] === 'save_onboarding_form') {
+                $form_id = intval($_POST['onboarding_form_id'] ?? 0);
+                update_option('bys_onboarding_form_id', $form_id);
+                add_action('admin_notices', function() {
+                    echo '<div class="notice notice-success is-dismissible"><p>Onboarding form saved.</p></div>';
+                });
+            }
         }
 
         /**
@@ -191,6 +199,38 @@ if (!class_exists('BYS_Groups_Admin_Settings')) {
                         <?php endif; ?>
                     </p>
                     <?php submit_button('Save Sender Email'); ?>
+                </form>
+
+                <hr>
+
+                <h2>Onboarding Form</h2>
+                <p>The Gravity Forms form shown in the onboarding modal.</p>
+
+                <form method="POST" style="max-width: 768px; display:flex; flex-direction: column; gap: 1rem;">
+                    <?php wp_nonce_field('bys_groups_settings', 'bys_groups_settings_nonce'); ?>
+                    <input type="hidden" name="action" value="save_onboarding_form">
+                    <label for="onboarding_form_id">
+                        Form
+                        <select id="onboarding_form_id" name="onboarding_form_id" class="regular-text">
+                            <option value="0">— None —</option>
+                            <?php
+                            if (class_exists('GFAPI')) {
+                                $gf_forms = GFAPI::get_forms();
+                                usort($gf_forms, fn($a, $b) => strcmp($a['title'], $b['title']));
+                                $saved = (int) get_option('bys_onboarding_form_id', 0);
+                                foreach ($gf_forms as $gf_form) {
+                                    printf(
+                                        '<option value="%d"%s>%s</option>',
+                                        $gf_form['id'],
+                                        selected($saved, $gf_form['id'], false),
+                                        esc_html($gf_form['title'])
+                                    );
+                                }
+                            }
+                            ?>
+                        </select>
+                    </label>
+                    <?php submit_button('Save Onboarding Form'); ?>
                 </form>
             </div>
             <?php
