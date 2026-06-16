@@ -66,25 +66,36 @@
         }
     
         &__suggestion {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: var(--wp--preset--spacing--4);
             padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--3);
             font-size: var(--wp--preset--font-size--small);
             color: var(--wp--preset--color--gray-700);
             list-style: none !important;
             cursor: pointer;
-    
+
             &:hover {
                 background: var(--wp--preset--color--gray-50);
             }
-    
+
             &--empty {
                 color: var(--wp--preset--color--gray-400);
                 font-style: italic;
                 cursor: default;
-    
+                display: list-item;
+
                 &:hover {
                     background: none;
                 }
             }
+        }
+
+        &__suggestion-shortname {
+            font-size: 0.6875rem;
+            color: var(--wp--preset--color--gray-400);
+            white-space: nowrap;
         }
     
         &__add-btn {

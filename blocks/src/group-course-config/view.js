@@ -95,7 +95,16 @@ function buildSuggestion(course) {
     const $li = jQuery(template.content.cloneNode(true)).find('.gcc__suggestion');
     $li.attr('data-course-id', course.id);
     $li.attr('data-course-title', course.title);
-    $li.text(course.title);
+
+    if (course.shortname) {
+        $li.append(
+            jQuery('<span class="gcc__suggestion-title">').text(course.title),
+            jQuery('<span class="gcc__suggestion-shortname">').text(course.shortname),
+        );
+    } else {
+        $li.text(course.title);
+    }
+
     return $li;
 }
 

@@ -95,10 +95,25 @@ if ($org_id) {
             ];
         }
 
-        // Pass 2: sort — required → optional → locked
+        // Pass 2: sort — required → optional → locked, each bucket ordered by admin-set course order
         $bucket_required = array_values(array_filter($enrolled, fn($id) => $lander_course_meta[$id]['is_required'] && !$lander_course_meta[$id]['is_locked']));
         $bucket_optional = array_values(array_filter($enrolled, fn($id) => !$lander_course_meta[$id]['is_required'] && !$lander_course_meta[$id]['is_locked']));
         $bucket_locked   = array_values(array_filter($enrolled, fn($id) => $lander_course_meta[$id]['is_locked']));
+
+        $course_order = BYS_Course_Order::get_order($matched_group_id);
+        if (!empty($course_order)) {
+            $order_map = array_flip($course_order);
+            $sort_by_order = function (array &$bucket) use ($order_map) {
+                usort($bucket, function ($a, $b) use ($order_map) {
+                    $ai = $order_map[$a] ?? PHP_INT_MAX;
+                    $bi = $order_map[$b] ?? PHP_INT_MAX;
+                    return $ai <=> $bi;
+                });
+            };
+            $sort_by_order($bucket_required);
+            $sort_by_order($bucket_optional);
+            $sort_by_order($bucket_locked);
+        }
 
         $lander_courses = array_merge($bucket_required, $bucket_optional, $bucket_locked);
     }
@@ -155,7 +170,7 @@ if ($org_id) {
     position: relative;
     border-radius: 1rem;
     overflow: hidden;
-    aspect-ratio: 3 / 2;
+    aspect-ratio: 16 / 9;
     background: rgba(0, 0, 0, 0.25);
 }
 .bys-lander-hero__video iframe,

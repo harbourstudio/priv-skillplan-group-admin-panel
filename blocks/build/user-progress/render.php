@@ -18,17 +18,7 @@ $wrapper_attributes = get_block_wrapper_attributes();
 
 $user_id = isset( $_GET['user_id'] ) ? intval( $_GET['user_id'] ) : 0;
 
-// Get validated auth header for client-side API requests
-require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-auth.php';
-$auth_header = BYS_Groups_Auth::get_auth_header();
-
 ?>
-
-<script>
-	window.bysGroupsAuth = {
-		header: '<?php echo esc_js( $auth_header ); ?>'
-	};
-</script>
 
 <div <?= $wrapper_attributes; ?>>
 
