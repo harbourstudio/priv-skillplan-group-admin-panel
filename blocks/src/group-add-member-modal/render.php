@@ -47,7 +47,7 @@ if ( $is_site_editor ) return;
                         printf(
                             wp_kses(
                                 /* translators: %s: link to CSV template download */
-                                __( 'First, download and populate the <b><a href="#" class="gaam__template">%s</a></b>. Please note the column header \'email\' must not be deleted.', 'bys' ),
+                                __('First, download and populate the <b><a href="#" class="gaam__template">%s</a></b>. Please note the column header &#39;email&#39; must not be deleted.', 'bys'),
                                 [ 'a' => [ 'href' => [], 'class' => [] ], 'b' => [] ]
                             ),
                             esc_html__( 'CSV template', 'bys' )
