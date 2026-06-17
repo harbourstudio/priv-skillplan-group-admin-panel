@@ -43,11 +43,16 @@ if ( $is_site_editor ) return;
                 <!-- Screen 1: Upload -->
                 <div class="gaam__screen gaam__screen--upload">
                     <p class="gaam__upload-desc">
-                        <?php esc_html_e( 'First, ', 'bys' ); ?>
-                        <a href="#" class="gaam__template"><?php esc_html_e( 'download the CSV template', 'bys' ); ?></a>
-                        <?php esc_html_e(' to populate.', 'bys'); ?>
-                        <?php esc_html_e('Please note that the \'email\' column is required to process the file.', 'bys'); ?>
-
+                        <?php
+                        printf(
+                            wp_kses(
+                                /* translators: %s: link to CSV template download */
+                                __('First, download and populate the <b><a href="#" class="gaam__template">%s</a></b>. Please note the column header &#39;email&#39; must not be deleted.', 'bys'),
+                                [ 'a' => [ 'href' => [], 'class' => [] ], 'b' => [] ]
+                            ),
+                            esc_html__( 'CSV template', 'bys' )
+                        );
+                        ?>
                     </p>
                     <div class="gaam__dropzone">
                         <i class="fa-solid fa-file-csv"></i>
