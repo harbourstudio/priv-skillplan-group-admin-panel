@@ -22,7 +22,7 @@ if ( $is_site_editor ) return;
 <div <?= $wrapper_attributes; ?>>
     <div class="gam__header">
         <h5 class="gam__title"><?php esc_html_e( 'Add Member', 'bys' ); ?></h5>
-        <p class="gam__subtitle"><?php esc_html_e( 'Enroll by email. New accounts are created automatically.', 'bys' ); ?></p>
+        <p class="gam__subtitle"><?php esc_html_e( 'Enrol by email. New accounts are created automatically.', 'bys' ); ?></p>
     </div>
     <div class="gam__card">
         <div class="gam__field">
