@@ -1,0 +1,25 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "bys-groups/lander-course-list",
+  "version": "1.0.0",
+  "title": "BYS - Lander Course List",
+  "category": "custom-blocks",
+  "icon": "grid-view",
+  "description": "Displays the course grid for a lander page, scoped to the user's matched group.",
+  "textdomain": "bys",
+  "supports": {
+    "anchor": true,
+    "html": false
+  },
+  "attributes": {
+    "blockId": {
+      "type": "string",
+      "default": ""
+    }
+  },
+  "editorScript": "file:./index.js",
+  "render": "file:./render.php",
+  "style": "file:./style-index.css",
+  "editorStyle": "file:./index.css"
+}

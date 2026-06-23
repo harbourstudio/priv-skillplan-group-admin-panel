@@ -1,0 +1,74 @@
+.wp-block-bys-groups-lander-completion-alert {
+
+    .bys-lander-completion-alert {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: var(--wp--preset--spacing--4);
+        border-radius: 0.125rem;
+        border: 1px solid;
+        padding: var(--wp--preset--spacing--5);
+
+        @media (min-width: 640px) {
+            flex-direction: row;
+            align-items: center;
+        }
+
+        &--locked {
+            background-color: var(--wp--preset--color--yellow-100);
+            border-color: var(--wp--preset--color--yellow-300);
+            color: var(--wp--preset--color--yellow-800);
+        }
+
+        &--unlocked {
+            background-color: var(--wp--preset--color--green-50);
+            border-color: var(--wp--preset--color--green-200);
+            color: var(--wp--preset--color--green-700);
+        }
+    }
+
+    .bys-lander-completion-alert__body {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--wp--preset--spacing--3);
+        flex: 1;
+        min-width: 0;
+    }
+
+    .bys-lander-completion-alert__icon {
+        flex-shrink: 0;
+        margin-top: var(--wp--preset--spacing--1);
+
+        .bys-lander-completion-alert--locked & {
+            color: var(--wp--preset--color--yellow-700);
+        }
+
+        .bys-lander-completion-alert--unlocked & {
+            color: var(--wp--preset--color--green-500);
+        }
+    }
+
+    .bys-lander-completion-alert__message {
+        font-size: var(--wp--preset--font-size--x-small);
+        margin-bottom: 0 !important;
+    }
+
+    .bys-lander-completion-alert__cta {
+        flex-shrink: 0;
+    }
+
+    .bys-lander-completion-alert__btn {
+        white-space: nowrap;
+
+        .bys-lander-completion-alert--unlocked & {
+            background-color: var(--wp--preset--color--green-500) !important;
+            border-color: var(--wp--preset--color--green-500) !important;
+        }
+
+        &--disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    }
+}

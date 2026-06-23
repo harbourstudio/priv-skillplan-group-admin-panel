@@ -51,6 +51,7 @@ if (!class_exists('BYS_Groups_Core')) {
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-quiz-access.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-scheduled-emails.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-conditional-emails.php';
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-lander-block-helpers.php';
         }
 
         public function init() {
