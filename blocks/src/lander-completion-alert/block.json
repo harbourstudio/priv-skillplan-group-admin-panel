@@ -1,0 +1,45 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "bys-groups/lander-completion-alert",
+	"version": "1.0.0",
+	"title": "BYS - Lander Completion Alert",
+	"category": "custom-blocks",
+	"icon": "awards",
+	"description": "Shows a locked/unlocked completion alert and CTA once all lander courses are finished.",
+	"textdomain": "bys",
+	"supports": {
+		"anchor": true,
+		"html": false
+	},
+	"attributes": {
+		"blockId": {
+			"type": "string",
+			"default": ""
+		},
+		"lockedText": {
+			"type": "string",
+			"default": ""
+		},
+		"unlockedText": {
+			"type": "string",
+			"default": ""
+		},
+		"ctaLabel": {
+			"type": "string",
+			"default": ""
+		},
+		"ctaUrl": {
+			"type": "string",
+			"default": ""
+		},
+		"ctaOpenModal": {
+			"type": "boolean",
+			"default": false
+		}
+	},
+	"editorScript": "file:./index.js",
+	"render": "file:./render.php",
+	"style": "file:./style-index.css",
+	"editorStyle": "file:./index.css"
+}

@@ -1,0 +1,220 @@
+import { useEffect } from 'react';
+import { __ } from '@wordpress/i18n';
+import {
+	useBlockProps, InspectorControls, PanelColorSettings, RichText, BlockControls,
+	MediaUpload, MediaUploadCheck,
+} from '@wordpress/block-editor';
+import {
+	PanelBody, PanelRow, TextControl, Button,
+	__experimentalToggleGroupControl as ToggleGroupControl,
+	__experimentalToggleGroupControlOption as ToggleGroupControlOption,
+} from '@wordpress/components';
+import { MediaToolbar, Image } from '@10up/block-components';
+import './style.scss';
+import './editor.scss';
+
+const FALLBACK_START = '#1a1a2e';
+const FALLBACK_END   = '#16213e';
+
+export default function Edit( { clientId, attributes, setAttributes } ) {
+	const {
+		blockId, heading, subtext,
+		videoUrl, imageId, imageUrl, imageAlt, focalPoint,
+		heroStartColour, heroEndColour,
+		logoId, logoUrl, logoAlt,
+		mediaType, imageFit,
+	} = attributes;
+
+	useEffect( () => {
+		if ( blockId !== clientId ) setAttributes( { blockId: clientId } );
+		// Migrate blocks saved before mediaType existed: if videoUrl is set, switch to video
+		if ( mediaType === 'image' && videoUrl ) setAttributes( { mediaType: 'video' } );
+	}, [ clientId ] ); // eslint-disable-line react-hooks/exhaustive-deps
+
+	const gradientStart = heroStartColour || FALLBACK_START;
+	const gradientEnd   = heroEndColour   || FALLBACK_END;
+
+	const blockProps = useBlockProps( {
+		className: 'bys-lander-hero pt-hh alignfull',
+		style: { background: `linear-gradient(135deg, ${ gradientStart }, ${ gradientEnd })` },
+	} );
+
+	return (
+		<>
+			{ mediaType === 'image' && (
+				<BlockControls>
+					<MediaToolbar
+						isOptional
+						id={ imageId || undefined }
+						onSelect={ ( img ) => setAttributes( { imageId: img.id, imageUrl: img.url, imageAlt: img.alt || '' } ) }
+						onRemove={ () => setAttributes( { imageId: 0, imageUrl: '', imageAlt: '' } ) }
+					/>
+				</BlockControls>
+			) }
+
+			<InspectorControls>
+				<PanelBody title={ __( 'Hero Settings', 'bys' ) } initialOpen={ true }>
+					<ToggleGroupControl
+						label={ __( 'Media', 'bys' ) }
+						value={ mediaType }
+						onChange={ ( val ) => setAttributes( { mediaType: val } ) }
+						isBlock
+					>
+						<ToggleGroupControlOption value="image" label={ __( 'Image', 'bys' ) } />
+						<ToggleGroupControlOption value="video" label={ __( 'Video', 'bys' ) } />
+						<ToggleGroupControlOption value="none"  label={ __( 'None', 'bys' ) }  />
+					</ToggleGroupControl>
+					{ mediaType === 'image' && (
+						<PanelRow>
+							<ToggleGroupControl
+								label={ __( 'Image fit', 'bys' ) }
+								value={ imageFit }
+								onChange={ ( val ) => setAttributes( { imageFit: val } ) }
+								isBlock
+								__nextHasNoMarginBottom
+							>
+								<ToggleGroupControlOption value="cover"   label={ __( 'Cover', 'bys' ) } />
+								<ToggleGroupControlOption value="contain" label={ __( 'Contain', 'bys' ) } />
+							</ToggleGroupControl>
+						</PanelRow>
+					) }
+					{ mediaType === 'video' && (
+						<PanelRow>
+							<TextControl
+								label={ __( 'Video URL', 'bys' ) }
+								value={ videoUrl }
+								onChange={ ( val ) => setAttributes( { videoUrl: val } ) }
+								placeholder="https://…"
+								help={ __( 'Paste an embed URL or a direct video file URL.', 'bys' ) }
+								__nextHasNoMarginBottom
+							/>
+						</PanelRow>
+					) }
+				</PanelBody>
+
+				<PanelBody title={ __( 'Logo Override', 'bys' ) } initialOpen={ false }>
+					<MediaUploadCheck>
+						<MediaUpload
+							onSelect={ ( img ) => setAttributes( { logoId: img.id, logoUrl: img.url, logoAlt: img.alt || '' } ) }
+							allowedTypes={ [ 'image' ] }
+							value={ logoId || undefined }
+							render={ ( { open } ) => (
+								<div className="bys-lander-hero__logo-inspector">
+									{ logoUrl && (
+										<div className="bys-lander-hero__logo-inspector-preview">
+											<img src={ logoUrl } alt={ logoAlt } />
+										</div>
+									) }
+									<Button variant={ logoId ? 'secondary' : 'primary' } onClick={ open }>
+										{ logoId ? __( 'Replace logo', 'bys' ) : __( 'Set logo override', 'bys' ) }
+									</Button>
+									{ logoId && (
+										<Button
+											variant="link"
+											isDestructive
+											onClick={ () => setAttributes( { logoId: 0, logoUrl: '', logoAlt: '' } ) }
+										>
+											{ __( 'Remove override', 'bys' ) }
+										</Button>
+									) }
+								</div>
+							) }
+						/>
+					</MediaUploadCheck>
+					<p className="bys-lander-hero__logo-inspector-note">
+						{ __( 'Leave blank to use the organization logo.', 'bys' ) }
+					</p>
+				</PanelBody>
+
+				<PanelColorSettings
+					title={ __( 'Gradient Colours', 'bys' ) }
+					initialOpen={ false }
+					colorSettings={ [
+						{
+							label:    __( 'Gradient Start', 'bys' ),
+							value:    heroStartColour || undefined,
+							onChange: ( val ) => setAttributes( { heroStartColour: val || '' } ),
+						},
+						{
+							label:    __( 'Gradient End', 'bys' ),
+							value:    heroEndColour || undefined,
+							onChange: ( val ) => setAttributes( { heroEndColour: val || '' } ),
+						},
+					] }
+				/>
+			</InspectorControls>
+
+			<section { ...blockProps }>
+				<div className="container">
+					<div className="bys-lander-hero__inner">
+
+						{ /* ── Left: logo + heading + subtext ── */ }
+						<div className="bys-lander-hero__left">
+							<div className={ `bys-lander-hero__left-inner${ mediaType === 'none' ? ' bys-lander-hero__left-inner--wide' : '' }` }>
+
+								{ logoUrl ? (
+									<div className="bys-lander-hero__logo">
+										<img src={ logoUrl } alt={ logoAlt } />
+									</div>
+								) : (
+									<p className="bys-lander-hero__logo-label">
+										{ __( 'Org logo — set on organization', 'bys' ) }
+									</p>
+								) }
+
+								<RichText
+									tagName="h1"
+									className="bys-lander-hero__heading"
+									value={ heading }
+									onChange={ ( val ) => setAttributes( { heading: val } ) }
+									placeholder={ __( 'Heading…', 'bys' ) }
+									allowedFormats={ [] }
+								/>
+
+								<RichText
+									tagName="div"
+									className="bys-lander-hero__subtext"
+									value={ subtext }
+									onChange={ ( val ) => setAttributes( { subtext: val } ) }
+									placeholder={ __( 'Subtext…', 'bys' ) }
+								/>
+
+							</div>
+						</div>
+
+						{ /* ── Right: media or nothing ── */ }
+						{ mediaType !== 'none' && (
+							<div className="bys-lander-hero__right">
+								{ mediaType === 'video' ? (
+									<div className="bys-lander-hero__video">
+										<span className={ `bys-lander-hero__video-label${ ! videoUrl ? ' bys-lander-hero__video-label--hint' : '' }` }>
+											{ videoUrl
+												? <>▶&nbsp;{ __( 'Video preview renders on the frontend', 'bys' ) }</>
+												: __( 'Add a Video URL in the inspector.', 'bys' )
+											}
+										</span>
+									</div>
+								) : (
+									<div className={ `bys-lander-hero__image bys-lander-hero__image--${ imageFit }` }>
+										<Image
+											id={ imageId || undefined }
+											size="large"
+											onSelect={ ( img ) => setAttributes( { imageId: img.id, imageUrl: img.url, imageAlt: img.alt || '' } ) }
+											focalPoint={ focalPoint }
+											onChangeFocalPoint={ ( val ) => setAttributes( { focalPoint: val } ) }
+											labels={ {
+												title:        __( 'Select Hero Image', 'bys' ),
+												instructions: __( 'Upload an image or pick one from your media library.', 'bys' ),
+											} }
+										/>
+									</div>
+								) }
+							</div>
+						) }
+
+					</div>
+				</div>
+			</section>
+		</>
+	);
+}

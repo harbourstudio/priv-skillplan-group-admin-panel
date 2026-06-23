@@ -862,9 +862,11 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
 
             $result = [];
             foreach (get_posts($args) as $course) {
+                $shortname = get_post_meta($course->ID, 'shortname', true);
                 $result[] = [
-                    'id'    => $course->ID,
-                    'title' => $this->normalize_course_title($course->post_title),
+                    'id'        => $course->ID,
+                    'title'     => $this->normalize_course_title($course->post_title),
+                    'shortname' => $shortname ?: null,
                 ];
             }
             return $result;

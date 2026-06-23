@@ -14,17 +14,8 @@ foreach ($attrs as $a) {
     }
 }
 
-require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-auth.php';
-$auth_header = BYS_Groups_Auth::get_auth_header();
-
 $wrapper_attributes = get_block_wrapper_attributes();
 ?>
-
-<script>
-	window.bysGroupsAuth = window.bysGroupsAuth || {
-		header: '<?php echo esc_js( $auth_header ); ?>'
-	};
-</script>
 
 <div <?= $wrapper_attributes; ?>>
 

@@ -1,0 +1,35 @@
+.wp-block-bys-groups-lander-course-list {
+
+    h2 {
+        margin-bottom: var(--wp--preset--spacing--5);
+    }
+
+    .courses__row {
+        display: grid;
+        gap: var(--wp--preset--spacing--5);
+        grid-template-columns: repeat(2, 1fr);
+
+        @media (min-width: 1024px) {
+            grid-template-columns: repeat(3, 1fr);
+        }
+
+        @media (max-width: 767px) {
+            display: flex;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scroll-snap-type: x mandatory;
+            padding-bottom: var(--wp--preset--spacing--4);
+            width: 100vw;
+            padding-right: 20vw;
+        }
+    }
+
+    .courses__column {
+        @media (max-width: 767px) {
+            width: 85vw;
+            flex-shrink: 0;
+            scroll-snap-align: start;
+        }
+    }
+}
