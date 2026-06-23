@@ -1,0 +1,101 @@
+.wp-block-bys-groups-lander-completion-alert {
+
+    // ── Alert shell — mirrors style.scss so the editor preview matches frontend ─
+
+    .bys-lander-completion-alert {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: var(--wp--preset--spacing--4);
+        border-radius: 0.125rem;
+        border: 1px solid;
+        padding: var(--wp--preset--spacing--5);
+
+        &--locked {
+            background-color: var(--wp--preset--color--yellow-100);
+            border-color: var(--wp--preset--color--yellow-300);
+            color: var(--wp--preset--color--yellow-800);
+        }
+
+        &--unlocked {
+            background-color: var(--wp--preset--color--green-50);
+            border-color: var(--wp--preset--color--green-200);
+            color: var(--wp--preset--color--green-700);
+        }
+    }
+
+    // ── Body ─────────────────────────────────────────────────────────────────
+
+    .bys-ca__body {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--wp--preset--spacing--3);
+        flex: 1;
+        min-width: 0;
+    }
+
+    .bys-ca__icon {
+        flex-shrink: 0;
+        font-size: 1.1em;
+        margin-top: 0.1em;
+
+        .bys-lander-completion-alert--locked & {
+            color: var(--wp--preset--color--yellow-700);
+        }
+
+        .bys-lander-completion-alert--unlocked & {
+            color: var(--wp--preset--color--green-500);
+        }
+    }
+
+    .bys-ca__message {
+        margin: 0 !important;
+        font-size: var(--wp--preset--font-size--x-small);
+        line-height: 1.5;
+    }
+
+    // ── CTA ───────────────────────────────────────────────────────────────────
+
+    .bys-ca__cta {
+        display: flex;
+        align-items: center;
+        gap: var(--wp--preset--spacing--2);
+        flex-shrink: 0;
+    }
+
+    .bys-ca__btn {
+        display: inline-block;
+        padding: 0.45em 1.1em;
+        border-radius: 4px;
+        font-size: var(--wp--preset--font-size--x-small);
+        font-weight: 500;
+        white-space: nowrap;
+        cursor: text;
+
+        &--active {
+            background-color: var(--wp--preset--color--green-500);
+            border: 1px solid var(--wp--preset--color--green-500);
+            color: var(--wp--preset--color--white);
+        }
+
+        &--disabled {
+            background-color: var(--wp--preset--color--gray-100);
+            border: 1px solid var(--wp--preset--color--gray-100);
+            color: var(--wp--preset--color--gray-500);
+            opacity: 0.7;
+        }
+    }
+
+    .bys-ca__modal-badge {
+        display: inline-block;
+        padding: 0.15em 0.5em;
+        background-color: var(--wp--preset--color--purple-50);
+        border: 1px solid var(--wp--preset--color--purple-100);
+        color: var(--wp--preset--color--purple-700);
+        border-radius: 3px;
+        font-size: var(--wp--preset--font-size--x-small);
+        font-weight: 500;
+        white-space: nowrap;
+    }
+}

@@ -44,7 +44,10 @@ if (!class_exists('BYS_Groups_Blocks')) {
             'user-quiz-attempts-modal',
             'user-quiz-details',
             'user-stats',
-            'user-tabs'
+            'user-tabs',
+            'lander-hero',
+            'lander-course-list',
+            'lander-completion-alert',
         ];
         
         public function __construct() {
