@@ -16,6 +16,10 @@
     "blockId": {
       "type": "string",
       "default": ""
+    },
+    "headingOverride": {
+      "type": "string",
+      "default": ""
     }
   },
   "editorScript": "file:./index.js",

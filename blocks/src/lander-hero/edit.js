@@ -4,7 +4,11 @@ import {
 	useBlockProps, InspectorControls, PanelColorSettings, RichText, BlockControls,
 	MediaUpload, MediaUploadCheck,
 } from '@wordpress/block-editor';
-import { PanelBody, PanelRow, TextControl, Button } from '@wordpress/components';
+import {
+	PanelBody, PanelRow, TextControl, Button,
+	__experimentalToggleGroupControl as ToggleGroupControl,
+	__experimentalToggleGroupControlOption as ToggleGroupControlOption,
+} from '@wordpress/components';
 import { MediaToolbar, Image } from '@10up/block-components';
 import './style.scss';
 import './editor.scss';
@@ -13,11 +17,19 @@ const FALLBACK_START = '#1a1a2e';
 const FALLBACK_END   = '#16213e';
 
 export default function Edit( { clientId, attributes, setAttributes } ) {
-	const { blockId, heading, subtext, videoUrl, imageId, imageAlt, focalPoint, heroStartColour, heroEndColour, logoId, logoUrl, logoAlt } = attributes;
+	const {
+		blockId, heading, subtext,
+		videoUrl, imageId, imageUrl, imageAlt, focalPoint,
+		heroStartColour, heroEndColour,
+		logoId, logoUrl, logoAlt,
+		mediaType, imageFit,
+	} = attributes;
 
 	useEffect( () => {
 		if ( blockId !== clientId ) setAttributes( { blockId: clientId } );
-	}, [ clientId ] );
+		// Migrate blocks saved before mediaType existed: if videoUrl is set, switch to video
+		if ( mediaType === 'image' && videoUrl ) setAttributes( { mediaType: 'video' } );
+	}, [ clientId ] ); // eslint-disable-line react-hooks/exhaustive-deps
 
 	const gradientStart = heroStartColour || FALLBACK_START;
 	const gradientEnd   = heroEndColour   || FALLBACK_END;
@@ -29,28 +41,57 @@ export default function Edit( { clientId, attributes, setAttributes } ) {
 
 	return (
 		<>
-			<BlockControls>
-				<MediaToolbar
-					isOptional
-					id={ imageId || undefined }
-					onSelect={ ( img ) => setAttributes( { imageId: img.id, imageUrl: img.url, imageAlt: img.alt || '' } ) }
-					onRemove={ () => setAttributes( { imageId: 0, imageUrl: '', imageAlt: '' } ) }
-				/>
-			</BlockControls>
+			{ mediaType === 'image' && (
+				<BlockControls>
+					<MediaToolbar
+						isOptional
+						id={ imageId || undefined }
+						onSelect={ ( img ) => setAttributes( { imageId: img.id, imageUrl: img.url, imageAlt: img.alt || '' } ) }
+						onRemove={ () => setAttributes( { imageId: 0, imageUrl: '', imageAlt: '' } ) }
+					/>
+				</BlockControls>
+			) }
 
 			<InspectorControls>
 				<PanelBody title={ __( 'Hero Settings', 'bys' ) } initialOpen={ true }>
-					<PanelRow>
-						<TextControl
-							label={ __( 'Video URL', 'bys' ) }
-							value={ videoUrl }
-							onChange={ ( val ) => setAttributes( { videoUrl: val } ) }
-							placeholder="https://…"
-							help={ __( 'Replaces the image when set.', 'bys' ) }
-							__nextHasNoMarginBottom
-						/>
-					</PanelRow>
+					<ToggleGroupControl
+						label={ __( 'Media', 'bys' ) }
+						value={ mediaType }
+						onChange={ ( val ) => setAttributes( { mediaType: val } ) }
+						isBlock
+					>
+						<ToggleGroupControlOption value="image" label={ __( 'Image', 'bys' ) } />
+						<ToggleGroupControlOption value="video" label={ __( 'Video', 'bys' ) } />
+						<ToggleGroupControlOption value="none"  label={ __( 'None', 'bys' ) }  />
+					</ToggleGroupControl>
+					{ mediaType === 'image' && (
+						<PanelRow>
+							<ToggleGroupControl
+								label={ __( 'Image fit', 'bys' ) }
+								value={ imageFit }
+								onChange={ ( val ) => setAttributes( { imageFit: val } ) }
+								isBlock
+								__nextHasNoMarginBottom
+							>
+								<ToggleGroupControlOption value="cover"   label={ __( 'Cover', 'bys' ) } />
+								<ToggleGroupControlOption value="contain" label={ __( 'Contain', 'bys' ) } />
+							</ToggleGroupControl>
+						</PanelRow>
+					) }
+					{ mediaType === 'video' && (
+						<PanelRow>
+							<TextControl
+								label={ __( 'Video URL', 'bys' ) }
+								value={ videoUrl }
+								onChange={ ( val ) => setAttributes( { videoUrl: val } ) }
+								placeholder="https://…"
+								help={ __( 'Paste an embed URL or a direct video file URL.', 'bys' ) }
+								__nextHasNoMarginBottom
+							/>
+						</PanelRow>
+					) }
 				</PanelBody>
+
 				<PanelBody title={ __( 'Logo Override', 'bys' ) } initialOpen={ false }>
 					<MediaUploadCheck>
 						<MediaUpload
@@ -84,6 +125,7 @@ export default function Edit( { clientId, attributes, setAttributes } ) {
 						{ __( 'Leave blank to use the organization logo.', 'bys' ) }
 					</p>
 				</PanelBody>
+
 				<PanelColorSettings
 					title={ __( 'Gradient Colours', 'bys' ) }
 					initialOpen={ false }
@@ -106,9 +148,9 @@ export default function Edit( { clientId, attributes, setAttributes } ) {
 				<div className="container">
 					<div className="bys-lander-hero__inner">
 
-						{ /* ── Left: heading + subtext ── */ }
+						{ /* ── Left: logo + heading + subtext ── */ }
 						<div className="bys-lander-hero__left">
-							<div className="bys-lander-hero__left-inner">
+							<div className={ `bys-lander-hero__left-inner${ mediaType === 'none' ? ' bys-lander-hero__left-inner--wide' : '' }` }>
 
 								{ logoUrl ? (
 									<div className="bys-lander-hero__logo">
@@ -140,30 +182,35 @@ export default function Edit( { clientId, attributes, setAttributes } ) {
 							</div>
 						</div>
 
-						{ /* ── Right: video placeholder or image ── */ }
-						<div className="bys-lander-hero__right">
-							{ videoUrl ? (
-								<div className="bys-lander-hero__video">
-									<span className="bys-lander-hero__video-label">
-										▶&nbsp;{ __( 'Video preview renders on the frontend', 'bys' ) }
-									</span>
-								</div>
-							) : (
-								<div className="bys-lander-hero__image">
-									<Image
-										id={ imageId || undefined }
-										size="large"
-										onSelect={ ( img ) => setAttributes( { imageId: img.id, imageUrl: img.url, imageAlt: img.alt || '' } ) }
-										focalPoint={ focalPoint }
-										onChangeFocalPoint={ ( val ) => setAttributes( { focalPoint: val } ) }
-										labels={ {
-											title:        __( 'Select Hero Image', 'bys' ),
-											instructions: __( 'Upload an image or pick one from your media library.', 'bys' ),
-										} }
-									/>
-								</div>
-							) }
-						</div>
+						{ /* ── Right: media or nothing ── */ }
+						{ mediaType !== 'none' && (
+							<div className="bys-lander-hero__right">
+								{ mediaType === 'video' ? (
+									<div className="bys-lander-hero__video">
+										<span className={ `bys-lander-hero__video-label${ ! videoUrl ? ' bys-lander-hero__video-label--hint' : '' }` }>
+											{ videoUrl
+												? <>▶&nbsp;{ __( 'Video preview renders on the frontend', 'bys' ) }</>
+												: __( 'Add a Video URL in the inspector.', 'bys' )
+											}
+										</span>
+									</div>
+								) : (
+									<div className={ `bys-lander-hero__image bys-lander-hero__image--${ imageFit }` }>
+										<Image
+											id={ imageId || undefined }
+											size="large"
+											onSelect={ ( img ) => setAttributes( { imageId: img.id, imageUrl: img.url, imageAlt: img.alt || '' } ) }
+											focalPoint={ focalPoint }
+											onChangeFocalPoint={ ( val ) => setAttributes( { focalPoint: val } ) }
+											labels={ {
+												title:        __( 'Select Hero Image', 'bys' ),
+												instructions: __( 'Upload an image or pick one from your media library.', 'bys' ),
+											} }
+										/>
+									</div>
+								) }
+							</div>
+						) }
 
 					</div>
 				</div>

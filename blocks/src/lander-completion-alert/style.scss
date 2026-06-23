@@ -6,9 +6,9 @@
         align-items: flex-start;
         justify-content: space-between;
         gap: var(--wp--preset--spacing--4);
-        border-radius: 0.125rem;
+        border-radius: 1rem;
         border: 1px solid;
-        padding: var(--wp--preset--spacing--5);
+        padding: var(--wp--preset--spacing--4);
 
         @media (min-width: 640px) {
             flex-direction: row;

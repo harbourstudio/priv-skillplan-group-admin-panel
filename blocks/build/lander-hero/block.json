@@ -1,76 +1,82 @@
 {
-  "$schema": "https://schemas.wp.org/trunk/block.json",
-  "apiVersion": 3,
-  "name": "bys-groups/lander-hero",
-  "version": "1.0.0",
-  "title": "BYS - Lander Hero",
-  "category": "custom-blocks",
-  "icon": "cover-image",
-  "description": "Hero section for a custom lander page. Renders org logo, heading, subtext, and video or image from ACF fields.",
-  "textdomain": "bys",
-  "supports": {
-    "anchor": true,
-    "html": false,
-    "align": [
-      "full"
-    ]
-  },
-  "attributes": {
-    "blockId": {
-      "type": "string",
-      "default": ""
-    },
-    "heading": {
-      "type": "string",
-      "default": ""
-    },
-    "subtext": {
-      "type": "string",
-      "default": ""
-    },
-    "videoUrl": {
-      "type": "string",
-      "default": ""
-    },
-    "imageId": {
-      "type": "integer",
-      "default": 0
-    },
-    "imageUrl": {
-      "type": "string",
-      "default": ""
-    },
-    "imageAlt": {
-      "type": "string",
-      "default": ""
-    },
-    "focalPoint": {
-      "type": "object",
-      "default": {}
-    },
-    "heroStartColour": {
-      "type": "string",
-      "default": ""
-    },
-    "heroEndColour": {
-      "type": "string",
-      "default": ""
-    },
-    "logoId": {
-      "type": "integer",
-      "default": 0
-    },
-    "logoUrl": {
-      "type": "string",
-      "default": ""
-    },
-    "logoAlt": {
-      "type": "string",
-      "default": ""
-    }
-  },
-  "editorScript": "file:./index.js",
-  "render": "file:./render.php",
-  "style": "file:./style-index.css",
-  "editorStyle": "file:./index.css"
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "bys-groups/lander-hero",
+	"version": "1.0.0",
+	"title": "BYS - Lander Hero",
+	"category": "custom-blocks",
+	"icon": "cover-image",
+	"description": "Hero section for a custom lander page. Renders org logo, heading, subtext, and video or image from ACF fields.",
+	"textdomain": "bys",
+	"supports": {
+		"anchor": true,
+		"html": false,
+		"align": ["full"]
+	},
+	"attributes": {
+		"blockId": {
+			"type": "string",
+			"default": ""
+		},
+		"heading": {
+			"type": "string",
+			"default": ""
+		},
+		"subtext": {
+			"type": "string",
+			"default": ""
+		},
+		"videoUrl": {
+			"type": "string",
+			"default": ""
+		},
+		"imageId": {
+			"type": "integer",
+			"default": 0
+		},
+		"imageUrl": {
+			"type": "string",
+			"default": ""
+		},
+		"imageAlt": {
+			"type": "string",
+			"default": ""
+		},
+		"focalPoint": {
+			"type": "object",
+			"default": {}
+		},
+		"heroStartColour": {
+			"type": "string",
+			"default": ""
+		},
+		"heroEndColour": {
+			"type": "string",
+			"default": ""
+		},
+		"logoId": {
+			"type": "integer",
+			"default": 0
+		},
+		"logoUrl": {
+			"type": "string",
+			"default": ""
+		},
+		"logoAlt": {
+			"type": "string",
+			"default": ""
+		},
+		"mediaType": {
+			"type": "string",
+			"default": "image"
+		},
+		"imageFit": {
+			"type": "string",
+			"default": "cover"
+		}
+	},
+	"editorScript": "file:./index.js",
+	"render": "file:./render.php",
+	"style": "file:./style-index.css",
+	"editorStyle": "file:./index.css"
 }

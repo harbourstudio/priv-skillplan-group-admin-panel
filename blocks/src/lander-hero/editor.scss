@@ -20,6 +20,11 @@
     .bys-lander-hero__video-label {
         color: rgba(255, 255, 255, 0.55);
         font-size: var(--wp--preset--font-size--x-small);
+
+        &--hint {
+            opacity: 0.45;
+            font-style: italic;
+        }
     }
 
     // ── Logo inspector panel ───────────────────────────────────────────────────

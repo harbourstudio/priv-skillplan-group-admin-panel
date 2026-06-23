@@ -5,10 +5,16 @@ if ( ! $lander_id ) return;
 $d = bys_lander_resolve( $lander_id );
 if ( empty( $d ) ) return;
 
-$heading   = ( $attributes['heading']  ?? '' ) ?: get_the_title( $lander_id );
-$subtext   = $attributes['subtext']  ?? '';
-$video_url = $attributes['videoUrl'] ?? '';
-$image     = ! empty( $attributes['imageId'] )
+$heading    = ( $attributes['heading']  ?? '' ) ?: get_the_title( $lander_id );
+$subtext    = $attributes['subtext']  ?? '';
+$media_type = $attributes['mediaType'] ?? 'image';
+// Backward compat: blocks saved before mediaType existed may have videoUrl set
+if ( $media_type === 'image' && ! empty( $attributes['videoUrl'] ) ) {
+    $media_type = 'video';
+}
+$video_url = $media_type === 'video' ? ( $attributes['videoUrl'] ?? '' ) : '';
+$image_fit = $attributes['imageFit'] ?? 'cover';
+$image     = ( $media_type === 'image' && ! empty( $attributes['imageId'] ) )
     ? [ 'url' => $attributes['imageUrl'] ?? '', 'alt' => $attributes['imageAlt'] ?? '', 'width' => '', 'height' => '' ]
     : null;
 $logo = ! empty( $attributes['logoId'] )
@@ -46,7 +52,7 @@ $wrapper_attributes = get_block_wrapper_attributes( [
         <div class="bys-lander-hero__inner">
 
             <div class="bys-lander-hero__left">
-                <div class="bys-lander-hero__left-inner">
+                <div class="bys-lander-hero__left-inner<?php echo $media_type === 'none' ? ' bys-lander-hero__left-inner--wide' : ''; ?>">
 
                     <?php if ( $logo ) : ?>
                         <div class="bys-lander-hero__logo">
@@ -70,6 +76,7 @@ $wrapper_attributes = get_block_wrapper_attributes( [
                 </div>
             </div>
 
+            <?php if ( $media_type !== 'none' ) : ?>
             <div class="bys-lander-hero__right">
 
                 <?php if ( $video_url ) : ?>
@@ -84,7 +91,7 @@ $wrapper_attributes = get_block_wrapper_attributes( [
                         ?>
                     </div>
                 <?php elseif ( $image ) : ?>
-                    <div class="bys-lander-hero__image">
+                    <div class="bys-lander-hero__image bys-lander-hero__image--<?php echo esc_attr( $image_fit ); ?>">
                         <img src="<?php echo esc_url( $image['url'] ); ?>"
                              alt="<?php echo esc_attr( $image['alt'] ); ?>"
                              width="<?php echo esc_attr( $image['width'] ); ?>"
@@ -93,6 +100,7 @@ $wrapper_attributes = get_block_wrapper_attributes( [
                 <?php endif; ?>
 
             </div>
+            <?php endif; ?>
 
         </div>
     </div>

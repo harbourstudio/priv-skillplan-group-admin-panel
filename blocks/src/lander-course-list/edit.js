@@ -1,5 +1,6 @@
 import { __ } from '@wordpress/i18n';
-import { useBlockProps } from '@wordpress/block-editor';
+import { useBlockProps, InspectorControls } from '@wordpress/block-editor';
+import { PanelBody, TextControl } from '@wordpress/components';
 import './editor.scss';
 
 const CARDS = [
@@ -33,28 +34,49 @@ function WireframeCard( { badge, badgeMod, progress, cta, locked } ) {
 	);
 }
 
-export default function Edit() {
+export default function Edit( { attributes, setAttributes } ) {
+	const { headingOverride } = attributes;
 	const blockProps = useBlockProps( { className: 'bys-lander-courses bys-cl-wf' } );
 
 	return (
-		<div { ...blockProps }>
+		<>
+			<InspectorControls>
+				<PanelBody title={ __( 'Heading', 'bys' ) } initialOpen={ true }>
+					<TextControl
+						label={ __( 'Heading override', 'bys' ) }
+						value={ headingOverride }
+						onChange={ ( val ) => setAttributes( { headingOverride: val } ) }
+						placeholder={ __( '[Group Name] Courses', 'bys' ) }
+						help={ __( 'Leave blank to use the auto-generated "[Group Name] Courses" heading.', 'bys' ) }
+						__nextHasNoMarginBottom
+					/>
+				</PanelBody>
+			</InspectorControls>
 
-			<div className="bys-cl-wf__notice">
-				<span className="bys-cl-wf__notice-icon" aria-hidden="true">&#8635;</span>
-				<span>
-					{ __( 'Courses are resolved server-side from the user\'s matched LearnDash group for this lander. Order, locks, and progress are per-user.', 'bys' ) }
-				</span>
+			<div { ...blockProps }>
+
+				<div className="bys-cl-wf__notice">
+					<span className="bys-cl-wf__notice-icon" aria-hidden="true">&#8635;</span>
+					<span>
+						{ __( 'Courses are resolved server-side from the user\'s matched LearnDash group for this lander. Order, locks, and progress are per-user.', 'bys' ) }
+					</span>
+				</div>
+
+				<div className="bys-cl-wf__heading">
+					{ headingOverride
+						? headingOverride
+						: <>
+							<span className="bys-cl-wf__heading-ghost">{ __( '[Group Name]', 'bys' ) }</span>
+							{ ' ' }{ __( 'Courses', 'bys' ) }
+						</>
+					}
+				</div>
+
+				<div className="bys-cl-wf__grid">
+					{ CARDS.map( ( card, i ) => <WireframeCard key={ i } { ...card } /> ) }
+				</div>
+
 			</div>
-
-			<div className="bys-cl-wf__heading">
-				<span className="bys-cl-wf__heading-ghost">{ __( '[Group Name]', 'bys' ) }</span>
-				{ ' ' }{ __( 'Courses', 'bys' ) }
-			</div>
-
-			<div className="bys-cl-wf__grid">
-				{ CARDS.map( ( card, i ) => <WireframeCard key={ i } { ...card } /> ) }
-			</div>
-
-		</div>
+		</>
 	);
 }

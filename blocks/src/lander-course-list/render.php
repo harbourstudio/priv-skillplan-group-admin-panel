@@ -5,17 +5,19 @@ if ( ! $lander_id ) return;
 $d = bys_lander_resolve( $lander_id );
 if ( empty( $d ) || empty( $d['lander_courses'] ) ) return;
 
-$lander_courses     = $d['lander_courses'];
-$lander_course_meta = $d['lander_course_meta'];
+$lander_courses      = $d['lander_courses'];
+$lander_course_meta  = $d['lander_course_meta'];
 $courses_group_title = $d['courses_group_title'];
+$heading_override    = $attributes['headingOverride'] ?? '';
+$h2_text             = $heading_override ?: ( $courses_group_title ? $courses_group_title . ' Courses' : '' );
 
 $wrapper_attributes = get_block_wrapper_attributes( [ 'class' => 'bys-lander-courses' ] );
 ?>
 
 <div <?php echo $wrapper_attributes; ?>>
 
-    <?php if ( $courses_group_title ) : ?>
-        <h2><?php echo esc_html( $courses_group_title ); ?> Courses</h2>
+    <?php if ( $h2_text ) : ?>
+        <h2><?php echo esc_html( $h2_text ); ?></h2>
     <?php endif; ?>
 
     <div class="courses__row">

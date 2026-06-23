@@ -15,6 +15,10 @@
     .bys-lander-hero__left-inner {
         max-width: 32rem;
 
+        &--wide {
+            max-width: 50rem;
+        }
+
         @media screen and (min-width: 992px) {
             padding-right: var(--wp--preset--spacing--4);
         }
@@ -74,6 +78,10 @@
             height: 100%;
             object-fit: cover;
             display: block;
+        }
+
+        &--contain img {
+            object-fit: contain;
         }
     }
 

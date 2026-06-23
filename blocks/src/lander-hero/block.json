@@ -65,6 +65,14 @@
 		"logoAlt": {
 			"type": "string",
 			"default": ""
+		},
+		"mediaType": {
+			"type": "string",
+			"default": "image"
+		},
+		"imageFit": {
+			"type": "string",
+			"default": "cover"
 		}
 	},
 	"editorScript": "file:./index.js",
