@@ -13,7 +13,9 @@ if ( $media_type === 'image' && ! empty( $attributes['videoUrl'] ) ) {
     $media_type = 'video';
 }
 $video_url = $media_type === 'video' ? ( $attributes['videoUrl'] ?? '' ) : '';
-$image_fit = $attributes['imageFit'] ?? 'cover';
+$image_fit      = $attributes['imageFit']      ?? 'cover';
+$heading_colour = $attributes['headingColour'] ?? '';
+$text_colour    = $attributes['textColour']    ?? '';
 $image     = ( $media_type === 'image' && ! empty( $attributes['imageId'] ) )
     ? [ 'url' => $attributes['imageUrl'] ?? '', 'alt' => $attributes['imageAlt'] ?? '', 'width' => '', 'height' => '' ]
     : null;
@@ -22,8 +24,9 @@ $logo = ! empty( $attributes['logoId'] )
     : $d['logo'];
 $hero_start    = ( $attributes['heroStartColour'] ?? '' ) ?: $d['hero_start_colour'];
 $hero_end      = ( $attributes['heroEndColour']   ?? '' ) ?: $d['hero_end_colour'];
-$footer_colour = $d['footer_colour'];
-$button_colour = $d['button_colour'];
+$footer_colour      = $d['footer_colour'];
+$footer_text_colour = $d['footer_text_colour'] ?? '';
+$button_colour      = $d['button_colour'];
 
 $wrapper_attributes = get_block_wrapper_attributes( [
     'class' => 'bys-lander-hero pt-hh',
@@ -31,20 +34,38 @@ $wrapper_attributes = get_block_wrapper_attributes( [
 ] );
 ?>
 
-<?php if ( $footer_colour || $button_colour ) : ?>
-<style>
-<?php if ( $footer_colour ) : ?>
-#colophon { background-color: <?php echo esc_attr( $footer_colour ); ?> !important; }
-.footer-brand svg, .footer-brand svg * { fill: #fff !important; }
-<?php endif; ?>
-<?php if ( $button_colour ) : ?>
-.wp-block-bys-groups-lander-course-list .btn.btn-primary,
-.wp-block-bys-groups-lander-completion-alert .btn.btn-primary {
-    background-color: <?php echo esc_attr( $button_colour ); ?> !important;
-    border-color: <?php echo esc_attr( $button_colour ); ?> !important;
-}
-<?php endif; ?>
-</style>
+<?php if ( $footer_colour || $footer_text_colour || $button_colour ) : ?>
+    <style>
+        <?php if ( $footer_colour ) : ?>
+            #colophon { 
+                background-color: <?php echo esc_attr( $footer_colour ); ?> !important; 
+            }
+        <?php endif; ?>
+        <?php if ( $footer_text_colour ) : ?>
+            #colophon,
+            #colophon h1, #colophon h2, #colophon h3, #colophon h4, #colophon h5, #colophon h6,
+            #colophon i, #colophon span, #colophon p, #colophon li,
+            #colophon a, #colophon a:hover, #colophon a:focus { 
+                color: <?php echo esc_attr( $footer_text_colour ); ?> !important; 
+            }
+            .footer-brand svg, .footer-brand svg * { 
+                fill: <?php echo esc_attr( $footer_text_colour ); ?> !important; 
+            }
+        <?php elseif ( $footer_colour ) : ?>
+        .footer-brand svg, .footer-brand svg * { 
+            fill: #fff !important; 
+        }
+        <?php endif; ?>
+        <?php if ( $button_colour ) : ?>
+        .wp-block-bys-groups-lander-course-list .btn.btn-primary,
+        .wp-block-bys-groups-lander-completion-alert .btn.btn-primary,
+        #content :is(.wp-block-button__link.wp-element-button, button),
+        #colophon button {
+            background-color: <?php echo esc_attr( $button_colour ); ?> !important;
+            border-color: <?php echo esc_attr( $button_colour ); ?> !important;
+        }
+        <?php endif; ?>
+    </style>
 <?php endif; ?>
 
 <section <?php echo $wrapper_attributes; ?>>
@@ -63,12 +84,12 @@ $wrapper_attributes = get_block_wrapper_attributes( [
                         </div>
                     <?php endif; ?>
 
-                    <h1 class="bys-lander-hero__heading">
+                    <h1 class="bys-lander-hero__heading"<?php echo $heading_colour ? ' style="color:' . esc_attr( $heading_colour ) . ';"' : ''; ?>>
                         <?php echo esc_html( $heading ); ?>
                     </h1>
 
                     <?php if ( $subtext ) : ?>
-                        <div class="bys-lander-hero__subtext">
+                        <div class="bys-lander-hero__subtext"<?php echo $text_colour ? ' style="color:' . esc_attr( $text_colour ) . ';"' : ''; ?>>
                             <?php echo wp_kses_post( $subtext ); ?>
                         </div>
                     <?php endif; ?>

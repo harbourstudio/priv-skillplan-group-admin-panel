@@ -1,11 +1,11 @@
 import { useEffect } from 'react';
 import { __ } from '@wordpress/i18n';
 import {
-	useBlockProps, InspectorControls, PanelColorSettings, RichText, BlockControls,
+	useBlockProps, InspectorControls, RichText, BlockControls,
 	MediaUpload, MediaUploadCheck,
 } from '@wordpress/block-editor';
 import {
-	PanelBody, PanelRow, TextControl, Button,
+	PanelBody, PanelRow, TextControl, Button, ColorPicker,
 	__experimentalToggleGroupControl as ToggleGroupControl,
 	__experimentalToggleGroupControlOption as ToggleGroupControlOption,
 } from '@wordpress/components';
@@ -23,6 +23,7 @@ export default function Edit( { clientId, attributes, setAttributes } ) {
 		heroStartColour, heroEndColour,
 		logoId, logoUrl, logoAlt,
 		mediaType, imageFit,
+		headingColour, textColour,
 	} = attributes;
 
 	useEffect( () => {
@@ -126,22 +127,47 @@ export default function Edit( { clientId, attributes, setAttributes } ) {
 					</p>
 				</PanelBody>
 
-				<PanelColorSettings
-					title={ __( 'Gradient Colours', 'bys' ) }
-					initialOpen={ false }
-					colorSettings={ [
-						{
-							label:    __( 'Gradient Start', 'bys' ),
-							value:    heroStartColour || undefined,
-							onChange: ( val ) => setAttributes( { heroStartColour: val || '' } ),
-						},
-						{
-							label:    __( 'Gradient End', 'bys' ),
-							value:    heroEndColour || undefined,
-							onChange: ( val ) => setAttributes( { heroEndColour: val || '' } ),
-						},
-					] }
-				/>
+				<PanelBody title={ __( 'Gradient Colours', 'bys' ) } initialOpen={ false }>
+					<p style={ { marginBottom: '8px', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase' } }>
+						{ __( 'Gradient Start', 'bys' ) }
+					</p>
+					<ColorPicker
+						color={ heroStartColour || FALLBACK_START }
+						onChange={ ( val ) => setAttributes( { heroStartColour: val } ) }
+						enableAlpha={ false }
+						copyFormat="hex"
+					/>
+					<p style={ { margin: '12px 0 8px', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase' } }>
+						{ __( 'Gradient End', 'bys' ) }
+					</p>
+					<ColorPicker
+						color={ heroEndColour || FALLBACK_END }
+						onChange={ ( val ) => setAttributes( { heroEndColour: val } ) }
+						enableAlpha={ false }
+						copyFormat="hex"
+					/>
+				</PanelBody>
+
+				<PanelBody title={ __( 'Text Colours', 'bys' ) } initialOpen={ false }>
+					<p style={ { marginBottom: '8px', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase' } }>
+						{ __( 'Heading', 'bys' ) }
+					</p>
+					<ColorPicker
+						color={ headingColour || '#ffffff' }
+						onChange={ ( val ) => setAttributes( { headingColour: val } ) }
+						enableAlpha={ false }
+						copyFormat="hex"
+					/>
+					<p style={ { margin: '12px 0 8px', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase' } }>
+						{ __( 'Body text', 'bys' ) }
+					</p>
+					<ColorPicker
+						color={ textColour || 'rgba(255,255,255,0.88)' }
+						onChange={ ( val ) => setAttributes( { textColour: val } ) }
+						enableAlpha={ false }
+						copyFormat="hex"
+					/>
+				</PanelBody>
 			</InspectorControls>
 
 			<section { ...blockProps }>
@@ -165,6 +191,7 @@ export default function Edit( { clientId, attributes, setAttributes } ) {
 								<RichText
 									tagName="h1"
 									className="bys-lander-hero__heading"
+									style={ headingColour ? { color: headingColour } : undefined }
 									value={ heading }
 									onChange={ ( val ) => setAttributes( { heading: val } ) }
 									placeholder={ __( 'Heading…', 'bys' ) }
@@ -174,6 +201,7 @@ export default function Edit( { clientId, attributes, setAttributes } ) {
 								<RichText
 									tagName="div"
 									className="bys-lander-hero__subtext"
+									style={ textColour ? { color: textColour } : undefined }
 									value={ subtext }
 									onChange={ ( val ) => setAttributes( { subtext: val } ) }
 									placeholder={ __( 'Subtext…', 'bys' ) }
