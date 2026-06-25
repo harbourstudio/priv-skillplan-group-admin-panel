@@ -1,0 +1,21 @@
+.wp-block-bys-groups-skill-level-wrapper {
+    display: block;
+    width: 100%;
+    max-width: 77.5rem !important;
+    border: 2px dashed rgba(100, 130, 230, 0.5);
+    border-radius: 4px;
+    padding: 12px;
+
+    .bys-slw__badge {
+        display: inline-block;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #6482e6;
+        background: rgba(100, 130, 230, 0.1);
+        border-radius: 3px;
+        padding: 2px 8px;
+        margin-bottom: 10px;
+    }
+}

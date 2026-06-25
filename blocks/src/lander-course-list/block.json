@@ -21,9 +21,9 @@
 			"type": "string",
 			"default": ""
 		},
-		"filterByTradeExperience": {
-			"type": "boolean",
-			"default": false
+		"skillLevelFilter": {
+			"type": "string",
+			"default": ""
 		}
 	},
 	"editorScript": "file:./index.js",

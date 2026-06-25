@@ -48,6 +48,7 @@ if (!class_exists('BYS_Groups_Blocks')) {
             'lander-hero',
             'lander-course-list',
             'lander-completion-alert',
+            'skill-level-wrapper',
         ];
         
         public function __construct() {
