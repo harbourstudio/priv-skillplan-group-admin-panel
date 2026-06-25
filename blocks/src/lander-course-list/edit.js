@@ -1,6 +1,6 @@
 import { __ } from '@wordpress/i18n';
 import { useBlockProps, InspectorControls } from '@wordpress/block-editor';
-import { PanelBody, TextControl } from '@wordpress/components';
+import { PanelBody, TextControl, ToggleControl } from '@wordpress/components';
 import './editor.scss';
 
 const CARDS = [
@@ -35,7 +35,7 @@ function WireframeCard( { badge, badgeMod, progress, cta, locked } ) {
 }
 
 export default function Edit( { attributes, setAttributes } ) {
-	const { headingOverride } = attributes;
+	const { headingOverride, filterByTradeExperience } = attributes;
 	const blockProps = useBlockProps( { className: 'bys-lander-courses bys-cl-wf' } );
 
 	return (
@@ -48,6 +48,16 @@ export default function Edit( { attributes, setAttributes } ) {
 						onChange={ ( val ) => setAttributes( { headingOverride: val } ) }
 						placeholder={ __( '[Group Name] Courses', 'bys' ) }
 						help={ __( 'Leave blank to use the auto-generated "[Group Name] Courses" heading.', 'bys' ) }
+						__nextHasNoMarginBottom
+					/>
+				</PanelBody>
+
+				<PanelBody title={ __( 'Course Filters', 'bys' ) } initialOpen={ false }>
+					<ToggleControl
+						label={ __( 'Filter by trade experience', 'bys' ) }
+						help={ __( 'When on, only courses whose skill-level matches the current user\'s trade_experience profile meta will be shown.', 'bys' ) }
+						checked={ filterByTradeExperience }
+						onChange={ ( val ) => setAttributes( { filterByTradeExperience: val } ) }
 						__nextHasNoMarginBottom
 					/>
 				</PanelBody>

@@ -14,6 +14,7 @@ if ( $media_type === 'image' && ! empty( $attributes['videoUrl'] ) ) {
 }
 $video_url = $media_type === 'video' ? ( $attributes['videoUrl'] ?? '' ) : '';
 $image_fit      = $attributes['imageFit']      ?? 'cover';
+$media_position = $attributes['mediaPosition'] ?? 'right';
 $heading_colour = $attributes['headingColour'] ?? '';
 $text_colour    = $attributes['textColour']    ?? '';
 $image     = ( $media_type === 'image' && ! empty( $attributes['imageId'] ) )
@@ -24,18 +25,32 @@ $logo = ! empty( $attributes['logoId'] )
     : $d['logo'];
 $hero_start    = ( $attributes['heroStartColour'] ?? '' ) ?: $d['hero_start_colour'];
 $hero_end      = ( $attributes['heroEndColour']   ?? '' ) ?: $d['hero_end_colour'];
+$bg_image_url  = ( ! empty( $attributes['bgImageId'] ) && ! empty( $attributes['bgImageUrl'] ) )
+    ? $attributes['bgImageUrl']
+    : '';
 $footer_colour      = $d['footer_colour'];
 $footer_text_colour = $d['footer_text_colour'] ?? '';
 $button_colour      = $d['button_colour'];
+$page_colour        = $d['page_colour'];
+
+$gradient = 'linear-gradient(135deg, ' . esc_attr( $hero_start ) . ', ' . esc_attr( $hero_end ) . ')';
+$bg_style = $bg_image_url
+    ? 'background: ' . $gradient . ', url(' . esc_url( $bg_image_url ) . ') center / cover no-repeat;'
+    : 'background: ' . $gradient . ';';
 
 $wrapper_attributes = get_block_wrapper_attributes( [
     'class' => 'bys-lander-hero pt-hh',
-    'style' => 'background: linear-gradient(135deg, ' . esc_attr( $hero_start ) . ', ' . esc_attr( $hero_end ) . ');',
+    'style' => $bg_style,
 ] );
 ?>
 
-<?php if ( $footer_colour || $footer_text_colour || $button_colour ) : ?>
+<?php if ( $footer_colour || $footer_text_colour || $button_colour || $page_colour ) : ?>
     <style>
+        <?php if ( $page_colour ) : ?>
+            #content{
+                background-color: <?php echo esc_attr( $page_colour ); ?> !important; 
+            }
+        <?php endif; ?>
         <?php if ( $footer_colour ) : ?>
             #colophon { 
                 background-color: <?php echo esc_attr( $footer_colour ); ?> !important; 
@@ -52,28 +67,32 @@ $wrapper_attributes = get_block_wrapper_attributes( [
                 fill: <?php echo esc_attr( $footer_text_colour ); ?> !important; 
             }
         <?php elseif ( $footer_colour ) : ?>
-        .footer-brand svg, .footer-brand svg * { 
-            fill: #fff !important; 
-        }
+            .footer-brand svg, .footer-brand svg * { 
+                fill: #fff !important; 
+            }
         <?php endif; ?>
         <?php if ( $button_colour ) : ?>
-        .wp-block-bys-groups-lander-course-list .btn.btn-primary,
-        .wp-block-bys-groups-lander-completion-alert .btn.btn-primary,
-        #content :is(.wp-block-button__link.wp-element-button, button),
-        #colophon button {
-            background-color: <?php echo esc_attr( $button_colour ); ?> !important;
-            border-color: <?php echo esc_attr( $button_colour ); ?> !important;
-        }
+            .wp-block-bys-groups-lander-course-list .btn.btn-primary:not([disabled]),
+            .wp-block-bys-groups-lander-completion-alert .btn.btn-primary:not([disabled]),
+            #content :is(.wp-block-button__link.wp-element-button, .btn.btn-primary):not([disabled]),
+            #colophon .btn.btn-primary:not([disabled]) {
+                background-color: <?php echo esc_attr( $button_colour ); ?> !important;
+                border-color: <?php echo esc_attr( $button_colour ); ?> !important;
+            }
+
+            main.bys-lander .wp-block-bys-groups-lander-course-list .hs-dropdown-toggle i{
+                color: <?php echo esc_attr( $button_colour ); ?> !important;
+            }
         <?php endif; ?>
     </style>
 <?php endif; ?>
 
 <section <?php echo $wrapper_attributes; ?>>
     <div class="container">
-        <div class="bys-lander-hero__inner">
+        <div class="bys-lander-hero__inner"<?php echo $media_position === 'left' ? ' style="flex-direction:row-reverse;"' : ''; ?>>
 
             <div class="bys-lander-hero__left">
-                <div class="bys-lander-hero__left-inner<?php echo $media_type === 'none' ? ' bys-lander-hero__left-inner--wide' : ''; ?>">
+                <div class="bys-lander-hero__left-inner<?php echo $media_type === 'none' ? ' bys-lander-hero__left-inner--wide' : ''; ?>"<?php echo $media_position === 'left' ? ' style="margin-inline:auto;"' : ''; ?>>
 
                     <?php if ( $logo ) : ?>
                         <div class="bys-lander-hero__logo">

@@ -8,6 +8,28 @@ $lander_courses      = $d['lander_courses']      ?? [];
 $lander_course_meta  = $d['lander_course_meta']  ?? [];
 $courses_group_title = $d['courses_group_title']  ?? '';
 $heading_override    = $attributes['headingOverride'] ?? '';
+
+if ( ! empty( $attributes['filterByTradeExperience'] ) ) {
+    $user_trade_raw = get_user_meta( $d['user_id'] ?? get_current_user_id(), 'trade_experience', true );
+    // meta may be stored as an array (e.g. ['Apprentice']); extract the string
+    $user_trade = strtolower( trim( is_array( $user_trade_raw ) ? (string) ( $user_trade_raw[0] ?? '' ) : (string) $user_trade_raw ) );
+
+    $lander_courses = array_values( array_filter( $lander_courses, function( $course_id ) use ( $user_trade ) {
+        $terms = wp_get_post_terms( $course_id, 'skill-level' );
+        if ( empty( $terms ) || is_wp_error( $terms ) ) {
+            return true; // no skill-level set — show to everyone
+        }
+        if ( '' === $user_trade ) {
+            return true; // user has no trade set — show everything
+        }
+        foreach ( $terms as $term ) {
+            if ( strtolower( $term->slug ) === $user_trade || strtolower( $term->name ) === $user_trade ) {
+                return true;
+            }
+        }
+        return false;
+    } ) );
+}
 $h2_text             = $heading_override ?: ( $courses_group_title ? $courses_group_title . ' Courses' : '' );
 
 $has_group   = ! empty( $courses_group_title );

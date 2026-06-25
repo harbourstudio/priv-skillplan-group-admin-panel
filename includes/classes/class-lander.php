@@ -70,6 +70,16 @@ if (!class_exists('BYS_Groups_Lander')) {
 
                 'fields' => [
                     [
+                        'key'            => 'field_lander_page_colour',
+                        'label'          => 'Page Colour',
+                        'name'           => 'lander_page_colour',
+                        'type'           => 'color_picker',
+                        'instructions'   => 'Overrides the page background colour on this lander.',
+                        'enable_opacity' => 0,
+                        'return_format'  => 'string',
+                        'wrapper'        => ['width' => '25'],
+                    ],
+                    [
                         'key'            => 'field_lander_footer_colour',
                         'label'          => 'Footer Colour',
                         'name'           => 'lander_footer_colour',
@@ -77,7 +87,7 @@ if (!class_exists('BYS_Groups_Lander')) {
                         'instructions'   => 'Overrides the organization footer background colour for this lander.',
                         'enable_opacity' => 0,
                         'return_format'  => 'string',
-                        'wrapper'        => ['width' => '33'],
+                        'wrapper'        => ['width' => '25'],
                     ],
                     [
                         'key'            => 'field_lander_footer_text_colour',
@@ -87,7 +97,7 @@ if (!class_exists('BYS_Groups_Lander')) {
                         'instructions'   => 'Overrides all text, link, and SVG logo fill colours in the footer.',
                         'enable_opacity' => 0,
                         'return_format'  => 'string',
-                        'wrapper'        => ['width' => '33'],
+                        'wrapper'        => ['width' => '25'],
                     ],
                     [
                         'key'            => 'field_lander_button_colour',
@@ -97,7 +107,7 @@ if (!class_exists('BYS_Groups_Lander')) {
                         'instructions'   => 'Overrides the primary button colour across all blocks on this lander.',
                         'enable_opacity' => 0,
                         'return_format'  => 'string',
-                        'wrapper'        => ['width' => '33'],
+                        'wrapper'        => ['width' => '25'],
                     ],
                 ],
             ]);

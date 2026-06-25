@@ -20,6 +20,10 @@
     "headingOverride": {
       "type": "string",
       "default": ""
+    },
+    "filterByTradeExperience": {
+      "type": "boolean",
+      "default": false
     }
   },
   "editorScript": "file:./index.js",
