@@ -87,7 +87,7 @@ $tz_offset_hours = $tz_offset_seconds / 3600;
         </div>
 
         <div class="guqc__date-row">
-            <div class="guqc__date-field">
+            <div class="guqc__date-field" data-tooltip="<?php esc_attr_e('Opening date: quiz becomes available from this date', 'bys'); ?>">
                 <i class="fa-solid fa-play guqc__date-icon" aria-hidden="true"></i>
                 <input
                     type="text"
@@ -110,7 +110,7 @@ $tz_offset_hours = $tz_offset_seconds / 3600;
                     <span class="skeleton"></span>
                 </div>
             </div>
-            <div class="guqc__date-field">
+            <div class="guqc__date-field" data-tooltip="<?php esc_attr_e('Closing date: quiz is no longer accessible after this date', 'bys'); ?>">
                 <i class="fa-solid fa-flag guqc__date-icon" aria-hidden="true"></i>
                 <input
                     type="text"
@@ -129,6 +129,20 @@ $tz_offset_hours = $tz_offset_seconds / 3600;
                 >
                     <i class="fa-solid fa-xmark" aria-hidden="true"></i>
                 </button>
+                <div class="guqc__field-skeleton" role="status" aria-busy="true" aria-label="<?php esc_attr_e( 'Awaiting quiz selection', 'bys' ); ?>" hidden>
+                    <span class="skeleton"></span>
+                </div>
+            </div>
+            <div class="guqc__date-field guqc__date-field--attempts" data-tooltip="<?php esc_attr_e('Attempts: max times a learner can take this quiz (blank = unlimited)', 'bys'); ?>">
+                <i class="fa-solid fa-hashtag guqc__date-icon" aria-hidden="true"></i>
+                <input
+                    type="number"
+                    class="guqc__attempts"
+                    aria-label="<?php esc_attr_e( 'Number of attempts', 'bys' ); ?>"
+                    data-field-type="attempts"
+                    min="0"
+                    placeholder="<?php esc_attr_e( 'Unlimited', 'bys' ); ?>"
+                />
                 <div class="guqc__field-skeleton" role="status" aria-busy="true" aria-label="<?php esc_attr_e( 'Awaiting quiz selection', 'bys' ); ?>" hidden>
                     <span class="skeleton"></span>
                 </div>

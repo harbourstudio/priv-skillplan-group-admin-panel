@@ -197,6 +197,7 @@
         }
 
         &__date-field {
+            position: relative;
             display: flex;
             align-items: center;
             gap: var(--wp--preset--spacing--2);
@@ -217,6 +218,45 @@
 
                 &::placeholder { color: var(--wp--preset--color--gray-400); }
             }
+
+            &[data-tooltip]:hover::after {
+                content: attr(data-tooltip);
+                position: absolute;
+                bottom: calc(100% + 6px);
+                left: 50%;
+                transform: translateX(-50%);
+                background: #1f2937;
+                color: #fff;
+                font-size: 0.7rem;
+                font-weight: 400;
+                line-height: 1.4;
+                padding: 4px 10px;
+                border-radius: 4px;
+                white-space: nowrap;
+                pointer-events: none;
+                z-index: 100;
+            }
+
+            &--attempts {
+                cursor: default;
+            }
+        }
+
+        &__attempts {
+            flex: 1;
+            border: none;
+            background: transparent;
+            font-size: var(--wp--preset--font-size--small);
+            color: var(--wp--preset--color--gray-700);
+            outline: none;
+            min-width: 0;
+            cursor: text;
+            -moz-appearance: textfield;
+
+            &::-webkit-outer-spin-button,
+            &::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+            &::placeholder { color: var(--wp--preset--color--gray-400); }
         }
 
         &__date-clear {

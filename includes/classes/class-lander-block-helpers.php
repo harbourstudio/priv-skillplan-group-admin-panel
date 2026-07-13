@@ -52,11 +52,15 @@ function bys_lander_resolve( int $lander_id ): array {
 
     // ── Lander-level colour overrides ─────────────────────────────────────────
 
-    $lander_footer_colour = get_field( 'lander_footer_colour', $lander_id ) ?: '';
-    $lander_button_colour = get_field( 'lander_button_colour', $lander_id ) ?: '';
+    $lander_footer_colour      = get_field( 'lander_footer_colour',      $lander_id ) ?: '';
+    $lander_footer_text_colour = get_field( 'lander_footer_text_colour', $lander_id ) ?: '';
+    $lander_button_colour      = get_field( 'lander_button_colour',      $lander_id ) ?: '';
+    $lander_page_colour        = get_field( 'lander_page_colour',        $lander_id ) ?: '';
 
     if ( $lander_footer_colour ) $footer_colour = $lander_footer_colour;
-    $button_colour = $lander_button_colour;
+    $footer_text_colour = $lander_footer_text_colour;
+    $button_colour      = $lander_button_colour;
+    $page_colour        = $lander_page_colour;
 
     // ── Courses ───────────────────────────────────────────────────────────────
 
@@ -122,7 +126,8 @@ function bys_lander_resolve( int $lander_id ): array {
     }
 
     return $cache[ $lander_id ] = compact(
-        'org_id', 'logo', 'hero_start_colour', 'hero_end_colour', 'footer_colour', 'button_colour',
+        'org_id', 'logo', 'hero_start_colour', 'hero_end_colour',
+        'footer_colour', 'footer_text_colour', 'button_colour', 'page_colour',
         'lander_courses', 'lander_course_meta', 'courses_group_title', 'user_id'
     );
 }

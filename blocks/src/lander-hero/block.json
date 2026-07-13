@@ -70,9 +70,29 @@
 			"type": "string",
 			"default": "image"
 		},
+		"mediaPosition": {
+			"type": "string",
+			"default": "right"
+		},
 		"imageFit": {
 			"type": "string",
 			"default": "cover"
+		},
+		"headingColour": {
+			"type": "string",
+			"default": ""
+		},
+		"textColour": {
+			"type": "string",
+			"default": ""
+		},
+		"bgImageId": {
+			"type": "integer",
+			"default": 0
+		},
+		"bgImageUrl": {
+			"type": "string",
+			"default": ""
 		}
 	},
 	"editorScript": "file:./index.js",

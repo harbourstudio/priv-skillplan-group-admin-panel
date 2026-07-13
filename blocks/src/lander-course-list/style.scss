@@ -4,6 +4,12 @@
         margin-bottom: var(--wp--preset--spacing--5);
     }
 
+    .bys-lander-courses__notice {
+        font-size: var(--wp--preset--font-size--small);
+        color: var(--wp--preset--color--gray-500);
+        margin: 0;
+    }
+
     .courses__row {
         display: grid;
         gap: var(--wp--preset--spacing--5);

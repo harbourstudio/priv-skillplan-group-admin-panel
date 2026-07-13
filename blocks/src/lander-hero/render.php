@@ -13,7 +13,10 @@ if ( $media_type === 'image' && ! empty( $attributes['videoUrl'] ) ) {
     $media_type = 'video';
 }
 $video_url = $media_type === 'video' ? ( $attributes['videoUrl'] ?? '' ) : '';
-$image_fit = $attributes['imageFit'] ?? 'cover';
+$image_fit      = $attributes['imageFit']      ?? 'cover';
+$media_position = $attributes['mediaPosition'] ?? 'right';
+$heading_colour = $attributes['headingColour'] ?? '';
+$text_colour    = $attributes['textColour']    ?? '';
 $image     = ( $media_type === 'image' && ! empty( $attributes['imageId'] ) )
     ? [ 'url' => $attributes['imageUrl'] ?? '', 'alt' => $attributes['imageAlt'] ?? '', 'width' => '', 'height' => '' ]
     : null;
@@ -22,37 +25,28 @@ $logo = ! empty( $attributes['logoId'] )
     : $d['logo'];
 $hero_start    = ( $attributes['heroStartColour'] ?? '' ) ?: $d['hero_start_colour'];
 $hero_end      = ( $attributes['heroEndColour']   ?? '' ) ?: $d['hero_end_colour'];
-$footer_colour = $d['footer_colour'];
-$button_colour = $d['button_colour'];
+$bg_image_url  = ( ! empty( $attributes['bgImageId'] ) && ! empty( $attributes['bgImageUrl'] ) )
+    ? $attributes['bgImageUrl']
+    : '';
+
+$gradient = 'linear-gradient(135deg, ' . esc_attr( $hero_start ) . ', ' . esc_attr( $hero_end ) . ')';
+$bg_style = $bg_image_url
+    ? 'background: ' . $gradient . ', url(' . esc_url( $bg_image_url ) . ') center / cover no-repeat;'
+    : 'background: ' . $gradient . ';';
 
 $wrapper_attributes = get_block_wrapper_attributes( [
     'class' => 'bys-lander-hero pt-hh',
-    'style' => 'background: linear-gradient(135deg, ' . esc_attr( $hero_start ) . ', ' . esc_attr( $hero_end ) . ');',
+    'style' => $bg_style,
 ] );
 ?>
 
-<?php if ( $footer_colour || $button_colour ) : ?>
-<style>
-<?php if ( $footer_colour ) : ?>
-#colophon { background-color: <?php echo esc_attr( $footer_colour ); ?> !important; }
-.footer-brand svg, .footer-brand svg * { fill: #fff !important; }
-<?php endif; ?>
-<?php if ( $button_colour ) : ?>
-.wp-block-bys-groups-lander-course-list .btn.btn-primary,
-.wp-block-bys-groups-lander-completion-alert .btn.btn-primary {
-    background-color: <?php echo esc_attr( $button_colour ); ?> !important;
-    border-color: <?php echo esc_attr( $button_colour ); ?> !important;
-}
-<?php endif; ?>
-</style>
-<?php endif; ?>
 
 <section <?php echo $wrapper_attributes; ?>>
     <div class="container">
-        <div class="bys-lander-hero__inner">
+        <div class="bys-lander-hero__inner"<?php echo $media_position === 'left' ? ' style="flex-direction:row-reverse;"' : ''; ?>>
 
             <div class="bys-lander-hero__left">
-                <div class="bys-lander-hero__left-inner<?php echo $media_type === 'none' ? ' bys-lander-hero__left-inner--wide' : ''; ?>">
+                <div class="bys-lander-hero__left-inner<?php echo $media_type === 'none' ? ' bys-lander-hero__left-inner--wide' : ''; ?>"<?php echo $media_position === 'left' ? ' style="margin-inline:auto;"' : ''; ?>>
 
                     <?php if ( $logo ) : ?>
                         <div class="bys-lander-hero__logo">
@@ -63,12 +57,12 @@ $wrapper_attributes = get_block_wrapper_attributes( [
                         </div>
                     <?php endif; ?>
 
-                    <h1 class="bys-lander-hero__heading">
+                    <h1 class="bys-lander-hero__heading"<?php echo $heading_colour ? ' style="color:' . esc_attr( $heading_colour ) . ';"' : ''; ?>>
                         <?php echo esc_html( $heading ); ?>
                     </h1>
 
                     <?php if ( $subtext ) : ?>
-                        <div class="bys-lander-hero__subtext">
+                        <div class="bys-lander-hero__subtext"<?php echo $text_colour ? ' style="color:' . esc_attr( $text_colour ) . ';"' : ''; ?>>
                             <?php echo wp_kses_post( $subtext ); ?>
                         </div>
                     <?php endif; ?>

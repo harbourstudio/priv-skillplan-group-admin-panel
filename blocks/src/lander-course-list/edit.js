@@ -1,6 +1,6 @@
 import { __ } from '@wordpress/i18n';
 import { useBlockProps, InspectorControls } from '@wordpress/block-editor';
-import { PanelBody, TextControl } from '@wordpress/components';
+import { PanelBody, TextControl, SelectControl } from '@wordpress/components';
 import './editor.scss';
 
 const CARDS = [
@@ -35,7 +35,7 @@ function WireframeCard( { badge, badgeMod, progress, cta, locked } ) {
 }
 
 export default function Edit( { attributes, setAttributes } ) {
-	const { headingOverride } = attributes;
+	const { headingOverride, skillLevelFilter } = attributes;
 	const blockProps = useBlockProps( { className: 'bys-lander-courses bys-cl-wf' } );
 
 	return (
@@ -48,6 +48,24 @@ export default function Edit( { attributes, setAttributes } ) {
 						onChange={ ( val ) => setAttributes( { headingOverride: val } ) }
 						placeholder={ __( '[Group Name] Courses', 'bys' ) }
 						help={ __( 'Leave blank to use the auto-generated "[Group Name] Courses" heading.', 'bys' ) }
+						__nextHasNoMarginBottom
+					/>
+				</PanelBody>
+
+				<PanelBody title={ __( 'Course Filters', 'bys' ) } initialOpen={ false }>
+					<SelectControl
+						label={ __( 'Skill level', 'bys' ) }
+						value={ skillLevelFilter }
+						options={ [
+							{ value: '',              label: __( 'All courses (no filter)', 'bys' ) },
+							{ value: 'explorer',      label: __( 'Explorer', 'bys' ) },
+							{ value: 'preapprentice', label: __( 'Pre-apprentice', 'bys' ) },
+							{ value: 'apprentice',    label: __( 'Apprentice', 'bys' ) },
+							{ value: 'journeyperson', label: __( 'Journeyperson', 'bys' ) },
+							{ value: 'support',       label: __( 'Non-Field Support Staff', 'bys' ) },
+							{ value: 'provider',      label: __( 'Training Provider', 'bys' ) },
+						] }
+						onChange={ ( val ) => setAttributes( { skillLevelFilter: val } ) }
 						__nextHasNoMarginBottom
 					/>
 				</PanelBody>

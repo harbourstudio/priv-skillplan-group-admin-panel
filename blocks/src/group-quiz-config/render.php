@@ -81,7 +81,7 @@ $tz_offset_hours = $tz_offset_seconds / 3600;
                 </div>
 
                 <div class="gqc__date-row">
-                    <div class="gqc__date-field">
+                    <div class="gqc__date-field" data-tooltip="<?php esc_attr_e('Opening date: quiz becomes available from this date', 'bys'); ?>">
                         <i class="fa-solid fa-play gqc__date-icon" aria-hidden="true"></i>
                         <input type="text" class="gqc__datetime gqc__datetime--start" aria-label="<?php esc_attr_e('Start date', 'bys'); ?>" data-field-type="start" readonly />
                         <i class="fa-regular fa-calendar gqc__calendar-icon" aria-hidden="true"></i>
@@ -94,7 +94,7 @@ $tz_offset_hours = $tz_offset_seconds / 3600;
                             <i class="fa-solid fa-xmark" aria-hidden="true"></i>
                         </button>
                     </div>
-                    <div class="gqc__date-field">
+                    <div class="gqc__date-field" data-tooltip="<?php esc_attr_e('Closing date: quiz is no longer accessible after this date', 'bys'); ?>">
                         <i class="fa-solid fa-flag gqc__date-icon" aria-hidden="true"></i>
                         <input type="text" class="gqc__datetime gqc__datetime--end" aria-label="<?php esc_attr_e('End date', 'bys'); ?>" data-field-type="end" readonly />
                         <i class="fa-regular fa-calendar gqc__calendar-icon" aria-hidden="true"></i>
@@ -106,6 +106,10 @@ $tz_offset_hours = $tz_offset_seconds / 3600;
                             hidden>
                             <i class="fa-solid fa-xmark" aria-hidden="true"></i>
                         </button>
+                    </div>
+                    <div class="gqc__date-field gqc__date-field--attempts" data-tooltip="<?php esc_attr_e('Attempts: max times a learner can take this quiz (blank = unlimited)', 'bys'); ?>">
+                        <i class="fa-solid fa-hashtag gqc__date-icon" aria-hidden="true"></i>
+                        <input type="number" class="gqc__attempts" aria-label="<?php esc_attr_e('Number of attempts', 'bys'); ?>" data-field-type="attempts" min="0" placeholder="<?php esc_attr_e('Unlimited', 'bys'); ?>" />
                     </div>
                 </div>
 
@@ -129,11 +133,11 @@ $tz_offset_hours = $tz_offset_seconds / 3600;
                         </button>
                     </div>
                     <div class="gqc__action-buttons">
-                        <button class="gqc__save-row btn-unstyled" type="button" disabled>
-                            <?php esc_html_e( 'Save', 'bys' ); ?>
-                        </button>
                         <button class="gqc__notify btn-unstyled" type="button">
                             <?php esc_html_e( 'Notify', 'bys' ); ?>
+                        </button>
+                        <button class="gqc__save-row btn-unstyled" type="button" disabled>
+                            <?php esc_html_e( 'Save', 'bys' ); ?>
                         </button>
                     </div>
                 </div>

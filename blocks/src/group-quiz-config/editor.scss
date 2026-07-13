@@ -1,6 +1,23 @@
 .wp-block-bys-groups-group-quiz-config {
-    .quiz-config__datetime {
+    .quiz-config__datetime,
+    .quiz-config-attempts {
         pointer-events: none;
+    }
+
+    .quiz-config-date-field--attempts {
+        cursor: default;
+    }
+
+    .quiz-config-attempts {
+        flex: 1;
+        border: none;
+        background: transparent;
+        font-size: inherit;
+        outline: none;
+        -moz-appearance: textfield;
+
+        &::-webkit-outer-spin-button,
+        &::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     }
 
     .quiz-config__badge {

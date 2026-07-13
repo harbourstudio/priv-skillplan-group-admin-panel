@@ -20,6 +20,10 @@
     "headingOverride": {
       "type": "string",
       "default": ""
+    },
+    "skillLevelFilter": {
+      "type": "string",
+      "default": ""
     }
   },
   "editorScript": "file:./index.js",
