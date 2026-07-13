@@ -40,13 +40,17 @@ export default function Edit({ clientId, attributes, setAttributes }) {
                                 <span className="quiz-config__quiz-name">{quiz.name}</span>
 
                                 <div className="quiz-config-date-row">
-                                    <div className="quiz-config-date-field">
+                                    <div className="quiz-config-date-field" title="Opens — quiz becomes available from this date">
                                         <i className="fa-solid fa-play quiz-config-date-icon" aria-hidden="true"></i>
                                         <input type="datetime-local" className="quiz-config-datetime" defaultValue="2025-09-01T23:00" readOnly />
                                     </div>
-                                    <div className="quiz-config-date-field">
+                                    <div className="quiz-config-date-field" title="Closes — quiz is no longer accessible after this date">
                                         <i className="fa-solid fa-flag quiz-config-date-icon" aria-hidden="true"></i>
                                         <input type="datetime-local" className="quiz-config-datetime" defaultValue="2025-12-31T12:00" readOnly />
+                                    </div>
+                                    <div className="quiz-config-date-field quiz-config-date-field--attempts" title="Attempts — max times a learner can take this quiz">
+                                        <i className="fa-solid fa-hashtag quiz-config-date-icon" aria-hidden="true"></i>
+                                        <input type="number" className="quiz-config-attempts" placeholder="Unlimited" readOnly />
                                     </div>
                                 </div>
 

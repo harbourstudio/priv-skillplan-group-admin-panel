@@ -222,6 +222,7 @@ async function loadQuizData($block, groupId, courses, readOnly = false) {
             const quizId = $item.data('quiz-id');
             const dates  = quizAccessDatesMap[quizId] || {};
             const $rowSaveBtn = $item.find('.gqc__save-row');
+
             if (readOnly) {
                 $item.find('.gqc__datetime--start, .gqc__datetime--end').prop('readonly', true);
                 $rowSaveBtn.hide();

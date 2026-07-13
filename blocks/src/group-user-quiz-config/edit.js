@@ -32,13 +32,17 @@ export default function Edit({ clientId, attributes, setAttributes }) {
                 </div>
 
                 <div className="uqc-date-row">
-                    <div className="uqc-date-field">
+                    <div className="uqc-date-field" title="Opens — quiz becomes available from this date">
                         <i className="fa-solid fa-play uqc-date-icon" aria-hidden="true"></i>
                         <input type="datetime-local" className="uqc-datetime" defaultValue="2025-09-01T23:00" readOnly />
                     </div>
-                    <div className="uqc-date-field">
+                    <div className="uqc-date-field" title="Closes — quiz is no longer accessible after this date">
                         <i className="fa-solid fa-flag uqc-date-icon" aria-hidden="true"></i>
                         <input type="datetime-local" className="uqc-datetime" defaultValue="2025-12-31T12:00" readOnly />
+                    </div>
+                    <div className="uqc-date-field uqc-date-field--attempts" title="Attempts — max times a learner can take this quiz">
+                        <i className="fa-solid fa-hashtag uqc-date-icon" aria-hidden="true"></i>
+                        <input type="number" className="uqc-attempts" placeholder="Unlimited" readOnly />
                     </div>
                 </div>
 

@@ -13,7 +13,7 @@ jQuery(document).ready(($) => {
   // Determine which group to select: stored > first valid > nothing.
   // Exclude the placeholder "" option from $validOptions so .first() can't
   // resolve to it.
-  const storedGroupId = sessionStorage.getItem('bys_selected_group_id');
+  const storedGroupId = localStorage.getItem('bys_selected_group_id');
   const $validOptions = $select.find('option').not('[value=""]');
   const $emptyOption  = $select.find('option[value=""]');
   const storedGroupExists = storedGroupId && $validOptions.filter(`[value="${storedGroupId}"]`).length > 0;
@@ -80,7 +80,7 @@ jQuery(document).ready(($) => {
     e.preventDefault();
     const groupId = $select.val();
     if (!groupId) return; // empty placeholder selected — nothing to do
-    sessionStorage.setItem('bys_selected_group_id', groupId);
+    localStorage.setItem('bys_selected_group_id', groupId);
     $spinnerWrapper.show();
     await fetchAndTriggerGroup(groupId);
   });

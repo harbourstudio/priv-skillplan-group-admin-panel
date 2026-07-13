@@ -2,7 +2,7 @@
 
 	.stats__grid {
         display: grid;
-        grid-template-columns: repeat(6, 1fr);
+        grid-template-columns: repeat(3, 1fr);
         gap: var(--wp--preset--spacing--3);
         margin-top: var(--wp--preset--spacing--4);
 
@@ -27,7 +27,7 @@
         }
 
         &__icon img {
-            height: 2rem;
+            height: 3rem;
             width: auto;
         }
     

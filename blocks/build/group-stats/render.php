@@ -16,25 +16,25 @@ foreach ($attrs as $a) {
 
 $stats = [
 	[
-		'icon' => 'fire.svg',
+		'icon' => 'total-participants.svg',
 		'alt'  => 'participants',
 		'stat' => 'total_members',
 		'label' => 'Total Participants',
 	],
 	[
-		'icon' => 'check-seal.svg',
+		'icon' => 'completed-courses.svg',
 		'alt'  => 'completed',
 		'stat' => 'completed_courses',
 		'label' => 'Completed Courses',
 	],
 	[
-		'icon' => 'fire.svg',
+		'icon' => 'incomplete-courses.svg',
 		'alt'  => 'incomplete',
 		'stat' => 'incomplete_courses',
 		'label' => 'Incomplete Courses',
 	],
 	[
-		'icon' => 'fire.svg',
+		'icon' => 'inactive-participants.svg',
 		'alt'  => 'inactive',
 		'stat' => 'total_inactive_members',
 		'label' => 'Inactive Participants',

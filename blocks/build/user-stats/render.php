@@ -70,37 +70,37 @@ if ($user_id) {
 
 $stats = [
     [
-        'icon' => 'fire.svg',
+        'icon' => 'required-courses.svg',
         'alt'  => 'required courses',
         'stat' => 'required_courses',
         'label' => 'Required Courses',
     ],
     [
-        'icon' => 'check-seal.svg',
+        'icon' => 'total-courses.svg',
         'alt'  => 'total courses',
         'stat' => 'total_courses',
         'label' => 'Total Courses',
     ],
     [
-        'icon' => 'fire.svg',
+        'icon' => 'mobile-check.svg',
         'alt'  => 'logins',
         'stat' => 'total_logins',
         'label' => 'Logins',
     ],
     [
-        'icon' => 'fire.svg',
+        'icon' => 'clock.svg',
         'alt'  => 'total time',
         'stat' => 'total_time',
         'label' => 'Total Time',
     ],
     [
-        'icon' => 'fire.svg',
+        'icon' => 'books-3.svg',
         'alt'  => 'total topics completed',
         'stat' => 'total_topics_completed',
         'label' => 'Lessons Completed',
     ],
     [
-        'icon' => 'fire.svg',
+        'icon' => 'check-seal.svg',
         'alt'  => 'total quizzes completed',
         'stat' => 'total_quizzes_completed',
         'label' => 'Quizzes Completed',
