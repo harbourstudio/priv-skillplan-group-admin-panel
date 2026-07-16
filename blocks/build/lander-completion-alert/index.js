@@ -1,1 +1,451 @@
-(()=>{"use strict";var e,s={5104(){const e=window.wp.blocks,s=window.React,o=window.wp.i18n,a=window.wp.blockEditor,l=window.wp.components,n=window.ReactJSXRuntime,t=JSON.parse('{"UU":"bys-groups/lander-completion-alert"}');(0,e.registerBlockType)(t.UU,{edit:function({clientId:e,attributes:t,setAttributes:c}){const{blockId:r,lockedText:i,unlockedText:d,ctaLabel:b,ctaUrl:_,ctaOpenModal:h}=t,[p,u]=(0,s.useState)(!1);(0,s.useEffect)(()=>{r!==e&&c({blockId:e})},[e]);const y=(0,a.useBlockProps)({className:"bys-lander-courses"}),m=p?"bys-lander-completion-alert--unlocked":"bys-lander-completion-alert--locked";return(0,n.jsxs)(n.Fragment,{children:[(0,n.jsx)(a.BlockControls,{children:(0,n.jsx)(l.ToolbarGroup,{children:(0,n.jsx)(l.ToolbarButton,{icon:p?"unlock":"lock",label:p?(0,o.__)("Preview: Unlocked — click to preview Locked","bys"):(0,o.__)("Preview: Locked — click to preview Unlocked","bys"),isPressed:p,onClick:()=>u(e=>!e),children:p?(0,o.__)("Unlocked","bys"):(0,o.__)("Locked","bys")})})}),(0,n.jsxs)(a.InspectorControls,{children:[(0,n.jsx)(l.PanelBody,{title:(0,o.__)("Preview","bys"),initialOpen:!0,children:(0,n.jsx)(l.ToggleControl,{label:(0,o.__)("Show unlocked state","bys"),checked:p,onChange:u,help:p?(0,o.__)("Editing the message shown when all courses are complete.","bys"):(0,o.__)("Editing the message shown while courses are incomplete.","bys"),__nextHasNoMarginBottom:!0})}),(0,n.jsxs)(l.PanelBody,{title:(0,o.__)("CTA Button","bys"),initialOpen:!0,children:[(0,n.jsx)(l.TextControl,{label:(0,o.__)("URL or Anchor","bys"),value:_,onChange:e=>c({ctaUrl:e}),placeholder:"#section-id or https://…",help:(0,o.__)("Leave blank to hide the button.","bys"),__nextHasNoMarginBottom:!0}),(0,n.jsx)(l.ToggleControl,{label:(0,o.__)("Open as modal","bys"),checked:h,onChange:e=>c({ctaOpenModal:e}),help:(0,o.__)("Triggers the URL as a modal overlay once all courses are complete.","bys"),__nextHasNoMarginBottom:!0})]})]}),(0,n.jsx)("div",{...y,children:(0,n.jsxs)("div",{className:`bys-lander-completion-alert ${m}`,children:[(0,n.jsxs)("div",{className:"bys-ca__body",children:[(0,n.jsx)("span",{className:`dashicons ${p?"dashicons-yes":"dashicons-lock"} bys-ca__icon`,"aria-hidden":"true"}),(0,n.jsx)(a.RichText,{tagName:"p",className:"bys-ca__message",value:p?d:i,onChange:e=>c(p?{unlockedText:e}:{lockedText:e}),placeholder:p?(0,o.__)("Message shown when all courses are complete…","bys"):(0,o.__)("Message shown while courses are incomplete…","bys")})]}),(0,n.jsxs)("div",{className:"bys-ca__cta",children:[(0,n.jsx)(a.RichText,{tagName:"span",className:"btn "+(p?"bys-ca__btn bys-ca__btn--active":"bys-ca__btn bys-ca__btn--disabled"),value:b,onChange:e=>c({ctaLabel:e}),placeholder:(0,o.__)("Button label…","bys"),allowedFormats:[]}),h&&p&&(0,n.jsx)("span",{className:"bys-ca__modal-badge",children:(0,o.__)("Opens modal","bys")})]})]})})]})},save:function(){return null}})}},o={};function a(e){var l=o[e];if(void 0!==l)return l.exports;var n=o[e]={exports:{}};return s[e](n,n.exports,a),n.exports}a.m=s,e=[],a.O=(s,o,l,n)=>{if(!o){var t=1/0;for(d=0;d<e.length;d++){for(var[o,l,n]=e[d],c=!0,r=0;r<o.length;r++)(!1&n||t>=n)&&Object.keys(a.O).every(e=>a.O[e](o[r]))?o.splice(r--,1):(c=!1,n<t&&(t=n));if(c){e.splice(d--,1);var i=l();void 0!==i&&(s=i)}}return s}n=n||0;for(var d=e.length;d>0&&e[d-1][2]>n;d--)e[d]=e[d-1];e[d]=[o,l,n]},a.o=(e,s)=>Object.prototype.hasOwnProperty.call(e,s),(()=>{var e={2912:0,7032:0};a.O.j=s=>0===e[s];var s=(s,o)=>{var l,n,[t,c,r]=o,i=0;if(t.some(s=>0!==e[s])){for(l in c)a.o(c,l)&&(a.m[l]=c[l]);if(r)var d=r(a)}for(s&&s(o);i<t.length;i++)n=t[i],a.o(e,n)&&e[n]&&e[n][0](),e[n]=0;return a.O(d)},o=globalThis.webpackChunkbys_groups=globalThis.webpackChunkbys_groups||[];o.forEach(s.bind(null,0)),o.push=s.bind(null,o.push.bind(o))})();var l=a.O(void 0,[7032],()=>a(5104));l=a.O(l)})();
+/******/ (() => { // webpackBootstrap
+/******/ 	"use strict";
+/******/ 	var __webpack_modules__ = ({
+
+/***/ "./src/lander-completion-alert/edit.js"
+/*!*********************************************!*\
+  !*** ./src/lander-completion-alert/edit.js ***!
+  \*********************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (/* binding */ Edit)
+/* harmony export */ });
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "react");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var _wordpress_i18n__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @wordpress/i18n */ "@wordpress/i18n");
+/* harmony import */ var _wordpress_i18n__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(_wordpress_i18n__WEBPACK_IMPORTED_MODULE_1__);
+/* harmony import */ var _wordpress_block_editor__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @wordpress/block-editor */ "@wordpress/block-editor");
+/* harmony import */ var _wordpress_block_editor__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(_wordpress_block_editor__WEBPACK_IMPORTED_MODULE_2__);
+/* harmony import */ var _wordpress_components__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! @wordpress/components */ "@wordpress/components");
+/* harmony import */ var _wordpress_components__WEBPACK_IMPORTED_MODULE_3___default = /*#__PURE__*/__webpack_require__.n(_wordpress_components__WEBPACK_IMPORTED_MODULE_3__);
+/* harmony import */ var _editor_scss__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./editor.scss */ "./src/lander-completion-alert/editor.scss");
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! react/jsx-runtime */ "react/jsx-runtime");
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5___default = /*#__PURE__*/__webpack_require__.n(react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__);
+
+
+
+
+
+
+function Edit({
+  clientId,
+  attributes,
+  setAttributes
+}) {
+  const {
+    blockId,
+    lockedText,
+    unlockedText,
+    ctaLabel,
+    ctaUrl,
+    ctaOpenModal
+  } = attributes;
+  const [showUnlocked, setShowUnlocked] = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false);
+  (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(() => {
+    if (blockId !== clientId) setAttributes({
+      blockId: clientId
+    });
+  }, [clientId]);
+  const blockProps = (0,_wordpress_block_editor__WEBPACK_IMPORTED_MODULE_2__.useBlockProps)({
+    className: 'bys-lander-courses'
+  });
+  const alertMod = showUnlocked ? 'bys-lander-completion-alert--unlocked' : 'bys-lander-completion-alert--locked';
+  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)(react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.Fragment, {
+    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_wordpress_block_editor__WEBPACK_IMPORTED_MODULE_2__.BlockControls, {
+      children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_3__.ToolbarGroup, {
+        children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_3__.ToolbarButton, {
+          icon: showUnlocked ? 'unlock' : 'lock',
+          label: showUnlocked ? (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_1__.__)('Preview: Unlocked — click to preview Locked', 'bys') : (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_1__.__)('Preview: Locked — click to preview Unlocked', 'bys'),
+          isPressed: showUnlocked,
+          onClick: () => setShowUnlocked(v => !v),
+          children: showUnlocked ? (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_1__.__)('Unlocked', 'bys') : (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_1__.__)('Locked', 'bys')
+        })
+      })
+    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)(_wordpress_block_editor__WEBPACK_IMPORTED_MODULE_2__.InspectorControls, {
+      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_3__.PanelBody, {
+        title: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_1__.__)('Preview', 'bys'),
+        initialOpen: true,
+        children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_3__.ToggleControl, {
+          label: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_1__.__)('Show unlocked state', 'bys'),
+          checked: showUnlocked,
+          onChange: setShowUnlocked,
+          help: showUnlocked ? (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_1__.__)('Editing the message shown when all courses are complete.', 'bys') : (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_1__.__)('Editing the message shown while courses are incomplete.', 'bys'),
+          __nextHasNoMarginBottom: true
+        })
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)(_wordpress_components__WEBPACK_IMPORTED_MODULE_3__.PanelBody, {
+        title: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_1__.__)('CTA Button', 'bys'),
+        initialOpen: true,
+        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_3__.TextControl, {
+          label: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_1__.__)('URL or Anchor', 'bys'),
+          value: ctaUrl,
+          onChange: val => setAttributes({
+            ctaUrl: val
+          }),
+          placeholder: "#section-id or https://\u2026",
+          help: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_1__.__)('Leave blank to hide the button.', 'bys'),
+          __nextHasNoMarginBottom: true
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_3__.ToggleControl, {
+          label: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_1__.__)('Open as modal', 'bys'),
+          checked: ctaOpenModal,
+          onChange: val => setAttributes({
+            ctaOpenModal: val
+          }),
+          help: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_1__.__)('Triggers the URL as a modal overlay once all courses are complete.', 'bys'),
+          __nextHasNoMarginBottom: true
+        })]
+      })]
+    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)("div", {
+      ...blockProps,
+      children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)("div", {
+        className: `bys-lander-completion-alert ${alertMod}`,
+        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)("div", {
+          className: "bys-ca__body",
+          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)("span", {
+            className: `dashicons ${showUnlocked ? 'dashicons-yes' : 'dashicons-lock'} bys-ca__icon`,
+            "aria-hidden": "true"
+          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_wordpress_block_editor__WEBPACK_IMPORTED_MODULE_2__.RichText, {
+            tagName: "p",
+            className: "bys-ca__message",
+            value: showUnlocked ? unlockedText : lockedText,
+            onChange: val => setAttributes(showUnlocked ? {
+              unlockedText: val
+            } : {
+              lockedText: val
+            }),
+            placeholder: showUnlocked ? (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_1__.__)('Message shown when all courses are complete…', 'bys') : (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_1__.__)('Message shown while courses are incomplete…', 'bys')
+          })]
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsxs)("div", {
+          className: "bys-ca__cta",
+          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_wordpress_block_editor__WEBPACK_IMPORTED_MODULE_2__.RichText, {
+            tagName: "span",
+            className: `btn ${showUnlocked ? 'bys-ca__btn bys-ca__btn--active' : 'bys-ca__btn bys-ca__btn--disabled'}`,
+            value: ctaLabel,
+            onChange: val => setAttributes({
+              ctaLabel: val
+            }),
+            placeholder: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_1__.__)('Button label…', 'bys'),
+            allowedFormats: []
+          }), ctaOpenModal && showUnlocked && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)("span", {
+            className: "bys-ca__modal-badge",
+            children: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_1__.__)('Opens modal', 'bys')
+          })]
+        })]
+      })
+    })]
+  });
+}
+
+/***/ },
+
+/***/ "./src/lander-completion-alert/index.js"
+/*!**********************************************!*\
+  !*** ./src/lander-completion-alert/index.js ***!
+  \**********************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _wordpress_blocks__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @wordpress/blocks */ "@wordpress/blocks");
+/* harmony import */ var _wordpress_blocks__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_wordpress_blocks__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var _style_scss__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./style.scss */ "./src/lander-completion-alert/style.scss");
+/* harmony import */ var _edit__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./edit */ "./src/lander-completion-alert/edit.js");
+/* harmony import */ var _save__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./save */ "./src/lander-completion-alert/save.js");
+/* harmony import */ var _block_json__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./block.json */ "./src/lander-completion-alert/block.json");
+/* harmony import */ var _editor_scss__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./editor.scss */ "./src/lander-completion-alert/editor.scss");
+
+
+
+
+
+
+(0,_wordpress_blocks__WEBPACK_IMPORTED_MODULE_0__.registerBlockType)(_block_json__WEBPACK_IMPORTED_MODULE_4__.name, {
+  edit: _edit__WEBPACK_IMPORTED_MODULE_2__["default"],
+  save: _save__WEBPACK_IMPORTED_MODULE_3__["default"]
+});
+
+/***/ },
+
+/***/ "./src/lander-completion-alert/save.js"
+/*!*********************************************!*\
+  !*** ./src/lander-completion-alert/save.js ***!
+  \*********************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (/* binding */ save)
+/* harmony export */ });
+function save() {
+  return null;
+}
+
+/***/ },
+
+/***/ "./src/lander-completion-alert/editor.scss"
+/*!*************************************************!*\
+  !*** ./src/lander-completion-alert/editor.scss ***!
+  \*************************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+// extracted by mini-css-extract-plugin
+
+
+/***/ },
+
+/***/ "./src/lander-completion-alert/style.scss"
+/*!************************************************!*\
+  !*** ./src/lander-completion-alert/style.scss ***!
+  \************************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+// extracted by mini-css-extract-plugin
+
+
+/***/ },
+
+/***/ "react"
+/*!************************!*\
+  !*** external "React" ***!
+  \************************/
+(module) {
+
+module.exports = window["React"];
+
+/***/ },
+
+/***/ "react/jsx-runtime"
+/*!**********************************!*\
+  !*** external "ReactJSXRuntime" ***!
+  \**********************************/
+(module) {
+
+module.exports = window["ReactJSXRuntime"];
+
+/***/ },
+
+/***/ "@wordpress/block-editor"
+/*!*************************************!*\
+  !*** external ["wp","blockEditor"] ***!
+  \*************************************/
+(module) {
+
+module.exports = window["wp"]["blockEditor"];
+
+/***/ },
+
+/***/ "@wordpress/blocks"
+/*!********************************!*\
+  !*** external ["wp","blocks"] ***!
+  \********************************/
+(module) {
+
+module.exports = window["wp"]["blocks"];
+
+/***/ },
+
+/***/ "@wordpress/components"
+/*!************************************!*\
+  !*** external ["wp","components"] ***!
+  \************************************/
+(module) {
+
+module.exports = window["wp"]["components"];
+
+/***/ },
+
+/***/ "@wordpress/i18n"
+/*!******************************!*\
+  !*** external ["wp","i18n"] ***!
+  \******************************/
+(module) {
+
+module.exports = window["wp"]["i18n"];
+
+/***/ },
+
+/***/ "./src/lander-completion-alert/block.json"
+/*!************************************************!*\
+  !*** ./src/lander-completion-alert/block.json ***!
+  \************************************************/
+(module) {
+
+module.exports = /*#__PURE__*/JSON.parse('{"$schema":"https://schemas.wp.org/trunk/block.json","apiVersion":3,"name":"bys-groups/lander-completion-alert","version":"1.0.0","title":"BYS - Lander Completion Alert","category":"custom-blocks","icon":"awards","description":"Shows a locked/unlocked completion alert and CTA once all lander courses are finished.","textdomain":"bys","supports":{"anchor":true,"html":false},"attributes":{"blockId":{"type":"string","default":""},"lockedText":{"type":"string","default":""},"unlockedText":{"type":"string","default":""},"ctaLabel":{"type":"string","default":""},"ctaUrl":{"type":"string","default":""},"ctaOpenModal":{"type":"boolean","default":false}},"editorScript":"file:./index.js","render":"file:./render.php","style":"file:./style-index.css","editorStyle":"file:./index.css"}');
+
+/***/ }
+
+/******/ 	});
+/************************************************************************/
+/******/ 	// The module cache
+/******/ 	var __webpack_module_cache__ = {};
+/******/ 	
+/******/ 	// The require function
+/******/ 	function __webpack_require__(moduleId) {
+/******/ 		// Check if module is in cache
+/******/ 		var cachedModule = __webpack_module_cache__[moduleId];
+/******/ 		if (cachedModule !== undefined) {
+/******/ 			return cachedModule.exports;
+/******/ 		}
+/******/ 		// Create a new module (and put it into the cache)
+/******/ 		var module = __webpack_module_cache__[moduleId] = {
+/******/ 			// no module.id needed
+/******/ 			// no module.loaded needed
+/******/ 			exports: {}
+/******/ 		};
+/******/ 	
+/******/ 		// Execute the module function
+/******/ 		if (!(moduleId in __webpack_modules__)) {
+/******/ 			delete __webpack_module_cache__[moduleId];
+/******/ 			var e = new Error("Cannot find module '" + moduleId + "'");
+/******/ 			e.code = 'MODULE_NOT_FOUND';
+/******/ 			throw e;
+/******/ 		}
+/******/ 		__webpack_modules__[moduleId](module, module.exports, __webpack_require__);
+/******/ 	
+/******/ 		// Return the exports of the module
+/******/ 		return module.exports;
+/******/ 	}
+/******/ 	
+/******/ 	// expose the modules object (__webpack_modules__)
+/******/ 	__webpack_require__.m = __webpack_modules__;
+/******/ 	
+/************************************************************************/
+/******/ 	/* webpack/runtime/chunk loaded */
+/******/ 	(() => {
+/******/ 		var deferred = [];
+/******/ 		__webpack_require__.O = (result, chunkIds, fn, priority) => {
+/******/ 			if(chunkIds) {
+/******/ 				priority = priority || 0;
+/******/ 				for(var i = deferred.length; i > 0 && deferred[i - 1][2] > priority; i--) deferred[i] = deferred[i - 1];
+/******/ 				deferred[i] = [chunkIds, fn, priority];
+/******/ 				return;
+/******/ 			}
+/******/ 			var notFulfilled = Infinity;
+/******/ 			for (var i = 0; i < deferred.length; i++) {
+/******/ 				var [chunkIds, fn, priority] = deferred[i];
+/******/ 				var fulfilled = true;
+/******/ 				for (var j = 0; j < chunkIds.length; j++) {
+/******/ 					if ((priority & 1 === 0 || notFulfilled >= priority) && Object.keys(__webpack_require__.O).every((key) => (__webpack_require__.O[key](chunkIds[j])))) {
+/******/ 						chunkIds.splice(j--, 1);
+/******/ 					} else {
+/******/ 						fulfilled = false;
+/******/ 						if(priority < notFulfilled) notFulfilled = priority;
+/******/ 					}
+/******/ 				}
+/******/ 				if(fulfilled) {
+/******/ 					deferred.splice(i--, 1)
+/******/ 					var r = fn();
+/******/ 					if (r !== undefined) result = r;
+/******/ 				}
+/******/ 			}
+/******/ 			return result;
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/compat get default export */
+/******/ 	(() => {
+/******/ 		// getDefaultExport function for compatibility with non-harmony modules
+/******/ 		__webpack_require__.n = (module) => {
+/******/ 			var getter = module && module.__esModule ?
+/******/ 				() => (module['default']) :
+/******/ 				() => (module);
+/******/ 			__webpack_require__.d(getter, { a: getter });
+/******/ 			return getter;
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/define property getters */
+/******/ 	(() => {
+/******/ 		// define getter functions for harmony exports
+/******/ 		__webpack_require__.d = (exports, definition) => {
+/******/ 			for(var key in definition) {
+/******/ 				if(__webpack_require__.o(definition, key) && !__webpack_require__.o(exports, key)) {
+/******/ 					Object.defineProperty(exports, key, { enumerable: true, get: definition[key] });
+/******/ 				}
+/******/ 			}
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/hasOwnProperty shorthand */
+/******/ 	(() => {
+/******/ 		__webpack_require__.o = (obj, prop) => (Object.prototype.hasOwnProperty.call(obj, prop))
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/make namespace object */
+/******/ 	(() => {
+/******/ 		// define __esModule on exports
+/******/ 		__webpack_require__.r = (exports) => {
+/******/ 			if(typeof Symbol !== 'undefined' && Symbol.toStringTag) {
+/******/ 				Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
+/******/ 			}
+/******/ 			Object.defineProperty(exports, '__esModule', { value: true });
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/jsonp chunk loading */
+/******/ 	(() => {
+/******/ 		// no baseURI
+/******/ 		
+/******/ 		// object to store loaded and loading chunks
+/******/ 		// undefined = chunk not loaded, null = chunk preloaded/prefetched
+/******/ 		// [resolve, reject, Promise] = chunk loading, 0 = chunk loaded
+/******/ 		var installedChunks = {
+/******/ 			"lander-completion-alert/index": 0,
+/******/ 			"lander-completion-alert/style-index": 0
+/******/ 		};
+/******/ 		
+/******/ 		// no chunk on demand loading
+/******/ 		
+/******/ 		// no prefetching
+/******/ 		
+/******/ 		// no preloaded
+/******/ 		
+/******/ 		// no HMR
+/******/ 		
+/******/ 		// no HMR manifest
+/******/ 		
+/******/ 		__webpack_require__.O.j = (chunkId) => (installedChunks[chunkId] === 0);
+/******/ 		
+/******/ 		// install a JSONP callback for chunk loading
+/******/ 		var webpackJsonpCallback = (parentChunkLoadingFunction, data) => {
+/******/ 			var [chunkIds, moreModules, runtime] = data;
+/******/ 			// add "moreModules" to the modules object,
+/******/ 			// then flag all "chunkIds" as loaded and fire callback
+/******/ 			var moduleId, chunkId, i = 0;
+/******/ 			if(chunkIds.some((id) => (installedChunks[id] !== 0))) {
+/******/ 				for(moduleId in moreModules) {
+/******/ 					if(__webpack_require__.o(moreModules, moduleId)) {
+/******/ 						__webpack_require__.m[moduleId] = moreModules[moduleId];
+/******/ 					}
+/******/ 				}
+/******/ 				if(runtime) var result = runtime(__webpack_require__);
+/******/ 			}
+/******/ 			if(parentChunkLoadingFunction) parentChunkLoadingFunction(data);
+/******/ 			for(;i < chunkIds.length; i++) {
+/******/ 				chunkId = chunkIds[i];
+/******/ 				if(__webpack_require__.o(installedChunks, chunkId) && installedChunks[chunkId]) {
+/******/ 					installedChunks[chunkId][0]();
+/******/ 				}
+/******/ 				installedChunks[chunkId] = 0;
+/******/ 			}
+/******/ 			return __webpack_require__.O(result);
+/******/ 		}
+/******/ 		
+/******/ 		var chunkLoadingGlobal = globalThis["webpackChunkbys_groups"] = globalThis["webpackChunkbys_groups"] || [];
+/******/ 		chunkLoadingGlobal.forEach(webpackJsonpCallback.bind(null, 0));
+/******/ 		chunkLoadingGlobal.push = webpackJsonpCallback.bind(null, chunkLoadingGlobal.push.bind(chunkLoadingGlobal));
+/******/ 	})();
+/******/ 	
+/************************************************************************/
+/******/ 	
+/******/ 	// startup
+/******/ 	// Load entry module and return exports
+/******/ 	// This entry module depends on other loaded chunks and execution need to be delayed
+/******/ 	var __webpack_exports__ = __webpack_require__.O(undefined, ["lander-completion-alert/style-index"], () => (__webpack_require__("./src/lander-completion-alert/index.js")))
+/******/ 	__webpack_exports__ = __webpack_require__.O(__webpack_exports__);
+/******/ 	
+/******/ })()
+;
+//# sourceMappingURL=index.js.map

@@ -15,6 +15,7 @@ if (!class_exists('BYS_Groups_Blocks')) {
         private $blocks = [
             'group-add-member',
             'group-add-member-modal',
+            'group-onboarding-modal',
             'group-archive',
             'group-communication-history-modal',
             'group-communication-log',

@@ -1,1 +1,488 @@
-(()=>{"use strict";var e,s={8086(){const e=window.wp.blocks,s=window.wp.i18n,r=window.wp.blockEditor,l=window.wp.components,a=window.ReactJSXRuntime,n=[{badge:"Required",badgeMod:"blue",progress:55,cta:"Continue Course",locked:!1},{badge:"Required",badgeMod:"blue",progress:0,cta:"Get Started",locked:!1},{badge:"Locked",badgeMod:"gray",progress:0,cta:"Locked",locked:!0}];function o({badge:e,badgeMod:r,progress:l,cta:n,locked:o}){return(0,a.jsxs)("div",{className:"bys-cl-wf__card"+(o?" bys-cl-wf__card--locked":""),children:[(0,a.jsxs)("div",{className:"bys-cl-wf__card-header",children:[(0,a.jsx)("span",{className:`bys-cl-wf__badge bys-cl-wf__badge--${r}`,children:e}),(0,a.jsx)("span",{className:"bys-cl-wf__info-icon","aria-hidden":"true",children:"i"})]}),(0,a.jsxs)("div",{className:"bys-cl-wf__card-content",children:[(0,a.jsx)("div",{className:"bys-cl-wf__skel bys-cl-wf__skel--lg"}),(0,a.jsx)("div",{className:"bys-cl-wf__skel bys-cl-wf__skel--md"})]}),(0,a.jsxs)("div",{className:"bys-cl-wf__card-foot",children:[(0,a.jsx)("div",{className:"bys-cl-wf__progress-track",children:(0,a.jsx)("div",{className:"bys-cl-wf__progress-fill",style:{width:`${l}%`}})}),(0,a.jsxs)("span",{className:"bys-cl-wf__progress-label",children:[l,"% ",(0,s.__)("Complete","bys")]}),(0,a.jsxs)("div",{className:"bys-cl-wf__cta"+(o?" bys-cl-wf__cta--locked":""),children:[o&&(0,a.jsx)("span",{className:"bys-cl-wf__lock","aria-hidden":"true",children:"🔒"}),n]})]})]})}const i=JSON.parse('{"UU":"bys-groups/lander-course-list"}');(0,e.registerBlockType)(i.UU,{edit:function({attributes:e,setAttributes:i}){const{headingOverride:c,skillLevelFilter:d}=e,t=(0,r.useBlockProps)({className:"bys-lander-courses bys-cl-wf"});return(0,a.jsxs)(a.Fragment,{children:[(0,a.jsxs)(r.InspectorControls,{children:[(0,a.jsx)(l.PanelBody,{title:(0,s.__)("Heading","bys"),initialOpen:!0,children:(0,a.jsx)(l.TextControl,{label:(0,s.__)("Heading override","bys"),value:c,onChange:e=>i({headingOverride:e}),placeholder:(0,s.__)("[Group Name] Courses","bys"),help:(0,s.__)('Leave blank to use the auto-generated "[Group Name] Courses" heading.',"bys"),__nextHasNoMarginBottom:!0})}),(0,a.jsx)(l.PanelBody,{title:(0,s.__)("Course Filters","bys"),initialOpen:!1,children:(0,a.jsx)(l.SelectControl,{label:(0,s.__)("Skill level","bys"),value:d,options:[{value:"",label:(0,s.__)("All courses (no filter)","bys")},{value:"explorer",label:(0,s.__)("Explorer","bys")},{value:"preapprentice",label:(0,s.__)("Pre-apprentice","bys")},{value:"apprentice",label:(0,s.__)("Apprentice","bys")},{value:"journeyperson",label:(0,s.__)("Journeyperson","bys")},{value:"support",label:(0,s.__)("Non-Field Support Staff","bys")},{value:"provider",label:(0,s.__)("Training Provider","bys")}],onChange:e=>i({skillLevelFilter:e}),__nextHasNoMarginBottom:!0})})]}),(0,a.jsxs)("div",{...t,children:[(0,a.jsxs)("div",{className:"bys-cl-wf__notice",children:[(0,a.jsx)("span",{className:"bys-cl-wf__notice-icon","aria-hidden":"true",children:"↻"}),(0,a.jsx)("span",{children:(0,s.__)("Courses are resolved server-side from the user's matched LearnDash group for this lander. Order, locks, and progress are per-user.","bys")})]}),(0,a.jsx)("div",{className:"bys-cl-wf__heading",children:c||(0,a.jsxs)(a.Fragment,{children:[(0,a.jsx)("span",{className:"bys-cl-wf__heading-ghost",children:(0,s.__)("[Group Name]","bys")})," ",(0,s.__)("Courses","bys")]})}),(0,a.jsx)("div",{className:"bys-cl-wf__grid",children:n.map((e,s)=>(0,a.jsx)(o,{...e},s))})]})]})},save:function(){return null}})}},r={};function l(e){var a=r[e];if(void 0!==a)return a.exports;var n=r[e]={exports:{}};return s[e](n,n.exports,l),n.exports}l.m=s,e=[],l.O=(s,r,a,n)=>{if(!r){var o=1/0;for(t=0;t<e.length;t++){for(var[r,a,n]=e[t],i=!0,c=0;c<r.length;c++)(!1&n||o>=n)&&Object.keys(l.O).every(e=>l.O[e](r[c]))?r.splice(c--,1):(i=!1,n<o&&(o=n));if(i){e.splice(t--,1);var d=a();void 0!==d&&(s=d)}}return s}n=n||0;for(var t=e.length;t>0&&e[t-1][2]>n;t--)e[t]=e[t-1];e[t]=[r,a,n]},l.o=(e,s)=>Object.prototype.hasOwnProperty.call(e,s),(()=>{var e={9095:0,7887:0};l.O.j=s=>0===e[s];var s=(s,r)=>{var a,n,[o,i,c]=r,d=0;if(o.some(s=>0!==e[s])){for(a in i)l.o(i,a)&&(l.m[a]=i[a]);if(c)var t=c(l)}for(s&&s(r);d<o.length;d++)n=o[d],l.o(e,n)&&e[n]&&e[n][0](),e[n]=0;return l.O(t)},r=globalThis.webpackChunkbys_groups=globalThis.webpackChunkbys_groups||[];r.forEach(s.bind(null,0)),r.push=s.bind(null,r.push.bind(r))})();var a=l.O(void 0,[7887],()=>l(8086));a=l.O(a)})();
+/******/ (() => { // webpackBootstrap
+/******/ 	"use strict";
+/******/ 	var __webpack_modules__ = ({
+
+/***/ "./src/lander-course-list/edit.js"
+/*!****************************************!*\
+  !*** ./src/lander-course-list/edit.js ***!
+  \****************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (/* binding */ Edit)
+/* harmony export */ });
+/* harmony import */ var _wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @wordpress/i18n */ "@wordpress/i18n");
+/* harmony import */ var _wordpress_i18n__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var _wordpress_block_editor__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @wordpress/block-editor */ "@wordpress/block-editor");
+/* harmony import */ var _wordpress_block_editor__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(_wordpress_block_editor__WEBPACK_IMPORTED_MODULE_1__);
+/* harmony import */ var _wordpress_components__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @wordpress/components */ "@wordpress/components");
+/* harmony import */ var _wordpress_components__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__);
+/* harmony import */ var _editor_scss__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./editor.scss */ "./src/lander-course-list/editor.scss");
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! react/jsx-runtime */ "react/jsx-runtime");
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4___default = /*#__PURE__*/__webpack_require__.n(react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__);
+
+
+
+
+
+const CARDS = [{
+  badge: 'Required',
+  badgeMod: 'blue',
+  progress: 55,
+  cta: 'Continue Course',
+  locked: false
+}, {
+  badge: 'Required',
+  badgeMod: 'blue',
+  progress: 0,
+  cta: 'Get Started',
+  locked: false
+}, {
+  badge: 'Locked',
+  badgeMod: 'gray',
+  progress: 0,
+  cta: 'Locked',
+  locked: true
+}];
+function WireframeCard({
+  badge,
+  badgeMod,
+  progress,
+  cta,
+  locked
+}) {
+  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsxs)("div", {
+    className: `bys-cl-wf__card${locked ? ' bys-cl-wf__card--locked' : ''}`,
+    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsxs)("div", {
+      className: "bys-cl-wf__card-header",
+      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)("span", {
+        className: `bys-cl-wf__badge bys-cl-wf__badge--${badgeMod}`,
+        children: badge
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)("span", {
+        className: "bys-cl-wf__info-icon",
+        "aria-hidden": "true",
+        children: "i"
+      })]
+    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsxs)("div", {
+      className: "bys-cl-wf__card-content",
+      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)("div", {
+        className: "bys-cl-wf__skel bys-cl-wf__skel--lg"
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)("div", {
+        className: "bys-cl-wf__skel bys-cl-wf__skel--md"
+      })]
+    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsxs)("div", {
+      className: "bys-cl-wf__card-foot",
+      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)("div", {
+        className: "bys-cl-wf__progress-track",
+        children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)("div", {
+          className: "bys-cl-wf__progress-fill",
+          style: {
+            width: `${progress}%`
+          }
+        })
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsxs)("span", {
+        className: "bys-cl-wf__progress-label",
+        children: [progress, "% ", (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Complete', 'bys')]
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsxs)("div", {
+        className: `bys-cl-wf__cta${locked ? ' bys-cl-wf__cta--locked' : ''}`,
+        children: [locked && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)("span", {
+          className: "bys-cl-wf__lock",
+          "aria-hidden": "true",
+          children: "\uD83D\uDD12"
+        }), cta]
+      })]
+    })]
+  });
+}
+function Edit({
+  attributes,
+  setAttributes
+}) {
+  const {
+    headingOverride,
+    skillLevelFilter
+  } = attributes;
+  const blockProps = (0,_wordpress_block_editor__WEBPACK_IMPORTED_MODULE_1__.useBlockProps)({
+    className: 'bys-lander-courses bys-cl-wf'
+  });
+  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsxs)(react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.Fragment, {
+    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsxs)(_wordpress_block_editor__WEBPACK_IMPORTED_MODULE_1__.InspectorControls, {
+      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.PanelBody, {
+        title: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Heading', 'bys'),
+        initialOpen: true,
+        children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.TextControl, {
+          label: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Heading override', 'bys'),
+          value: headingOverride,
+          onChange: val => setAttributes({
+            headingOverride: val
+          }),
+          placeholder: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('[Group Name] Courses', 'bys'),
+          help: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Leave blank to use the auto-generated "[Group Name] Courses" heading.', 'bys'),
+          __nextHasNoMarginBottom: true
+        })
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.PanelBody, {
+        title: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Course Filters', 'bys'),
+        initialOpen: false,
+        children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)(_wordpress_components__WEBPACK_IMPORTED_MODULE_2__.SelectControl, {
+          label: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Skill level', 'bys'),
+          value: skillLevelFilter,
+          options: [{
+            value: '',
+            label: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('All courses (no filter)', 'bys')
+          }, {
+            value: 'explorer',
+            label: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Explorer', 'bys')
+          }, {
+            value: 'preapprentice',
+            label: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Pre-apprentice', 'bys')
+          }, {
+            value: 'apprentice',
+            label: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Apprentice', 'bys')
+          }, {
+            value: 'journeyperson',
+            label: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Journeyperson', 'bys')
+          }, {
+            value: 'support',
+            label: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Non-Field Support Staff', 'bys')
+          }, {
+            value: 'provider',
+            label: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Training Provider', 'bys')
+          }],
+          onChange: val => setAttributes({
+            skillLevelFilter: val
+          }),
+          __nextHasNoMarginBottom: true
+        })
+      })]
+    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsxs)("div", {
+      ...blockProps,
+      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsxs)("div", {
+        className: "bys-cl-wf__notice",
+        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)("span", {
+          className: "bys-cl-wf__notice-icon",
+          "aria-hidden": "true",
+          children: "\u21BB"
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)("span", {
+          children: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Courses are resolved server-side from the user\'s matched LearnDash group for this lander. Order, locks, and progress are per-user.', 'bys')
+        })]
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)("div", {
+        className: "bys-cl-wf__heading",
+        children: headingOverride ? headingOverride : /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsxs)(react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.Fragment, {
+          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)("span", {
+            className: "bys-cl-wf__heading-ghost",
+            children: (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('[Group Name]', 'bys')
+          }), ' ', (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)('Courses', 'bys')]
+        })
+      }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)("div", {
+        className: "bys-cl-wf__grid",
+        children: CARDS.map((card, i) => /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)(WireframeCard, {
+          ...card
+        }, i))
+      })]
+    })]
+  });
+}
+
+/***/ },
+
+/***/ "./src/lander-course-list/index.js"
+/*!*****************************************!*\
+  !*** ./src/lander-course-list/index.js ***!
+  \*****************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _wordpress_blocks__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @wordpress/blocks */ "@wordpress/blocks");
+/* harmony import */ var _wordpress_blocks__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_wordpress_blocks__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var _style_scss__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./style.scss */ "./src/lander-course-list/style.scss");
+/* harmony import */ var _edit__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./edit */ "./src/lander-course-list/edit.js");
+/* harmony import */ var _save__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./save */ "./src/lander-course-list/save.js");
+/* harmony import */ var _block_json__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./block.json */ "./src/lander-course-list/block.json");
+/* harmony import */ var _editor_scss__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./editor.scss */ "./src/lander-course-list/editor.scss");
+
+
+
+
+
+
+(0,_wordpress_blocks__WEBPACK_IMPORTED_MODULE_0__.registerBlockType)(_block_json__WEBPACK_IMPORTED_MODULE_4__.name, {
+  edit: _edit__WEBPACK_IMPORTED_MODULE_2__["default"],
+  save: _save__WEBPACK_IMPORTED_MODULE_3__["default"]
+});
+
+/***/ },
+
+/***/ "./src/lander-course-list/save.js"
+/*!****************************************!*\
+  !*** ./src/lander-course-list/save.js ***!
+  \****************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "default": () => (/* binding */ save)
+/* harmony export */ });
+function save() {
+  return null;
+}
+
+/***/ },
+
+/***/ "./src/lander-course-list/editor.scss"
+/*!********************************************!*\
+  !*** ./src/lander-course-list/editor.scss ***!
+  \********************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+// extracted by mini-css-extract-plugin
+
+
+/***/ },
+
+/***/ "./src/lander-course-list/style.scss"
+/*!*******************************************!*\
+  !*** ./src/lander-course-list/style.scss ***!
+  \*******************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+// extracted by mini-css-extract-plugin
+
+
+/***/ },
+
+/***/ "react/jsx-runtime"
+/*!**********************************!*\
+  !*** external "ReactJSXRuntime" ***!
+  \**********************************/
+(module) {
+
+module.exports = window["ReactJSXRuntime"];
+
+/***/ },
+
+/***/ "@wordpress/block-editor"
+/*!*************************************!*\
+  !*** external ["wp","blockEditor"] ***!
+  \*************************************/
+(module) {
+
+module.exports = window["wp"]["blockEditor"];
+
+/***/ },
+
+/***/ "@wordpress/blocks"
+/*!********************************!*\
+  !*** external ["wp","blocks"] ***!
+  \********************************/
+(module) {
+
+module.exports = window["wp"]["blocks"];
+
+/***/ },
+
+/***/ "@wordpress/components"
+/*!************************************!*\
+  !*** external ["wp","components"] ***!
+  \************************************/
+(module) {
+
+module.exports = window["wp"]["components"];
+
+/***/ },
+
+/***/ "@wordpress/i18n"
+/*!******************************!*\
+  !*** external ["wp","i18n"] ***!
+  \******************************/
+(module) {
+
+module.exports = window["wp"]["i18n"];
+
+/***/ },
+
+/***/ "./src/lander-course-list/block.json"
+/*!*******************************************!*\
+  !*** ./src/lander-course-list/block.json ***!
+  \*******************************************/
+(module) {
+
+module.exports = /*#__PURE__*/JSON.parse('{"$schema":"https://schemas.wp.org/trunk/block.json","apiVersion":3,"name":"bys-groups/lander-course-list","version":"1.0.0","title":"BYS - Lander Course List","category":"custom-blocks","icon":"grid-view","description":"Displays the course grid for a lander page, scoped to the user\'s matched group.","textdomain":"bys","supports":{"anchor":true,"html":false},"attributes":{"blockId":{"type":"string","default":""},"headingOverride":{"type":"string","default":""},"skillLevelFilter":{"type":"string","default":""}},"editorScript":"file:./index.js","render":"file:./render.php","style":"file:./style-index.css","editorStyle":"file:./index.css"}');
+
+/***/ }
+
+/******/ 	});
+/************************************************************************/
+/******/ 	// The module cache
+/******/ 	var __webpack_module_cache__ = {};
+/******/ 	
+/******/ 	// The require function
+/******/ 	function __webpack_require__(moduleId) {
+/******/ 		// Check if module is in cache
+/******/ 		var cachedModule = __webpack_module_cache__[moduleId];
+/******/ 		if (cachedModule !== undefined) {
+/******/ 			return cachedModule.exports;
+/******/ 		}
+/******/ 		// Create a new module (and put it into the cache)
+/******/ 		var module = __webpack_module_cache__[moduleId] = {
+/******/ 			// no module.id needed
+/******/ 			// no module.loaded needed
+/******/ 			exports: {}
+/******/ 		};
+/******/ 	
+/******/ 		// Execute the module function
+/******/ 		if (!(moduleId in __webpack_modules__)) {
+/******/ 			delete __webpack_module_cache__[moduleId];
+/******/ 			var e = new Error("Cannot find module '" + moduleId + "'");
+/******/ 			e.code = 'MODULE_NOT_FOUND';
+/******/ 			throw e;
+/******/ 		}
+/******/ 		__webpack_modules__[moduleId](module, module.exports, __webpack_require__);
+/******/ 	
+/******/ 		// Return the exports of the module
+/******/ 		return module.exports;
+/******/ 	}
+/******/ 	
+/******/ 	// expose the modules object (__webpack_modules__)
+/******/ 	__webpack_require__.m = __webpack_modules__;
+/******/ 	
+/************************************************************************/
+/******/ 	/* webpack/runtime/chunk loaded */
+/******/ 	(() => {
+/******/ 		var deferred = [];
+/******/ 		__webpack_require__.O = (result, chunkIds, fn, priority) => {
+/******/ 			if(chunkIds) {
+/******/ 				priority = priority || 0;
+/******/ 				for(var i = deferred.length; i > 0 && deferred[i - 1][2] > priority; i--) deferred[i] = deferred[i - 1];
+/******/ 				deferred[i] = [chunkIds, fn, priority];
+/******/ 				return;
+/******/ 			}
+/******/ 			var notFulfilled = Infinity;
+/******/ 			for (var i = 0; i < deferred.length; i++) {
+/******/ 				var [chunkIds, fn, priority] = deferred[i];
+/******/ 				var fulfilled = true;
+/******/ 				for (var j = 0; j < chunkIds.length; j++) {
+/******/ 					if ((priority & 1 === 0 || notFulfilled >= priority) && Object.keys(__webpack_require__.O).every((key) => (__webpack_require__.O[key](chunkIds[j])))) {
+/******/ 						chunkIds.splice(j--, 1);
+/******/ 					} else {
+/******/ 						fulfilled = false;
+/******/ 						if(priority < notFulfilled) notFulfilled = priority;
+/******/ 					}
+/******/ 				}
+/******/ 				if(fulfilled) {
+/******/ 					deferred.splice(i--, 1)
+/******/ 					var r = fn();
+/******/ 					if (r !== undefined) result = r;
+/******/ 				}
+/******/ 			}
+/******/ 			return result;
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/compat get default export */
+/******/ 	(() => {
+/******/ 		// getDefaultExport function for compatibility with non-harmony modules
+/******/ 		__webpack_require__.n = (module) => {
+/******/ 			var getter = module && module.__esModule ?
+/******/ 				() => (module['default']) :
+/******/ 				() => (module);
+/******/ 			__webpack_require__.d(getter, { a: getter });
+/******/ 			return getter;
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/define property getters */
+/******/ 	(() => {
+/******/ 		// define getter functions for harmony exports
+/******/ 		__webpack_require__.d = (exports, definition) => {
+/******/ 			for(var key in definition) {
+/******/ 				if(__webpack_require__.o(definition, key) && !__webpack_require__.o(exports, key)) {
+/******/ 					Object.defineProperty(exports, key, { enumerable: true, get: definition[key] });
+/******/ 				}
+/******/ 			}
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/hasOwnProperty shorthand */
+/******/ 	(() => {
+/******/ 		__webpack_require__.o = (obj, prop) => (Object.prototype.hasOwnProperty.call(obj, prop))
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/make namespace object */
+/******/ 	(() => {
+/******/ 		// define __esModule on exports
+/******/ 		__webpack_require__.r = (exports) => {
+/******/ 			if(typeof Symbol !== 'undefined' && Symbol.toStringTag) {
+/******/ 				Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
+/******/ 			}
+/******/ 			Object.defineProperty(exports, '__esModule', { value: true });
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/jsonp chunk loading */
+/******/ 	(() => {
+/******/ 		// no baseURI
+/******/ 		
+/******/ 		// object to store loaded and loading chunks
+/******/ 		// undefined = chunk not loaded, null = chunk preloaded/prefetched
+/******/ 		// [resolve, reject, Promise] = chunk loading, 0 = chunk loaded
+/******/ 		var installedChunks = {
+/******/ 			"lander-course-list/index": 0,
+/******/ 			"lander-course-list/style-index": 0
+/******/ 		};
+/******/ 		
+/******/ 		// no chunk on demand loading
+/******/ 		
+/******/ 		// no prefetching
+/******/ 		
+/******/ 		// no preloaded
+/******/ 		
+/******/ 		// no HMR
+/******/ 		
+/******/ 		// no HMR manifest
+/******/ 		
+/******/ 		__webpack_require__.O.j = (chunkId) => (installedChunks[chunkId] === 0);
+/******/ 		
+/******/ 		// install a JSONP callback for chunk loading
+/******/ 		var webpackJsonpCallback = (parentChunkLoadingFunction, data) => {
+/******/ 			var [chunkIds, moreModules, runtime] = data;
+/******/ 			// add "moreModules" to the modules object,
+/******/ 			// then flag all "chunkIds" as loaded and fire callback
+/******/ 			var moduleId, chunkId, i = 0;
+/******/ 			if(chunkIds.some((id) => (installedChunks[id] !== 0))) {
+/******/ 				for(moduleId in moreModules) {
+/******/ 					if(__webpack_require__.o(moreModules, moduleId)) {
+/******/ 						__webpack_require__.m[moduleId] = moreModules[moduleId];
+/******/ 					}
+/******/ 				}
+/******/ 				if(runtime) var result = runtime(__webpack_require__);
+/******/ 			}
+/******/ 			if(parentChunkLoadingFunction) parentChunkLoadingFunction(data);
+/******/ 			for(;i < chunkIds.length; i++) {
+/******/ 				chunkId = chunkIds[i];
+/******/ 				if(__webpack_require__.o(installedChunks, chunkId) && installedChunks[chunkId]) {
+/******/ 					installedChunks[chunkId][0]();
+/******/ 				}
+/******/ 				installedChunks[chunkId] = 0;
+/******/ 			}
+/******/ 			return __webpack_require__.O(result);
+/******/ 		}
+/******/ 		
+/******/ 		var chunkLoadingGlobal = globalThis["webpackChunkbys_groups"] = globalThis["webpackChunkbys_groups"] || [];
+/******/ 		chunkLoadingGlobal.forEach(webpackJsonpCallback.bind(null, 0));
+/******/ 		chunkLoadingGlobal.push = webpackJsonpCallback.bind(null, chunkLoadingGlobal.push.bind(chunkLoadingGlobal));
+/******/ 	})();
+/******/ 	
+/************************************************************************/
+/******/ 	
+/******/ 	// startup
+/******/ 	// Load entry module and return exports
+/******/ 	// This entry module depends on other loaded chunks and execution need to be delayed
+/******/ 	var __webpack_exports__ = __webpack_require__.O(undefined, ["lander-course-list/style-index"], () => (__webpack_require__("./src/lander-course-list/index.js")))
+/******/ 	__webpack_exports__ = __webpack_require__.O(__webpack_exports__);
+/******/ 	
+/******/ })()
+;
+//# sourceMappingURL=index.js.map

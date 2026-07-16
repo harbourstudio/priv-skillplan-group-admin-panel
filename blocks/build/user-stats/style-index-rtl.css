@@ -1,1 +1,44 @@
-.wp-block-bys-groups-user-stats .stats__grid{display:grid;gap:var(--wp--preset--spacing--3);grid-template-columns:repeat(3,1fr);margin-top:var(--wp--preset--spacing--4)}@media(max-width:821px){.wp-block-bys-groups-user-stats .stats__grid{grid-template-columns:repeat(2,1fr)}}.wp-block-bys-groups-user-stats .stat__box{align-items:center;background-color:#fff;border:1px solid var(--wp--preset--color--gray-100);border-radius:.75rem;display:flex;gap:var(--wp--preset--spacing--4);padding:var(--wp--preset--spacing--4) var(--wp--preset--spacing--5)}@media(max-width:821px){.wp-block-bys-groups-user-stats .stat__box{padding-inline:var(--wp--preset--spacing--3)}}.wp-block-bys-groups-user-stats .stat__icon img{height:3rem;width:auto}.wp-block-bys-groups-user-stats .stat__content{color:var(--wp--preset--color--gray-500);display:flex;flex-direction:column;font-size:var(--wp--preset--font-size--small);font-weight:500;line-height:1.2}.wp-block-bys-groups-user-stats .stat__number{color:var(--wp--preset--color--dark);font-size:var(--wp--preset--font-size--x-large)}
+/*!**********************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ./node_modules/css-loader/dist/cjs.js??ruleSet[1].rules[4].use[1]!./node_modules/postcss-loader/dist/cjs.js??ruleSet[1].rules[4].use[2]!./node_modules/@wordpress/scripts/node_modules/sass-loader/dist/cjs.js??ruleSet[1].rules[4].use[3]!./src/user-stats/style.scss ***!
+  \**********************************************************************************************************************************************************************************************************************************************************************************/
+.wp-block-bys-groups-user-stats .stats__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--wp--preset--spacing--3);
+  margin-top: var(--wp--preset--spacing--4);
+}
+@media (max-width: 821px) {
+  .wp-block-bys-groups-user-stats .stats__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+.wp-block-bys-groups-user-stats .stat__box {
+  background-color: white;
+  border-radius: 0.75rem;
+  padding: var(--wp--preset--spacing--4) var(--wp--preset--spacing--5);
+  border: 1px solid var(--wp--preset--color--gray-100);
+  display: flex;
+  gap: var(--wp--preset--spacing--4);
+  align-items: center;
+}
+@media (max-width: 821px) {
+  .wp-block-bys-groups-user-stats .stat__box {
+    padding-inline: var(--wp--preset--spacing--3);
+  }
+}
+.wp-block-bys-groups-user-stats .stat__icon img {
+  height: 3rem;
+  width: auto;
+}
+.wp-block-bys-groups-user-stats .stat__content {
+  display: flex;
+  flex-direction: column;
+  font-size: var(--wp--preset--font-size--small);
+  color: var(--wp--preset--color--gray-500);
+  font-weight: 500;
+  line-height: 1.2;
+}
+.wp-block-bys-groups-user-stats .stat__number {
+  color: var(--wp--preset--color--dark);
+  font-size: var(--wp--preset--font-size--x-large);
+}
