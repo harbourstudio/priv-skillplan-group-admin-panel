@@ -320,6 +320,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                     'last_active'  => $last_active_ts ? wp_date('c', $last_active_ts) : null,
                     'status'       => $this->get_user_active_status($user_id),
                     'status_checked_at' => gmdate('c'),
+                    'enable_comms' => bys_groups_user_can_receive_comms($user_id),
                 ];
             }
 
@@ -483,6 +484,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                     'last_active'  => $last_active_ts ? wp_date('c', $last_active_ts) : null,
                     'status'       => $this->get_user_active_status($user_id),
                     'status_checked_at' => gmdate('c'),
+                    'enable_comms' => bys_groups_user_can_receive_comms($user_id),
                 ];
             }
 
@@ -528,6 +530,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 'last_login'          => $last_login_timestamp,
                 'last_active'         => $last_active_ts ? wp_date('c', $last_active_ts) : null,
                 'avatar_url'          => get_avatar_url($user_id, ['size' => 80]),
+                'enable_comms'        => bys_groups_user_can_receive_comms($user_id),
             ];
         }
 
