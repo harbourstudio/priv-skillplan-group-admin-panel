@@ -85,6 +85,21 @@ if (!class_exists('BYS_Groups_Scheduled_Emails')) {
             foreach ($emails as $email_row) {
                 $recipient_email = $email_row['recipient_email'];
 
+                // Opt-out check runs at SEND time (not queue time) so a user
+                // who opts out between scheduled time and SEND time is honoured.
+                // Convert 'scheduled' to 'comms_disabled' in place
+                $recipient_user = get_user_by('email', $recipient_email);
+                if ($recipient_user && !bys_groups_user_can_receive_comms((int) $recipient_user->ID)) {
+                    $wpdb->update(
+                        $wpdb->prefix . BYS_GROUPS_COMMS_TABLE,
+                        ['delivery_status' => 'comms_disabled'],
+                        ['id' => (int) $email_row['id']],
+                        ['%s'],
+                        ['%d']
+                    );
+                    continue;
+                }
+
                 // Get recipient name from email (basic extraction, can be improved)
                 $recipient_name = explode('@', $recipient_email)[0];
 
