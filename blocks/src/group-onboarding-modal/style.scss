@@ -1,0 +1,229 @@
+.wp-block-bys-groups-group-onboarding-modal {
+    .gom {
+        &.hs-overlay {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            padding: var(--wp--preset--spacing--4);
+
+            &:not(.hidden) {
+                display: flex;
+            }
+        }
+
+        // ── Modal content wrapper ──────────────────────────────────────────────
+        &__inner {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            background: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+            max-width: 52rem;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        // ── Close button (absolutely positioned, top-right) ────────────────────
+        &__close {
+            position: absolute;
+            top: var(--wp--preset--spacing--2);
+            right: var(--wp--preset--spacing--2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 2rem;
+            height: 2rem;
+            border-radius: 9999px;
+            color: var(--wp--preset--color--gray-400);
+            font-size: 1rem;
+            z-index: 1;
+            transition: color 0.15s, background 0.15s;
+
+            &:hover {
+                color: var(--wp--preset--color--gray-700);
+                background: var(--wp--preset--color--gray-100);
+            }
+        }
+
+        // ── Body / slide container ─────────────────────────────────────────────
+        &__body {
+            padding: var(--wp--preset--spacing--6) var(--wp--preset--spacing--6) var(--wp--preset--spacing--5);
+        }
+
+        // ── Individual slide ───────────────────────────────────────────────────
+        &__slide {
+            display: none;
+            gap: var(--wp--preset--spacing--6);
+            align-items: center;
+
+            &.is-active {
+                display: flex;
+            }
+
+            // Stack on narrow screens
+            @media (max-width: 640px) {
+                flex-direction: column-reverse;
+            }
+        }
+
+        // ── Left column ────────────────────────────────────────────────────────
+        &__slide-content {
+            flex: 1 1 0;
+            display: flex;
+            flex-direction: column;
+            gap: var(--wp--preset--spacing--2);
+            min-width: 0;
+        }
+
+        &__slide-text {
+            display: flex;
+            flex-direction: column;
+            gap: var(--wp--preset--spacing--1);
+        }
+
+        // ── Action buttons (Next / Get started / View again) ──────────────────
+        &__slide-action {
+            display: flex;
+            align-items: center;
+            gap: var(--wp--preset--spacing--3);
+            margin-top: var(--wp--preset--spacing--5);
+        }
+
+        &__next,
+        &__finish {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: var(--wp--preset--spacing--3) var(--wp--preset--spacing--5);
+            border-radius: 9999px;
+            font-size: var(--wp--preset--font-size--small);
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s;
+            background: var(--wp--preset--color--primary);
+            color: white;
+            border: 1px solid var(--wp--preset--color--primary);
+
+            i { font-size: 0.8rem; }
+
+            &:hover {
+                background: var(--wp--preset--color--blue-700);
+                border-color: var(--wp--preset--color--blue-700);
+            }
+        }
+
+        &__restart {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: var(--wp--preset--spacing--3) var(--wp--preset--spacing--5);
+            border-radius: 9999px;
+            font-size: var(--wp--preset--font-size--small);
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s;
+            background: var(--wp--preset--color--blue-50);
+            color: var(--wp--preset--color--blue-500);
+            border: 1px solid var(--wp--preset--color--blue-500);
+
+            i { font-size: 0.8rem; }
+
+            &:hover {
+                background: var(--wp--preset--color--gray-100);
+                color: var(--wp--preset--color--gray-700);
+            }
+        }
+
+        // ── Right column ───────────────────────────────────────────────────────
+        &__slide-image {
+            flex: 0 0 44%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--wp--preset--color--gray-50);
+            border-radius: 0.5rem;
+            overflow: hidden;
+            aspect-ratio: 4 / 3;
+
+            img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                display: block;
+            }
+
+            @media (max-width: 640px) {
+                flex: unset;
+                width: 100%;
+                aspect-ratio: 16 / 9;
+            }
+        }
+
+        // ── Footer / step dots ─────────────────────────────────────────────────
+        &__footer {
+            padding: var(--wp--preset--spacing--4) var(--wp--preset--spacing--6);
+            border-top: 1px solid var(--wp--preset--color--gray-100);
+            display: flex;
+            justify-content: center;
+        }
+
+        &__dots {
+            display: flex;
+            align-items: center;
+            gap: var(--wp--preset--spacing--2);
+        }
+
+        &__dot {
+            width: 0.5rem;
+            height: 0.5rem;
+            border-radius: 9999px;
+            background: var(--wp--preset--color--gray-200);
+            cursor: pointer;
+            transition: background 0.2s, width 0.2s;
+
+            &.is-active {
+                background: var(--wp--preset--color--primary);
+                width: 1.25rem;
+            }
+
+            &:hover:not(.is-active) {
+                background: var(--wp--preset--color--gray-400);
+            }
+        }
+    }
+
+    // ── Admin preview trigger ──────────────────────────────────────────────────
+    .gom__preview-trigger {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--4);
+        background: var(--wp--preset--color--gray-100);
+        color: var(--wp--preset--color--gray-600);
+        border: 1px dashed var(--wp--preset--color--gray-300);
+        border-radius: 9999px;
+        font-size: var(--wp--preset--font-size--small);
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s;
+        margin-bottom: var(--wp--preset--spacing--3);
+
+        i { font-size: 0.85rem; }
+
+        &:hover {
+            background: var(--wp--preset--color--gray-200);
+            color: var(--wp--preset--color--gray-900);
+        }
+    }
+
+    .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.4);
+        z-index: 0;
+    }
+}

@@ -37,6 +37,12 @@ if (!class_exists('BYS_Groups_Me_Router')) {
                 'callback'            => [$this, 'get_current_user_archived_groups'],
                 'permission_callback' => 'is_user_logged_in',
             ]);
+
+            register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/me/tutorial-seen', [
+                'methods'             => WP_REST_Server::CREATABLE,
+                'callback'            => [$this, 'mark_tutorial_seen'],
+                'permission_callback' => 'is_user_logged_in',
+            ]);
         }
 
         /**
@@ -436,6 +442,18 @@ if (!class_exists('BYS_Groups_Me_Router')) {
             usort($archived_groups, fn($a, $b) => $b['archived_date'] <=> $a['archived_date']);
 
             return ['groups' => $archived_groups];
+        }
+
+        /**
+         * POST /me/tutorial-seen
+         *
+         * Marks the group dashboard onboarding tutorial as seen for the current user.
+         * Called by the group-onboarding-modal block after the modal is closed on first visit.
+         */
+        public function mark_tutorial_seen($request) {
+            $user_id = get_current_user_id();
+            update_user_meta( $user_id, 'bys_group_tutorial_seen', true );
+            return new WP_REST_Response( [ 'success' => true ], 200 );
         }
     }
 }

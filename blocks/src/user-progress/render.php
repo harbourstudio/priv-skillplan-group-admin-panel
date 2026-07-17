@@ -114,7 +114,7 @@ $user_id = isset( $_GET['user_id'] ) ? intval( $_GET['user_id'] ) : 0;
 
     </div>
 
-    <div class="user-progress-achievements">
+    <div class="user-progress-achievements" style="display: none;">
         <h6 class="user-progress__section-title">Achievements</h6>
         <div class="user-progress-achievements__list">
             <?php if ( $user_id ) : ?>

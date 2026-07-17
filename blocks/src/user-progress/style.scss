@@ -12,10 +12,10 @@
 }
 
 .wp-block-bys-groups-user-progress {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: var(--wp--preset--spacing--6);
-    align-items: start;
+    // display: grid;
+    // grid-template-columns: 2fr 1fr;
+    // gap: var(--wp--preset--spacing--6);
+    // align-items: start;
 
     .user-progress__section-title {
         color: var(--wp--preset--color--gray-500) !important;

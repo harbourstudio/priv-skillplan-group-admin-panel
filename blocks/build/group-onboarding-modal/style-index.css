@@ -1,0 +1,201 @@
+/*!**********************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ./node_modules/css-loader/dist/cjs.js??ruleSet[1].rules[4].use[1]!./node_modules/postcss-loader/dist/cjs.js??ruleSet[1].rules[4].use[2]!./node_modules/@wordpress/scripts/node_modules/sass-loader/dist/cjs.js??ruleSet[1].rules[4].use[3]!./src/group-onboarding-modal/style.scss ***!
+  \**********************************************************************************************************************************************************************************************************************************************************************************************/
+.wp-block-bys-groups-group-onboarding-modal .gom.hs-overlay {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  padding: var(--wp--preset--spacing--4);
+}
+.wp-block-bys-groups-group-onboarding-modal .gom.hs-overlay:not(.hidden) {
+  display: flex;
+}
+.wp-block-bys-groups-group-onboarding-modal .gom__inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  background: white;
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  max-width: 52rem;
+  width: 100%;
+  overflow: hidden;
+}
+.wp-block-bys-groups-group-onboarding-modal .gom__close {
+  position: absolute;
+  top: var(--wp--preset--spacing--2);
+  right: var(--wp--preset--spacing--2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9999px;
+  color: var(--wp--preset--color--gray-400);
+  font-size: 1rem;
+  z-index: 1;
+  transition: color 0.15s, background 0.15s;
+}
+.wp-block-bys-groups-group-onboarding-modal .gom__close:hover {
+  color: var(--wp--preset--color--gray-700);
+  background: var(--wp--preset--color--gray-100);
+}
+.wp-block-bys-groups-group-onboarding-modal .gom__body {
+  padding: var(--wp--preset--spacing--6) var(--wp--preset--spacing--6) var(--wp--preset--spacing--5);
+}
+.wp-block-bys-groups-group-onboarding-modal .gom__slide {
+  display: none;
+  gap: var(--wp--preset--spacing--6);
+  align-items: center;
+}
+.wp-block-bys-groups-group-onboarding-modal .gom__slide.is-active {
+  display: flex;
+}
+@media (max-width: 640px) {
+  .wp-block-bys-groups-group-onboarding-modal .gom__slide {
+    flex-direction: column-reverse;
+  }
+}
+.wp-block-bys-groups-group-onboarding-modal .gom__slide-content {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--wp--preset--spacing--2);
+  min-width: 0;
+}
+.wp-block-bys-groups-group-onboarding-modal .gom__slide-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wp--preset--spacing--1);
+}
+.wp-block-bys-groups-group-onboarding-modal .gom__slide-action {
+  display: flex;
+  align-items: center;
+  gap: var(--wp--preset--spacing--3);
+  margin-top: var(--wp--preset--spacing--5);
+}
+.wp-block-bys-groups-group-onboarding-modal .gom__next, .wp-block-bys-groups-group-onboarding-modal .gom__finish {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: var(--wp--preset--spacing--3) var(--wp--preset--spacing--5);
+  border-radius: 9999px;
+  font-size: var(--wp--preset--font-size--small);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  background: var(--wp--preset--color--primary);
+  color: white;
+  border: 1px solid var(--wp--preset--color--primary);
+}
+.wp-block-bys-groups-group-onboarding-modal .gom__next i, .wp-block-bys-groups-group-onboarding-modal .gom__finish i {
+  font-size: 0.8rem;
+}
+.wp-block-bys-groups-group-onboarding-modal .gom__next:hover, .wp-block-bys-groups-group-onboarding-modal .gom__finish:hover {
+  background: var(--wp--preset--color--blue-700);
+  border-color: var(--wp--preset--color--blue-700);
+}
+.wp-block-bys-groups-group-onboarding-modal .gom__restart {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: var(--wp--preset--spacing--3) var(--wp--preset--spacing--5);
+  border-radius: 9999px;
+  font-size: var(--wp--preset--font-size--small);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  background: var(--wp--preset--color--blue-50);
+  color: var(--wp--preset--color--blue-500);
+  border: 1px solid var(--wp--preset--color--blue-500);
+}
+.wp-block-bys-groups-group-onboarding-modal .gom__restart i {
+  font-size: 0.8rem;
+}
+.wp-block-bys-groups-group-onboarding-modal .gom__restart:hover {
+  background: var(--wp--preset--color--gray-100);
+  color: var(--wp--preset--color--gray-700);
+}
+.wp-block-bys-groups-group-onboarding-modal .gom__slide-image {
+  flex: 0 0 44%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--wp--preset--color--gray-50);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  aspect-ratio: 4/3;
+}
+.wp-block-bys-groups-group-onboarding-modal .gom__slide-image img {
+  width: 100%;
+  height: 100%;
+  -o-object-fit: cover;
+     object-fit: cover;
+  display: block;
+}
+@media (max-width: 640px) {
+  .wp-block-bys-groups-group-onboarding-modal .gom__slide-image {
+    flex: unset;
+    width: 100%;
+    aspect-ratio: 16/9;
+  }
+}
+.wp-block-bys-groups-group-onboarding-modal .gom__footer {
+  padding: var(--wp--preset--spacing--4) var(--wp--preset--spacing--6);
+  border-top: 1px solid var(--wp--preset--color--gray-100);
+  display: flex;
+  justify-content: center;
+}
+.wp-block-bys-groups-group-onboarding-modal .gom__dots {
+  display: flex;
+  align-items: center;
+  gap: var(--wp--preset--spacing--2);
+}
+.wp-block-bys-groups-group-onboarding-modal .gom__dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: var(--wp--preset--color--gray-200);
+  cursor: pointer;
+  transition: background 0.2s, width 0.2s;
+}
+.wp-block-bys-groups-group-onboarding-modal .gom__dot.is-active {
+  background: var(--wp--preset--color--primary);
+  width: 1.25rem;
+}
+.wp-block-bys-groups-group-onboarding-modal .gom__dot:hover:not(.is-active) {
+  background: var(--wp--preset--color--gray-400);
+}
+.wp-block-bys-groups-group-onboarding-modal .gom__preview-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--4);
+  background: var(--wp--preset--color--gray-100);
+  color: var(--wp--preset--color--gray-600);
+  border: 1px dashed var(--wp--preset--color--gray-300);
+  border-radius: 9999px;
+  font-size: var(--wp--preset--font-size--small);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  margin-bottom: var(--wp--preset--spacing--3);
+}
+.wp-block-bys-groups-group-onboarding-modal .gom__preview-trigger i {
+  font-size: 0.85rem;
+}
+.wp-block-bys-groups-group-onboarding-modal .gom__preview-trigger:hover {
+  background: var(--wp--preset--color--gray-200);
+  color: var(--wp--preset--color--gray-900);
+}
+.wp-block-bys-groups-group-onboarding-modal .modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 0;
+}
+
+/*# sourceMappingURL=style-index.css.map*/
