@@ -62,7 +62,7 @@ jQuery(document).ready(function($) {
     const PROMPT_TYPE_CONDITIONS = {
         'password-reset':      ['outstanding_login'],
         'course-progress':     ['outstanding_login', 'inactive_days', 'outstanding_course_access', 'outstanding_course_completed', 'outstanding_quiz_completed'],
-        'assessment-deadline': ['outstanding_course_access', 'outstanding_quiz_completed'],
+        'assessment-reminder': ['outstanding_course_access', 'outstanding_quiz_completed'],
         'welcome-reminder':    ['outstanding_course_access', 'outstanding_login'],
         'custom':              null,
     };

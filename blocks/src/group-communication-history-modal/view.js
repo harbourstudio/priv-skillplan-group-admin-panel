@@ -406,15 +406,15 @@ function statusClassName(status) {
     return `comm-status-badge--${(status || 'pending').replace(/_/g, '-')}`;
 }
 
-// Screen 1 (batch aggregate) — server folds comms_disabled into failed/
+// Screen 1 (batch aggregate) — server folds comms_disabled into failed /
 // partial_failure, so this table never sees comms_disabled directly.
 const BATCH_STATUS_LABELS = {
     delivered:       'All Success',
     scheduled:       'Scheduled',
-    failed:          'All Failed',
-    partial_failure: 'Some Failed',
-    bounced:         'All Failed',
-    spam:            'Some Failed',
+    failed:          'None Delivered',
+    partial_failure: 'Some Sent',
+    bounced:         'None Delivered',
+    spam:            'Some Sent',
     pending:         'Pending',
 };
 
@@ -428,7 +428,7 @@ const RECIPIENT_STATUS_LABELS = {
     failed:         'Failed',
     bounced:        'Bounced',
     spam:           'Spam',
-    comms_disabled: 'Communications: off',
+    comms_disabled: 'Communications: Off',
 };
 
 function batchStatusLabel(status) {

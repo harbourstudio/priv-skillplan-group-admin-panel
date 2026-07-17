@@ -240,7 +240,7 @@ function bys_get_password_reset_email(string $group_name, string $recipient_name
 	$reset_url = wp_login_url() . '?action=lostpassword';
 	$heading = "Password Reset";
 	$content = "<p>You have been added to the group <strong>" . esc_html( $group_name ) . "</strong>. Please reset your password to complete your account setup.</p>";
-	$footer_text = 'Questions? Contact <a href="mailto:learn@skillplan.ca">learn@skillplan.ca</a>';
+	$footer_text = 'Questions? Contact <a href="mailto:learn@skillplan.ca" style="color:#2465FF;">learn@skillplan.ca</a>';
 
 	return bys_build_email_template(
 		$subject,
@@ -271,7 +271,7 @@ function bys_get_course_nudge_email(string $group_name, string $recipient_name, 
 	$dashboard_url = !empty($cta_url_override) ? $cta_url_override : $site_url . '/dashboard/';
 	$heading = "Course Progress Update";
 	$content = "<p>Your learning resources are ready. Click the link below to get started or continue your learning.</p>";
-	$footer_text = 'Questions? Contact <a href="mailto:learn@skillplan.ca">learn@skillplan.ca</a>';
+	$footer_text = 'Questions? Contact <a href="mailto:learn@skillplan.ca" style="color:#2465FF;">learn@skillplan.ca</a>';
 
 
 	return bys_build_email_template(
@@ -302,7 +302,7 @@ function bys_get_assessment_deadline_email(string $group_name, string $recipient
 	$dashboard_url = !empty($cta_url_override) ? $cta_url_override : $site_url . '/dashboard/';
 	$heading = "Assessment Deadline Reminder";
 	$content = "<p>This is a reminder that you have a required assessment coming up in <strong>" . esc_html($group_name) . "</strong>. Please complete it before the deadline to stay on track with your learning.</p>";
-	$footer_text = 'Questions? Contact <a href="mailto:learn@skillplan.ca">learn@skillplan.ca</a>';
+	$footer_text = 'Questions? Contact <a href="mailto:learn@skillplan.ca" style="color:#2465FF;">learn@skillplan.ca</a>';
 
 	return bys_build_email_template(
 		$subject,
@@ -332,7 +332,7 @@ function bys_get_welcome_reminder_email(string $group_name, string $recipient_na
 	$dashboard_url = !empty($cta_url_override) ? $cta_url_override : $site_url . '/dashboard/';
 	$heading = "Welcome to " . esc_html($group_name) . "!";
 	$content = "<p>You’ve been invited to the <strong>". esc_html($group_name) ."</strong> training group. Log in today to get started!</p>";
-	$footer_text = 'Questions? Contact <a href="mailto:learn@skillplan.ca">learn@skillplan.ca</a>';
+	$footer_text = 'Questions? Contact <a href="mailto:learn@skillplan.ca" style="color:#2465FF;">learn@skillplan.ca</a>';
 
 	return bys_build_email_template(
 		$subject,
@@ -516,7 +516,7 @@ function bys_get_quiz_access_notification_email(array $vars): array {
 
     $content = $intro . $attempts_html . $window_html;
 
-    $footer_text = 'Questions? Contact <a href="mailto:learn@skillplan.ca">learn@skillplan.ca</a>';
+    $footer_text = 'Questions? Contact <a href="mailto:learn@skillplan.ca" style="color:#2465FF;">learn@skillplan.ca</a>';
 
     return bys_build_email_template(
         $subject,
