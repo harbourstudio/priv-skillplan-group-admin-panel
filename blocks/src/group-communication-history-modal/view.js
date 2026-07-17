@@ -409,7 +409,7 @@ function statusClassName(status) {
 // Screen 1 (batch aggregate) — server folds comms_disabled into failed /
 // partial_failure, so this table never sees comms_disabled directly.
 const BATCH_STATUS_LABELS = {
-    delivered:       'All Success',
+    delivered:       'All Sent',
     scheduled:       'Scheduled',
     failed:          'None Delivered',
     partial_failure: 'Some Sent',
@@ -432,7 +432,7 @@ const RECIPIENT_STATUS_LABELS = {
 };
 
 function batchStatusLabel(status) {
-    return BATCH_STATUS_LABELS[status] || 'All Success';
+    return BATCH_STATUS_LABELS[status] || 'All Sent';
 }
 
 function recipientStatusLabel(status) {
