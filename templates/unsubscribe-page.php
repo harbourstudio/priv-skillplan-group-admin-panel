@@ -10,7 +10,6 @@
  *   $token         string  Only populated in 'confirm' variant (form field)
  *   $post_url      string  Only populated in 'confirm' variant (form action)
  *   $error_message string  Only populated in 'error' variant
- *   $preferences_url string Optional link back to the GF preferences form
  */
 
 if (!defined('ABSPATH')) exit;
@@ -20,7 +19,7 @@ if (!defined('ABSPATH')) exit;
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title><?php echo esc_html($site_name); ?> — Unsubscribe</title>
+    <title><?php echo esc_html($site_name); ?> — <?php esc_html_e('Unsubscribe', 'bys'); ?></title>
     <style>
         body {
             min-height: 100vh;
@@ -174,41 +173,62 @@ if (!defined('ABSPATH')) exit;
         <div class="card">
 
             <?php if ($variant === 'confirm') : ?>
-                <h1>Unsubscribe from group communications?</h1>
+                <h1><?php esc_html_e('Unsubscribe from group communications?', 'bys'); ?></h1>
                 <p>
-                    Click the button below to stop receiving group communications from
-                    <strong><?php echo esc_html($site_name); ?></strong>. You will still receive
-                    account emails like password resets.
+                    <?php echo wp_kses(
+                        sprintf(
+                            /* translators: %s: site name (bolded). */
+                            __('Click the button below to stop receiving group communications from %s. You will still receive account emails like password resets.', 'bys'),
+                            '<strong>' . esc_html($site_name) . '</strong>'
+                        ),
+                        ['strong' => []]
+                    ); ?>
                 </p>
                 <p class="muted">
-                    You can re-enable group communications any time by updating your preferences.
+                    <?php esc_html_e('You can re-enable group communications any time by updating your preferences.', 'bys'); ?>
                 </p>
                 <form method="POST" action="<?php echo esc_url($post_url); ?>">
                     <input type="hidden" name="token" value="<?php echo esc_attr($token); ?>" />
                     <input type="hidden" name="bys_nonce" value="<?php echo esc_attr(wp_create_nonce('bys_groups_unsubscribe')); ?>" />
-                    <button type="submit" class="btn btn-primary">Unsubscribe</button>
-                    <a href="<?php echo esc_url($site_url); ?>" class="btn btn-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-primary"><?php esc_html_e('Unsubscribe', 'bys'); ?></button>
+                    <a href="<?php echo esc_url($site_url); ?>" class="btn btn-secondary"><?php esc_html_e('Cancel', 'bys'); ?></a>
                 </form>
 
             <?php elseif ($variant === 'success') : ?>
-                <h1>You're unsubscribed</h1>
+                <h1><?php esc_html_e("You're unsubscribed", 'bys'); ?></h1>
                 <p>
-                    You will no longer receive group communications from
-                    <strong><?php echo esc_html($site_name); ?></strong>. Account emails such
-                    as password resets will continue to be delivered.
+                    <?php echo wp_kses(
+                        sprintf(
+                            /* translators: %s: site name (bolded). */
+                            __('You will no longer receive group communications from %s. Account emails such as password resets will continue to be delivered.', 'bys'),
+                            '<strong>' . esc_html($site_name) . '</strong>'
+                        ),
+                        ['strong' => []]
+                    ); ?>
                 </p>
                 <p class="muted">
-                    You can re-enable group communications any time by updating your preferences.
+                    <?php esc_html_e('You can re-enable group communications any time by updating your preferences.', 'bys'); ?>
                 </p>
 
             <?php else : /* error */ ?>
-                <h1>Unsuccessful</h1>
-                <p class="muted"><?php echo esc_html($error_message ?: 'The unsubscribe link is invalid or has expired.'); ?></p>
+                <h1><?php esc_html_e('Unsuccessful', 'bys'); ?></h1>
+                <p class="muted"><?php echo esc_html($error_message ?: __('The unsubscribe link is invalid or has expired.', 'bys')); ?></p>
             <?php endif; ?>
 
         </div>
         <div class="footer">
-            <p class="muted">&copy; <?php echo date('Y'); ?> <?php echo esc_html($site_name); ?>. Questions? Contact <a href="mailto:learn@skillplan.ca" target="_blank">learn@skillplan.ca</a></p>
+            <p class="muted">
+                <?php echo wp_kses(
+                    sprintf(
+                        /* translators: 1: current year, 2: site name, 3: contact email link */
+                        __('&copy; %1$s %2$s. Questions? Contact %3$s', 'bys'),
+                        esc_html(date('Y')),
+                        esc_html($site_name),
+                        '<a href="mailto:learn@skillplan.ca" target="_blank">learn@skillplan.ca</a>'
+                    ),
+                    ['a' => ['href' => [], 'target' => []]]
+                ); ?>
+            </p>
         </div>
     </div>
 </body>

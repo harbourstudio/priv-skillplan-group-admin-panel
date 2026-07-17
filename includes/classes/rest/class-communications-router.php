@@ -238,6 +238,7 @@ if (!class_exists('BYS_Groups_Communications_Router')) {
                 $html_body = preg_replace('/<style[^>]*>.*?<\/style>/is', '', $html_body);
                 $html_body = preg_replace('/\s{2,}/s', ' ', $html_body);
                 $html_body = trim($html_body);
+                $html_body = wp_kses_post($html_body);
             }
 
             // Plain-text body: same fallback chain

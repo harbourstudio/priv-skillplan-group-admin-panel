@@ -157,7 +157,7 @@ function bys_build_email_template(
 								</p>
 								<?php if (!empty($unsubscribe_url)) : ?>
 									<p style="margin:8px 0 0;font-size:14px;color:#9ca3af;">
-										<a href="<?php echo esc_url($unsubscribe_url); ?>" style="color:#9ca3af;text-decoration:underline;">
+										<a href="<?php echo esc_url($unsubscribe_url); ?>" style="color:#9ca3af;text-decoration:none;">
 											Unsubscribe from group communications
 										</a>
 									</p>
@@ -401,7 +401,7 @@ function bys_get_custom_email(string $group_name, string $custom_message, string
 								</p>
 								<?php if (!empty($unsubscribe_url)) : ?>
 									<p style="margin:8px 0 0;font-size:14px;color:#9ca3af;">
-										<a href="<?php echo esc_url($unsubscribe_url); ?>" style="color:#9ca3af;text-decoration:underline;">
+										<a href="<?php echo esc_url($unsubscribe_url); ?>" style="color:#9ca3af;text-decoration:none;">
 											Unsubscribe from group communications
 										</a>
 									</p>
