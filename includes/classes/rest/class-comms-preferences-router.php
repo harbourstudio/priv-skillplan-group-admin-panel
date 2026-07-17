@@ -1,6 +1,7 @@
 <?php
 /**
- * Public Communication Preferences Router - self service opt-out endpoint reached via footer link on   plugin-generated emails 
+ * Public Communication Preferences Router — self-service opt-out
+ * endpoint reached via the footer link on plugin-generated emails.
  *
  * Two-step confirmation flow:
  *   GET  /unsubscribe?token=… — verifies token, renders a confirmation
@@ -9,8 +10,8 @@
  *                               bys_groups_enable_comms user meta to
  *                               '0', renders a success page.
  *
- * Endpoints return HTML. The callback echoes the
- * template and exits before REST serialization runs.
+ * Endpoints return HTML. The callback echoes the template and exits
+ * before REST serialization runs.
  *
  * @package BYS_Groups
  * @since 1.2.0
@@ -20,6 +21,10 @@ if (!defined('ABSPATH')) exit;
 
 if (!class_exists('BYS_Groups_Comms_Preferences_Router')) {
     class BYS_Groups_Comms_Preferences_Router {
+
+        // Rate limit for POST /unsubscribe
+        const RATE_LIMIT_MAX     = 5;
+        const RATE_LIMIT_WINDOW  = 60; // seconds
 
         public function __construct() {
             add_action('rest_api_init', [$this, 'register_routes']);
@@ -72,7 +77,7 @@ if (!class_exists('BYS_Groups_Comms_Preferences_Router')) {
 
             if (!wp_verify_nonce($nonce, 'bys_groups_unsubscribe')) {
                 $this->render('error', [
-                    'error_message' => 'Security check failed. Please open the link from your email again.',
+                    'error_message' => __('Security check failed. Please open the link from your email again.', 'bys'),
                 ]);
             }
 
@@ -83,8 +88,28 @@ if (!class_exists('BYS_Groups_Comms_Preferences_Router')) {
                 ]);
             }
 
-            bys_groups_set_user_comms_enabled((int) $decoded['user_id'], false);
+            if (!$this->consume_rate_limit((int) $decoded['user_id'])) {
+                $this->render('error', [
+                    'error_message' => __('Too many requests. Please wait a moment and try again.', 'bys'),
+                ]);
+            }
+
+            bys_groups_set_user_comms_enabled((int) $decoded['user_id'], false, 'email_link');
             $this->render('success');
+        }
+
+        /**
+         * Transient-based rate limiter keyed on user id + client IP
+         * Returns false when the limit is exceeded, true otherwise.
+         * Increments on every call; call once per request.
+         */
+        private function consume_rate_limit(int $user_id): bool {
+            $ip  = isset($_SERVER['REMOTE_ADDR']) ? sanitize_text_field($_SERVER['REMOTE_ADDR']) : 'noip';
+            $key = 'bys_unsub_rl_' . md5($user_id . '|' . $ip);
+            $hit = (int) get_transient($key);
+            if ($hit >= self::RATE_LIMIT_MAX) return false;
+            set_transient($key, $hit + 1, self::RATE_LIMIT_WINDOW);
+            return true;
         }
 
         /**
@@ -97,7 +122,6 @@ if (!class_exists('BYS_Groups_Comms_Preferences_Router')) {
             $token           = $extra['token']           ?? '';
             $post_url        = $extra['post_url']        ?? '';
             $error_message   = $extra['error_message']   ?? '';
-            $preferences_url = apply_filters('bys_groups_comms_preferences_url', '');
             $recipient       = '';
 
             if (!headers_sent()) {
