@@ -1638,6 +1638,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 'sender_email'      => $sender_email,
                 'attempts_granted'  => $attempts_granted,
                 'attempts_previous' => $attempts_previous,
+                'unsubscribe_url'   => BYS_Groups_Signed_URL::build_unsubscribe_url($user_id),
             ]);
 
             if (empty($email['subject']) || empty($email['html'])) {
@@ -1821,14 +1822,15 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 if (!$recipient || empty($recipient->user_email)) continue;
 
                 $email = bys_get_quiz_access_notification_email([
-                    'recipient_name' => !empty($recipient->display_name) ? $recipient->display_name : $recipient->user_login,
-                    'site_name'      => $site_name,
-                    'site_url'       => $site_url,
-                    'quiz_title'     => $quiz_ttl,
-                    'quiz_url'       => $quiz_url,
-                    'start'          => $start,
-                    'end'            => $end,
-                    'sender_email'   => $sender_email,
+                    'recipient_name'  => !empty($recipient->display_name) ? $recipient->display_name : $recipient->user_login,
+                    'site_name'       => $site_name,
+                    'site_url'        => $site_url,
+                    'quiz_title'      => $quiz_ttl,
+                    'quiz_url'        => $quiz_url,
+                    'start'           => $start,
+                    'end'             => $end,
+                    'sender_email'    => $sender_email,
+                    'unsubscribe_url' => BYS_Groups_Signed_URL::build_unsubscribe_url((int) $uid),
                 ]);
 
                 if (empty($email['subject']) || empty($email['html'])) continue;
@@ -2377,12 +2379,16 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                     $sent_at = $postmark_detail['ReceivedAt'];
                 }
 
-                // Scheduled emails use scheduled_at (converted to local time).
-                // Batches that never reached Postmark fall back to created_at
+                // Scheduled emails use scheduled_at, which is stored as UTC
+                // (gmdate) → convert to local for display. Batches that never
+                // reached Postmark fall back to created_at, which is written
+                // with current_time('mysql') and is ALREADY site-local —
+                // passing it through utc_to_local_datetime would shift it a
+                // second time.
                 if ($delivery_status === 'scheduled') {
                     $display_time = $this->utc_to_local_datetime($batch['scheduled_at']);
                 } elseif (empty($sent_at) && !empty($batch['created_at'])) {
-                    $display_time = $this->utc_to_local_datetime($batch['created_at']);
+                    $display_time = $batch['created_at'];
                 } else {
                     $display_time = $sent_at;
                 }

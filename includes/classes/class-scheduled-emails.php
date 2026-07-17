@@ -119,6 +119,9 @@ if (!class_exists('BYS_Groups_Scheduled_Emails')) {
                             'site_name' => get_bloginfo('name'),
                             'site_url' => home_url(),
                             'sender_email' => $sender_email,
+                            'unsubscribe_url' => $recipient_user
+                                ? BYS_Groups_Signed_URL::build_unsubscribe_url((int) $recipient_user->ID)
+                                : '',
                         ));
                     } catch (Exception $e) {
                         error_log("[BYS_Groups_Scheduled_Emails] Error getting email content: " . $e->getMessage());

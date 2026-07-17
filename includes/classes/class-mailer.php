@@ -20,7 +20,7 @@ if (!class_exists('BYS_Groups_Mailer')) {
          * Send group communication emails via Postmark API.
          *
          * @param int $group_id Group post ID
-         * @param string $prompt_type Prompt type (password-reset, course-progress, assessment-deadline, welcome-reminder, custom)
+         * @param string $prompt_type Prompt type (password-reset, course-progress, assessment-reminder, welcome-reminder, custom)
          * @param string $recipient_type Recipient filter (group, individual, condition)
          * @param array $recipient_ids User IDs for 'individual' type, empty for others
          * @param string $custom_message Custom message body for 'custom' prompt type
@@ -126,6 +126,8 @@ if (!class_exists('BYS_Groups_Mailer')) {
                 // Get email content. Non-custom promptTypes ignore custom_message;
                 // cta_url_override is used by templates with a dashboard CTA to
                 // deep-link to a specific course (see $cta_url_override above).
+                // unsubscribe_url is per-recipient — generated here so the token
+                // encodes THIS user's id.
                 $email = bys_get_comm_email($prompt_type, array(
                     'group_name'       => $group_name,
                     'recipient_name'   => $recipient_name,
@@ -134,6 +136,7 @@ if (!class_exists('BYS_Groups_Mailer')) {
                     'sender_email'     => $sender_email,
                     'custom_message'   => $custom_message,
                     'cta_url_override' => $cta_url_override,
+                    'unsubscribe_url'  => BYS_Groups_Signed_URL::build_unsubscribe_url($recipient_uid),
                 ));
 
                 // Validate email template

@@ -22,7 +22,58 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Build an email template with consistent styling matching invite.php.
+ * Return the hosted-PNG SkillPlan wordmark used in the email brand header.
+ *
+ * Uses <img> with a plugin-hosted PNG so Outlook desktop, Yahoo, and every
+ * other client render the logo reliably.
+ */
+if (!function_exists('bys_email_logo_svg')) {
+	function bys_email_logo_svg(): string {
+		$site_name = get_bloginfo('name');
+		$default   = defined('BYS_GROUPS_PLUGIN_URL')
+			? BYS_GROUPS_PLUGIN_URL . 'assets/img/buildyourskills.png'
+			: '';
+
+		// Filter: override the logo URL. Useful for local dev where
+		// plugin_dir_url() resolves to an unreachable `.local` host — hook this
+		// from a mu-plugin and return a publicly reachable URL (e.g. a staging
+		// copy) so Gmail's image proxy can fetch it during testing.
+		$src = apply_filters('bys_email_logo_url', $default);
+
+		return sprintf(
+			'<img src="%s" alt="%s" width="200" height="44" style="display:block;border:0;outline:none;width:200px;max-width:200px;height:auto;" />',
+			esc_url($src),
+			esc_attr($site_name)
+		);
+	}
+}
+
+/**
+ * Shared progressive-enhancement <style> block for transactional emails.
+ *
+ * Clients that honor <style> in head apply these (most modern clients do;
+ * Outlook desktop ignores). Every critical style is still inlined per-element.
+ */
+if (!function_exists('bys_email_head_styles')) {
+	function bys_email_head_styles(): string {
+		return '<style>'
+			. 'a:hover,.bys-btn:hover{opacity:0.85;}'
+			. '@media (max-width:480px){'
+			. '.bys-card{padding:1.5rem !important;}'
+			. '.bys-logo img{width:160px !important;max-width:160px !important;}'
+			. '.bys-h1{font-size:20px !important;}'
+			. '.bys-body{font-size:16px !important;}'
+			. '}'
+			. '</style>';
+	}
+}
+
+/**
+ * Build an email template with consistent branding.
+ *
+ * Uses table structure + inline styles for cross-client compatibility, plus
+ * a <style> block in head for hover and mobile tweaks (progressive
+ * enhancement — safe to fall through in Outlook desktop).
  *
  * @return array Array with 'subject', 'html', 'plain' keys
  */
@@ -35,8 +86,12 @@ function bys_build_email_template(
 	string $recipient_name = 'Learner',
 	string $cta_url = '',
 	string $cta_text = '',
-	string $footer_text = ''
+	string $footer_text = '',
+	string $unsubscribe_url = ''
 ): array {
+
+	$logo   = bys_email_logo_svg();
+	$styles = bys_email_head_styles();
 
 	ob_start();
 	?>
@@ -46,60 +101,67 @@ function bys_build_email_template(
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<title><?php echo esc_html($subject); ?></title>
+		<?php echo $styles; ?>
 	</head>
-	<body style="margin:0;padding:0;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;">
-		<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;padding:40px 16px;">
+	<body style="margin:0;padding:0;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;color:#4F5C6F;">
+		<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;padding:48px 16px;">
 			<tr>
 				<td align="center">
 					<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
 						<tr>
-							<td align="center" style="padding-bottom:24px;">
-								<a href="<?php echo esc_url($site_url); ?>" style="text-decoration:none;">
-									<span style="font-size:22px;font-weight:700;color:#1e40af;"><?php echo esc_html($site_name); ?></span>
+							<td align="center" style="padding-bottom:32px;">
+								<a href="<?php echo esc_url($site_url); ?>" class="bys-logo" style="text-decoration:none;line-height:0;display:inline-block;" aria-label="<?php echo esc_attr($site_name); ?>">
+									<?php echo $logo; ?>
 								</a>
 							</td>
 						</tr>
 						<tr>
-							<td style="background:#ffffff;border-radius:12px;padding:40px 40px 32px;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
-								<h1 style="margin:0 0 24px;font-size:22px;font-weight:700;color:#111827;">
+							<td class="bys-card" style="background:#ffffff;border-radius:16px;padding:2rem;border:1px solid #E8EBEF;">
+								<h1 class="bys-h1" style="margin:0 0 24px;font-size:22px;font-weight:700;color:#111827;line-height:1.3;">
 									<?php echo esc_html($heading); ?>
 								</h1>
-								<p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.6;">
+								<p class="bys-body" style="margin:0 0 16px;font-size:17px;color:#4F5C6F;line-height:1.6;">
 									Hi <?php echo esc_html($recipient_name); ?>,
 								</p>
-								<div style="margin:0 0 32px;font-size:15px;color:#374151;line-height:1.6;">
+								<div class="bys-body" style="margin:0 0 32px;font-size:17px;color:#4F5C6F;line-height:1.6;">
 									<?php echo wp_kses_post($content); ?>
 								</div>
 								<?php if (!empty($cta_url) && !empty($cta_text)) : ?>
-									<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 32px;">
+									<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
 										<tr>
-											<td style="background:#1d4ed8;border-radius:9999px;">
-												<a href="<?php echo esc_url($cta_url); ?>"
-													style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">
+											<td style="background:#2465FF;border-radius:9999px;">
+												<a href="<?php echo esc_url($cta_url); ?>" class="bys-btn"
+													style="display:inline-block;padding:12px 24px;font-size:16px;font-weight:600;color:#ffffff;text-decoration:none;">
 													<?php echo esc_html($cta_text); ?>
 												</a>
 											</td>
 										</tr>
 									</table>
-									<p style="margin:0;font-size:13px;color:#9ca3af;text-align:center;">
+									<p style="margin:24px 0 0;font-size:13px;color:#9ca3af;text-align:center;line-height:1.5;">
 										Or copy this link into your browser:<br />
 										<a href="<?php echo esc_url($cta_url); ?>"
-											style="color:#1d4ed8;word-break:break-all;">
+											style="color:#2465FF;word-break:break-all;">
 											<?php echo esc_url($cta_url); ?>
 										</a>
 									</p>
 								<?php endif; ?>
 							</td>
 						</tr>
-						<!-- Footer -->
 						<tr>
 							<td style="padding-top:24px;text-align:center;">
-								<p style="margin:0;font-size:12px;color:#9ca3af;">
+								<p style="margin:0;font-size:14px;color:#9ca3af;line-height:1.5;">
 									&copy; <?php echo date('Y'); ?> <?php echo esc_html($site_name); ?>.
 									<?php if (!empty($footer_text)) : ?>
 										<?php echo wp_kses_post($footer_text); ?>
 									<?php endif; ?>
 								</p>
+								<?php if (!empty($unsubscribe_url)) : ?>
+									<p style="margin:8px 0 0;font-size:14px;color:#9ca3af;">
+										<a href="<?php echo esc_url($unsubscribe_url); ?>" style="color:#9ca3af;text-decoration:underline;">
+											Unsubscribe from group communications
+										</a>
+									</p>
+								<?php endif; ?>
 							</td>
 						</tr>
 					</table>
@@ -119,6 +181,9 @@ function bys_build_email_template(
 	if (!empty($footer_text)) {
 		$plain .= "\n\n" . wp_strip_all_tags($footer_text);
 	}
+	if (!empty($unsubscribe_url)) {
+		$plain .= "\n\nUnsubscribe from group communications: " . $unsubscribe_url;
+	}
 
 	return compact('subject', 'html', 'plain');
 }
@@ -126,7 +191,7 @@ function bys_build_email_template(
 /**
  * Get group communication email template by prompt type
  *
- * @param string $prompt_type Prompt type (password-reset, course-progress, assessment-deadline, welcome-reminder, custom)
+ * @param string $prompt_type Prompt type (password-reset, course-progress, assessment-reminder, welcome-reminder, custom)
  * @param array $vars Template variables (group_name, recipient_name, site_name, site_url, custom_message)
  * @return array Array with 'subject', 'html', 'plain' keys
  */
@@ -140,21 +205,22 @@ function bys_get_comm_email(string $prompt_type, array $vars): array {
 	// a navigational CTA use it instead of the dashboard URL. Empty string
 	// means "no override" — keep the template's default.
 	$cta_url_override = $vars['cta_url_override'] ?? '';
+	$unsubscribe_url  = $vars['unsubscribe_url'] ?? '';
 
 	switch ($prompt_type) {
 		case 'password-reset':
 			// CTA is the password-reset link, never a course — override ignored.
-			return bys_get_password_reset_email($group_name, $recipient_name, $site_name, $site_url);
+			return bys_get_password_reset_email($group_name, $recipient_name, $site_name, $site_url, $unsubscribe_url);
 		case 'course-progress':
-			return bys_get_course_nudge_email($group_name, $recipient_name, $site_name, $site_url, $cta_url_override);
-		case 'assessment-deadline':
-			return bys_get_assessment_deadline_email($group_name, $recipient_name, $site_name, $site_url, $cta_url_override);
+			return bys_get_course_nudge_email($group_name, $recipient_name, $site_name, $site_url, $cta_url_override, $unsubscribe_url);
+		case 'assessment-reminder':
+			return bys_get_assessment_deadline_email($group_name, $recipient_name, $site_name, $site_url, $cta_url_override, $unsubscribe_url);
 		case 'welcome-reminder':
-			return bys_get_welcome_reminder_email($group_name, $recipient_name, $site_name, $site_url, $cta_url_override);
+			return bys_get_welcome_reminder_email($group_name, $recipient_name, $site_name, $site_url, $cta_url_override, $unsubscribe_url);
 		case 'custom':
 			// Leader-authored body; no CTA button — override doesn't apply.
 			$custom_message = $vars['custom_message'] ?? '';
-			return bys_get_custom_email($group_name, $custom_message);
+			return bys_get_custom_email($group_name, $custom_message, $unsubscribe_url);
 		default:
 			return array('subject' => '', 'html' => '', 'plain' => '');
 	}
@@ -169,7 +235,7 @@ function bys_get_comm_email(string $prompt_type, array $vars): array {
  * @param string $site_url Site URL
  * @return array Array with 'subject', 'html', 'plain' keys
  */
-function bys_get_password_reset_email(string $group_name, string $recipient_name, string $site_name, string $site_url): array {
+function bys_get_password_reset_email(string $group_name, string $recipient_name, string $site_name, string $site_url, string $unsubscribe_url = ''): array {
 	$subject = "Password reset for {$site_name}";
 	$reset_url = wp_login_url() . '?action=lostpassword';
 	$heading = "Password Reset";
@@ -185,7 +251,8 @@ function bys_get_password_reset_email(string $group_name, string $recipient_name
 		$recipient_name,
 		$reset_url,
 		'Reset my password',
-		$footer_text
+		$footer_text,
+		$unsubscribe_url
 	);
 }
 
@@ -199,11 +266,11 @@ function bys_get_password_reset_email(string $group_name, string $recipient_name
  * @param string $site_url Site URL
  * @return array Array with 'subject', 'html', 'plain' keys
  */
-function bys_get_course_nudge_email(string $group_name, string $recipient_name, string $site_name, string $site_url, string $cta_url_override = ''): array {
+function bys_get_course_nudge_email(string $group_name, string $recipient_name, string $site_name, string $site_url, string $cta_url_override = '', string $unsubscribe_url = ''): array {
 	$subject = "Course progress update";
 	$dashboard_url = !empty($cta_url_override) ? $cta_url_override : $site_url . '/dashboard/';
 	$heading = "Course Progress Update";
-	$content = "<p>Your learning resources are ready and available for you. Click the link below to get started or continue your progress.</p>";
+	$content = "<p>Your learning resources are ready. Click the link below to get started or continue your learning.</p>";
 	$footer_text = 'Questions? Contact <a href="mailto:learn@skillplan.ca">learn@skillplan.ca</a>';
 
 
@@ -216,7 +283,8 @@ function bys_get_course_nudge_email(string $group_name, string $recipient_name, 
 		$recipient_name,
 		$dashboard_url,
 		'Continue progress',
-		$footer_text
+		$footer_text,
+		$unsubscribe_url
 	);
 }
 
@@ -229,7 +297,7 @@ function bys_get_course_nudge_email(string $group_name, string $recipient_name, 
  * @param string $site_url Site URL
  * @return array Array with 'subject', 'html', 'plain' keys
  */
-function bys_get_assessment_deadline_email(string $group_name, string $recipient_name, string $site_name, string $site_url, string $cta_url_override = ''): array {
+function bys_get_assessment_deadline_email(string $group_name, string $recipient_name, string $site_name, string $site_url, string $cta_url_override = '', string $unsubscribe_url = ''): array {
 	$subject = "Assessment deadline reminder";
 	$dashboard_url = !empty($cta_url_override) ? $cta_url_override : $site_url . '/dashboard/';
 	$heading = "Assessment Deadline Reminder";
@@ -245,7 +313,8 @@ function bys_get_assessment_deadline_email(string $group_name, string $recipient
 		$recipient_name,
 		$dashboard_url,
 		'Continue progress',
-		$footer_text
+		$footer_text,
+		$unsubscribe_url
 	);
 }
 
@@ -258,7 +327,7 @@ function bys_get_assessment_deadline_email(string $group_name, string $recipient
  * @param string $site_url Site URL
  * @return array Array with 'subject', 'html', 'plain' keys
  */
-function bys_get_welcome_reminder_email(string $group_name, string $recipient_name, string $site_name, string $site_url, string $cta_url_override = ''): array {
+function bys_get_welcome_reminder_email(string $group_name, string $recipient_name, string $site_name, string $site_url, string $cta_url_override = '', string $unsubscribe_url = ''): array {
 	$subject = "Welcome to {$group_name}";
 	$dashboard_url = !empty($cta_url_override) ? $cta_url_override : $site_url . '/dashboard/';
 	$heading = "Welcome to " . esc_html($group_name) . "!";
@@ -274,7 +343,8 @@ function bys_get_welcome_reminder_email(string $group_name, string $recipient_na
 		$recipient_name,
 		$dashboard_url,
 		'Get started',
-		$footer_text
+		$footer_text,
+		$unsubscribe_url
 	);
 }
 
@@ -285,12 +355,13 @@ function bys_get_welcome_reminder_email(string $group_name, string $recipient_na
  * @param string $custom_message The custom message body (HTML or plain text)
  * @return array Array with 'subject', 'html', 'plain' keys
  */
-function bys_get_custom_email(string $group_name, string $custom_message): array {
-	$subject = "Build Your Skills | You have received a message from your group leader";
+function bys_get_custom_email(string $group_name, string $custom_message, string $unsubscribe_url = ''): array {
+	$subject   = "Build Your Skills | You have received a message from your group leader";
 	$site_name = get_bloginfo('name');
-	$site_url = home_url();
+	$site_url  = home_url();
+	$logo      = bys_email_logo_svg();
+	$styles    = bys_email_head_styles();
 
-	// Build email with custom content, no CTA button
 	ob_start();
 	?>
 <!DOCTYPE html>
@@ -299,34 +370,42 @@ function bys_get_custom_email(string $group_name, string $custom_message): array
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<title><?php echo esc_html($subject); ?></title>
+		<?php echo $styles; ?>
 	</head>
-	<body style="margin:0;padding:0;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;">
-		<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;padding:40px 16px;">
+	<body style="margin:0;padding:0;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;color:#4F5C6F;">
+		<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;padding:48px 16px;">
 			<tr>
 				<td align="center">
 					<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
 						<tr>
-							<td align="center" style="padding-bottom:24px;">
-								<a href="<?php echo esc_url($site_url); ?>" style="text-decoration:none;">
-									<span style="font-size:22px;font-weight:700;color:#1e40af;"><?php echo esc_html($site_name); ?></span>
+							<td align="center" style="padding-bottom:32px;">
+								<a href="<?php echo esc_url($site_url); ?>" class="bys-logo" style="text-decoration:none;line-height:0;display:inline-block;" aria-label="<?php echo esc_attr($site_name); ?>">
+									<?php echo $logo; ?>
 								</a>
 							</td>
 						</tr>
 						<tr>
-							<td style="background:#ffffff;border-radius:12px;padding:40px 40px 32px;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
-								<h1 style="margin:0 0 24px;font-size:22px;font-weight:700;color:#111827;">
+							<td class="bys-card" style="background:#ffffff;border-radius:16px;padding:2rem;border:1px solid #E8EBEF;">
+								<h1 class="bys-h1" style="margin:0 0 24px;font-size:22px;font-weight:700;color:#111827;line-height:1.3;">
 									<?php echo esc_html($group_name); ?> has sent you the following message:
 								</h1>
-								<p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.6;">
+								<div class="bys-body" style="margin:0;font-size:17px;color:#4F5C6F;line-height:1.6;">
 									<?php echo wp_kses_post($custom_message); ?>
-								</p>
+								</div>
 							</td>
 						</tr>
 						<tr>
 							<td style="padding-top:24px;text-align:center;">
-								<p style="margin:0;font-size:12px;color:#9ca3af;">
-									&copy; <?php echo date('Y'); ?> <?php echo esc_html($site_name); ?>. Questions? Contact <a href="mailto:learn@skillplan.ca">learn@skillplan.ca</a>
+								<p style="margin:0;font-size:14px;color:#9ca3af;line-height:1.5;">
+									&copy; <?php echo date('Y'); ?> <?php echo esc_html($site_name); ?>. Questions? Contact <a href="mailto:learn@skillplan.ca" style="color:#2465FF;">learn@skillplan.ca</a>
 								</p>
+								<?php if (!empty($unsubscribe_url)) : ?>
+									<p style="margin:8px 0 0;font-size:14px;color:#9ca3af;">
+										<a href="<?php echo esc_url($unsubscribe_url); ?>" style="color:#9ca3af;text-decoration:underline;">
+											Unsubscribe from group communications
+										</a>
+									</p>
+								<?php endif; ?>
 							</td>
 						</tr>
 					</table>
@@ -340,6 +419,9 @@ function bys_get_custom_email(string $group_name, string $custom_message): array
 
 	// Plain text version
 	$plain = wp_strip_all_tags($custom_message);
+	if (!empty($unsubscribe_url)) {
+		$plain .= "\n\nUnsubscribe from group communications: " . $unsubscribe_url;
+	}
 
 	return compact('subject', 'html', 'plain');
 }
@@ -363,16 +445,26 @@ function bys_get_custom_email(string $group_name, string $custom_message): array
  * @return array { subject, html, plain }
  */
 function bys_get_quiz_access_notification_email(array $vars): array {
-    $recipient_name = $vars['recipient_name'] ?? 'Learner';
-    $site_name      = $vars['site_name']      ?? get_bloginfo('name');
-    $site_url       = $vars['site_url']       ?? home_url();
-    $quiz_title     = $vars['quiz_title']     ?? 'your quiz';
-    $quiz_url       = $vars['quiz_url']       ?? $site_url;
-    $start          = $vars['start']          ?? '';
-    $end            = $vars['end']            ?? '';
+    $recipient_name    = $vars['recipient_name']    ?? 'Learner';
+    $site_name         = $vars['site_name']         ?? get_bloginfo('name');
+    $site_url          = $vars['site_url']          ?? home_url();
+    $quiz_title        = $vars['quiz_title']        ?? 'your quiz';
+    $quiz_url          = $vars['quiz_url']          ?? $site_url;
+    $start             = $vars['start']             ?? '';
+    $end               = $vars['end']               ?? '';
+    $unsubscribe_url   = $vars['unsubscribe_url']   ?? '';
+    $attempts_granted  = isset($vars['attempts_granted'])  ? (int) $vars['attempts_granted']  : null;
+    $attempts_previous = isset($vars['attempts_previous']) ? (int) $vars['attempts_previous'] : null;
+    $attempts_changed  = $attempts_granted !== null
+        && $attempts_previous !== null
+        && $attempts_granted !== $attempts_previous;
 
-    $subject = sprintf('Quiz access: %s', $quiz_title);
-    $heading = sprintf('Access details for %s', $quiz_title);
+    $subject = $attempts_changed
+        ? sprintf('Quiz access update: %s', $quiz_title)
+        : sprintf('Quiz access: %s', $quiz_title);
+    $heading = $attempts_changed
+        ? sprintf('Access update for %s', $quiz_title)
+        : sprintf('Access details for %s', $quiz_title);
 
     // Render the access window as a uniform "Opens / Closes" pair. Empty
     // bounds are surfaced as plain-language fallbacks rather than being
@@ -396,7 +488,33 @@ function bys_get_quiz_access_notification_email(array $vars): array {
         esc_html($quiz_title)
     );
 
-    $content = $intro . $window_html;
+    $attempts_html = '';
+    if ($attempts_changed) {
+        if ($attempts_granted > $attempts_previous) {
+            $delta = $attempts_granted - $attempts_previous;
+            $attempts_line = sprintf(
+                'You have been granted <strong>%d additional attempt%s</strong> on this quiz (total additional attempts: %d).',
+                $delta,
+                $delta === 1 ? '' : 's',
+                $attempts_granted
+            );
+        } elseif ($attempts_granted === 0) {
+            $attempts_line = 'Your previously granted additional attempts on this quiz have been removed.';
+        } else {
+            $attempts_line = sprintf(
+                'Your additional attempts on this quiz have been updated (previously %d, now <strong>%d</strong>).',
+                $attempts_previous,
+                $attempts_granted
+            );
+        }
+
+        $attempts_html = sprintf(
+            '<p style="margin:0 0 16px;color:#374151;font-size:15px;">%s</p>',
+            $attempts_line
+        );
+    }
+
+    $content = $intro . $attempts_html . $window_html;
 
     $footer_text = 'Questions? Contact <a href="mailto:learn@skillplan.ca">learn@skillplan.ca</a>';
 
@@ -409,7 +527,8 @@ function bys_get_quiz_access_notification_email(array $vars): array {
         $recipient_name,
         $quiz_url,
         sprintf('Open %s', $quiz_title),
-        $footer_text
+        $footer_text,
+        $unsubscribe_url
     );
 }
 
