@@ -13,7 +13,12 @@
 
 if (!defined('ABSPATH')) exit;
 
-const BYS_GROUPS_COMMS_META_KEY = 'bys_groups_enable_comms';
+const BYS_GROUPS_COMMS_META_KEY   = 'bys_groups_enable_comms';
+// Audit-trail of every opt-in/opt-out transition. Stored as a JSON-encoded
+// array of { ts, enabled, method, ip } records. Bounded to the most recent BYS_GROUPS_COMMS_EVENTS_MAX val (E.G 20) per user to cap meta size
+
+const BYS_GROUPS_COMMS_EVENTS_KEY = 'bys_groups_comms_events';
+const BYS_GROUPS_COMMS_EVENTS_MAX = 20;
 
 /**
  * Whether $user_id may receive plugin-generated group communications.
@@ -42,12 +47,36 @@ function bys_groups_user_can_receive_comms($user_id) {
  * submission is normalised and what bys_groups_user_can_receive_comms()
  * expects on read.
  *
+ * Every call appends an audit-trail record to BYS_GROUPS_COMMS_EVENTS_KEY
+ * which is a timestamped log of the transition
+ *
  * @param integer $user_id
  * @param boolean $enabled
+ * @param string  $method  How the opt-in/out change was triggered
  * @return void
  */
-function bys_groups_set_user_comms_enabled($user_id,$enabled): void {
+function bys_groups_set_user_comms_enabled($user_id, $enabled, $method = 'unknown'): void {
+    $user_id = (int) $user_id;
+    if (!$user_id || !get_userdata($user_id)) return;
+
     update_user_meta($user_id, BYS_GROUPS_COMMS_META_KEY, $enabled ? '1' : '0');
+
+    $events = get_user_meta($user_id, BYS_GROUPS_COMMS_EVENTS_KEY, true);
+    if (!is_array($events)) $events = [];
+
+    $events[] = [
+        'ts'      => current_time('mysql', 1), // 1 sets this as UTC ts
+        'enabled' => (bool) $enabled,
+        'method'  => (string) $method,
+        'ip'      => isset($_SERVER['REMOTE_ADDR']) ? sanitize_text_field($_SERVER['REMOTE_ADDR']) : '',
+    ];
+
+    // Caps the meta size 
+    if (count($events) > BYS_GROUPS_COMMS_EVENTS_MAX) {
+        $events = array_slice($events, -BYS_GROUPS_COMMS_EVENTS_MAX);
+    }
+
+    update_user_meta($user_id, BYS_GROUPS_COMMS_EVENTS_KEY, $events);
 }
 
 if (!class_exists('BYS_Groups_User_Comms_Preferences')) {
@@ -77,7 +106,7 @@ if (!class_exists('BYS_Groups_User_Comms_Preferences')) {
 
             $raw = rgar($entry, self::FIELD_ID . '.1');
             $enabled = ($raw !== '' && $raw !== null);
-            bys_groups_set_user_comms_enabled($user_id, $enabled);
+            bys_groups_set_user_comms_enabled($user_id, $enabled, 'form');
         }
 
         /**
