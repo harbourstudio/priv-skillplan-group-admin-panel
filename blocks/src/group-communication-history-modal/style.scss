@@ -203,6 +203,11 @@
             background: var(--wp--preset--color--orange-100);
             color: var(--wp--preset--color--orange-700);
         }
+
+        &--comms-disabled {
+            background: var(--wp--preset--color--gray-100);
+            color: var(--wp--preset--color--gray-600);
+        }
     }
 
     // ── Show more ─────────────────────────────────────────────────────────
@@ -266,6 +271,11 @@
         white-space: pre-wrap;
         background: var(--wp--preset--color--gray-50);
         border-radius: 0.5rem;
+
+        table {
+            border-collapse: separate;
+            border-spacing: 0;
+        }
 
         table * {
             border-style: none;

@@ -320,6 +320,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                     'last_active'  => $last_active_ts ? wp_date('c', $last_active_ts) : null,
                     'status'       => $this->get_user_active_status($user_id),
                     'status_checked_at' => gmdate('c'),
+                    'enable_comms' => bys_groups_user_can_receive_comms($user_id),
                 ];
             }
 
@@ -483,6 +484,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                     'last_active'  => $last_active_ts ? wp_date('c', $last_active_ts) : null,
                     'status'       => $this->get_user_active_status($user_id),
                     'status_checked_at' => gmdate('c'),
+                    'enable_comms' => bys_groups_user_can_receive_comms($user_id),
                 ];
             }
 
@@ -528,6 +530,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 'last_login'          => $last_login_timestamp,
                 'last_active'         => $last_active_ts ? wp_date('c', $last_active_ts) : null,
                 'avatar_url'          => get_avatar_url($user_id, ['size' => 80]),
+                'enable_comms'        => bys_groups_user_can_receive_comms($user_id),
             ];
         }
 
@@ -1623,15 +1626,19 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             $quiz_post      = get_post($quiz_id);
             $from           = BYS_Groups_Postmark::get_from_email();
 
+            // Build the email content unconditionally so history modal shows "what would have been sent" rather than display empty content
             $email = bys_get_quiz_access_notification_email([
-                'recipient_name' => !empty($recipient->display_name) ? $recipient->display_name : $recipient->user_login,
-                'site_name'      => get_bloginfo('name'),
-                'site_url'       => home_url(),
-                'quiz_title'     => $quiz_post ? get_the_title($quiz_post) : 'your quiz',
-                'quiz_url'       => $quiz_post ? get_permalink($quiz_post) : home_url(),
-                'start'          => $start,
-                'end'            => $end,
-                'sender_email'   => $sender_email,
+                'recipient_name'    => !empty($recipient->display_name) ? $recipient->display_name : $recipient->user_login,
+                'site_name'         => get_bloginfo('name'),
+                'site_url'          => home_url(),
+                'quiz_title'        => $quiz_post ? get_the_title($quiz_post) : 'your quiz',
+                'quiz_url'          => $quiz_post ? get_permalink($quiz_post) : home_url(),
+                'start'             => $start,
+                'end'               => $end,
+                'sender_email'      => $sender_email,
+                'attempts_granted'  => $attempts_granted,
+                'attempts_previous' => $attempts_previous,
+                'unsubscribe_url'   => BYS_Groups_Signed_URL::build_unsubscribe_url($user_id),
             ]);
 
             if (empty($email['subject']) || empty($email['html'])) {
@@ -1639,6 +1646,33 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             }
 
             $batch_id = wp_generate_uuid4();
+
+            // Recipient opted out — insert as comms_disabled log row
+            if (!bys_groups_user_can_receive_comms($user_id)) {
+                global $wpdb;
+                $wpdb->insert(
+                    $wpdb->prefix . BYS_GROUPS_COMMS_TABLE,
+                    [
+                        'message_id'      => null,
+                        'recipient_email' => $recipient->user_email,
+                        'group_id'        => $group_id,
+                        'sender_user_id'  => $sender_user_id,
+                        'prompt_type'     => 'user-quiz-access',
+                        'batch_id'        => $batch_id,
+                        'subject'         => $email['subject'],
+                        'body_html'       => $email['html'],
+                        'body_text'       => $email['plain'],
+                        'delivery_status' => 'comms_disabled',
+                        'created_at'      => current_time('mysql'),
+                    ],
+                    ['%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s']
+                );
+                return [
+                    'success'        => true,
+                    'comms_disabled' => true,
+                    'batch_id'       => $batch_id,
+                ];
+            }
 
             $payload = [
                 'From'     => $from,
@@ -1776,25 +1810,40 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             // shared batch_id for all recipients
             $batch_id = wp_generate_uuid4();
 
-            // build a Postmark /email/batch payload
+            // build a Postmark /email/batch payload. Recipients who have
+            // opted out (bys_groups_enable_comms = '0') are diverted into
+            // $skipped and logged as 'comms_disabled' after the Postmark
+            // call so the leader can see them in the history modal.
             $messages = [];
+            $skipped  = [];
             $valid_recipient_count = 0;
             foreach ($user_ids as $uid) {
                 $recipient = get_user_by('ID', $uid);
                 if (!$recipient || empty($recipient->user_email)) continue;
 
                 $email = bys_get_quiz_access_notification_email([
-                    'recipient_name' => !empty($recipient->display_name) ? $recipient->display_name : $recipient->user_login,
-                    'site_name'      => $site_name,
-                    'site_url'       => $site_url,
-                    'quiz_title'     => $quiz_ttl,
-                    'quiz_url'       => $quiz_url,
-                    'start'          => $start,
-                    'end'            => $end,
-                    'sender_email'   => $sender_email,
+                    'recipient_name'  => !empty($recipient->display_name) ? $recipient->display_name : $recipient->user_login,
+                    'site_name'       => $site_name,
+                    'site_url'        => $site_url,
+                    'quiz_title'      => $quiz_ttl,
+                    'quiz_url'        => $quiz_url,
+                    'start'           => $start,
+                    'end'             => $end,
+                    'sender_email'    => $sender_email,
+                    'unsubscribe_url' => BYS_Groups_Signed_URL::build_unsubscribe_url((int) $uid),
                 ]);
 
                 if (empty($email['subject']) || empty($email['html'])) continue;
+
+                if (!bys_groups_user_can_receive_comms((int) $uid)) {
+                    $skipped[] = [
+                        'email'   => $recipient->user_email,
+                        'subject' => $email['subject'],
+                        'html'    => $email['html'],
+                        'plain'   => $email['plain'],
+                    ];
+                    continue;
+                }
 
                 $messages[] = [
                     'From'     => $from,
@@ -1814,7 +1863,43 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 $valid_recipient_count++;
             }
 
+            // Log opted-out recipients so the history modal surfaces batch even if all recipients are opted-out
+            $skipped_sender_id = $sender_user_id !== '' ? (int) $sender_user_id : 0;
+            $log_skipped = function () use ($skipped, $group_id, $skipped_sender_id, $batch_id) {
+                if (empty($skipped)) return;
+                global $wpdb;
+                foreach ($skipped as $row) {
+                    $wpdb->insert(
+                        $wpdb->prefix . BYS_GROUPS_COMMS_TABLE,
+                        [
+                            'message_id'      => null,
+                            'recipient_email' => $row['email'],
+                            'group_id'        => $group_id,
+                            'sender_user_id'  => $skipped_sender_id,
+                            'prompt_type'     => 'group-quiz-access',
+                            'batch_id'        => $batch_id,
+                            'subject'         => $row['subject'],
+                            'body_html'       => $row['html'],
+                            'body_text'       => $row['plain'],
+                            'delivery_status' => 'comms_disabled',
+                            'created_at'      => current_time('mysql'),
+                        ],
+                        ['%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s']
+                    );
+                }
+            };
+
             if (empty($messages)) {
+                if (!empty($skipped)) {
+                    $log_skipped();
+                    return [
+                        'success'        => true,
+                        'sent_count'     => 0,
+                        'failed_count'   => 0,
+                        'skipped_count'  => count($skipped),
+                        'batch_id'       => $batch_id,
+                    ];
+                }
                 return new WP_Error('no_recipients', 'No deliverable recipients in this group', ['status' => 404]);
             }
 
@@ -1881,11 +1966,15 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 );
             }
 
+            // Log opted-out recipients alongside the real batch (same batch_id)
+            $log_skipped();
+
             return [
-                'success'      => true,
-                'sent_count'   => $sent_count,
-                'failed_count' => $valid_recipient_count - $sent_count,
-                'batch_id'     => $batch_id,
+                'success'       => true,
+                'sent_count'    => $sent_count,
+                'failed_count'  => $valid_recipient_count - $sent_count,
+                'skipped_count' => count($skipped),
+                'batch_id'      => $batch_id,
             ];
         }
 
@@ -2143,16 +2232,21 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 $recipient_counts[$cr['batch_id']] = (int) $cr['cnt'];
             }
 
-            // Scheduled-but-not-yet-sent rows are tracked separately (they have no
-            // Postmark MessageID yet, so they don't appear in the outbound list).
-            $scheduled_rows = $wpdb->get_results(
+            // Rows that never reached Postmark are invisible to the outbound
+            // list join above. Three sources produce them:
+            //   • scheduled queue (delivery_status='scheduled')
+            //   • opted-out recipients (delivery_status='comms_disabled')
+            //   • submit-time rejects with no MessageID (delivery_status='failed')
+            // Pull them separately so batches surface in the log even
+            // when every row in the batch is unsent.
+            $unsent_rows = $wpdb->get_results(
                 $wpdb->prepare(
                     "SELECT batch_id, prompt_type, subject, delivery_status, sender_user_id, scheduled_at, created_at
                      FROM {$wpdb->prefix}" . BYS_GROUPS_COMMS_TABLE . "
                      WHERE group_id = %d
-                       AND delivery_status = 'scheduled'
                        AND message_id IS NULL
-                     ORDER BY scheduled_at DESC
+                       AND delivery_status IN ('scheduled', 'comms_disabled', 'failed')
+                     ORDER BY COALESCE(scheduled_at, created_at) DESC
                      LIMIT %d",
                     $group_id,
                     $count
@@ -2160,7 +2254,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 ARRAY_A
             );
 
-            if (empty($log_rows) && empty($scheduled_rows)) {
+            if (empty($log_rows) && empty($unsent_rows)) {
                 return [
                     'total'    => 0,
                     'messages' => [],
@@ -2203,8 +2297,9 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 }
             }
 
-            // Fold in scheduled-only batches
-            foreach ($scheduled_rows as $row) {
+            // Fold in fully-unsent batches (scheduled queue, opted-out recipients,
+            // submit-time failures)
+            foreach ($unsent_rows as $row) {
                 $batch_id = $row['batch_id'];
                 if (!isset($batches_by_id[$batch_id])) {
                     $batches_by_id[$batch_id] = [
@@ -2212,12 +2307,15 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                         'message_ids'        => [],
                         'prompt_type'        => $row['prompt_type'],
                         'subject'            => $row['subject'],
-                        'delivery_statuses'  => ['scheduled'],
+                        'delivery_statuses'  => [$row['delivery_status']],
                         'first_message_id'   => null,
                         'first_postmark_msg' => null,
                         'sender_user_id'     => $row['sender_user_id'],
                         'scheduled_at'       => $row['scheduled_at'],
+                        'created_at'         => $row['created_at'],
                     ];
+                } else {
+                    $batches_by_id[$batch_id]['delivery_statuses'][] = $row['delivery_status'];
                 }
             }
 
@@ -2235,8 +2333,12 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 $delivery_status = 'pending';
                 $postmark_detail = null;
 
-                $has_failed       = in_array('failed', $batch['delivery_statuses'], true);
-                $non_failed_count = count(array_filter($batch['delivery_statuses'], fn($s) => $s !== 'failed'));
+                $unsent_statuses  = ['failed', 'comms_disabled'];
+                $has_failed       = count(array_intersect($unsent_statuses, $batch['delivery_statuses'])) > 0;
+                $non_failed_count = count(array_filter(
+                    $batch['delivery_statuses'],
+                    fn($s) => !in_array($s, $unsent_statuses, true)
+                ));
 
                 if ($has_failed && $non_failed_count === 0) {
                     // Every recipient failed at submit time (no Postmark delivery to fetch)
@@ -2277,10 +2379,19 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                     $sent_at = $postmark_detail['ReceivedAt'];
                 }
 
-                // Scheduled emails use scheduled_at (converted to local time); everything else uses sent_at
-                $display_time = $delivery_status === 'scheduled'
-                    ? $this->utc_to_local_datetime($batch['scheduled_at'])
-                    : $sent_at;
+                // Scheduled emails use scheduled_at, which is stored as UTC
+                // (gmdate) → convert to local for display. Batches that never
+                // reached Postmark fall back to created_at, which is written
+                // with current_time('mysql') and is ALREADY site-local —
+                // passing it through utc_to_local_datetime would shift it a
+                // second time.
+                if ($delivery_status === 'scheduled') {
+                    $display_time = $this->utc_to_local_datetime($batch['scheduled_at']);
+                } elseif (empty($sent_at) && !empty($batch['created_at'])) {
+                    $display_time = $batch['created_at'];
+                } else {
+                    $display_time = $sent_at;
+                }
 
                 $messages[] = [
                     'batch_id'        => $batch_id,

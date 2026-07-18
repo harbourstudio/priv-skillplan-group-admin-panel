@@ -123,29 +123,8 @@ jQuery(document).ready(($) => {
             }
             const dateStr = sentAt && !isNaN(sentAt.getTime()) ? sentAt.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : '';
 
-            // Calculate status based on delivery_status
-            let statusText = 'All Success';
-            let statusClass = 'comm-status-badge--delivered';
-
-            if (batch.delivery_status === 'scheduled') {
-                statusText = 'Scheduled';
-                statusClass = 'comm-status-badge--scheduled';
-            } else if (batch.delivery_status === 'failed') {
-                statusText = 'All Failed';
-                statusClass = 'comm-status-badge--failed';
-            } else if (batch.delivery_status === 'partial_failure') {
-                statusText = 'Some Failed';
-                statusClass = 'comm-status-badge--partial-failure';
-            } else if (batch.delivery_status === 'bounced') {
-                statusText = 'All Failed';
-                statusClass = 'comm-status-badge--bounced';
-            } else if (batch.delivery_status === 'spam') {
-                statusText = 'Some Failed';
-                statusClass = 'comm-status-badge--spam';
-            } else if (batch.delivery_status === 'pending') {
-                statusText = 'Pending';
-                statusClass = 'comm-status-badge--pending';
-            }
+            const statusText  = batchStatusLabel(batch.delivery_status);
+            const statusClass = statusClassName(batch.delivery_status || 'delivered');
 
             // Fetch sender user info via the shared api client so the WP REST
             // nonce + plugin auth header are included (bare fetch hits 401 for
@@ -217,8 +196,8 @@ jQuery(document).ready(($) => {
         }
 
         data.recipients.forEach((recipient) => {
-            const statusLabel = capitalize(recipient.delivery_status || 'pending');
-            const statusClass = `comm-status-badge--${recipient.delivery_status}`;
+            const statusLabel = recipientStatusLabel(recipient.delivery_status);
+            const statusClass = statusClassName(recipient.delivery_status);
             // Use message_id if available, otherwise fall back to DB row id
             const detailId = recipient.message_id || recipient.id;
             const $row = $(`
@@ -279,8 +258,8 @@ jQuery(document).ready(($) => {
      * Render message detail into Screen 3
      */
     function renderMessageDetail(detail) {
-        const statusLabel = capitalize(detail.delivery_status || 'pending');
-        const statusClass = `comm-status-badge--${detail.delivery_status}`;
+        const statusLabel = recipientStatusLabel(detail.delivery_status);
+        const statusClass = statusClassName(detail.delivery_status);
 
         setScreen3Loading(false);
 
@@ -418,6 +397,47 @@ jQuery(document).ready(($) => {
  */
 function capitalize(str) {
     return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
+}
+
+/**
+ * Utility: DB delivery_status → CSS class name.
+ */
+function statusClassName(status) {
+    return `comm-status-badge--${(status || 'pending').replace(/_/g, '-')}`;
+}
+
+// Screen 1 (batch aggregate) — server folds comms_disabled into failed /
+// partial_failure, so this table never sees comms_disabled directly.
+const BATCH_STATUS_LABELS = {
+    delivered:       'All Sent',
+    scheduled:       'Scheduled',
+    failed:          'None Delivered',
+    partial_failure: 'Some Sent',
+    bounced:         'None Delivered',
+    spam:            'Some Sent',
+    pending:         'Pending',
+};
+
+// Screen 2/3 (per-recipient) — comms_disabled surfaces here directly.
+// Anything unmapped falls back to capitalize() for forward-compat with
+// new statuses the backend might introduce.
+const RECIPIENT_STATUS_LABELS = {
+    pending:        'Pending',
+    delivered:      'Delivered',
+    scheduled:      'Scheduled',
+    failed:         'Failed',
+    bounced:        'Bounced',
+    spam:           'Spam',
+    comms_disabled: 'Communications: Off',
+};
+
+function batchStatusLabel(status) {
+    return BATCH_STATUS_LABELS[status] || 'All Sent';
+}
+
+function recipientStatusLabel(status) {
+    const s = status || 'pending';
+    return RECIPIENT_STATUS_LABELS[s] || capitalize(s);
 }
 
 /**

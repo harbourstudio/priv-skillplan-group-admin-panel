@@ -3,11 +3,11 @@ import { useBlockProps } from '@wordpress/block-editor';
 import './editor.scss';
 
 const PROMPTS = [
-    { title: 'Password reset',              desc: 'Lorem ipsum dolor sit amet consectetur. Maecenas etiam at dignissim urna risus quis.' },
-    { title: 'Course progress nudge',       desc: "Sent to inactive learners who haven't logged in within 14 days. Links to last active course." },
-    { title: 'Assessment deadline warning', desc: "7-day warning for learners who haven't completed a required assessment before the access close date." },
-    { title: 'Welcome/login reminder',      desc: 'Lorem ipsum dolor sit amet consectetur. Maecenas etiam at dignissim urna risus quis.' },
-    { title: 'Custom message',              desc: 'Lorem ipsum dolor sit amet consectetur. Maecenas etiam at dignissim urna risus quis.' },
+    { title: 'Password reset',              desc: 'Send a secure password reset link to learners who are unable to access their account.' },
+    { title: 'Course progress reminder',       desc: "Remind inactive learners to return to their courses and continue their progress." },
+    { title: 'Assessment reminder', desc: "Send a reminder to learners about an upcoming assessment." },
+    { title: 'Welcome and login information',      desc: 'Send new group members a welcome message with instructions for accessing their account.' },
+    { title: 'Custom message',              desc: 'Create and send a personalized message to selected learners.' },
 ];
 
 export default function Edit({ clientId, attributes, setAttributes }) {
@@ -20,7 +20,7 @@ export default function Edit({ clientId, attributes, setAttributes }) {
     return (
         <div {...useBlockProps()}>
             <h5>Learner prompts</h5>
-            <p className="gcp__subtitle">Pre-configured nudges defined by SkillPlan. Select a template, choose recipients, and send.</p>
+            <p className="gcp__subtitle">Ready-to-send messages to engage learners. Choose a template, select recipients and send.</p>
 
             <div className="gcp__card">
                 {PROMPTS.map((prompt) => (

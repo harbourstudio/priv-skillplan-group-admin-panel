@@ -5,7 +5,7 @@ import './editor.scss';
 
 const PREVIEW_ENTRIES = [
 	{ date: 'Mar 15', label: 'Quiz reminder: Jane Doe',            type: 'prompt' },
-	{ date: 'Mar 12', label: 'Assessment deadline: Entire group',  type: 'prompt' },
+	{ date: 'Mar 12', label: 'Assessment reminder: Entire group',  type: 'prompt' },
 	{ date: 'Mar 8',  label: 'Great progress this week!: John Doe', type: 'custom' },
 	{ date: 'Feb 28', label: 'Inactivity nudge: Entire group',     type: 'prompt' },
 	{ date: 'Feb 15', label: 'Quiz reminder: John Doe',            type: 'prompt' },
