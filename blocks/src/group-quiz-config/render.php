@@ -107,10 +107,10 @@ $tz_offset_hours = $tz_offset_seconds / 3600;
                             <i class="fa-solid fa-xmark" aria-hidden="true"></i>
                         </button>
                     </div>
-                    <div class="gqc__date-field gqc__date-field--attempts" data-tooltip="<?php esc_attr_e('Attempts: max times a learner can take this quiz (blank = unlimited)', 'bys'); ?>">
+                    <!-- <div class="gqc__date-field gqc__date-field--attempts" data-tooltip="<?php esc_attr_e('Attempts: max times a learner can take this quiz (blank = unlimited)', 'bys'); ?>">
                         <i class="fa-solid fa-hashtag gqc__date-icon" aria-hidden="true"></i>
                         <input type="number" class="gqc__attempts" aria-label="<?php esc_attr_e('Number of attempts', 'bys'); ?>" data-field-type="attempts" min="0" placeholder="<?php esc_attr_e('Unlimited', 'bys'); ?>" />
-                    </div>
+                    </div> -->
                 </div>
 
                 <div class="gqc__actions">

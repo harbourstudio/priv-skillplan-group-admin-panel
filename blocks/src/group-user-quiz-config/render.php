@@ -133,7 +133,7 @@ $tz_offset_hours = $tz_offset_seconds / 3600;
                     <span class="skeleton"></span>
                 </div>
             </div>
-            <div class="guqc__date-field guqc__date-field--attempts" data-tooltip="<?php esc_attr_e('Attempts: max times a learner can take this quiz (blank = unlimited)', 'bys'); ?>">
+            <!-- <div class="guqc__date-field guqc__date-field--attempts" data-tooltip="<?php esc_attr_e('Attempts: max times a learner can take this quiz (blank = unlimited)', 'bys'); ?>">
                 <i class="fa-solid fa-hashtag guqc__date-icon" aria-hidden="true"></i>
                 <input
                     type="number"
@@ -146,7 +146,7 @@ $tz_offset_hours = $tz_offset_seconds / 3600;
                 <div class="guqc__field-skeleton" role="status" aria-busy="true" aria-label="<?php esc_attr_e( 'Awaiting quiz selection', 'bys' ); ?>" hidden>
                     <span class="skeleton"></span>
                 </div>
-            </div>
+            </div> -->
         </div>
 
         <div class="guqc__actions">
