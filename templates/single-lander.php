@@ -60,9 +60,8 @@ if ( $footer_colour || $footer_text_colour || $button_colour || $page_colour ) :
         }
     <?php endif; ?>
     <?php if ( $button_colour ) : ?>
-        .wp-block-bys-groups-lander-course-list .btn.btn-primary:not([disabled]),
-        .wp-block-bys-groups-lander-completion-alert .btn.btn-primary:not([disabled]),
-        #content :is(.wp-block-button__link.wp-element-button, .btn.btn-primary):not([disabled]),
+        .wp-block-bys-groups-lander-course-list .btn.btn-primary:not([disabled], .bys-lander-completion-alert__btn),
+        #content :is(.wp-block-button__link.wp-element-button, .btn.btn-primary):not([disabled], .bys-lander-completion-alert__btn),
         #colophon .btn.btn-primary:not([disabled]) {
             background-color: <?php echo esc_attr( $button_colour ); ?> !important;
             border-color: <?php echo esc_attr( $button_colour ); ?> !important;

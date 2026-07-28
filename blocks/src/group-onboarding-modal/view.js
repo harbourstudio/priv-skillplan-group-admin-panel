@@ -75,6 +75,9 @@ jQuery(document).ready(($) => {
     $block.find('.gom__preview-trigger').on('click', openModal);
 
     if (autoOpen) {
-        setTimeout(openModal, 600);
+        setTimeout(() => {
+            openModal();
+            markSeen();
+        }, 600);
     }
 });

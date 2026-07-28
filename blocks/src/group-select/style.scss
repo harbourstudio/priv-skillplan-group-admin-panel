@@ -23,13 +23,21 @@
         &__select{
             font-family: var(--wp--preset--font-family--primary);
             font-size: var(--wp--preset--font-size--base);
-            background: white;
+            background-color: white;
             color: var(--wp--preset--color--gray-700);
             border-radius: 0.25rem;
             border: 1px solid var(--wp--preset--color--gray-300);
             min-width: 23.5rem;
             padding: var(--wp--preset--spacing--3);
+            padding-right: 2.5rem;
             min-height: 3.25rem;
+
+            // Replace browser-native chevron with a consistent custom one
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239CA3AF' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.875rem center;
 
             @media (max-width: 821px) {
                 min-width: 0;

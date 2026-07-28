@@ -121,7 +121,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.wp-block-bys-groups-group-members .gm__email {
+.wp-block-bys-groups-group-members .gm__email, .wp-block-bys-groups-group-members .gm__enable-comms {
   font-size: var(--wp--preset--font-size--small);
   color: var(--wp--preset--color--gray-500);
   white-space: nowrap;

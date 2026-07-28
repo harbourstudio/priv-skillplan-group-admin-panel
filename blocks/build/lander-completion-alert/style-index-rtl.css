@@ -54,11 +54,11 @@
 .wp-block-bys-groups-lander-completion-alert .bys-lander-completion-alert__btn {
   white-space: nowrap;
 }
-.bys-lander-completion-alert--unlocked .wp-block-bys-groups-lander-completion-alert .bys-lander-completion-alert__btn {
-  background-color: var(--wp--preset--color--green-500) !important;
-  border-color: var(--wp--preset--color--green-500) !important;
-}
 .wp-block-bys-groups-lander-completion-alert .bys-lander-completion-alert__btn--disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+.wp-block-bys-groups-lander-completion-alert .bys-lander-completion-alert--unlocked .bys-lander-completion-alert__btn {
+  background-color: var(--wp--preset--color--green-500);
+  border-color: var(--wp--preset--color--green-500);
 }

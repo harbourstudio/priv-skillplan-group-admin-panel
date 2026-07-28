@@ -1,1 +1,0 @@
-{"version":3,"file":"group-course-config/index.css","mappings":";;;AACI;EACI;EACA;AAAR,C","sources":["webpack://bys-groups/./src/group-course-config/editor.scss"],"sourcesContent":[".wp-block-bys-groups-group-course-config {\n    .course-config__toggle {\n        cursor: default;\n        pointer-events: none;\n    }\n}\n"],"names":[],"sourceRoot":""}

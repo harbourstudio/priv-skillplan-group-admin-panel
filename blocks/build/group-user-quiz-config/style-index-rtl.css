@@ -165,7 +165,7 @@
 }
 .bys-groups-alert__message {
   font-size: var(--wp--preset--font-size--small);
-  color: var(--wp--preset--color--gray-800);
+  color: var(--wp--preset--color--gray-700);
   margin: 0;
   line-height: 1.5;
 }
@@ -308,7 +308,7 @@
   background: transparent;
 }
 .wp-block-bys-groups-group-user-quiz-config .guqc__suggestion-name {
-  font-size: var(--wp--preset--font-size--small);
+  font-size: var(--wp--preset--font-size--x-small);
   color: var(--wp--preset--color--gray-800);
   font-weight: 500;
 }

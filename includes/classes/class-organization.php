@@ -10,6 +10,7 @@
  *   groups              — relationship to the 'groups' (LearnDash) CPT
  *   courses             — relationship to the 'sfwd-courses' (LearnDash) CPT
  *   landers             — relationship to the 'lander' CPT
+ *   show_onboarding_modal — true/false toggle (default: true)
  *   logo                — image (returns full array)
  *   font                — file upload (returns full array)
  *   hero_start_colour   — colour picker
@@ -26,8 +27,76 @@ if (!class_exists('BYS_Groups_Organization')) {
     class BYS_Groups_Organization {
 
         public function __construct() {
-            add_action('init',      [$this, 'register_post_type']);
-            add_action('acf/init',  [$this, 'register_fields']);
+            add_action('init',                  [$this, 'register_post_type']);
+            add_action('acf/init',              [$this, 'register_fields']);
+            add_action('gform_after_submission', [$this, 'maybe_suppress_onboarding_modal'], 10, 2);
+            add_action('gform_user_registered', [$this, 'add_registered_user_to_org'], 10, 4);
+        }
+
+        /**
+         * Fires synchronously during form submission (before the async background
+         * process creates the user). If this form is a registration form for an org
+         * with Show Onboarding Modal disabled, store a short-lived transient so the
+         * modal template can suppress auto-open on the next page load — before the
+         * background process has had a chance to add the user to the org's users field.
+         */
+        public function maybe_suppress_onboarding_modal( $entry, $form ) {
+            $form_id = intval( $form['id'] );
+
+            $orgs = get_posts([
+                'post_type'      => 'organization',
+                'post_status'    => 'publish',
+                'posts_per_page' => -1,
+                'fields'         => 'ids',
+            ]);
+
+            foreach ( $orgs as $org_id ) {
+                if ( (int) get_field( 'registration_form', $org_id ) !== $form_id ) continue;
+                if ( get_field( 'show_onboarding_modal', $org_id ) ) break; // modal enabled — nothing to suppress
+
+                $email = '';
+                foreach ( $form['fields'] as $field ) {
+                    if ( $field->type === 'email' ) {
+                        $email = rgar( $entry, $field->id );
+                        break;
+                    }
+                }
+
+                if ( $email ) {
+                    set_transient( 'bys_suppress_modal_' . md5( strtolower( $email ) ), 1, HOUR_IN_SECONDS );
+                }
+                break;
+            }
+        }
+
+        public function add_registered_user_to_org( $user_id, $feed, $entry, $password ) {
+            $form_id = intval( rgar( $entry, 'form_id' ) );
+            if ( ! $form_id || ! $user_id ) return;
+
+            $orgs = get_posts([
+                'post_type'      => 'organization',
+                'post_status'    => 'publish',
+                'posts_per_page' => -1,
+                'fields'         => 'ids',
+            ]);
+
+            foreach ( $orgs as $org_id ) {
+                if ( (int) get_field( 'registration_form', $org_id ) !== $form_id ) continue;
+
+                $raw      = get_field( 'users', $org_id );
+                $existing = is_array( $raw ) ? array_map( 'intval', $raw ) : [];
+                if ( ! in_array( $user_id, $existing, true ) ) {
+                    $existing[] = $user_id;
+                    update_field( 'field_org_users', $existing, $org_id );
+                }
+
+                // Belt-and-suspenders: if the background process happens to finish
+                // before the first page render, ensure the modal won't auto-open.
+                if ( ! get_field( 'show_onboarding_modal', $org_id ) ) {
+                    update_user_meta( $user_id, 'bys_onboarding_seen', 1 );
+                }
+                break;
+            }
         }
 
         public function register_post_type() {
@@ -81,6 +150,17 @@ if (!class_exists('BYS_Groups_Organization')) {
                         'allow_null'    => 1,
                         'return_format' => 'object',
                         'role'          => [],
+                    ],
+                    [
+                        'key'           => 'field_org_users',
+                        'label'         => 'Users',
+                        'name'          => 'users',
+                        'type'          => 'user',
+                        'multiple'      => 1,
+                        'allow_null'    => 1,
+                        'return_format' => 'id',
+                        'role'          => [],
+                        'wrapper'       => ['width' => '50'],
                     ],
                     [
                         'key'           => 'field_org_groups',
@@ -218,6 +298,17 @@ if (!class_exists('BYS_Groups_Organization')) {
                         'default_value' => '',
                     ],
                     [
+                        'key'           => 'field_org_show_onboarding_modal',
+                        'label'         => 'Show Onboarding Modal',
+                        'name'          => 'show_onboarding_modal',
+                        'type'          => 'true_false',
+                        'default_value' => 1,
+                        'ui'            => 1,
+                        'ui_on_text'    => 'Yes',
+                        'ui_off_text'   => 'No',
+                        'wrapper'       => ['width' => '50'],
+                    ],
+                    [
                         'key'          => 'field_org_onboarding_form',
                         'label'        => 'Onboarding Form',
                         'name'         => 'onboarding_form',
@@ -230,6 +321,15 @@ if (!class_exists('BYS_Groups_Organization')) {
                         'return_format' => 'value',
                         'placeholder'  => 'Select a form',
                         'wrapper'      => ['width' => '50'],
+                        'conditional_logic' => [
+                            [
+                                [
+                                    'field'    => 'field_org_show_onboarding_modal',
+                                    'operator' => '==',
+                                    'value'    => '1',
+                                ],
+                            ],
+                        ],
                     ],
                     [
                         'key'          => 'field_org_registration_form',

@@ -177,6 +177,10 @@
   background: var(--wp--preset--color--orange-100);
   color: var(--wp--preset--color--orange-700);
 }
+.wp-block-bys-groups-group-communication-history-modal .comm-status-badge--comms-disabled {
+  background: var(--wp--preset--color--gray-100);
+  color: var(--wp--preset--color--gray-600);
+}
 .wp-block-bys-groups-group-communication-history-modal .show-more {
   display: block;
   width: 100%;
@@ -230,6 +234,10 @@
   white-space: pre-wrap;
   background: var(--wp--preset--color--gray-50);
   border-radius: 0.5rem;
+}
+.wp-block-bys-groups-group-communication-history-modal .comm-message-body table {
+  border-collapse: separate;
+  border-spacing: 0;
 }
 .wp-block-bys-groups-group-communication-history-modal .comm-message-body table * {
   border-style: none;
