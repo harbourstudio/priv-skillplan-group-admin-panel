@@ -50,6 +50,7 @@ if (!class_exists('BYS_Groups_Blocks')) {
             'lander-course-list',
             'lander-completion-alert',
             'skill-level-wrapper',
+            'user-group-list',
         ];
         
         public function __construct() {

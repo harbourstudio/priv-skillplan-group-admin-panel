@@ -1,1 +1,0 @@
-{"version":3,"file":"group-communication-prompts/index.css","mappings":";;;AACI;;EAEI;AAAR,C","sources":["webpack://bys-groups/./src/group-communication-prompts/editor.scss"],"sourcesContent":[".wp-block-bys-groups-group-communication-prompts {\n    .gcp__history,\n    .gcp__proceed {\n        pointer-events: none;\n    }\n}\n"],"names":[],"sourceRoot":""}

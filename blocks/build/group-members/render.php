@@ -54,6 +54,7 @@ $wrapper_attributes = get_block_wrapper_attributes();
                 <div class="gm__info">
                     <span class="gm__name"></span>
                     <span class="gm__email"></span>
+                    <span class="gm__enable-comms"><?php esc_html_e('Group communications: Off', 'bys'); ?></span>
                 </div>
                 <button class="gm__remove btn-unstyled" type="button" aria-label=""></button>
             </div>

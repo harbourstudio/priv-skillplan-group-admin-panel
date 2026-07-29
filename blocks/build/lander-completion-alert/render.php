@@ -28,14 +28,36 @@ $alert_text  = $all_complete ? $unlocked_text : $locked_text;
 $alert_state = $all_complete ? 'bys-lander-completion-alert--unlocked' : 'bys-lander-completion-alert--locked';
 $icon_class  = $all_complete ? 'fa-circle-check' : 'fa-lock';
 
+// ── Custom colours & icon visibility ────────────────────────────────────────
+$prefix    = $all_complete ? 'unlocked' : 'locked';
+$bg_color     = esc_attr( $attributes[ $prefix . 'BgColor'     ] ?? '' );
+$border_color = esc_attr( $attributes[ $prefix . 'BorderColor' ] ?? '' );
+$text_color   = esc_attr( $attributes[ $prefix . 'TextColor'   ] ?? '' );
+$icon_color   = esc_attr( $attributes[ $prefix . 'IconColor'   ] ?? '' );
+$btn_color    = esc_attr( $attributes[ $prefix . 'BtnColor'    ] ?? '' );
+$hide_icon    = ! empty( $attributes[ $prefix . 'HideIcon'     ] );
+
+$alert_style = implode( '', array_filter( [
+    $bg_color     ? "background-color:{$bg_color};"   : '',
+    $border_color ? "border-color:{$border_color};"   : '',
+    $text_color   ? "color:{$text_color};"             : '',
+] ) );
+$icon_style = $icon_color ? "color:{$icon_color};" : '';
+$btn_style  = $btn_color  ? "background-color:{$btn_color};border-color:{$btn_color};" : '';
+
 $wrapper_attributes = get_block_wrapper_attributes( [ 'class' => 'bys-lander-courses' ] );
 ?>
 
 <div <?php echo $wrapper_attributes; ?>>
-    <div class="bys-lander-completion-alert <?php echo esc_attr( $alert_state ); ?>">
+    <div class="bys-lander-completion-alert <?php echo esc_attr( $alert_state ); ?>"
+         <?php if ( $alert_style ) : ?>style="<?php echo $alert_style; ?>"<?php endif; ?>>
 
         <div class="bys-lander-completion-alert__body">
-            <i class="fa-solid <?php echo esc_attr( $icon_class ); ?> bys-lander-completion-alert__icon" aria-hidden="true"></i>
+            <?php if ( ! $hide_icon ) : ?>
+            <i class="fa-solid <?php echo esc_attr( $icon_class ); ?> bys-lander-completion-alert__icon"
+               aria-hidden="true"
+               <?php if ( $icon_style ) : ?>style="<?php echo $icon_style; ?>"<?php endif; ?>></i>
+            <?php endif; ?>
             <p class="bys-lander-completion-alert__message"><?php echo wp_kses_post( $alert_text ); ?></p>
         </div>
 
@@ -48,11 +70,14 @@ $wrapper_attributes = get_block_wrapper_attributes( [ 'class' => 'bys-lander-cou
                                 aria-haspopup="dialog"
                                 aria-expanded="false"
                                 aria-controls="<?php echo esc_attr( ltrim( $cta_url, '#' ) ); ?>"
-                                data-overlay="<?php echo esc_attr( $cta_url ); ?>">
+                                data-overlay="<?php echo esc_attr( $cta_url ); ?>"
+                                <?php if ( $btn_style ) : ?>style="<?php echo $btn_style; ?>"<?php endif; ?>>
                             <?php echo esc_html( $cta_label ); ?>
                         </button>
                     <?php elseif ( $cta_url ) : ?>
-                        <a href="<?php echo esc_url( $cta_url ); ?>" class="btn btn-primary bys-lander-completion-alert__btn">
+                        <a href="<?php echo esc_url( $cta_url ); ?>"
+                           class="btn btn-primary bys-lander-completion-alert__btn"
+                           <?php if ( $btn_style ) : ?>style="<?php echo $btn_style; ?>"<?php endif; ?>>
                             <?php echo esc_html( $cta_label ); ?>
                         </a>
                     <?php endif; ?>
@@ -60,7 +85,8 @@ $wrapper_attributes = get_block_wrapper_attributes( [ 'class' => 'bys-lander-cou
                     <button type="button"
                             class="btn btn-secondary bys-lander-completion-alert__btn bys-lander-completion-alert__btn--disabled"
                             disabled
-                            aria-disabled="true">
+                            aria-disabled="true"
+                            <?php if ( $btn_style ) : ?>style="<?php echo $btn_style; ?>"<?php endif; ?>>
                         <i class="fa-solid fa-lock fa-xs" aria-hidden="true"></i>
                         <?php echo esc_html( $cta_label ); ?>
                     </button>

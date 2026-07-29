@@ -25,23 +25,23 @@ $prompts = [
     ],
     [
         'type'        => 'course-progress',
-        'title'       => __('Course progress nudge', 'bys'),
-        'description' => __(" Send a reminder to inactive learners to access their courses.", 'bys' ),
+        'title'       => __('Course progress reminder', 'bys'),
+        'description' => __("Remind inactive learners to return to their courses and continue their progress.", 'bys' ),
     ],
     [
-        'type'        => 'assessment-deadline',
-        'title'       => __('Assessment deadline warning', 'bys'),
+        'type'        => 'assessment-reminder',
+        'title'       => __('Assessment reminder', 'bys'),
         'description' => __("Send a reminder to learners about an upcoming assessment.", 'bys'),
     ],
     [
         'type'        => 'welcome-reminder',
-        'title'       => __('Welcome/login reminder', 'bys'),
-        'description' => __('Send a welcome message with login information to new group members.', 'bys'),
+        'title'       => __('Welcome and login information', 'bys'),
+        'description' => __('Send new group members a welcome message with instructions for accessing their account.', 'bys'),
     ],
     [
         'type'        => 'custom',
         'title'       => __('Custom message', 'bys'),
-        'description' => __('Create and send a personalized message.', 'bys'),
+        'description' => __('Create and send a personalized message to selected learners.', 'bys'),
     ],
 ];
 ?>
@@ -52,7 +52,7 @@ $prompts = [
             <?php esc_html_e( 'Learner prompts', 'bys' ); ?>
         </h5>
         <p class="gcp__subtitle">
-            <?php esc_html_e( 'Ready-to-send learner engagement messages. Choose a template, select recipients, and send.', 'bys' ); ?>
+            <?php esc_html_e( 'Ready-to-send messages to engage learners. Choose a template, select recipients and send.', 'bys' ); ?>
         </p>
     </div>
 
