@@ -344,6 +344,17 @@
             white-space: wrap;
         }
 
+        &__pending-badge {
+            display: inline-block;
+            padding: var(--wp--preset--spacing--1) var(--wp--preset--spacing--2);
+            border-radius: 0.25rem;
+            background: var(--wp--preset--color--orange-100, #fff3e0);
+            color: var(--wp--preset--color--orange-700, #b45309);
+            font-size: var(--wp--preset--font-size--x-small);
+            vertical-align: middle;
+            margin-left: var(--wp--preset--spacing--2);
+        }
+
         // ── Schedule ──────────────────────────────────────────────────────────────
 
         &__form-schedule {

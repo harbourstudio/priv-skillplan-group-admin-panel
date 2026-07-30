@@ -33,8 +33,15 @@ if (!class_exists('BYS_Groups_Mailer')) {
             $recipient_ids = array(),
             $custom_message = '',
             $scheduled_at = '',
-            $condition = array()
+            $condition = array(),
+            $pending_user_ids = array()
         ) {
+
+            // if the caller sent pending-user ids alongside a prompt type that isn't included in the relevant prompts, silently wipes the pending-user list back to empty so those recipients get dropped from the send.
+            if (!empty($pending_user_ids)
+                && !in_array($prompt_type, BYS_Groups_Conditional_Emails::PENDING_USERS_PROMPTS, true)) {
+                $pending_user_ids = array();
+            }
             // Validate recipient type
             $valid_types = array('group', 'individual', 'condition');
             if (!in_array($recipient_type, $valid_types, true)) {
@@ -71,7 +78,7 @@ if (!class_exists('BYS_Groups_Mailer')) {
             $group_name = $group->post_title;
 
             // Resolve recipients with user data
-            $recipients_data = $this->get_recipients_with_names($group_id, $recipient_type, $recipient_ids);
+            $recipients_data = $this->get_recipients_with_names($group_id, $recipient_type, $recipient_ids, $pending_user_ids);
             if (empty($recipients_data)) {
                 return array(
                     'success' => false,
@@ -122,12 +129,14 @@ if (!class_exists('BYS_Groups_Mailer')) {
                 $recipient_email = $recipient['email'];
                 $recipient_name = $recipient['name'];
                 $recipient_uid  = isset($recipient['user_id']) ? (int) $recipient['user_id'] : 0;
+                $is_pending_user = !empty($recipient['is_pending_user']);
 
                 // Get email content. Non-custom promptTypes ignore custom_message;
                 // cta_url_override is used by templates with a dashboard CTA to
                 // deep-link to a specific course (see $cta_url_override above).
                 // unsubscribe_url is per-recipient — generated here so the token
-                // encodes THIS user's id.
+                // encodes THIS user's id. Pending users have no account, so
+                // no signed unsubscribe link is emitted for them.
                 $email = bys_get_comm_email($prompt_type, array(
                     'group_name'       => $group_name,
                     'recipient_name'   => $recipient_name,
@@ -136,7 +145,7 @@ if (!class_exists('BYS_Groups_Mailer')) {
                     'sender_email'     => $sender_email,
                     'custom_message'   => $custom_message,
                     'cta_url_override' => $cta_url_override,
-                    'unsubscribe_url'  => BYS_Groups_Signed_URL::build_unsubscribe_url($recipient_uid),
+                    'unsubscribe_url'  => $is_pending_user ? '' : BYS_Groups_Signed_URL::build_unsubscribe_url($recipient_uid),
                 ));
 
                 // Validate email template
@@ -377,7 +386,7 @@ if (!class_exists('BYS_Groups_Mailer')) {
          * @param array $recipient_ids User IDs for 'individual' type
          * @return array Array of arrays with 'email' and 'name' keys
          */
-        private function get_recipients_with_names($group_id, $recipient_type, $recipient_ids = array()) {
+        private function get_recipients_with_names($group_id, $recipient_type, $recipient_ids = array(), $pending_user_ids = array()) {
             $recipients = array();
 
             if (($recipient_type === 'individual' || $recipient_type === 'condition') && !empty($recipient_ids)) {
@@ -392,9 +401,16 @@ if (!class_exists('BYS_Groups_Mailer')) {
                         );
                     }
                 }
-            } else {
+            } elseif ($recipient_type === 'group') {
                 // All group members (for 'group' type)
                 $recipients = $this->get_group_users_with_names($group_id);
+            }
+
+            // If any pending-user ids came in, look them up (re-verifying group + status + role at the DB), and add the results to the recipients list.
+            if (!empty($pending_user_ids)) {
+                foreach (BYS_Groups_Conditional_Emails::fetch_pending_users($group_id, $pending_user_ids) as $pending_user) {
+                    $recipients[] = $pending_user;
+                }
             }
 
             // Remove duplicates by email
