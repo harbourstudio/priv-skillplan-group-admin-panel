@@ -16,6 +16,7 @@ if (!class_exists('BYS_Groups_Blocks')) {
             'group-add-member',
             'group-add-member-modal',
             'group-onboarding-modal',
+            'group-onboarding-trigger',
             'group-archive',
             'group-communication-history-modal',
             'group-communication-log',
