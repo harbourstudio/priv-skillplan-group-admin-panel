@@ -96,9 +96,12 @@
             flex-wrap: wrap;
             gap: var(--wp--preset--spacing--2);
             margin-bottom: var(--wp--preset--spacing--4);
-            position: absolute;
-            top: 0;
-            left: 0;
+
+            @media screen and (min-width: 992px){
+                position: absolute;
+                top: 0;
+                left: 0;
+            }
         }
 
         &__slide-nav-pill {

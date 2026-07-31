@@ -55,7 +55,6 @@
   white-space: nowrap;
 }
 .wp-block-bys-groups-lander-completion-alert .bys-lander-completion-alert__btn--disabled {
-  opacity: 0.5;
   cursor: not-allowed;
 }
 .wp-block-bys-groups-lander-completion-alert .bys-lander-completion-alert--unlocked .bys-lander-completion-alert__btn {
