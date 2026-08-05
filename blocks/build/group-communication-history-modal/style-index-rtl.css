@@ -231,9 +231,14 @@
   font-size: var(--wp--preset--font-size--small);
   color: var(--wp--preset--color--gray-700);
   line-height: 1.6;
-  white-space: pre-wrap;
   background: var(--wp--preset--color--gray-50);
   border-radius: 0.5rem;
+}
+.wp-block-bys-groups-group-communication-history-modal .comm-message-body--plain {
+  white-space: pre-wrap;
+}
+.wp-block-bys-groups-group-communication-history-modal .comm-message-body p {
+  margin: 1rem 0;
 }
 .wp-block-bys-groups-group-communication-history-modal .comm-message-body table {
   border-collapse: separate;

@@ -1,1 +1,26 @@
-.wp-block-bys-groups-user-tabs .user-tabs-editor-preview{display:flex;flex-wrap:wrap;gap:.375rem}.wp-block-bys-groups-user-tabs .user-tab-preview{align-items:center;background:#fff;border:1px solid var(--wp--preset--color--gray-200,#e5e7eb);border-radius:999px;color:var(--wp--preset--color--gray-600,#4b5563);display:inline-flex;font-size:var(--wp--preset--font-size--small);font-weight:500;padding:.25rem .875rem}.wp-block-bys-groups-user-tabs .user-tab-preview--active{background:var(--wp--preset--color--primary);border-color:var(--wp--preset--color--primary);color:#fff}
+/*!**********************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ./node_modules/css-loader/dist/cjs.js??ruleSet[1].rules[4].use[1]!./node_modules/postcss-loader/dist/cjs.js??ruleSet[1].rules[4].use[2]!./node_modules/@wordpress/scripts/node_modules/sass-loader/dist/cjs.js??ruleSet[1].rules[4].use[3]!./src/user-tabs/editor.scss ***!
+  \**********************************************************************************************************************************************************************************************************************************************************************************/
+.wp-block-bys-groups-user-tabs .user-tabs-editor-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+.wp-block-bys-groups-user-tabs .user-tab-preview {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.875rem;
+  border-radius: 999px;
+  font-size: var(--wp--preset--font-size--small);
+  font-weight: 500;
+  border: 1px solid var(--wp--preset--color--gray-200, #E5E7EB);
+  background: white;
+  color: var(--wp--preset--color--gray-600, #4B5563);
+}
+.wp-block-bys-groups-user-tabs .user-tab-preview--active {
+  background: var(--wp--preset--color--primary);
+  border-color: var(--wp--preset--color--primary);
+  color: white;
+}
+
+/*# sourceMappingURL=index.css.map*/

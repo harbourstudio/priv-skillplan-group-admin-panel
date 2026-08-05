@@ -1,0 +1,1 @@
+{"version":3,"file":"group-select/index.css","mappings":";;;AACI;EACI;AAAR,C","sources":["webpack://bys-groups/./src/group-select/editor.scss"],"sourcesContent":[".wp-block-bys-groups-group-select { \n    select{\n        background: white !important;\n    }\n}"],"names":[],"sourceRoot":""}

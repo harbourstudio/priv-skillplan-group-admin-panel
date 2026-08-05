@@ -416,6 +416,16 @@
   color: var(--wp--preset--color--gray-500);
   white-space: wrap;
 }
+.wp-block-bys-groups-group-communication-send-modal .gcsm__pending-badge {
+  display: inline-block;
+  padding: var(--wp--preset--spacing--1) var(--wp--preset--spacing--2);
+  border-radius: 0.25rem;
+  background: var(--wp--preset--color--orange-100, #fff3e0);
+  color: var(--wp--preset--color--orange-700, #b45309);
+  font-size: var(--wp--preset--font-size--x-small);
+  vertical-align: middle;
+  margin-right: var(--wp--preset--spacing--2);
+}
 .wp-block-bys-groups-group-communication-send-modal .gcsm__form-schedule {
   display: flex;
   align-items: center;
