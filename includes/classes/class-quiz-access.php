@@ -14,6 +14,7 @@ if (!class_exists('BYS_Groups_Quiz_Access')) {
     class BYS_Groups_Quiz_Access {
         const GROUP_QUIZ_ACCESS_META = '_bys_quiz_access';
         const GROUP_USER_QUIZ_ACCESS_META = '_bys_user_quiz_access_';
+        const USER_QUIZ_GRANTED_REPEATS_META = '_bys_quiz_granted_repeats_';
 
         public function __construct() {
             // apply the custom start/end date
@@ -395,6 +396,102 @@ if (!class_exists('BYS_Groups_Quiz_Access')) {
             }
 
             update_user_meta($user_id, self::GROUP_USER_QUIZ_ACCESS_META . $group_id, $access_dates);
+        }
+
+        /**
+         * Read the running total of additional repeats a leader has granted
+         * to this user for this quiz. Returns 0 when nothing has been granted.
+         */
+        public static function get_user_quiz_granted_repeats($user_id, $quiz_id) {
+            $value = get_user_meta((int) $user_id, self::USER_QUIZ_GRANTED_REPEATS_META . (int) $quiz_id, true);
+            return $value === '' ? 0 : max(0, (int) $value);
+        }
+
+        /**
+         * Persist the running total of additional repeats. Returns the
+         * previous value so callers can diff for email notifications. A
+         * count of 0 deletes the meta row so it doesn't linger.
+         */
+        public static function save_user_quiz_granted_repeats($user_id, $quiz_id, $count) {
+            $user_id  = (int) $user_id;
+            $quiz_id  = (int) $quiz_id;
+            $count    = max(0, (int) $count);
+            $previous = self::get_user_quiz_granted_repeats($user_id, $quiz_id);
+
+            $meta_key = self::USER_QUIZ_GRANTED_REPEATS_META . $quiz_id;
+            if ($count === 0) {
+                delete_user_meta($user_id, $meta_key);
+            } else {
+                update_user_meta($user_id, $meta_key, $count);
+            }
+
+            return $previous;
+        }
+
+        /**
+         * Snapshot of the user's LD quiz history + our per-user grant,
+         * shaped for the group-user-quiz-config block's info panel.
+         *
+         * `granted_repeats_remaining` is a display-side computation:
+         * grant total minus attempts already logged beyond the quiz's base
+         * allowance. Lets the leader see what's actually still available to
+         * the learner.
+         */
+        public static function get_user_quiz_attempts_summary($user_id, $quiz_id) {
+            $user_id = (int) $user_id;
+            $quiz_id = (int) $quiz_id;
+
+            $total_attempts   = 0;
+            $last_attempt_utc = '';
+
+            if (function_exists('learndash_get_user_quiz_attempt')) {
+                $attempts = learndash_get_user_quiz_attempt($user_id, ['quiz' => $quiz_id]);
+                if (is_array($attempts)) {
+                    $total_attempts = count($attempts);
+
+                    $latest_ts = 0;
+                    foreach ($attempts as $attempt) {
+                        $ts = 0;
+                        if (isset($attempt['time'])) {
+                            $ts = (int) $attempt['time'];
+                        } elseif (isset($attempt['completed'])) {
+                            $ts = (int) $attempt['completed'];
+                        }
+                        if ($ts > $latest_ts) {
+                            $latest_ts = $ts;
+                        }
+                    }
+
+                    if ($latest_ts > 0) {
+                        // LD attempt timestamps are Unix (UTC).
+                        $last_attempt_utc = gmdate('c', $latest_ts);
+                    }
+                }
+            }
+
+            $quiz_meta      = get_post_meta($quiz_id, '_sfwd-quiz', true);
+            $global_repeats = is_array($quiz_meta) && isset($quiz_meta['sfwd-quiz_repeats'])
+                ? (int) $quiz_meta['sfwd-quiz_repeats']
+                : 0;
+            $repeats_unlimited = $global_repeats <= 0;
+
+            $granted_repeats = self::get_user_quiz_granted_repeats($user_id, $quiz_id);
+
+            // Grants are consumed once the learner takes attempts beyond
+            // the quiz's base allowance. Unlimited quizzes never consume.
+            $consumed_grants = $repeats_unlimited
+                ? 0
+                : max(0, $total_attempts - $global_repeats);
+            $granted_remaining = max(0, $granted_repeats - $consumed_grants);
+
+            return [
+                'total_attempts'            => $total_attempts,
+                'last_attempt_utc'          => $last_attempt_utc,
+                'granted_repeats'           => $granted_repeats,
+                'granted_repeats_remaining' => $granted_remaining,
+                'global_repeats'            => $global_repeats,
+                'repeats_unlimited'         => $repeats_unlimited,
+            ];
         }
     }
 }
