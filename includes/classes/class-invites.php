@@ -13,8 +13,36 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 if ( ! class_exists( 'BYS_Groups_Invites' ) ) {
     class BYS_Groups_Invites {
 
+        /**
+         * Groups this request has already assigned as leader, keyed by user_id.
+         * Populated by handle_registration, drained by reapply_leader_assignments.
+         * Kept in-memory so the reapply step needs no extra DB query.
+         *
+         * @var array<int, int[]>
+         */
+        private $pending_leader_reapply = array();
+
         public function __construct() {
             add_action( 'user_register', array( $this, 'handle_registration' ), 10, 1 );
+            // GF User Registration calls wp_update_user() inside its create_user()
+            // AFTER user_register fires, which invokes set_role() and wipes any addiitonal role assigned 
+            // (and leaves the leader user_meta in an inconsistent state). gform_user_registered fires
+            // after GF is done mutating the user, so rehydrate the leader role + meta here
+            add_action('gform_user_registered', array($this, 'reapply_leader_assignments'), 20, 1);
+        }
+
+        /**
+         * Reapplies leader-role + meta for groups this request already
+         * assigned via handle_registration. Runs after GF's wp_update_user in
+         * the same request; no-op if queue is empty.
+         */
+        public function reapply_leader_assignments(int $user_id): void {
+            if (empty($this->pending_leader_reapply[$user_id])) return;
+
+            foreach ($this->pending_leader_reapply[$user_id] as $gid) {
+                self::add_to_group( $user_id, $gid, 'leader', true );
+            }
+            unset($this->pending_leader_reapply[$user_id]);
         }
 
         /**
@@ -39,7 +67,13 @@ if ( ! class_exists( 'BYS_Groups_Invites' ) ) {
                 $group_id = intval( $invite->group_id );
                 $role     = $invite->role;
 
-                self::add_to_group( $user_id, $group_id, $role );
+                // Fresh-registration context: for leader invites, swap the GF-assigned role 
+                // from the User Registration feed with group_leader
+                self::add_to_group($user_id, $group_id, $role, $role === 'leader');
+
+                if ($role === 'leader') {
+                    $this->pending_leader_reapply[$user_id][] = $group_id;
+                }
 
                 $wpdb->update(
                     $table,
@@ -57,20 +91,35 @@ if ( ! class_exists( 'BYS_Groups_Invites' ) ) {
 
         /**
          * Add a user to a LearnDash group with the given role.
-         * role = 'learner' → standard group-member enrollment only
-         * role = 'leader'  → group-leader assignment only
+         *
+         * $replace_role only applies to the leader path:
+         * false (default): add group_leader alongside the user's existing roles.
+         * true: swap the user's roles for group_leader role only.
          */
-        public static function add_to_group( int $user_id, int $group_id, string $role = 'learner' ): void {
-            if ( $role === 'leader' ) {
-                $leaders   = (array) get_post_meta( $group_id, 'learndash_group_leaders', true );
-                $leaders[] = $user_id;
-                update_post_meta( $group_id, 'learndash_group_leaders', array_unique( $leaders ) );
-                update_user_meta( $user_id, "learndash_group_leaders_{$group_id}", $group_id );
+        public static function add_to_group(int $user_id, int $group_id, string $role = 'learner', bool $replace_role = false): void {
+            if ($role === 'leader') {
+                // LD's programmatic API only writes the learndash_group_leaders_{group_id}
+                // user_meta and fires an action. In particular it does NOT
+                // assign the WP group_leader role, which LD's own leader-detection
+                // (learndash_is_group_leader_user → user_can) requires.
+                if (function_exists('ld_update_leader_group_access')) {
+                    ld_update_leader_group_access($user_id, $group_id, false);
+                }
+                $user = new \WP_User($user_id);
+                if (!$user->exists()) return;
+
+                if ($replace_role) {
+                    if(array('group_leader') !== (array) $user->roles) {
+                        $user->set_role('group_leader');
+                    }
+                } elseif (!in_array('group_leader', (array) $user->roles, true)) {
+                    $user->add_role('group_leader');
+                }
                 return;
             }
 
             // Default: learner / group-member enrollment.
-            ld_update_group_access( $user_id, $group_id, false );
+            ld_update_group_access($user_id, $group_id, false);
         }
 
         /**

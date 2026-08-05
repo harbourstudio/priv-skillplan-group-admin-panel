@@ -38,10 +38,9 @@ jQuery(document).ready(function($) {
     let currentPromptType = null;
     let currentGroupId = null;
     let isSubmitting = false;
-    let conditionRecipients = [];
+    let conditionRecipients = { userIds: [], pendingUserIds: [] };
     let coursesLoaded = false;
     let resolveTimer = null;
-
 
     // Per-condition required-input map. Drives both UI toggles and validation.
     const CONDITION_INPUTS = {
@@ -186,7 +185,7 @@ jQuery(document).ready(function($) {
     // error — that is owned solely by validateDaysInput() so an invalid entry
     // persists its error message until the user fixes or clears the field.
     function resetConditionState() {
-        conditionRecipients = [];
+        conditionRecipients = { userIds: [], pendingUserIds: [] };
         $conditionalRecipientsList.empty();
         $conditionalRecipientsTable.hide();
         $conditionalRecipientsSkeleton.hide();
@@ -363,10 +362,14 @@ jQuery(document).ready(function($) {
 
         try {
             const url = endpoints.conditionalRecipients(currentGroupId);
-            const response = await api.post(url, payload);
+            // Pass prompt_type so the backend can decide whether to append pending users to the recipient list
+            const response = await api.post(url, { ...payload, prompt_type: currentPromptType });
 
             const recipients = (response && Array.isArray(response.recipients)) ? response.recipients : [];
-            conditionRecipients = recipients.map(r => r.user_id);
+            conditionRecipients = {
+                userIds:        recipients.filter(r => !r.is_pending_user).map(r => r.user_id),
+                pendingUserIds: recipients.filter(r =>  r.is_pending_user).map(r => r.pending_user_id),
+            };
 
             if (recipients.length === 0) {
                 $conditionalRecipientsTable.hide();
@@ -384,7 +387,11 @@ jQuery(document).ready(function($) {
                 const $row = $(rowTpl.content.firstElementChild.cloneNode(true));
                 $row.find('[data-field="name"]').text(r.display_name);
                 $row.find('[data-field="email"]').text(r.email);
-                $row.find('[data-field="user-id"]').text(r.user_id);
+                $row.find('[data-field="user-id"]').text(r.is_pending_user ? '—' : r.user_id);
+
+                if (r.is_pending_user) {
+                    $row.find('[data-field="name"]').append('<span class="gcsm__pending-badge">Pending</span>');
+                }
 
                 const $detailsLine = $row.find('[data-field="details"] .gcsm__details-line');
                 $detailsLine.text(formatDetails(r.details));
@@ -397,7 +404,7 @@ jQuery(document).ready(function($) {
             console.error('[send-modal] Failed to resolve conditional recipients:', err);
             $conditionalRecipientsTable.hide();
             $conditionalRecipientsEmpty.text('Error loading recipients.').show();
-            conditionRecipients = [];
+            conditionRecipients = { userIds: [], pendingUserIds: [] };
         } finally {
             $conditionalRecipientsSkeleton.hide();
         }
@@ -730,6 +737,7 @@ jQuery(document).ready(function($) {
 
             // Get selected recipient IDs for individual type
             let recipientIds = [];
+            let pendingUserIds = [];
             let conditionPayload = null;
             if (recipientType === 'individual') {
                 recipientIds = $modal
@@ -738,13 +746,15 @@ jQuery(document).ready(function($) {
                     .get();
             } else if (recipientType === 'condition') {
                 const built = buildConditionPayload();
-                if (!built || conditionRecipients.length === 0) {
+                const totalMatches = conditionRecipients.userIds.length + conditionRecipients.pendingUserIds.length;
+                if (!built || totalMatches === 0) {
                     showFeedback('Please pick a condition with matching recipients.', 'error');
                     isSubmitting = false;
                     $submitBtn.prop('disabled', false).text('Send Prompt');
                     return;
                 }
-                recipientIds = conditionRecipients.slice();
+                recipientIds   = conditionRecipients.userIds.slice();
+                pendingUserIds = conditionRecipients.pendingUserIds.slice();
                 conditionPayload = {
                     type:      built.condition,
                     days:      built.days ?? 0,
@@ -763,6 +773,7 @@ jQuery(document).ready(function($) {
                 prompt_type: currentPromptType,
                 recipient_type: recipientType,
                 recipient_ids: recipientIds,
+                pending_user_ids: pendingUserIds,
                 custom_message: customMessage,
                 scheduled_at: scheduledAt,
             };

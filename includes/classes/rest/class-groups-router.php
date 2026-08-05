@@ -1998,22 +1998,26 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             $body = $request->get_json_params();
             if (empty($body) || !is_array($body)) {
                 $body = [
-                    'prompt_type'    => $request->get_param('prompt_type'),
-                    'recipient_type' => $request->get_param('recipient_type'),
-                    'recipient_ids'  => $request->get_param('recipient_ids'),
-                    'custom_message' => $request->get_param('custom_message'),
-                    'scheduled_at'   => $request->get_param('scheduled_at'),
-                    'condition'      => $request->get_param('condition'),
+                    'prompt_type'      => $request->get_param('prompt_type'),
+                    'recipient_type'   => $request->get_param('recipient_type'),
+                    'recipient_ids'    => $request->get_param('recipient_ids'),
+                    'pending_user_ids' => $request->get_param('pending_user_ids'),
+                    'custom_message'   => $request->get_param('custom_message'),
+                    'scheduled_at'     => $request->get_param('scheduled_at'),
+                    'condition'        => $request->get_param('condition'),
                 ];
             }
 
-            $prompt_type    = sanitize_text_field($body['prompt_type'] ?? '');
-            $recipient_type = sanitize_text_field($body['recipient_type'] ?? '');
-            $recipient_ids  = isset($body['recipient_ids']) && is_array($body['recipient_ids'])
-                                ? array_map('intval', $body['recipient_ids'])
-                                : [];
-            $custom_message = wp_kses_post($body['custom_message'] ?? '');
-            $scheduled_at   = sanitize_text_field($body['scheduled_at'] ?? '');
+            $prompt_type      = sanitize_text_field($body['prompt_type'] ?? '');
+            $recipient_type   = sanitize_text_field($body['recipient_type'] ?? '');
+            $recipient_ids    = isset($body['recipient_ids']) && is_array($body['recipient_ids'])
+                                    ? array_map('intval', $body['recipient_ids'])
+                                    : [];
+            $pending_user_ids = isset($body['pending_user_ids']) && is_array($body['pending_user_ids'])
+                                    ? array_values(array_filter(array_map('intval', $body['pending_user_ids'])))
+                                    : [];
+            $custom_message   = wp_kses_post($body['custom_message'] ?? '');
+            $scheduled_at     = sanitize_text_field($body['scheduled_at'] ?? '');
 
             $condition = [];
             if ($recipient_type === 'condition' && isset($body['condition']) && is_array($body['condition'])) {
@@ -2034,9 +2038,11 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 return new WP_Error('bad_request', 'Custom prompts require message', ['status' => 400]);
             }
 
-            // Conditional sends must include resolved recipients + a condition type
+            // Conditional sends must include resolved recipients + condition type
+            // Recipients may be WP users or pending users
+            // pending users only appear for outstanding_login on eligible prompts (see PENDING_USERS_PROMPTS)
             if ($recipient_type === 'condition') {
-                if (empty($recipient_ids)) {
+                if (empty($recipient_ids) && empty($pending_user_ids)) {
                     return new WP_Error('bad_request', 'Conditional send requires resolved recipients', ['status' => 400]);
                 }
                 if (empty($condition['type'])) {
@@ -2054,7 +2060,8 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 $recipient_ids,
                 $custom_message,
                 $scheduled_at,
-                $condition
+                $condition,
+                $pending_user_ids
             );
 
             if (!empty($result['success'])) {

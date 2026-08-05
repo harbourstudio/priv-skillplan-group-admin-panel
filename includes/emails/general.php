@@ -390,7 +390,7 @@ function bys_get_custom_email(string $group_name, string $custom_message, string
 									<?php echo esc_html($group_name); ?> has sent you the following message:
 								</h1>
 								<div class="bys-body" style="margin:0;font-size:17px;color:#4F5C6F;line-height:1.6;">
-									<?php echo wp_kses_post($custom_message); ?>
+									<?php echo wp_kses_post(wpautop($custom_message)); ?>
 								</div>
 							</td>
 						</tr>

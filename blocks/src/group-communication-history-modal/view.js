@@ -272,7 +272,10 @@ jQuery(document).ready(($) => {
         const $badge = $screen3.find('.comm-status-badge');
         $badge.removeClass().addClass(`comm-status-badge ${statusClass}`).text(statusLabel);
 
-        // Render email body (prefer HTML, fallback to text)
+        // Render email body (prefer HTML, fallback to text). Toggle the
+        // `--plain` modifier so `white-space: pre-wrap` only applies on the
+        // text fallback — with HTML, pre-wrap doubles up on wpautop's
+        // `<br />\n` output and creates extra visual line breaks.
         const $body = $screen3.find('.comm-message-body');
         if (detail.body_html) {
             const bodyHtml = detail.body_html
@@ -280,9 +283,9 @@ jQuery(document).ready(($) => {
                 .replace(/>\s+</g, '><')
                 .replace(/\s\s+/g, ' ')
                 .trim();
-            $body.html(bodyHtml);
+            $body.removeClass('comm-message-body--plain').html(bodyHtml);
         } else {
-            $body.text(detail.body_text || '(No content)');
+            $body.addClass('comm-message-body--plain').text(detail.body_text || '(No content)');
         }
     }
 
