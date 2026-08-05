@@ -947,8 +947,6 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             }
 
             // 4. Batch-resolve which attempts contain ungraded questions.
-            // Build statistic_ref_id → activity_id, then a single JOIN tells us
-            // which refs include any essay/assessment/unscored-free_answer row.
             $ref_to_activity = [];
             foreach ($meta_map as $aid => $m) {
                 if (!empty($m['statistic_ref_id'])) {
@@ -956,32 +954,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 }
             }
 
-            $ungraded_activity_ids = [];
-            if (!empty($ref_to_activity)) {
-                $stat_table     = LDLMS_DB::get_table_name('quiz_statistic');
-                $question_table = LDLMS_DB::get_table_name('quiz_question');
-
-                if ($stat_table && $question_table) {
-                    $ref_placeholders = implode(',', array_fill(0, count($ref_to_activity), '%d'));
-                    $ungraded_refs    = $wpdb->get_col($wpdb->prepare(
-                        "SELECT DISTINCT s.statistic_ref_id
-                         FROM {$stat_table} s
-                         INNER JOIN {$question_table} q ON q.id = s.question_id
-                         WHERE s.statistic_ref_id IN ({$ref_placeholders})
-                           AND (
-                               q.answer_type = 'essay'
-                               OR q.answer_type = 'assessment_answer'
-                               OR (q.answer_type = 'free_answer' AND s.correct_count = 0 AND s.incorrect_count = 0)
-                           )",
-                        ...array_keys($ref_to_activity)
-                    ));
-
-                    foreach ($ungraded_refs as $ref_id) {
-                        $aid = $ref_to_activity[intval($ref_id)] ?? null;
-                        if ($aid) $ungraded_activity_ids[] = $aid;
-                    }
-                }
-            }
+            $ungraded_activity_ids = BYS_Groups_Quiz_Grading::activities_with_ungraded_questions($ref_to_activity);
 
             // 5. Stitch everything into the response shape
             $result = [];
@@ -1057,10 +1030,8 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             }
 
             global $wpdb;
-            $ld_table       = $wpdb->prefix . 'learndash_user_activity';
-            $meta_table     = $wpdb->prefix . 'learndash_user_activity_meta';
-            $stat_table     = LDLMS_DB::get_table_name('quiz_statistic');
-            $question_table = LDLMS_DB::get_table_name('quiz_question');
+            $ld_table   = $wpdb->prefix . 'learndash_user_activity';
+            $meta_table = $wpdb->prefix . 'learndash_user_activity_meta';
 
             $user_placeholders = implode(',', array_fill(0, count($user_ids), '%d'));
             $quiz_placeholders = implode(',', array_fill(0, count($quiz_ids), '%d'));
@@ -1092,38 +1063,58 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             }
 
             // ── Per-quiz ungraded count ──
-            // One JOIN across activity → meta(statistic_ref_id) → quiz_statistic → quiz_question
-            // counts distinct attempts that contain at least one essay / assessment /
-            // unscored free_answer question. Single query for all requested quizzes.
-            if ($stat_table && $question_table) {
-                $ungraded_rows = $wpdb->get_results($wpdb->prepare(
-                    "SELECT a.post_id AS quiz_id,
-                            COUNT(DISTINCT a.activity_id) AS ungraded_count
-                     FROM {$ld_table} a
-                     INNER JOIN {$meta_table} m
-                         ON m.activity_id = a.activity_id
-                         AND m.activity_meta_key = 'statistic_ref_id'
-                     INNER JOIN {$stat_table} s
-                         ON s.statistic_ref_id = CAST(m.activity_meta_value AS UNSIGNED)
-                     INNER JOIN {$question_table} q
-                         ON q.id = s.question_id
-                     WHERE a.activity_type = 'quiz'
-                       AND a.user_id IN ({$user_placeholders})
-                       AND a.post_id IN ({$quiz_placeholders})
-                       AND (
-                           q.answer_type = 'essay'
-                           OR q.answer_type = 'assessment_answer'
-                           OR (q.answer_type = 'free_answer' AND s.correct_count = 0 AND s.incorrect_count = 0)
-                       )
-                     GROUP BY a.post_id",
-                    ...array_merge($user_ids, $quiz_ids)
-                ), ARRAY_A);
+            //
+            // For each quiz in scope, figure out how many of its attempts still have
+            // at least one question awaiting manual grading.
+            //
+            // Defers the "is this ungraded?" decision to BYS_Groups_Quiz_Grading (see class for details).
+            //
+            // That helper takes a statistic_ref_id => activity_id map as input
+            // (statistic_ref_id is LD's internal link from an attempt to its per-question rows).
+            // It uses the ref ids to run its own queries and returns the subset
+            // of activity_ids whose attempts are still ungraded. Two lookup maps needed:
+            //
+            //  ref_to_activity: statistic_ref_id => activity_id
+            //  — fed IN to the helper
+            //  activity_to_quiz: activity_id  => quiz_id
+            //  — used to attribute the helper's output back to the correct quiz for counting
 
-                foreach ($ungraded_rows as $row) {
-                    $qid = intval($row['quiz_id']);
-                    if (isset($stats_map[$qid])) {
-                        $stats_map[$qid]['ungraded_count'] = intval($row['ungraded_count']);
-                    }
+            // Fetch (activity_id, quiz_id, statistic_ref_id) for every attempt in scope
+            $attempt_rows = $wpdb->get_results($wpdb->prepare(
+                "SELECT a.activity_id, a.post_id AS quiz_id, m.activity_meta_value AS statistic_ref_id
+                 FROM {$ld_table} a
+                 INNER JOIN {$meta_table} m
+                     ON m.activity_id = a.activity_id
+                     AND m.activity_meta_key = 'statistic_ref_id'
+                 WHERE a.activity_type = 'quiz'
+                   AND a.user_id IN ({$user_placeholders})
+                   AND a.post_id IN ({$quiz_placeholders})",
+                ...array_merge($user_ids, $quiz_ids)
+            ), ARRAY_A);
+
+            // Build the two maps in one pass over the rows.
+            $ref_to_activity  = [];
+            $activity_to_quiz = [];
+            foreach ($attempt_rows as $row) {
+                $ref = intval($row['statistic_ref_id']);
+                $aid = intval($row['activity_id']);
+
+                // Skip old attempts (from before WpProQuiz integration) that don't have a statistic_ref_id
+                if (!$ref || !$aid) continue;
+
+                $ref_to_activity[$ref]  = $aid;
+                $activity_to_quiz[$aid] = intval($row['quiz_id']);
+            }
+
+            // Ask the helper which of these attempts are still ungraded
+            $ungraded_activity_ids = BYS_Groups_Quiz_Grading::activities_with_ungraded_questions($ref_to_activity);
+
+            // Convert the flat list of ungraded activity_ids back into
+            // per-quiz counts using the second map.
+            foreach ($ungraded_activity_ids as $aid) {
+                $qid = $activity_to_quiz[$aid] ?? 0;
+                if ($qid && isset($stats_map[$qid])) {
+                    $stats_map[$qid]['ungraded_count']++;
                 }
             }
 

@@ -28,6 +28,7 @@ if (!class_exists('BYS_Groups_Core')) {
             // Utilities (load first — referenced by routers and feature classes)
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/utils/class-permissions.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/utils/class-postmark.php';
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/utils/class-quiz-grading.php';
 
             // REST routers
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/rest/class-webhooks-router.php';
