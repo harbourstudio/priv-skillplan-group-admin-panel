@@ -203,6 +203,11 @@
             background: var(--wp--preset--color--orange-100);
             color: var(--wp--preset--color--orange-700);
         }
+
+        &--comms-disabled {
+            background: var(--wp--preset--color--gray-100);
+            color: var(--wp--preset--color--gray-600);
+        }
     }
 
     // ── Show more ─────────────────────────────────────────────────────────
@@ -263,9 +268,21 @@
         font-size: var(--wp--preset--font-size--small);
         color: var(--wp--preset--color--gray-700);
         line-height: 1.6;
-        white-space: pre-wrap;
         background: var(--wp--preset--color--gray-50);
         border-radius: 0.5rem;
+
+        &--plain {
+            white-space: pre-wrap;
+        }
+
+        p {
+            margin: 1rem 0;
+        }
+
+        table {
+            border-collapse: separate;
+            border-spacing: 0;
+        }
 
         table * {
             border-style: none;

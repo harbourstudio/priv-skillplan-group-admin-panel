@@ -1,1 +1,26 @@
-.wp-block-bys-groups-group-quiz-config .quiz-config-attempts,.wp-block-bys-groups-group-quiz-config .quiz-config__datetime{pointer-events:none}.wp-block-bys-groups-group-quiz-config .quiz-config-date-field--attempts{cursor:default}.wp-block-bys-groups-group-quiz-config .quiz-config-attempts{-moz-appearance:textfield;background:transparent;border:none;flex:1;font-size:inherit;outline:none}.wp-block-bys-groups-group-quiz-config .quiz-config-attempts::-webkit-inner-spin-button,.wp-block-bys-groups-group-quiz-config .quiz-config-attempts::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}.wp-block-bys-groups-group-quiz-config .quiz-config__badge{cursor:default;pointer-events:none}
+/*!******************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ./node_modules/css-loader/dist/cjs.js??ruleSet[1].rules[4].use[1]!./node_modules/postcss-loader/dist/cjs.js??ruleSet[1].rules[4].use[2]!./node_modules/@wordpress/scripts/node_modules/sass-loader/dist/cjs.js??ruleSet[1].rules[4].use[3]!./src/group-quiz-config/editor.scss ***!
+  \******************************************************************************************************************************************************************************************************************************************************************************************/
+.wp-block-bys-groups-group-quiz-config .quiz-config__datetime,
+.wp-block-bys-groups-group-quiz-config .quiz-config-attempts {
+  pointer-events: none;
+}
+.wp-block-bys-groups-group-quiz-config .quiz-config-date-field--attempts {
+  cursor: default;
+}
+.wp-block-bys-groups-group-quiz-config .quiz-config-attempts {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: inherit;
+  outline: none;
+  -moz-appearance: textfield;
+}
+.wp-block-bys-groups-group-quiz-config .quiz-config-attempts::-webkit-outer-spin-button, .wp-block-bys-groups-group-quiz-config .quiz-config-attempts::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.wp-block-bys-groups-group-quiz-config .quiz-config__badge {
+  pointer-events: none;
+  cursor: default;
+}

@@ -61,14 +61,13 @@
     .bys-lander-completion-alert__btn {
         white-space: nowrap;
 
-        .bys-lander-completion-alert--unlocked & {
-            background-color: var(--wp--preset--color--green-500) !important;
-            border-color: var(--wp--preset--color--green-500) !important;
-        }
-
         &--disabled {
-            opacity: 0.5;
             cursor: not-allowed;
         }
+    }
+
+    .bys-lander-completion-alert--unlocked .bys-lander-completion-alert__btn{
+        background-color: var(--wp--preset--color--green-500);
+        border-color: var(--wp--preset--color--green-500);
     }
 }

@@ -29,6 +29,7 @@ if (!class_exists('BYS_Groups_Core')) {
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/utils/class-permissions.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/utils/class-postmark.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/utils/class-quiz-grading.php';
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/utils/class-signed-url.php';
 
             // REST routers
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/rest/class-webhooks-router.php';
@@ -38,6 +39,7 @@ if (!class_exists('BYS_Groups_Core')) {
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/rest/class-communications-router.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/rest/class-courses-router.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/rest/class-groups-router.php';
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/rest/class-comms-preferences-router.php';
 
             // Core classes
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-activator.php';
@@ -53,6 +55,7 @@ if (!class_exists('BYS_Groups_Core')) {
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-scheduled-emails.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-conditional-emails.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-lander-block-helpers.php';
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-user-comms-preferences.php';
         }
 
         public function init() {
@@ -79,6 +82,7 @@ if (!class_exists('BYS_Groups_Core')) {
             new BYS_Groups_Invites();
             new BYS_Groups_Quiz_Access();
             new BYS_Groups_Scheduled_Emails();
+            new BYS_Groups_User_Comms_Preferences();
 
             // REST routers
             new BYS_Groups_Webhooks_Router();
@@ -88,6 +92,7 @@ if (!class_exists('BYS_Groups_Core')) {
             new BYS_Groups_Communications_Router();
             new BYS_Groups_Courses_Router();
             new BYS_Groups_Groups_Router();
+            new BYS_Groups_Comms_Preferences_Router();
 
             // Flush rewrite rules once after activation so new CPTs are reachable.
             if (get_option('bys_flush_rewrite_rules')) {

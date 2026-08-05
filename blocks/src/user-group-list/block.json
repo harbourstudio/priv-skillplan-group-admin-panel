@@ -1,0 +1,29 @@
+{
+    "$schema": "https://schemas.wp.org/trunk/block.json",
+    "apiVersion": 3,
+    "name": "bys-groups/user-group-list",
+    "version": "0.1.0",
+    "title": "BYS - User Group List",
+    "category": "custom-blocks",
+    "icon": "groups",
+    "description": "Lists the LearnDash groups a user is enrolled in, grouped by organization. Intended for account settings pages.",
+    "textdomain": "bys",
+    "supports": {
+        "anchor": true,
+        "html": false,
+        "spacing": {
+            "margin": true
+        }
+    },
+    "keywords": [ "group", "user", "account", "learndash", "membership" ],
+    "attributes": {
+        "blockId": {
+            "type": "string",
+            "default": ""
+        }
+    },
+    "editorScript": "file:./index.js",
+    "render": "file:./render.php",
+    "style": "file:./style-index.css",
+    "viewScript": "file:./view.js"
+}

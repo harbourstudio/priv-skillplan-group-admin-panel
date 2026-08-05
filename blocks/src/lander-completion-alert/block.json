@@ -36,7 +36,19 @@
 		"ctaOpenModal": {
 			"type": "boolean",
 			"default": false
-		}
+		},
+		"lockedBgColor":       { "type": "string",  "default": "" },
+		"lockedBorderColor":   { "type": "string",  "default": "" },
+		"lockedTextColor":     { "type": "string",  "default": "" },
+		"lockedIconColor":     { "type": "string",  "default": "" },
+		"lockedBtnColor":      { "type": "string",  "default": "" },
+		"lockedHideIcon":      { "type": "boolean", "default": false },
+		"unlockedBgColor":     { "type": "string",  "default": "" },
+		"unlockedBorderColor": { "type": "string",  "default": "" },
+		"unlockedTextColor":   { "type": "string",  "default": "" },
+		"unlockedIconColor":   { "type": "string",  "default": "" },
+		"unlockedBtnColor":    { "type": "string",  "default": "" },
+		"unlockedHideIcon":    { "type": "boolean", "default": false }
 	},
 	"editorScript": "file:./index.js",
 	"render": "file:./render.php",

@@ -15,9 +15,14 @@ if (!class_exists('BYS_Groups_Conditional_Emails')) {
     class BYS_Groups_Conditional_Emails {
 
         /**
+         * Prompt types relevant to pending users.
+         */
+        const PENDING_USERS_PROMPTS = ['custom', 'welcome-reminder'];
+
+        /**
          * REST entry point.
          * POST /bys-groups/v1/groups/{group_id}/conditional-recipients
-         * Body: { condition, days?, course_id?, quiz_id? }
+         * Body: { condition, days?, course_id?, quiz_id?, prompt_type? }
          */
         public static function rest_get_recipients($request) {
             $group_id = intval($request['group_id']);
@@ -33,18 +38,21 @@ if (!class_exists('BYS_Groups_Conditional_Emails')) {
             $body = $request->get_json_params();
             if (empty($body) || !is_array($body)) {
                 $body = array(
-                    'condition' => $request->get_param('condition'),
-                    'days'      => $request->get_param('days'),
-                    'course_id' => $request->get_param('course_id'),
-                    'quiz_id'   => $request->get_param('quiz_id'),
+                    'condition'   => $request->get_param('condition'),
+                    'days'        => $request->get_param('days'),
+                    'course_id'   => $request->get_param('course_id'),
+                    'quiz_id'     => $request->get_param('quiz_id'),
+                    'prompt_type' => $request->get_param('prompt_type'),
                 );
             }
 
-            $condition = sanitize_key($body['condition'] ?? '');
+            $condition   = sanitize_key($body['condition'] ?? '');
+            $prompt_type = sanitize_key($body['prompt_type'] ?? '');
             $args = array(
-                'days'      => intval($body['days'] ?? 0),
-                'course_id' => intval($body['course_id'] ?? 0),
-                'quiz_id'   => intval($body['quiz_id'] ?? 0),
+                'days'        => intval($body['days'] ?? 0),
+                'course_id'   => intval($body['course_id'] ?? 0),
+                'quiz_id'     => intval($body['quiz_id'] ?? 0),
+                'prompt_type' => $prompt_type,
             );
 
             $valid = self::validate_condition_args($condition, $args);
@@ -130,11 +138,19 @@ if (!class_exists('BYS_Groups_Conditional_Emails')) {
         /**
          * Public dispatch — resolve matching users for the given condition.
          *
-         * @return array Array of [{ user_id, display_name, email }]
+         * @return array
          */
         public static function resolve_recipients($group_id, $condition, $args = array()) {
             $user_ids = self::get_group_user_ids($group_id);
-            if (empty($user_ids)) {
+
+            $prompt_type = isset($args['prompt_type']) ? (string) $args['prompt_type'] : '';
+
+            $include_pending_users = ($condition === 'outstanding_login')
+                && in_array($prompt_type, self::PENDING_USERS_PROMPTS, true);
+
+            // Bail early only when there is nothing to resolve at all — no WP
+            // members AND no pending users to append.
+            if (empty($user_ids) && !$include_pending_users) {
                 return array();
             }
 
@@ -167,7 +183,85 @@ if (!class_exists('BYS_Groups_Conditional_Emails')) {
                     return array();
             }
 
-            return self::hydrate_users($matched);
+            $hydrated = self::hydrate_users($matched);
+
+            // When outstanding_login + eligible prompt is satisfied, fetch the
+            // group's pending invites in one query, then append any whose
+            // email isn't already in the matched-user list — prevents
+            // duplicate emails to people whose invite row is stale.
+            if ($include_pending_users) {
+                $pending_users = self::fetch_pending_users($group_id);
+                if (!empty($pending_users)) {
+                    $existing_emails = array();
+                    foreach ($hydrated as $r) {
+                        $existing_emails[strtolower($r['email'])] = true;
+                    }
+                    foreach ($pending_users as $pending_user) {
+                        if (isset($existing_emails[strtolower($pending_user['email'])])) {
+                            continue;
+                        }
+                        $hydrated[] = $pending_user;
+                    }
+                }
+            }
+
+            return $hydrated;
+        }
+
+        /**
+         * Fetch pending-learner invite rows for a group as recipient rows.
+         *
+         * "Pending user" = a row on bys_group_invites that has not yet
+         * resolved to a WP account. Single source of truth for both the
+         * preview path (resolve_recipients) and the send path
+         * (Mailer::get_recipients_with_names).
+         *
+         * @param int        $group_id
+         * @param int[]|null $pending_user_ids
+         * @return array
+         */
+        public static function fetch_pending_users($group_id, $pending_user_ids = null) {
+            global $wpdb;
+            $table = $wpdb->prefix . BYS_GROUPS_INVITES_TABLE;
+
+            if ($pending_user_ids !== null) {
+                $ids = array_values(array_filter(array_map('intval', (array) $pending_user_ids)));
+                if (empty($ids)) return array();
+
+                $placeholders = implode(',', array_fill(0, count($ids), '%d'));
+                $params       = array_merge($ids, array(intval($group_id)));
+
+                $rows = $wpdb->get_results($wpdb->prepare(
+                    "SELECT id, email FROM {$table}
+                     WHERE id IN ($placeholders)
+                       AND group_id = %d
+                       AND status = 'pending'
+                       AND role = 'learner'",
+                    $params
+                ), ARRAY_A);
+            } else {
+                $rows = $wpdb->get_results($wpdb->prepare(
+                    "SELECT id, email FROM {$table}
+                     WHERE group_id = %d AND status = 'pending' AND role = 'learner'
+                     ORDER BY invited_at ASC",
+                    intval($group_id)
+                ), ARRAY_A);
+            }
+
+            $out = array();
+            foreach ((array) $rows as $row) {
+                $email = isset($row['email']) ? trim($row['email']) : '';
+                if ($email === '' || !is_email($email)) continue;
+                $out[] = array(
+                    'user_id'         => 0,
+                    'pending_user_id' => intval($row['id']),
+                    'email'           => $email,
+                    'display_name'    => $email,
+                    'name'            => $email,
+                    'is_pending_user' => true,
+                );
+            }
+            return $out;
         }
 
         /* ============================================================

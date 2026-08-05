@@ -8,13 +8,13 @@
         gap: var(--wp--preset--spacing--3);
         padding: var(--wp--preset--spacing--4) var(--wp--preset--spacing--5);
         background-color: var(--wp--preset--color--yellow-100);
-        border: 1px solid var(--wp--preset--color--yellow-600);
+        border: 1px solid var(--wp--preset--color--yellow-300);
         border-radius: 0.5rem;
 
         &.hidden { display: none; }
 
         &__icon {
-            color: var(--wp--preset--color--yellow-700);
+            color: var(--wp--preset--color--yellow-600);
             font-size: var(--wp--preset--font-size--medium);
             flex-shrink: 0;
         }

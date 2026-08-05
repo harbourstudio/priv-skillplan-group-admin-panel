@@ -15,6 +15,8 @@ if (!class_exists('BYS_Groups_Blocks')) {
         private $blocks = [
             'group-add-member',
             'group-add-member-modal',
+            'group-onboarding-modal',
+            'group-onboarding-trigger',
             'group-archive',
             'group-communication-history-modal',
             'group-communication-log',
@@ -49,6 +51,7 @@ if (!class_exists('BYS_Groups_Blocks')) {
             'lander-course-list',
             'lander-completion-alert',
             'skill-level-wrapper',
+            'user-group-list',
         ];
         
         public function __construct() {

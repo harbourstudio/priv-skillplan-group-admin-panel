@@ -20,7 +20,7 @@ if (!class_exists('BYS_Groups_Mailer')) {
          * Send group communication emails via Postmark API.
          *
          * @param int $group_id Group post ID
-         * @param string $prompt_type Prompt type (password-reset, course-progress, assessment-deadline, welcome-reminder, custom)
+         * @param string $prompt_type Prompt type (password-reset, course-progress, assessment-reminder, welcome-reminder, custom)
          * @param string $recipient_type Recipient filter (group, individual, condition)
          * @param array $recipient_ids User IDs for 'individual' type, empty for others
          * @param string $custom_message Custom message body for 'custom' prompt type
@@ -33,8 +33,15 @@ if (!class_exists('BYS_Groups_Mailer')) {
             $recipient_ids = array(),
             $custom_message = '',
             $scheduled_at = '',
-            $condition = array()
+            $condition = array(),
+            $pending_user_ids = array()
         ) {
+
+            // if the caller sent pending-user ids alongside a prompt type that isn't included in the relevant prompts, silently wipes the pending-user list back to empty so those recipients get dropped from the send.
+            if (!empty($pending_user_ids)
+                && !in_array($prompt_type, BYS_Groups_Conditional_Emails::PENDING_USERS_PROMPTS, true)) {
+                $pending_user_ids = array();
+            }
             // Validate recipient type
             $valid_types = array('group', 'individual', 'condition');
             if (!in_array($recipient_type, $valid_types, true)) {
@@ -71,7 +78,7 @@ if (!class_exists('BYS_Groups_Mailer')) {
             $group_name = $group->post_title;
 
             // Resolve recipients with user data
-            $recipients_data = $this->get_recipients_with_names($group_id, $recipient_type, $recipient_ids);
+            $recipients_data = $this->get_recipients_with_names($group_id, $recipient_type, $recipient_ids, $pending_user_ids);
             if (empty($recipients_data)) {
                 return array(
                     'success' => false,
@@ -113,15 +120,23 @@ if (!class_exists('BYS_Groups_Mailer')) {
             $batch_id = wp_generate_uuid4();
             error_log("[Mailer::send_group_communication] Generated batch_id: $batch_id");
 
-            // Build Postmark batch payload
+            // Build Postmark batch payload. Recipients who have opted out
+            // (bys_groups_enable_comms = '0') are diverted into $skipped and
+            // logged as 'comms_disabled' after the Postmark call.
             $messages = array();
+            $skipped  = array();
             foreach ($recipients_data as $recipient) {
                 $recipient_email = $recipient['email'];
                 $recipient_name = $recipient['name'];
+                $recipient_uid  = isset($recipient['user_id']) ? (int) $recipient['user_id'] : 0;
+                $is_pending_user = !empty($recipient['is_pending_user']);
 
                 // Get email content. Non-custom promptTypes ignore custom_message;
                 // cta_url_override is used by templates with a dashboard CTA to
                 // deep-link to a specific course (see $cta_url_override above).
+                // unsubscribe_url is per-recipient — generated here so the token
+                // encodes THIS user's id. Pending users have no account, so
+                // no signed unsubscribe link is emitted for them.
                 $email = bys_get_comm_email($prompt_type, array(
                     'group_name'       => $group_name,
                     'recipient_name'   => $recipient_name,
@@ -130,10 +145,21 @@ if (!class_exists('BYS_Groups_Mailer')) {
                     'sender_email'     => $sender_email,
                     'custom_message'   => $custom_message,
                     'cta_url_override' => $cta_url_override,
+                    'unsubscribe_url'  => $is_pending_user ? '' : BYS_Groups_Signed_URL::build_unsubscribe_url($recipient_uid),
                 ));
 
                 // Validate email template
                 if (empty($email['subject']) || empty($email['html'])) {
+                    continue;
+                }
+
+                if ($recipient_uid && !bys_groups_user_can_receive_comms($recipient_uid)) {
+                    $skipped[] = array(
+                        'email'   => $recipient_email,
+                        'subject' => $email['subject'],
+                        'html'    => $email['html'],
+                        'plain'   => $email['plain'],
+                    );
                     continue;
                 }
 
@@ -154,6 +180,19 @@ if (!class_exists('BYS_Groups_Mailer')) {
                 );
             }
 
+            // Every recipient opted out
+            if (empty($messages) && !empty($skipped)) {
+                $this->log_comms_disabled_rows(
+                    $skipped, $group_id, $user_id, $prompt_type, $batch_id,
+                    $has_condition_meta ? wp_json_encode($condition) : null
+                );
+                return array(
+                    'success'    => true,
+                    'sent_count' => 0,
+                    'errors'     => array(),
+                );
+            }
+
             if (empty($messages)) {
                 return array(
                     'success' => false,
@@ -162,8 +201,16 @@ if (!class_exists('BYS_Groups_Mailer')) {
                 );
             }
 
-            // If scheduled for later, queue the emails instead of sending immediately
+            // If scheduled for later, queue the emails instead of sending immediately.
+            // Opted-out recipients are logged as comms_disabled up-front so they
+            // appear in the batch's history modal even for scheduled sends.
             if (!empty($scheduled_at)) {
+                if (!empty($skipped)) {
+                    $this->log_comms_disabled_rows(
+                        $skipped, $group_id, $user_id, $prompt_type, $batch_id,
+                        $has_condition_meta ? wp_json_encode($condition) : null
+                    );
+                }
                 return $this->queue_scheduled_emails(
                     $messages,
                     $group_id,
@@ -279,8 +326,17 @@ if (!class_exists('BYS_Groups_Mailer')) {
                 }
             }
 
-            // sent_count reflects the recipient selection size, NOT individual delivery success
-            $sent_count = count($recipients_data);
+            // Log opted-out recipients alongside real sends so the history
+            // modal shows who was skipped
+            if (!empty($skipped)) {
+                $this->log_comms_disabled_rows(
+                    $skipped, $group_id, $user_id, $prompt_type, $batch_id, $condition_meta_json
+                );
+            }
+
+            // sent_count reflects the recipients Postmark accepted
+            // (selection size minus opt-outs).
+            $sent_count = count($messages);
 
             // Postmark accepted the batch (we're past the !200 guard above) —
             // success reflects THAT, not whether every log row landed.
@@ -292,6 +348,37 @@ if (!class_exists('BYS_Groups_Mailer')) {
         }
 
         /**
+         * Insert a 'comms_disabled' log row per recipient with bys_groups_enable_comms = '0'
+         * Capture subject/body that would have been sent otherwise and display in history modal 
+         */
+        private function log_comms_disabled_rows($skipped, $group_id, $sender_user_id, $prompt_type, $batch_id, $condition_meta_json) {
+            global $wpdb;
+            foreach ($skipped as $row) {
+                $wpdb->insert(
+                    $wpdb->prefix . BYS_GROUPS_COMMS_TABLE,
+                    array(
+                        'message_id'      => null,
+                        'recipient_email' => $row['email'],
+                        'group_id'        => $group_id,
+                        'sender_user_id'  => $sender_user_id,
+                        'prompt_type'     => $prompt_type,
+                        'batch_id'        => $batch_id,
+                        'subject'         => $row['subject'],
+                        'body_html'       => $row['html'],
+                        'body_text'       => $row['plain'],
+                        'delivery_status' => 'comms_disabled',
+                        'condition_meta'  => $condition_meta_json,
+                        'created_at'      => current_time('mysql'),
+                    ),
+                    array('%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')
+                );
+                if ($wpdb->last_error) {
+                    error_log('[BYS_Groups_Mailer] comms_disabled log insert failed: ' . $wpdb->last_error . ' — recipient: ' . $row['email']);
+                }
+            }
+        }
+
+        /**
          * Resolve recipients with email and display name for personalization.
          *
          * @param int $group_id Group post ID
@@ -299,7 +386,7 @@ if (!class_exists('BYS_Groups_Mailer')) {
          * @param array $recipient_ids User IDs for 'individual' type
          * @return array Array of arrays with 'email' and 'name' keys
          */
-        private function get_recipients_with_names($group_id, $recipient_type, $recipient_ids = array()) {
+        private function get_recipients_with_names($group_id, $recipient_type, $recipient_ids = array(), $pending_user_ids = array()) {
             $recipients = array();
 
             if (($recipient_type === 'individual' || $recipient_type === 'condition') && !empty($recipient_ids)) {
@@ -308,14 +395,22 @@ if (!class_exists('BYS_Groups_Mailer')) {
                     $user = get_user_by('ID', $user_id);
                     if ($user && !empty($user->user_email)) {
                         $recipients[] = array(
+                            'user_id' => (int) $user->ID,
                             'email' => $user->user_email,
                             'name' => !empty($user->display_name) ? $user->display_name : $user->user_login,
                         );
                     }
                 }
-            } else {
+            } elseif ($recipient_type === 'group') {
                 // All group members (for 'group' type)
                 $recipients = $this->get_group_users_with_names($group_id);
+            }
+
+            // If any pending-user ids came in, look them up (re-verifying group + status + role at the DB), and add the results to the recipients list.
+            if (!empty($pending_user_ids)) {
+                foreach (BYS_Groups_Conditional_Emails::fetch_pending_users($group_id, $pending_user_ids) as $pending_user) {
+                    $recipients[] = $pending_user;
+                }
             }
 
             // Remove duplicates by email
@@ -387,6 +482,7 @@ if (!class_exists('BYS_Groups_Mailer')) {
                 $user = get_user_by('ID', $user_id);
                 if ($user && !empty($user->user_email)) {
                     $recipients[] = array(
+                        'user_id' => (int) $user->ID,
                         'email' => $user->user_email,
                         'name' => !empty($user->display_name) ? $user->display_name : $user->user_login,
                     );

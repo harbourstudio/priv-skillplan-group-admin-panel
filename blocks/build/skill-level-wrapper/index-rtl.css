@@ -1,1 +1,23 @@
-.wp-block-bys-groups-skill-level-wrapper{border:2px dashed rgba(100,130,230,.5);border-radius:4px;display:block;max-width:77.5rem!important;padding:12px;width:100%}.wp-block-bys-groups-skill-level-wrapper .bys-slw__badge{background:rgba(100,130,230,.1);border-radius:3px;color:#6482e6;display:inline-block;font-size:11px;font-weight:600;letter-spacing:.04em;margin-bottom:10px;padding:2px 8px;text-transform:uppercase}
+/*!********************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ./node_modules/css-loader/dist/cjs.js??ruleSet[1].rules[4].use[1]!./node_modules/postcss-loader/dist/cjs.js??ruleSet[1].rules[4].use[2]!./node_modules/@wordpress/scripts/node_modules/sass-loader/dist/cjs.js??ruleSet[1].rules[4].use[3]!./src/skill-level-wrapper/editor.scss ***!
+  \********************************************************************************************************************************************************************************************************************************************************************************************/
+.wp-block-bys-groups-skill-level-wrapper {
+  display: block;
+  width: 100%;
+  max-width: 77.5rem !important;
+  border: 2px dashed rgba(100, 130, 230, 0.5);
+  border-radius: 4px;
+  padding: 12px;
+}
+.wp-block-bys-groups-skill-level-wrapper .bys-slw__badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6482e6;
+  background: rgba(100, 130, 230, 0.1);
+  border-radius: 3px;
+  padding: 2px 8px;
+  margin-bottom: 10px;
+}

@@ -15,6 +15,10 @@ function buildMemberRow(member, groupId, onRemove, canModify) {
     $row.find('.gm__name').text(name);
     $row.find('.gm__email').text(member.email || '');
 
+    if (member.enable_comms !== false) {
+        $row.find('.gm__enable-comms').remove();
+    }
+
     // Avatar: <img> when a URL is provided
     const $avatar = $row.find('.gm__avatar');
     if (member.avatar) {

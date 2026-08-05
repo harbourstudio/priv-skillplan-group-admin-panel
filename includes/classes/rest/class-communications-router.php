@@ -238,10 +238,28 @@ if (!class_exists('BYS_Groups_Communications_Router')) {
                 $html_body = preg_replace('/<style[^>]*>.*?<\/style>/is', '', $html_body);
                 $html_body = preg_replace('/\s{2,}/s', ' ', $html_body);
                 $html_body = trim($html_body);
+                $html_body = wp_kses_post($html_body);
             }
 
             // Plain-text body: same fallback chain
             $text_body = $postmark_body['TextBody'] ?? $msg_row['body_text'] ?? '';
+
+            // Strip recipient's unsubscribe link in the history-modal preview
+            $unsub_prefix = rest_url(BYS_Groups_Core::REST_NAMESPACE . '/unsubscribe');
+            if (!empty($html_body)) {
+                $html_body = preg_replace(
+                    '/href=(["\'])' . preg_quote($unsub_prefix, '/') . '[^"\']*\1/i',
+                    'href="#preview-unsubscribe-omitted"',
+                    $html_body
+                );
+            }
+            if (!empty($text_body)) {
+                $text_body = preg_replace(
+                    '/Unsubscribe from group communications:\s*' . preg_quote($unsub_prefix, '/') . '\S*/i',
+                    '',
+                    $text_body
+                );
+            }
 
             return [
                 'message_id'      => $message_id,

@@ -67,13 +67,15 @@
             text-overflow: ellipsis;
         }
     
-        &__email {
+        &__email,
+        &__enable-comms {
             font-size: var(--wp--preset--font-size--small);
             color: var(--wp--preset--color--gray-500);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
+
     
         &__remove {
             flex-shrink: 0;

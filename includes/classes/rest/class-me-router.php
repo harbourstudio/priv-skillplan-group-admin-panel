@@ -37,6 +37,31 @@ if (!class_exists('BYS_Groups_Me_Router')) {
                 'callback'            => [$this, 'get_current_user_archived_groups'],
                 'permission_callback' => 'is_user_logged_in',
             ]);
+
+            register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/me/tutorial-seen', [
+                'methods'             => WP_REST_Server::CREATABLE,
+                'callback'            => [$this, 'mark_tutorial_seen'],
+                'permission_callback' => 'is_user_logged_in',
+            ]);
+
+            register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/me/member-groups', [
+                'methods'             => WP_REST_Server::READABLE,
+                'callback'            => [$this, 'get_current_user_member_groups'],
+                'permission_callback' => 'is_user_logged_in',
+            ]);
+
+            register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/me/groups/(?P<group_id>\d+)/leave', [
+                'methods'             => WP_REST_Server::CREATABLE,
+                'callback'            => [$this, 'leave_group'],
+                'permission_callback' => function ($request) {
+                    if (!is_user_logged_in()) return false;
+                    $group_id = intval($request['group_id']);
+                    $user_id  = get_current_user_id();
+                    return function_exists('learndash_is_user_in_group')
+                        ? (bool) learndash_is_user_in_group($user_id, $group_id)
+                        : false;
+                },
+            ]);
         }
 
         /**
@@ -436,6 +461,107 @@ if (!class_exists('BYS_Groups_Me_Router')) {
             usort($archived_groups, fn($a, $b) => $b['archived_date'] <=> $a['archived_date']);
 
             return ['groups' => $archived_groups];
+        }
+
+        /**
+         * POST /me/tutorial-seen
+         *
+         * Marks the group dashboard onboarding tutorial as seen for the current user.
+         * Called by the group-onboarding-modal block after the modal is closed on first visit.
+         */
+        public function mark_tutorial_seen($request) {
+            $user_id = get_current_user_id();
+            update_user_meta( $user_id, 'bys_group_tutorial_seen', true );
+            return new WP_REST_Response( [ 'success' => true ], 200 );
+        }
+
+        /**
+         * GET /me/member-groups
+         *
+         * Returns all published LearnDash groups the current user is enrolled in
+         * as a member (not as a leader/admin). Each group is enriched with its
+         * parent organization info when one exists.
+         */
+        public function get_current_user_member_groups($request) {
+            $user_id = get_current_user_id();
+            if (!$user_id) return ['groups' => []];
+
+            $group_ids = learndash_get_users_group_ids($user_id);
+            if (empty($group_ids)) return ['groups' => []];
+
+            // Build a group_id => org map from ACF 'groups' field on organization posts.
+            $group_to_org_id = [];
+            $org_titles      = [];
+            $all_org_ids     = get_posts([
+                'post_type'      => 'organization',
+                'post_status'    => 'publish',
+                'posts_per_page' => -1,
+                'fields'         => 'ids',
+            ]);
+            foreach ($all_org_ids as $org_id) {
+                $raw = get_field('groups', $org_id);
+                foreach ((array) $raw as $group) {
+                    $g_id = $group instanceof \WP_Post ? $group->ID : intval($group);
+                    if ($g_id > 0) {
+                        $group_to_org_id[$g_id] = $org_id;
+                    }
+                }
+            }
+
+            $groups = [];
+            foreach ($group_ids as $group_id) {
+                $post = get_post($group_id);
+                if (!$post || $post->post_status !== 'publish') continue;
+
+                $org_id    = $group_to_org_id[$group_id] ?? null;
+                $org_title = null;
+                if ($org_id) {
+                    if (!isset($org_titles[$org_id])) {
+                        $org_titles[$org_id] = get_the_title($org_id);
+                    }
+                    $org_title = $org_titles[$org_id];
+                }
+
+                $groups[] = [
+                    'id'        => $group_id,
+                    'title'     => $post->post_title,
+                    'permalink' => get_permalink($group_id),
+                    'org_id'    => $org_id,
+                    'org_title' => $org_title,
+                ];
+            }
+
+            // Sort: orged groups first (alpha by org then group name), then ungrouped alpha.
+            usort($groups, function($a, $b) {
+                if ($a['org_title'] && $b['org_title']) {
+                    return strcmp($a['org_title'], $b['org_title']) ?: strcmp($a['title'], $b['title']);
+                }
+                if ($a['org_title']) return -1;
+                if ($b['org_title']) return 1;
+                return strcmp($a['title'], $b['title']);
+            });
+
+            return ['groups' => $groups];
+        }
+
+        /**
+         * POST /me/groups/{group_id}/leave
+         *
+         * Removes the current user from the given LearnDash group.
+         * Permission callback already verifies membership before this runs.
+         */
+        public function leave_group($request) {
+            $group_id = intval($request['group_id']);
+            $user_id  = get_current_user_id();
+
+            $group = get_post($group_id);
+            if (!$group || $group->post_type !== 'groups') {
+                return new WP_Error('not_found', 'Group not found', ['status' => 404]);
+            }
+
+            ld_update_group_access($user_id, $group_id, true);
+
+            return ['success' => true];
         }
     }
 }

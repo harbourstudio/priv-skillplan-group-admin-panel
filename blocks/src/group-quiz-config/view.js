@@ -324,11 +324,29 @@ jQuery(document).ready(($) => {
             await persistRowAccessDates($item, quizId);
 
             const result = await api.post(`/wp-json/bys-groups/v1/groups/${currentGroupId}/quizzes/${quizId}/notify-access`)
-            const sent = result?.sent_count ?? 0;
+            const sent    = result?.sent_count    ?? 0;
+            const skipped = result?.skipped_count ?? 0;
+
+            // Skip counts learners with bys_groups_enable_comms = '0'
+            // Inform leaders that batch includes recipients that are opted-out via bysAlert
+            if (skipped > 0 && sent === 0) {
+                $btn.text(originalLabel).prop('disabled', false);
+                bysAlert(
+                    `All ${skipped} learner${skipped === 1 ? '' : 's'} in this group have turned off group communications. No notifications were sent.`
+                );
+                return;
+            }
+
             $btn.text(`Notified ${sent}`);
             setTimeout(() => {
                 $btn.text(originalLabel).prop('disabled', false);
             }, 2500);
+
+            if (skipped > 0) {
+                bysAlert(
+                    `${skipped} learner${skipped === 1 ? ' has' : 's have'} turned off group communications and did not receive this notification. Check the Communications log for per-recipient delivery status.`
+                );
+            }
         } catch (err) {
             console.error('[quiz-config] Failed to save + notify:', err);
             $btn.text('Failed');
@@ -379,11 +397,10 @@ jQuery(document).ready(($) => {
     const cachedCourses = store.getCourses();
     const cachedUsers   = store.getUsers();
     if (cachedGroupId !== null && cachedCourses !== null) {
-        console.log('[bys-store] group-quiz-config: HIT — loading quiz data from cached courses', cachedCourses);
         currentGroupId = cachedGroupId;
         memberCount    = cachedUsers ? cachedUsers.length : 0;
         loadQuizData($block, currentGroupId, cachedCourses);
     } else {
-        console.log('[bys-store] group-quiz-config: MISS — waiting for bys:groupSelected');
+        console.warn('[bys-store] group-quiz-config: MISS — waiting for bys:groupSelected');
     }
 });

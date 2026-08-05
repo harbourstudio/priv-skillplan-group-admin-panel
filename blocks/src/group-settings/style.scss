@@ -1,11 +1,14 @@
 .wp-block-bys-groups-group-settings {
+    height: 100%;
+    
     .group-settings {
-        
+    
         &__card {
             padding: var(--wp--preset--spacing--5);
             background: var(--wp--preset--color--white);
             border: 1px solid var(--wp--preset--color--gray-100);
             border-radius: 0.75rem;
+            height: 100%;
         }
     
         &__title {

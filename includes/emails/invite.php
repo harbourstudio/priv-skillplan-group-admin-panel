@@ -21,12 +21,18 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
+// Depends on bys_email_logo_svg() and bys_email_head_styles() defined in
+// general.php. class-invites.php only requires this file, not general.php,
+// so pull it in here to stay self-sufficient. Both helpers are guarded with
+// function_exists() so double-loading is safe.
+require_once __DIR__ . '/general.php';
+
 function bys_get_invite_email( string $group_name, string $register_url, string $invited_by_name, string $site_name, string $site_url ): array {
 
-    // ── Subject ───────────────────────────────────────────────────────────────
     $subject = sprintf( "You've been invited to join %s on %s", $group_name, $site_name );
+    $logo    = bys_email_logo_svg();
+    $styles  = bys_email_head_styles();
 
-    // ── HTML body ─────────────────────────────────────────────────────────────
     ob_start();
     ?>
 <!DOCTYPE html>
@@ -35,72 +41,69 @@ function bys_get_invite_email( string $group_name, string $register_url, string 
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title><?php echo esc_html( $subject ); ?></title>
+<?php echo $styles; ?>
 </head>
-<body style="margin:0;padding:0;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;">
+<body style="margin:0;padding:0;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;color:#4F5C6F;">
 
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;padding:40px 16px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;padding:48px 16px;">
     <tr>
       <td align="center">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
 
-          <!-- Logo / brand header -->
           <tr>
-            <td align="center" style="padding-bottom:24px;">
-              <a href="<?php echo esc_url( $site_url ); ?>" style="text-decoration:none;">
-                <span style="font-size:22px;font-weight:700;color:#1e40af;"><?php echo esc_html( $site_name ); ?></span>
+            <td align="center" style="padding-bottom:32px;">
+              <a href="<?php echo esc_url( $site_url ); ?>" class="bys-logo" style="text-decoration:none;line-height:0;display:inline-block;" aria-label="<?php echo esc_attr( $site_name ); ?>">
+                <?php echo $logo; ?>
               </a>
             </td>
           </tr>
 
-          <!-- Card -->
           <tr>
-            <td style="background:#ffffff;border-radius:12px;padding:40px 40px 32px;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+            <td class="bys-card" style="background:#ffffff;border-radius:16px;padding:2rem;border:1px solid #E8EBEF;">
 
-              <h1 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#111827;">
+              <h1 class="bys-h1" style="margin:0 0 12px;font-size:22px;font-weight:700;color:#111827;line-height:1.3;">
                 You've been invited!
               </h1>
-              <p style="margin:0 0 24px;font-size:15px;color:#6b7280;">
+              <p class="bys-body" style="margin:0 0 24px;font-size:17px;color:#4F5C6F;line-height:1.6;">
                 <?php echo esc_html( $invited_by_name ); ?> has invited you to join
                 <strong style="color:#111827;"><?php echo esc_html( $group_name ); ?></strong>.
               </p>
 
-              <p style="margin:0 0 32px;font-size:15px;color:#374151;line-height:1.6;">
+              <p class="bys-body" style="margin:0 0 32px;font-size:17px;color:#4F5C6F;line-height:1.6;">
                 To get started, create your free account using the button below.
                 Once registered, you'll be automatically enrolled in the group.
               </p>
 
-              <!-- CTA button -->
-              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto 32px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
                 <tr>
-                  <td style="background:#1d4ed8;border-radius:9999px;">
-                    <a href="<?php echo esc_url( $register_url ); ?>"
-                       style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">
+                  <td style="background:#2465FF;border-radius:9999px;">
+                    <a href="<?php echo esc_url( $register_url ); ?>" class="bys-btn"
+                       style="display:inline-block;padding:12px 24px;font-size:16px;font-weight:600;color:#ffffff;text-decoration:none;">
                       Create my account
                     </a>
                   </td>
                 </tr>
               </table>
 
-              <p style="margin:0 0 24px;font-size:13px;color:#9ca3af;text-align:center;">
+              <p style="margin:24px 0 24px;font-size:13px;color:#9ca3af;text-align:center;line-height:1.5;">
                 Or copy this link into your browser:<br />
                 <a href="<?php echo esc_url( $register_url ); ?>"
-                   style="color:#1d4ed8;word-break:break-all;">
+                   style="color:#2465FF;word-break:break-all;">
                   <?php echo esc_url( $register_url ); ?>
                 </a>
               </p>
 
-              <p style="margin:0;font-size:13px;color:#9ca3af;text-align:center;">
+              <p style="margin:0;font-size:13px;color:#9ca3af;text-align:center;line-height:1.5;">
                 If you weren't expecting this invitation, you can safely ignore this email.
               </p>
 
             </td>
           </tr>
 
-          <!-- Footer -->
           <tr>
             <td style="padding-top:24px;text-align:center;">
-              <p style="margin:0;font-size:12px;color:#9ca3af;">
-                &copy; <?php echo date('Y'); ?> <?php echo esc_html( $site_name ); ?>. Questions? Contact <a href="mailto:learn@skillplan.ca">learn@skillplan.ca</a>
+              <p style="margin:0;font-size:14px;color:#9ca3af;line-height:1.5;">
+                &copy; <?php echo date('Y'); ?> <?php echo esc_html( $site_name ); ?>. Questions? Contact <a href="mailto:learn@skillplan.ca" style="color:#2465FF;">learn@skillplan.ca</a>
               </p>
             </td>
           </tr>

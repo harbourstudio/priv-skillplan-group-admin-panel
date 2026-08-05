@@ -440,10 +440,20 @@ jQuery(document).ready(($) => {
             // Notify without explicitly hitting Save Changes).
             await persistUserAccessDates();
 
-            await api.post(
+            const notifyResp = await api.post(
                 endpoints.notifyUserQuizAccess(currentGroupId, selectedUserId),
                 { quiz_id: selectedQuizId }
             );
+
+            // Server returns `{ success: true, comms_disabled: true }` when the
+            // learner has opted out of plugin communications.
+            if (notifyResp && notifyResp.comms_disabled) {
+                $notifyBtn.text(originalLabel);
+                updateActions();
+                bysAlert('This learner has turned off group communications. No notification was sent.');
+                return;
+            }
+
             $notifyBtn.text('Learner notified!');
             setTimeout(() => {
                 $notifyBtn.text(originalLabel);
