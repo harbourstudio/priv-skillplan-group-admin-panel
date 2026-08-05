@@ -21,20 +21,20 @@ if ( $is_site_editor ) return;
 $user_id      = get_current_user_id();
 $already_seen = $user_id && get_user_meta( $user_id, 'bys_group_tutorial_seen', true );
 $auto_open    = $already_seen ? 'false' : 'true';
-$can_preview  = current_user_can( 'administrator' ) || current_user_can( 'editor' );
+$can_preview  = is_user_logged_in();
 
 $allowed_inline = [ 'strong' => [], 'em' => [], 'br' => [] ];
 
 $slides = [
     [
         'title' => __( 'Welcome to the My Groups Dashboard', 'bys' ),
-        'body'  => __( 'Use the different pages of the My Groups Dashboard to monitor your learners\' progress and manage their access to training.', 'bys' ),
+        'body'  => __( 'Monitor your learners\' progress and manage their access to training in the My Groups Dashboard.', 'bys' ),
         'image' => BYS_GROUPS_PLUGIN_URL . 'assets/img/welcome.gif',
         'alt'   => __( 'Group dashboard overview', 'bys' ),
     ],
     [
         'title' => __( 'Overview', 'bys' ),
-        'body'  => __( 'The <strong>Overview</strong> page provides a snapshot of your group’s progress, with options to view detailed progress for individual courses and learners.', 'bys' ),
+        'body'  => __( 'The <strong>Overview</strong> page provides a snapshot of your group\'s progress, with options to view detailed progress for individual courses and learners.', 'bys' ),
         'image' => BYS_GROUPS_PLUGIN_URL . 'assets/img/overview-page.gif',
         'alt'   => __( 'group progress', 'bys' ),
     ],
@@ -58,17 +58,17 @@ $slides = [
     ],
 ];
 
+$nav_items = [
+    [ 'label' => __( 'Overview', 'bys' ),       'slide' => 2 ],
+    [ 'label' => __( 'Enrolment', 'bys' ),      'slide' => 3 ],
+    [ 'label' => __( 'Curriculum', 'bys' ),     'slide' => 4 ],
+    [ 'label' => __( 'Communications', 'bys' ), 'slide' => 5 ],
+];
+
 $total = count( $slides );
 ?>
 
 <div <?= $wrapper_attributes; ?>>
-    <?php if ( $can_preview ) : ?>
-    <button class="gom__preview-trigger btn-unstyled" type="button" title="<?php esc_attr_e( 'Preview onboarding modal', 'bys' ); ?>">
-        <i class="fa-solid fa-eye"></i>
-        <?php esc_html_e( 'Preview onboarding', 'bys' ); ?>
-    </button>
-    <?php endif; ?>
-
     <div
         id="onboarding-modal"
         class="gom hs-overlay hidden"
@@ -97,6 +97,16 @@ $total = count( $slides );
                     aria-hidden="<?= $is_first ? 'false' : 'true'; ?>"
                 >
                     <div class="gom__slide-content">
+                        <div class="gom__slide-content-inner">
+                        <nav class="gom__slide-nav" aria-label="<?php esc_attr_e( 'Jump to section', 'bys' ); ?>">
+                            <?php foreach ( $nav_items as $item ) : ?>
+                            <button
+                                class="gom__slide-nav-pill btn-unstyled<?= $n === $item['slide'] ? ' is-active' : ''; ?>"
+                                type="button"
+                                data-slide="<?= $item['slide']; ?>"
+                            ><?= esc_html( $item['label'] ); ?></button>
+                            <?php endforeach; ?>
+                        </nav>
                         <div class="gom__slide-text">
                             <h4 id="gom-slide-title-<?= $n; ?>" class="gom__slide-title">
                                 <?= esc_html( $slide['title'] ); ?>
@@ -121,6 +131,7 @@ $total = count( $slides );
                                     <i class="fa-solid fa-arrow-right"></i>
                                 </button>
                             <?php endif; ?>
+                        </div>
                         </div>
                     </div>
 

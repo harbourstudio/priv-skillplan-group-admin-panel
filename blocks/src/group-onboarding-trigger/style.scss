@@ -1,0 +1,23 @@
+.wp-block-bys-groups-group-onboarding-trigger {
+    .gom__preview-trigger {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: var(--wp--preset--spacing--2) var(--wp--preset--spacing--4);
+        background: var(--wp--preset--color--gray-100);
+        color: var(--wp--preset--color--gray-600);
+        border: 1px solid var(--wp--preset--color--gray-300);
+        border-radius: 9999px;
+        font-size: var(--wp--preset--font-size--small);
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s;
+        margin-bottom: 0;
+
+        i { font-size: 0.85rem; }
+
+        &:hover {
+            background: var(--wp--preset--color--gray-200);
+            color: var(--wp--preset--color--gray-900);
+        }
+    }
+}

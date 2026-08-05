@@ -38,6 +38,11 @@ jQuery(document).ready(($) => {
         goToSlide(parseInt($(this).data('dot'), 10));
     });
 
+    // Section nav pills
+    $modal.on('click', '.gom__slide-nav-pill', function () {
+        goToSlide(parseInt($(this).data('slide'), 10));
+    });
+
     // ── Open / close ──────────────────────────────────────────────────────────
 
     function openModal() {
@@ -71,8 +76,8 @@ jQuery(document).ready(($) => {
         if (e.key === 'Escape' && !$modal.hasClass('hidden')) handleClose();
     });
 
-    // Admin/editor preview trigger — opens without marking seen.
-    $block.find('.gom__preview-trigger').on('click', openModal);
+    // Trigger button lives in the separate group-onboarding-trigger block.
+    $(document).on('click', '.gom__preview-trigger', openModal);
 
     if (autoOpen) {
         setTimeout(() => {
