@@ -252,10 +252,9 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
 
         /**
          * GET /groups/{group_id}/base-group-data
-         * Single-call dashboard bootstrap: returns hydrated users + courses
-         * for the group. Replaces the legacy two-call pattern (user-stats
-         * + courses) used by group-select. Does NOT compute the expensive
-         * inactive-members count — that lives in /group-stats.
+         * Single-call dashboard bootstrap: returns hydrated users, courses,
+         * leaders, and the pending-users count for the group. Replaces the
+         * legacy two-call pattern (user-stats + courses) used by group-select.
          */
         public function get_base_group_data($request) {
             $group_id = intval($request['group_id']);
@@ -374,60 +373,46 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             //    Lets group-leaders skip its own /leaders fetch on cold load.
             $leaders = $this->fetch_group_leaders($group_id);
 
+            // ── 5. Outstanding learner invites for the group-stats tile.
+            $pending_users = $this->count_pending_users($group_id);
+
             return new WP_REST_Response([
-                'group_id' => $group_id,
-                'users'    => $users,
-                'courses'  => $courses,
-                'leaders'  => $leaders,
+                'group_id'      => $group_id,
+                'users'         => $users,
+                'courses'       => $courses,
+                'leaders'       => $leaders,
+                'pending_users' => $pending_users,
             ], 200);
         }
 
+        /**
+         * Count outstanding learner invites for a group — the "pending"
+         * population shown in the group-stats tile.
+         */
+        private function count_pending_users($group_id) {
+            global $wpdb;
+            $invites_table = $wpdb->prefix . BYS_GROUPS_INVITES_TABLE;
+            return (int) $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM {$invites_table}
+                 WHERE group_id = %d AND status = 'pending' AND role = 'learner'",
+                intval($group_id)
+            ));
+        }
+
+        /**
+         * GET /groups/{group_id}/group-stats
+         * Fallback endpoint for the group-stats block when the shared store
+         * is cold (no cached /base-group-data payload for the group).
+         * On warm loads the block reads the same number from
+         * the store and this endpoint is never hit.
+         */
         public function get_base_group_stats($request) {
             $group_id = intval($request['group_id']);
             if (!$group_id) return new WP_Error('bad_request', 'Invalid group ID', ['status' => 400]);
 
-            $auth_header = BYS_Groups_Auth::get_auth_header();
-            if (!$auth_header) return new WP_Error('server_error', 'API credentials not configured', ['status' => 500]);
-
-            // Paginate LD's group-users endpoint for IDs
-            $user_ids = [];
-            $page     = 1;
-            $per_page = 100;
-            do {
-                $url = get_home_url() . "/wp-json/ldlms/v2/groups/{$group_id}/users?_fields=id&per_page={$per_page}&page={$page}";
-                $response = wp_remote_get($url, [
-                    'headers'   => ['Authorization' => $auth_header],
-                    'timeout'   => 30,
-                    'sslverify' => false,
-                ]);
-                if (is_wp_error($response)) return new WP_Error('server_error', $response->get_error_message(), ['status' => 500]);
-                if (wp_remote_retrieve_response_code($response) !== 200) {
-                    return new WP_Error('ld_api_failure', 'Failed to fetch users from LearnDash API', ['status' => 502]);
-                }
-                $page_users = json_decode(wp_remote_retrieve_body($response), true);
-                if (!is_array($page_users) || empty($page_users)) break;
-                foreach ($page_users as $u) {
-                    $user_ids[] = intval($u['id']);
-                }
-                $page++;
-            } while (count($page_users) === $per_page);
-
-            // Inactive = no login meta at all. Known N+1, intentionally kept
-            // isolated to this endpoint so only group-stats pays the cost.
-            $inactive_members = 0;
-            foreach ($user_ids as $user_id) {
-                $login_meta = [
-                    intval(get_user_meta($user_id, '_ld_notifications_last_login', true) ?: 0),
-                    intval(get_user_meta($user_id, 'learndash-last-login',          true) ?: 0),
-                ];
-                if (max($login_meta) === 0) $inactive_members++;
-            }
-
             return [
-                'group_id'               => $group_id,
-                'total_members'          => count($user_ids),
-                'total_inactive_members' => $inactive_members,
-                'user_ids'               => $user_ids,
+                'group_id'      => $group_id,
+                'pending_users' => $this->count_pending_users($group_id),
             ];
         }
 
