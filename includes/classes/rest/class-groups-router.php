@@ -1669,6 +1669,15 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             $start  = $window['start'] ?? '';
             $end    = $window['end']   ?? '';
 
+            // Resolve the learner's total attempts on this quiz for the
+            // email body. attempts_allowed = quiz's base + this user's
+            // granted repeats; attempts_unlimited wins over the count.
+            $summary            = BYS_Groups_Quiz_Access::get_user_quiz_attempts_summary($user_id, $quiz_id);
+            $attempts_unlimited = (bool) $summary['repeats_unlimited'];
+            $attempts_allowed   = $attempts_unlimited
+                ? null
+                : ((int) $summary['global_repeats'] + (int) $summary['granted_repeats']);
+
             $postmark_token = get_option('bys_postmark_token', '');
             if (empty($postmark_token)) {
                 return new WP_Error('server_error', 'Postmark token not configured', ['status' => 500]);
@@ -1685,17 +1694,17 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
 
             // Build the email content unconditionally so history modal shows "what would have been sent" rather than display empty content
             $email = bys_get_quiz_access_notification_email([
-                'recipient_name'    => !empty($recipient->display_name) ? $recipient->display_name : $recipient->user_login,
-                'site_name'         => get_bloginfo('name'),
-                'site_url'          => home_url(),
-                'quiz_title'        => $quiz_post ? get_the_title($quiz_post) : 'your quiz',
-                'quiz_url'          => $quiz_post ? get_permalink($quiz_post) : home_url(),
-                'start'             => $start,
-                'end'               => $end,
-                'sender_email'      => $sender_email,
-                'attempts_granted'  => $attempts_granted,
-                'attempts_previous' => $attempts_previous,
-                'unsubscribe_url'   => BYS_Groups_Signed_URL::build_unsubscribe_url($user_id),
+                'recipient_name'     => !empty($recipient->display_name) ? $recipient->display_name : $recipient->user_login,
+                'site_name'          => get_bloginfo('name'),
+                'site_url'           => home_url(),
+                'quiz_title'         => $quiz_post ? get_the_title($quiz_post) : 'your quiz',
+                'quiz_url'           => $quiz_post ? get_permalink($quiz_post) : home_url(),
+                'start'              => $start,
+                'end'                => $end,
+                'sender_email'       => $sender_email,
+                'attempts_allowed'   => $attempts_allowed,
+                'attempts_unlimited' => $attempts_unlimited,
+                'unsubscribe_url'    => BYS_Groups_Signed_URL::build_unsubscribe_url($user_id),
             ]);
 
             if (empty($email['subject']) || empty($email['html'])) {

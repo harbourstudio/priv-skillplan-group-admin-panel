@@ -430,41 +430,47 @@ function bys_get_custom_email(string $group_name, string $custom_message, string
  * Build the per-user quiz-access notification email.
  *
  * Sent by the group-user-quiz-config block when a group leader clicks
- * "Notify Learner" to inform a single learner about the start/end access
- * window set for them on a specific quiz.
+ * "Notify Learner". Body always contains:
+ *   - The start/end access window set for the learner on this quiz.
+ *   - How many attempts the learner has on the quiz (either a finite
+ *     count or "unlimited"). Omitted only when the caller passes
+ *     neither value.
+ *
+ * The email is intentionally state-only — no diff of what changed on
+ * this save. The learner just needs to know their current access.
  *
  * @param array $vars {
- *     @type string $recipient_name Learner's display name.
- *     @type string $site_name      Site name (header brand).
- *     @type string $site_url       Site URL.
- *     @type string $quiz_title     The quiz the access window applies to.
- *     @type string $quiz_url       Permalink to the quiz (used as CTA).
- *     @type string $start          UTC ISO-8601 datetime when access opens, or ''.
- *     @type string $end            UTC ISO-8601 datetime when access closes, or ''.
+ *     @type string $recipient_name    Learner's display name.
+ *     @type string $site_name         Site name (header brand).
+ *     @type string $site_url          Site URL.
+ *     @type string $quiz_title        The quiz the access window applies to.
+ *     @type string $quiz_url          Permalink to the quiz (used as CTA).
+ *     @type string $start             UTC ISO-8601 datetime when access opens, or ''.
+ *     @type string $end               UTC ISO-8601 datetime when access closes, or ''.
+ *     @type string $unsubscribe_url   Signed unsubscribe URL for the footer.
+ *     @type int    $attempts_allowed  Optional. Total attempts the learner has on
+ *                                     this quiz (base repeats + granted repeats).
+ *                                     Rendered as "You have N attempt(s)…".
+ *     @type bool   $attempts_unlimited Optional. True when the quiz has no cap.
+ *                                     Wins over $attempts_allowed if both set;
+ *                                     renders as "You have unlimited attempts…".
  * }
  * @return array { subject, html, plain }
  */
 function bys_get_quiz_access_notification_email(array $vars): array {
-    $recipient_name    = $vars['recipient_name']    ?? 'Learner';
-    $site_name         = $vars['site_name']         ?? get_bloginfo('name');
-    $site_url          = $vars['site_url']          ?? home_url();
-    $quiz_title        = $vars['quiz_title']        ?? 'your quiz';
-    $quiz_url          = $vars['quiz_url']          ?? $site_url;
-    $start             = $vars['start']             ?? '';
-    $end               = $vars['end']               ?? '';
-    $unsubscribe_url   = $vars['unsubscribe_url']   ?? '';
-    $attempts_granted  = isset($vars['attempts_granted'])  ? (int) $vars['attempts_granted']  : null;
-    $attempts_previous = isset($vars['attempts_previous']) ? (int) $vars['attempts_previous'] : null;
-    $attempts_changed  = $attempts_granted !== null
-        && $attempts_previous !== null
-        && $attempts_granted !== $attempts_previous;
+    $recipient_name     = $vars['recipient_name']     ?? 'Learner';
+    $site_name          = $vars['site_name']          ?? get_bloginfo('name');
+    $site_url           = $vars['site_url']           ?? home_url();
+    $quiz_title         = $vars['quiz_title']         ?? 'your quiz';
+    $quiz_url            = $vars['quiz_url']           ?? $site_url;
+    $start              = $vars['start']              ?? '';
+    $end                = $vars['end']                ?? '';
+    $unsubscribe_url    = $vars['unsubscribe_url']    ?? '';
+    $attempts_allowed   = isset($vars['attempts_allowed']) ? (int) $vars['attempts_allowed'] : null;
+    $attempts_unlimited = !empty($vars['attempts_unlimited']);
 
-    $subject = $attempts_changed
-        ? sprintf('Quiz access update: %s', $quiz_title)
-        : sprintf('Quiz access: %s', $quiz_title);
-    $heading = $attempts_changed
-        ? sprintf('Access update for %s', $quiz_title)
-        : sprintf('Access details for %s', $quiz_title);
+    $subject = sprintf('Quiz access: %s', $quiz_title);
+    $heading = sprintf('Access details for %s', $quiz_title);
 
     // Render the access window as a uniform "Opens / Closes" pair. Empty
     // bounds are surfaced as plain-language fallbacks rather than being
@@ -488,29 +494,16 @@ function bys_get_quiz_access_notification_email(array $vars): array {
         esc_html($quiz_title)
     );
 
+    // How many attempts the learner has on this quiz. Skipped entirely if
+    // the caller passes neither value (backward-compat for older callers).
     $attempts_html = '';
-    if ($attempts_changed) {
-        if ($attempts_granted > $attempts_previous) {
-            $delta = $attempts_granted - $attempts_previous;
-            $attempts_line = sprintf(
-                'You have been granted <strong>%d additional attempt%s</strong> on this quiz (total additional attempts: %d).',
-                $delta,
-                $delta === 1 ? '' : 's',
-                $attempts_granted
-            );
-        } elseif ($attempts_granted === 0) {
-            $attempts_line = 'Your previously granted additional attempts on this quiz have been removed.';
-        } else {
-            $attempts_line = sprintf(
-                'Your additional attempts on this quiz have been updated (previously %d, now <strong>%d</strong>).',
-                $attempts_previous,
-                $attempts_granted
-            );
-        }
-
+    if ($attempts_unlimited) {
+        $attempts_html = '<p style="margin:0 0 16px;color:#374151;font-size:15px;">You have <strong>unlimited attempts</strong> on this quiz.</p>';
+    } elseif ($attempts_allowed !== null && $attempts_allowed > 0) {
         $attempts_html = sprintf(
-            '<p style="margin:0 0 16px;color:#374151;font-size:15px;">%s</p>',
-            $attempts_line
+            '<p style="margin:0 0 16px;color:#374151;font-size:15px;">You have <strong>%d attempt%s</strong> on this quiz.</p>',
+            $attempts_allowed,
+            $attempts_allowed === 1 ? '' : 's'
         );
     }
 
