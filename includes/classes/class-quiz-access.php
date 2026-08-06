@@ -22,6 +22,63 @@ if (!class_exists('BYS_Groups_Quiz_Access')) {
 
             // hooks into learndash_content to show a gated quiz view by using a custom 'quiz-unavailable' template
             add_filter('learndash_content', array($this, 'display_gated_quiz'), 1, 2);
+
+            // Per-user override of the quiz's retake limit. Two filters cover both paths LD uses:
+            // - learndash_allowed_repeats: read by the deprecated `learndash_can_attempt_again()` helper.
+            // - learndash_quiz_attempts: the modern gate used by the [ld_quiz] shortcode to decide
+            // whether the Start/Restart
+            add_filter('learndash_allowed_repeats', array($this, 'apply_user_granted_repeats'), 10, 3);
+            add_filter('learndash_quiz_attempts', array($this, 'apply_user_granted_repeats_to_quiz_attempts'), 10, 4);
+        }
+
+        /**
+         * Add any per-user granted repeats on top of the quiz's global
+         * `sfwd-quiz_repeats` value. If the quiz is unlimited (base 0/empty),
+         * grants are ignored
+         */
+        public function apply_user_granted_repeats($repeats, $user_id, $quiz_id) {
+            $grant = self::get_user_quiz_granted_repeats((int) $user_id, (int) $quiz_id);
+            if ($grant <= 0) {
+                return $repeats;
+            }
+            $base = (int) $repeats;
+            return $base > 0 ? $base + $grant : $repeats;
+        }
+
+        /**
+         * Modern retake-gate override. Hooks learndash_quiz_attempts and
+         * authoritatively recomputes $attempts_left for any quiz with a
+         * retake limit set.
+         *
+         * We can't rely on LD's own $attempts_count: ld_quiz.php only
+         * counts _sfwd-quizzes rows whose 'course' field matches the
+         * current course, so attempts logged without a course_id get
+         * silently dropped. Counting attempts via learndash_get_user_quiz_attempt
+         * (course-irrespective) keeps the gate aligned with the leader-facing summary.
+         *
+         * @param bool|int $attempts_left  LD's initial verdict (ignored).
+         * @param int      $attempts_count LD's course-scoped count (ignored).
+         * @param int      $user_id
+         * @param int      $quiz_id
+         * @return bool|int
+         */
+        public function apply_user_granted_repeats_to_quiz_attempts($attempts_left, $attempts_count, $user_id, $quiz_id) {
+            $quiz_settings = learndash_get_setting((int) $quiz_id);
+            $repeats = isset($quiz_settings['repeats']) ? trim((string) $quiz_settings['repeats']) : '';
+            if ('' === $repeats) {
+                return $attempts_left; // Unlimited quiz — nothing to enforce.
+            }
+
+            $grant = self::get_user_quiz_granted_repeats((int) $user_id, (int) $quiz_id);
+
+            $attempts = function_exists('learndash_get_user_quiz_attempt')
+                ? learndash_get_user_quiz_attempt((int) $user_id, ['quiz' => (int) $quiz_id])
+                : [];
+            $accurate_count = is_array($attempts) ? count($attempts) : 0;
+
+            $allowed_total = (int) $repeats + $grant;
+
+            return ($accurate_count < $allowed_total) ? 1 : 0;
         }
 
         /**
