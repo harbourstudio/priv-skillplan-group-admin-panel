@@ -194,7 +194,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/groups/(?P<group_id>\d+)/users/(?P<user_id>\d+)/notify-quiz-access', [
                 'methods'             => WP_REST_Server::CREATABLE,
                 'callback'            => [$this, 'notify_user_quiz_access'],
-                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_access_group($request['group_id']),
+                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_access_user($request['user_id']),
             ]);
 
             // Broadcasts the group-level quiz access to every group user
@@ -207,7 +207,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/groups/(?P<group_id>\d+)/users/(?P<user_id>\d+)/quiz-access', [
                 'methods'             => 'GET, POST',
                 'callback'            => [$this, 'user_quiz_access'],
-                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_access_group($request['group_id']),
+                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_access_user($request['user_id']),
             ]);
 
             register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/groups/(?P<group_id>\d+)/quiz-access', [
@@ -1550,8 +1550,31 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
 
         /**
          * GET|POST /groups/{group_id}/users/{user_id}/quiz-access
-         * Per-user override of the group-level quiz-access window. Same shape
-         * as group_quiz_access but scoped to a specific user.
+         *
+         * Per-user quiz configuration surface. Owns two things:
+         * 1. Quiz access window (start/end datetimes) that gates when this user can take the quiz.
+         * 2. Granted quiz repeats total: additional retakes the leader
+         *    has granted to the user on top of the quiz's global `sfwd-quiz_repeats`.
+         *
+         * GET forms
+         *   - no query params:  returns { quiz_id: {start, end}, ... } — a
+         *                       map of every saved access window for this
+         *                       user. Legacy shape; kept for older callers.
+         *   - ?quiz_id=X:       returns { start, end, attempts_summary }
+         *                       for a single quiz. The block uses this
+         *                       shape after a learner+quiz selection so it
+         *                       can populate the date pickers AND the
+         *                       attempts info panel in a single round trip.
+         * POST body
+         *   - quiz_id          (int, required)
+         *   - start, end       (ISO 8601 UTC strings; both empty removes
+         *                       any saved window)
+         *   - granted_repeats  (int, optional — signed delta, see below)
+         *
+         * The `granted_repeats` field is a *delta*, not an absolute total.
+         * A single POST both saves the date window AND, if the field is
+         * present, applies the grant adjustment. Response includes the
+         * post-save state so the block doesn't need a follow-up GET.
          */
         public function user_quiz_access($request) {
             $group_id = intval($request['group_id']);
@@ -1562,18 +1585,52 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
 
             if ('GET' === $request->get_method()) {
                 $access_dates = BYS_Groups_Quiz_Access::get_user_quiz_access_dates($user_id, $group_id);
+
+                $quiz_id = intval($request->get_param('quiz_id'));
+                if ($quiz_id) {
+                    $window = $access_dates[$quiz_id] ?? [];
+                    return [
+                        'start'            => $window['start'] ?? '',
+                        'end'              => $window['end']   ?? '',
+                        'attempts_summary' => BYS_Groups_Quiz_Access::get_user_quiz_attempts_summary($user_id, $quiz_id),
+                    ];
+                }
+
                 return $access_dates;
             }
 
             if ('POST' === $request->get_method()) {
-                $quiz_id = intval($request->get_json_params()['quiz_id'] ?? 0);
+                $body    = $request->get_json_params();
+                $quiz_id = intval($body['quiz_id'] ?? 0);
                 if (!$quiz_id) return new WP_Error('bad_request', 'Invalid quiz_id', ['status' => 400]);
 
-                $start = sanitize_text_field($request->get_json_params()['start'] ?? '');
-                $end   = sanitize_text_field($request->get_json_params()['end']   ?? '');
+                $start = sanitize_text_field($body['start'] ?? '');
+                $end   = sanitize_text_field($body['end']   ?? '');
 
                 BYS_Groups_Quiz_Access::save_user_quiz_access_dates($user_id, $group_id, $quiz_id, $start, $end);
-                return ['success' => true];
+
+                $response = ['success' => true];
+
+                // Delta model for the grant adjustment:
+                // +N: award N additional repeats (adds to stored total)
+                // -N: revoke N (subtracts; clamped at 0 so the total can never go negative)
+                // 0: no-op
+                if (array_key_exists('granted_repeats', $body)) {
+                    $delta    = (int) $body['granted_repeats'];
+                    $previous = BYS_Groups_Quiz_Access::get_user_quiz_granted_repeats($user_id, $quiz_id);
+                    $granted  = max(0, $previous + $delta);
+                    BYS_Groups_Quiz_Access::save_user_quiz_granted_repeats($user_id, $quiz_id, $granted);
+
+                    $post_summary = BYS_Groups_Quiz_Access::get_user_quiz_attempts_summary($user_id, $quiz_id);
+                    $response['granted_repeats'] = [
+                        'granted'   => $granted,
+                        'remaining' => (int) $post_summary['granted_repeats_remaining'],
+                        'previous'  => $previous,
+                        'delta'     => $delta,
+                    ];
+                }
+
+                return $response;
             }
 
             return new WP_Error('method_not_allowed', 'Error executing this request.', ['status' => 405]);
