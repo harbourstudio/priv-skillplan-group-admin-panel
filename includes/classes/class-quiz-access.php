@@ -19,6 +19,8 @@ if (!class_exists('BYS_Groups_Quiz_Access')) {
         const GROUP_QUIZ_ACCESS_META = '_bys_quiz_access';
         const GROUP_USER_QUIZ_ACCESS_META = '_bys_user_quiz_access_';
         const USER_QUIZ_GRANTED_REPEATS_META = '_bys_quiz_granted_repeats_';
+        // Hard cap on the stored granted-repeats total per user + quiz.
+        const MAX_USER_QUIZ_GRANTED_REPEATS = 10;
         // Attempts count snapshotted the moment a repeats are granted. Consumption is
         // is measured forward from this baseline so a user's historical over-base
         // attempts don't retroactively consume new grants
@@ -517,7 +519,7 @@ if (!class_exists('BYS_Groups_Quiz_Access')) {
         public static function save_user_quiz_granted_repeats($user_id, $quiz_id, $count) {
             $user_id  = (int) $user_id;
             $quiz_id  = (int) $quiz_id;
-            $count    = max(0, (int) $count);
+            $count    = max(0, min(self::MAX_USER_QUIZ_GRANTED_REPEATS, (int) $count));
             $previous = self::get_user_quiz_granted_repeats($user_id, $quiz_id);
 
             $grant_key    = self::USER_QUIZ_GRANTED_REPEATS_META . $quiz_id;
@@ -529,7 +531,7 @@ if (!class_exists('BYS_Groups_Quiz_Access')) {
             } else {
                 update_user_meta($user_id, $grant_key, $count);
 
-                // Snapshot only on 0
+                // Snapshot only on 0 → positive (start of a new series).
                 if ($previous === 0) {
                     $attempts_count = self::count_user_quiz_attempts($user_id, $quiz_id);
                     update_user_meta($user_id, $baseline_key, $attempts_count);

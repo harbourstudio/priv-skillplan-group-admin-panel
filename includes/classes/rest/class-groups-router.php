@@ -1618,7 +1618,8 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 if (array_key_exists('granted_repeats', $body)) {
                     $delta    = (int) $body['granted_repeats'];
                     $previous = BYS_Groups_Quiz_Access::get_user_quiz_granted_repeats($user_id, $quiz_id);
-                    $granted  = max(0, $previous + $delta);
+                    // Clamp to [0, MAX] here so the response body reflects the true stored value
+                    $granted  = max(0, min(BYS_Groups_Quiz_Access::MAX_USER_QUIZ_GRANTED_REPEATS, $previous + $delta));
                     BYS_Groups_Quiz_Access::save_user_quiz_granted_repeats($user_id, $quiz_id, $granted);
 
                     $post_summary = BYS_Groups_Quiz_Access::get_user_quiz_attempts_summary($user_id, $quiz_id);
