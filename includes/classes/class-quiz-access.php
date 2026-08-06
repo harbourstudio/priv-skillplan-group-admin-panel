@@ -15,6 +15,11 @@ if (!class_exists('BYS_Groups_Quiz_Access')) {
         const GROUP_QUIZ_ACCESS_META = '_bys_quiz_access';
         const GROUP_USER_QUIZ_ACCESS_META = '_bys_user_quiz_access_';
         const USER_QUIZ_GRANTED_REPEATS_META = '_bys_quiz_granted_repeats_';
+        // Snapshot of the user's attempts count at the moment their current
+        // grant series started (grant went 0 → positive). Consumption is
+        // measured forward from this baseline so historical over-base
+        // attempts don't retroactively burn through a fresh grant.
+        const USER_QUIZ_GRANT_BASELINE_META = '_bys_quiz_grant_baseline_';
 
         public function __construct() {
             // apply the custom start/end date
@@ -56,6 +61,16 @@ if (!class_exists('BYS_Groups_Quiz_Access')) {
          * silently dropped. Counting attempts via learndash_get_user_quiz_attempt
          * (course-irrespective) keeps the gate aligned with the leader-facing summary.
          *
+         * Allowed iff the user has budget in EITHER bucket:
+         *   base_left  = max(0, base  - taken)          — untouched base allowance
+         *   grant_used = max(0, taken - baseline)       — attempts SINCE grant was awarded
+         *   grant_left = max(0, grant - grant_used)     — grant remaining
+         *
+         * The baseline (attempts count at grant-award time, see
+         * USER_QUIZ_GRANT_BASELINE_META) is what makes a fresh grant usable
+         * even for a learner who has already exceeded base — their
+         * historical over-base attempts don't retroactively burn through it.
+         *
          * @param bool|int $attempts_left  LD's initial verdict (ignored).
          * @param int      $attempts_count LD's course-scoped count (ignored).
          * @param int      $user_id
@@ -69,16 +84,22 @@ if (!class_exists('BYS_Groups_Quiz_Access')) {
                 return $attempts_left; // Unlimited quiz — nothing to enforce.
             }
 
-            $grant = self::get_user_quiz_granted_repeats((int) $user_id, (int) $quiz_id);
+            $grant    = self::get_user_quiz_granted_repeats((int) $user_id, (int) $quiz_id);
+            $baseline = self::get_user_quiz_grant_baseline((int) $user_id, (int) $quiz_id);
 
             $attempts = function_exists('learndash_get_user_quiz_attempt')
                 ? learndash_get_user_quiz_attempt((int) $user_id, ['quiz' => (int) $quiz_id])
                 : [];
             $accurate_count = is_array($attempts) ? count($attempts) : 0;
 
-            $allowed_total = (int) $repeats + $grant;
+            $base       = (int) $repeats;
+            $base_left  = max(0, $base - $accurate_count);
+            $grant_used = max(0, $accurate_count - $baseline);
+            $grant_left = max(0, $grant - $grant_used);
 
-            return ($accurate_count < $allowed_total) ? 1 : 0;
+            $has_budget = ($base_left > 0) || ($grant_left > 0);
+
+            return $has_budget ? 1 : 0;
         }
 
         /**
@@ -465,9 +486,17 @@ if (!class_exists('BYS_Groups_Quiz_Access')) {
         }
 
         /**
-         * Persist the running total of additional repeats. Returns the
-         * previous value so callers can diff for email notifications. A
-         * count of 0 deletes the meta row so it doesn't linger.
+         * Persist the running total of additional repeats + maintain the
+         * grant-series baseline. Returns the previous value so callers can
+         * diff for email notifications.
+         *
+         * Baseline rules (see USER_QUIZ_GRANT_BASELINE_META docblock):
+         *   - previous 0, new > 0   → snapshot baseline = current taken
+         *                             (starts a fresh grant series)
+         *   - previous > 0, new > 0 → baseline preserved
+         *                             (extending / trimming existing series)
+         *   - previous > 0, new = 0 → delete baseline
+         *                             (series ended; next grant starts fresh)
          */
         public static function save_user_quiz_granted_repeats($user_id, $quiz_id, $count) {
             $user_id  = (int) $user_id;
@@ -475,14 +504,47 @@ if (!class_exists('BYS_Groups_Quiz_Access')) {
             $count    = max(0, (int) $count);
             $previous = self::get_user_quiz_granted_repeats($user_id, $quiz_id);
 
-            $meta_key = self::USER_QUIZ_GRANTED_REPEATS_META . $quiz_id;
+            $grant_key    = self::USER_QUIZ_GRANTED_REPEATS_META . $quiz_id;
+            $baseline_key = self::USER_QUIZ_GRANT_BASELINE_META . $quiz_id;
+
             if ($count === 0) {
-                delete_user_meta($user_id, $meta_key);
+                delete_user_meta($user_id, $grant_key);
+                delete_user_meta($user_id, $baseline_key);
             } else {
-                update_user_meta($user_id, $meta_key, $count);
+                update_user_meta($user_id, $grant_key, $count);
+
+                // Only snapshot when starting a fresh series — 0 → positive.
+                // Preserve on positive → positive so accumulated consumption
+                // isn't wiped by additional grants mid-series.
+                if ($previous === 0) {
+                    $attempts_taken = self::count_user_quiz_attempts($user_id, $quiz_id);
+                    update_user_meta($user_id, $baseline_key, $attempts_taken);
+                }
             }
 
             return $previous;
+        }
+
+        /**
+         * Attempts count sourced the same way get_user_quiz_attempts_summary
+         * counts them — via `learndash_get_user_quiz_attempt` — so the
+         * baseline is consistent with what downstream calculations see.
+         */
+        private static function count_user_quiz_attempts($user_id, $quiz_id) {
+            if (!function_exists('learndash_get_user_quiz_attempt')) return 0;
+            $attempts = learndash_get_user_quiz_attempt((int) $user_id, ['quiz' => (int) $quiz_id]);
+            return is_array($attempts) ? count($attempts) : 0;
+        }
+
+        /**
+         * Read the grant-series baseline (attempts count at the time the
+         * user's current grant series began). Returns 0 when no baseline
+         * has been snapshotted — safe default that behaves like "no
+         * historical attempts to exclude".
+         */
+        public static function get_user_quiz_grant_baseline($user_id, $quiz_id) {
+            $value = get_user_meta((int) $user_id, self::USER_QUIZ_GRANT_BASELINE_META . (int) $quiz_id, true);
+            return $value === '' ? 0 : max(0, (int) $value);
         }
 
         /**
@@ -533,12 +595,16 @@ if (!class_exists('BYS_Groups_Quiz_Access')) {
             $repeats_unlimited = $global_repeats <= 0;
 
             $granted_repeats = self::get_user_quiz_granted_repeats($user_id, $quiz_id);
+            $baseline        = self::get_user_quiz_grant_baseline($user_id, $quiz_id);
 
-            // Grants are consumed once the learner takes attempts beyond
-            // the quiz's base allowance. Unlimited quizzes never consume.
+            // Consumption is measured forward from the grant baseline, not
+            // from the quiz's base allowance. Any attempts the learner had
+            // BEFORE the grant was awarded are grandfathered — they don't
+            // burn through the fresh grant. Unlimited quizzes never
+            // consume grants at all.
             $consumed_grants = $repeats_unlimited
                 ? 0
-                : max(0, $total_attempts - $global_repeats);
+                : max(0, $total_attempts - $baseline);
             $granted_remaining = max(0, $granted_repeats - $consumed_grants);
 
             return [
@@ -546,6 +612,7 @@ if (!class_exists('BYS_Groups_Quiz_Access')) {
                 'last_attempt_utc'          => $last_attempt_utc,
                 'granted_repeats'           => $granted_repeats,
                 'granted_repeats_remaining' => $granted_remaining,
+                'grant_baseline'            => $baseline,
                 'global_repeats'            => $global_repeats,
                 'repeats_unlimited'         => $repeats_unlimited,
             ];
