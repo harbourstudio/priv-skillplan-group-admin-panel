@@ -22,6 +22,7 @@ const DEFAULT_STATE = {
   users: null,
   leaders: null,
   courses: null,
+  pending_users: null,
 };
 
 function loadInitialState() {
@@ -35,6 +36,7 @@ function loadInitialState() {
       users: parsed.users ?? null,
       leaders: parsed.leaders ?? null,
       courses: parsed.courses ?? null,
+      pending_users: parsed.pending_users ?? null,
     };
   } catch (_err) {
     return { ...DEFAULT_STATE };
@@ -51,6 +53,7 @@ const store = window[KEY] || {
     this.state.users = null;
     this.state.leaders = null;
     this.state.courses = null;
+    this.state.pending_users = null;
     this._emit();
   },
 
@@ -93,6 +96,13 @@ const store = window[KEY] || {
   // email, avatar) so consumers can render directly from cache on a HIT.
   setLeaders(leaders) {
     this.state.leaders = leaders;
+    this._emit();
+  },
+
+  // Count of outstanding learner invites for the current group. Sourced from
+  // /base-group-data on group switch; group-stats reads it on paint.
+  setPendingUsers(count) {
+    this.state.pending_users = Number.isFinite(count) ? count : null;
     this._emit();
   },
 
@@ -139,6 +149,10 @@ const store = window[KEY] || {
 
   getCourses() {
     return this.state.courses;
+  },
+
+  getPendingUsers() {
+    return this.state.pending_users;
   },
 
   // Derived getters: read from the stored arrays, no separate slots.
