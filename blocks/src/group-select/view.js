@@ -39,15 +39,17 @@ jQuery(document).ready(($) => {
 
     try {
       const basegroupdata = await api.get(endpoints.baseGroupData(groupId), true); // Force refresh
-      const users   = Array.isArray(basegroupdata?.users)   ? basegroupdata.users   : [];
-      const courses = Array.isArray(basegroupdata?.courses) ? basegroupdata.courses : [];
-      const leaders = Array.isArray(basegroupdata?.leaders) ? basegroupdata.leaders : [];
+      const users         = Array.isArray(basegroupdata?.users)   ? basegroupdata.users   : [];
+      const courses       = Array.isArray(basegroupdata?.courses) ? basegroupdata.courses : [];
+      const leaders       = Array.isArray(basegroupdata?.leaders) ? basegroupdata.leaders : [];
+      const pendingUsers  = Number.isFinite(basegroupdata?.pending_users) ? basegroupdata.pending_users : 0;
 
-      // Populate the shared store with hydrated users + courses + leaders.
+      // Populate the shared store with hydrated users + courses + leaders + pending count.
       store.setCurrentGroup(groupId);
       store.setUsers(users);
       store.setCourses(courses);
       store.setLeaders(leaders);
+      store.setPendingUsers(pendingUsers);
 
       // Group-specific capability flags — server computes them in /me/groups
       // and we surface them on the <option data-*>. Blocks gate UI on
