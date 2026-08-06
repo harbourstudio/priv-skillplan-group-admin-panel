@@ -194,7 +194,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/groups/(?P<group_id>\d+)/users/(?P<user_id>\d+)/notify-quiz-access', [
                 'methods'             => WP_REST_Server::CREATABLE,
                 'callback'            => [$this, 'notify_user_quiz_access'],
-                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_access_group($request['group_id']),
+                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_access_user($request['user_id']),
             ]);
 
             // Broadcasts the group-level quiz access to every group user
@@ -207,7 +207,7 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/groups/(?P<group_id>\d+)/users/(?P<user_id>\d+)/quiz-access', [
                 'methods'             => 'GET, POST',
                 'callback'            => [$this, 'user_quiz_access'],
-                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_access_group($request['group_id']),
+                'permission_callback' => fn($request) => BYS_Groups_Permissions::can_access_user($request['user_id']),
             ]);
 
             register_rest_route(BYS_Groups_Core::REST_NAMESPACE, '/groups/(?P<group_id>\d+)/quiz-access', [
@@ -252,10 +252,9 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
 
         /**
          * GET /groups/{group_id}/base-group-data
-         * Single-call dashboard bootstrap: returns hydrated users + courses
-         * for the group. Replaces the legacy two-call pattern (user-stats
-         * + courses) used by group-select. Does NOT compute the expensive
-         * inactive-members count — that lives in /group-stats.
+         * Single-call dashboard bootstrap: returns hydrated users, courses,
+         * leaders, and the pending-users count for the group. Replaces the
+         * legacy two-call pattern (user-stats + courses) used by group-select.
          */
         public function get_base_group_data($request) {
             $group_id = intval($request['group_id']);
@@ -374,60 +373,46 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             //    Lets group-leaders skip its own /leaders fetch on cold load.
             $leaders = $this->fetch_group_leaders($group_id);
 
+            // ── 5. Outstanding learner invites for the group-stats tile.
+            $pending_users = $this->count_pending_users($group_id);
+
             return new WP_REST_Response([
-                'group_id' => $group_id,
-                'users'    => $users,
-                'courses'  => $courses,
-                'leaders'  => $leaders,
+                'group_id'      => $group_id,
+                'users'         => $users,
+                'courses'       => $courses,
+                'leaders'       => $leaders,
+                'pending_users' => $pending_users,
             ], 200);
         }
 
+        /**
+         * Count outstanding learner invites for a group — the "pending"
+         * population shown in the group-stats tile.
+         */
+        private function count_pending_users($group_id) {
+            global $wpdb;
+            $invites_table = $wpdb->prefix . BYS_GROUPS_INVITES_TABLE;
+            return (int) $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM {$invites_table}
+                 WHERE group_id = %d AND status = 'pending' AND role = 'learner'",
+                intval($group_id)
+            ));
+        }
+
+        /**
+         * GET /groups/{group_id}/group-stats
+         * Fallback endpoint for the group-stats block when the shared store
+         * is cold (no cached /base-group-data payload for the group).
+         * On warm loads the block reads the same number from
+         * the store and this endpoint is never hit.
+         */
         public function get_base_group_stats($request) {
             $group_id = intval($request['group_id']);
             if (!$group_id) return new WP_Error('bad_request', 'Invalid group ID', ['status' => 400]);
 
-            $auth_header = BYS_Groups_Auth::get_auth_header();
-            if (!$auth_header) return new WP_Error('server_error', 'API credentials not configured', ['status' => 500]);
-
-            // Paginate LD's group-users endpoint for IDs
-            $user_ids = [];
-            $page     = 1;
-            $per_page = 100;
-            do {
-                $url = get_home_url() . "/wp-json/ldlms/v2/groups/{$group_id}/users?_fields=id&per_page={$per_page}&page={$page}";
-                $response = wp_remote_get($url, [
-                    'headers'   => ['Authorization' => $auth_header],
-                    'timeout'   => 30,
-                    'sslverify' => false,
-                ]);
-                if (is_wp_error($response)) return new WP_Error('server_error', $response->get_error_message(), ['status' => 500]);
-                if (wp_remote_retrieve_response_code($response) !== 200) {
-                    return new WP_Error('ld_api_failure', 'Failed to fetch users from LearnDash API', ['status' => 502]);
-                }
-                $page_users = json_decode(wp_remote_retrieve_body($response), true);
-                if (!is_array($page_users) || empty($page_users)) break;
-                foreach ($page_users as $u) {
-                    $user_ids[] = intval($u['id']);
-                }
-                $page++;
-            } while (count($page_users) === $per_page);
-
-            // Inactive = no login meta at all. Known N+1, intentionally kept
-            // isolated to this endpoint so only group-stats pays the cost.
-            $inactive_members = 0;
-            foreach ($user_ids as $user_id) {
-                $login_meta = [
-                    intval(get_user_meta($user_id, '_ld_notifications_last_login', true) ?: 0),
-                    intval(get_user_meta($user_id, 'learndash-last-login',          true) ?: 0),
-                ];
-                if (max($login_meta) === 0) $inactive_members++;
-            }
-
             return [
-                'group_id'               => $group_id,
-                'total_members'          => count($user_ids),
-                'total_inactive_members' => $inactive_members,
-                'user_ids'               => $user_ids,
+                'group_id'      => $group_id,
+                'pending_users' => $this->count_pending_users($group_id),
             ];
         }
 
@@ -1541,8 +1526,31 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
 
         /**
          * GET|POST /groups/{group_id}/users/{user_id}/quiz-access
-         * Per-user override of the group-level quiz-access window. Same shape
-         * as group_quiz_access but scoped to a specific user.
+         *
+         * Per-user quiz configuration surface. Owns two things:
+         * 1. Quiz access window (start/end datetimes) that gates when this user can take the quiz.
+         * 2. Granted quiz repeats total: additional retakes the leader
+         *    has granted to the user on top of the quiz's global `sfwd-quiz_repeats`.
+         *
+         * GET forms
+         *   - no query params:  returns { quiz_id: {start, end}, ... } — a
+         *                       map of every saved access window for this
+         *                       user. Legacy shape; kept for older callers.
+         *   - ?quiz_id=X:       returns { start, end, attempts_summary }
+         *                       for a single quiz. The block uses this
+         *                       shape after a learner+quiz selection so it
+         *                       can populate the date pickers AND the
+         *                       attempts info panel in a single round trip.
+         * POST body
+         *   - quiz_id          (int, required)
+         *   - start, end       (ISO 8601 UTC strings; both empty removes
+         *                       any saved window)
+         *   - granted_repeats  (int, optional — signed delta, see below)
+         *
+         * The `granted_repeats` field is a *delta*, not an absolute total.
+         * A single POST both saves the date window AND, if the field is
+         * present, applies the grant adjustment. Response includes the
+         * post-save state so the block doesn't need a follow-up GET.
          */
         public function user_quiz_access($request) {
             $group_id = intval($request['group_id']);
@@ -1553,18 +1561,53 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
 
             if ('GET' === $request->get_method()) {
                 $access_dates = BYS_Groups_Quiz_Access::get_user_quiz_access_dates($user_id, $group_id);
+
+                $quiz_id = intval($request->get_param('quiz_id'));
+                if ($quiz_id) {
+                    $window = $access_dates[$quiz_id] ?? [];
+                    return [
+                        'start'            => $window['start'] ?? '',
+                        'end'              => $window['end']   ?? '',
+                        'attempts_summary' => BYS_Groups_Quiz_Access::get_user_quiz_attempts_summary($user_id, $quiz_id),
+                    ];
+                }
+
                 return $access_dates;
             }
 
             if ('POST' === $request->get_method()) {
-                $quiz_id = intval($request->get_json_params()['quiz_id'] ?? 0);
+                $body    = $request->get_json_params();
+                $quiz_id = intval($body['quiz_id'] ?? 0);
                 if (!$quiz_id) return new WP_Error('bad_request', 'Invalid quiz_id', ['status' => 400]);
 
-                $start = sanitize_text_field($request->get_json_params()['start'] ?? '');
-                $end   = sanitize_text_field($request->get_json_params()['end']   ?? '');
+                $start = sanitize_text_field($body['start'] ?? '');
+                $end   = sanitize_text_field($body['end']   ?? '');
 
                 BYS_Groups_Quiz_Access::save_user_quiz_access_dates($user_id, $group_id, $quiz_id, $start, $end);
-                return ['success' => true];
+
+                $response = ['success' => true];
+
+                // Delta model for the grant adjustment:
+                // +N: award N additional repeats (adds to stored total)
+                // -N: revoke N (subtracts; clamped at 0 so the total can never go negative)
+                // 0: no-op
+                if (array_key_exists('granted_repeats', $body)) {
+                    $delta    = (int) $body['granted_repeats'];
+                    $previous = BYS_Groups_Quiz_Access::get_user_quiz_granted_repeats($user_id, $quiz_id);
+                    // Clamp to [0, MAX] here so the response body reflects the true stored value
+                    $granted  = max(0, min(BYS_Groups_Quiz_Access::MAX_USER_QUIZ_GRANTED_REPEATS, $previous + $delta));
+                    BYS_Groups_Quiz_Access::save_user_quiz_granted_repeats($user_id, $quiz_id, $granted);
+
+                    $post_summary = BYS_Groups_Quiz_Access::get_user_quiz_attempts_summary($user_id, $quiz_id);
+                    $response['granted_repeats'] = [
+                        'granted'   => $granted,
+                        'remaining' => (int) $post_summary['granted_repeats_remaining'],
+                        'previous'  => $previous,
+                        'delta'     => $delta,
+                    ];
+                }
+
+                return $response;
             }
 
             return new WP_Error('method_not_allowed', 'Error executing this request.', ['status' => 405]);
@@ -1603,6 +1646,15 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             $start  = $window['start'] ?? '';
             $end    = $window['end']   ?? '';
 
+            // Resolve the learner's total attempts on this quiz for the
+            // email body. attempts_allowed = quiz's base + this user's
+            // granted repeats; attempts_unlimited wins over the count.
+            $summary            = BYS_Groups_Quiz_Access::get_user_quiz_attempts_summary($user_id, $quiz_id);
+            $attempts_unlimited = (bool) $summary['repeats_unlimited'];
+            $attempts_allowed   = $attempts_unlimited
+                ? null
+                : ((int) $summary['global_repeats'] + (int) $summary['granted_repeats']);
+
             $postmark_token = get_option('bys_postmark_token', '');
             if (empty($postmark_token)) {
                 return new WP_Error('server_error', 'Postmark token not configured', ['status' => 500]);
@@ -1619,17 +1671,17 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
 
             // Build the email content unconditionally so history modal shows "what would have been sent" rather than display empty content
             $email = bys_get_quiz_access_notification_email([
-                'recipient_name'    => !empty($recipient->display_name) ? $recipient->display_name : $recipient->user_login,
-                'site_name'         => get_bloginfo('name'),
-                'site_url'          => home_url(),
-                'quiz_title'        => $quiz_post ? get_the_title($quiz_post) : 'your quiz',
-                'quiz_url'          => $quiz_post ? get_permalink($quiz_post) : home_url(),
-                'start'             => $start,
-                'end'               => $end,
-                'sender_email'      => $sender_email,
-                'attempts_granted'  => $attempts_granted,
-                'attempts_previous' => $attempts_previous,
-                'unsubscribe_url'   => BYS_Groups_Signed_URL::build_unsubscribe_url($user_id),
+                'recipient_name'     => !empty($recipient->display_name) ? $recipient->display_name : $recipient->user_login,
+                'site_name'          => get_bloginfo('name'),
+                'site_url'           => home_url(),
+                'quiz_title'         => $quiz_post ? get_the_title($quiz_post) : 'your quiz',
+                'quiz_url'           => $quiz_post ? get_permalink($quiz_post) : home_url(),
+                'start'              => $start,
+                'end'                => $end,
+                'sender_email'       => $sender_email,
+                'attempts_allowed'   => $attempts_allowed,
+                'attempts_unlimited' => $attempts_unlimited,
+                'unsubscribe_url'    => BYS_Groups_Signed_URL::build_unsubscribe_url($user_id),
             ]);
 
             if (empty($email['subject']) || empty($email['html'])) {

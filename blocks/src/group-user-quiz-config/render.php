@@ -37,7 +37,6 @@ $tz_offset_hours = $tz_offset_seconds / 3600;
             <p class="guqc__subtitle"><?php esc_html_e( 'Reset or resend attempts for a specific learner', 'bys' ); ?></p>
         </div>
 
-        <!-- Validation alert -->
         <div class="guqc__alert guqc__alert--error" style="display:none;">
             <div class="guqc__alert__title"><?php esc_html_e( 'Missing or invalid information', 'bys' ); ?></div>
             <ul class="guqc__alert__list"></ul>
@@ -133,20 +132,38 @@ $tz_offset_hours = $tz_offset_seconds / 3600;
                     <span class="skeleton"></span>
                 </div>
             </div>
-            <!-- <div class="guqc__date-field guqc__date-field--attempts" data-tooltip="<?php esc_attr_e('Attempts: max times a learner can take this quiz (blank = unlimited)', 'bys'); ?>">
-                <i class="fa-solid fa-hashtag guqc__date-icon" aria-hidden="true"></i>
+        </div>
+
+        <div class="guqc__attempts-group">
+            <label class="guqc__label" for="guqc__attempts-value">
+                <?php esc_html_e( 'Grant attempts', 'bys' ); ?>
+            </label>
+            <div class="guqc__attempts" data-tooltip="<?php esc_attr_e('Max total attempts granted to user: 10', 'bys'); ?>">
+                <button id="guqc__attempts-minus" type="button" class="btn-unstyled guqc__attempts-minus"
+                        aria-label="<?php esc_attr_e( 'Revoke one attempt', 'bys' ); ?>">
+                    <i class="fa-solid fa-minus" aria-hidden="true"></i>
+                </button>
                 <input
+                    id="guqc__attempts-value"
                     type="number"
-                    class="guqc__attempts"
-                    aria-label="<?php esc_attr_e( 'Number of attempts', 'bys' ); ?>"
+                    class="guqc__attempts-value"
+                    aria-label="<?php esc_attr_e( 'Number of attempts to grant (signed)', 'bys' ); ?>"
                     data-field-type="attempts"
-                    min="0"
-                    placeholder="<?php esc_attr_e( 'Unlimited', 'bys' ); ?>"
+                    placeholder="<?php esc_attr_e( '0', 'bys' ); ?>"
                 />
-                <div class="guqc__field-skeleton" role="status" aria-busy="true" aria-label="<?php esc_attr_e( 'Awaiting quiz selection', 'bys' ); ?>" hidden>
-                    <span class="skeleton"></span>
-                </div>
-            </div> -->
+                <button id="guqc__attempts-add" type="button" class="btn-unstyled guqc__attempts-add"
+                        aria-label="<?php esc_attr_e( 'Grant one attempt', 'bys' ); ?>">
+                    <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="guqc__attempts-info" hidden>
+            <ul>
+                <li><?php esc_html_e( 'Base attempts:', 'bys' ); ?> <span class="guqc__attempts-base"><span class="skeleton"></span></span></li>
+                <li><?php esc_html_e( 'Attempts taken:', 'bys' ); ?> <span class="guqc__attempts-taken"><span class="skeleton"></span></span></li>
+                <li><?php esc_html_e( 'Additional attempts:', 'bys' ); ?> <span class="guqc__attempts-additional"><span class="skeleton"></span></span></li>
+            </ul>
         </div>
 
         <div class="guqc__actions">
