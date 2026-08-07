@@ -76,37 +76,87 @@ function bys_lander_resolve( int $lander_id ): array {
             (array) learndash_get_administrators_group_ids( $user_id )
         ) ) );
 
-        $matched_group_id = null;
+        // Collect ALL groups the user belongs to — the same lander may be shared
+        // across multiple groups in one org, so we must not stop at the first hit.
+        $matched_group_ids = [];
         foreach ( $org_groups as $g ) {
             $gid = $g instanceof WP_Post ? $g->ID : intval( $g );
             if ( in_array( $gid, $user_group_ids, true ) ) {
-                $matched_group_id = $gid;
-                break;
+                $matched_group_ids[] = $gid;
             }
         }
 
-        if ( $matched_group_id ) {
-            $courses_group_title = get_the_title( $matched_group_id );
+        if ( ! empty( $matched_group_ids ) ) {
+            // Use the first matched group's title for display.
+            $courses_group_title = get_the_title( $matched_group_ids[0] );
 
-            $raw_required        = get_post_meta( $matched_group_id, '_bys_required_course_ids', true );
-            $lander_required_ids = is_array( $raw_required ) ? array_map( 'intval', $raw_required ) : [];
+            // ── Aggregate courses from every matched group ────────────────────
+            // $course_group_data[ cid ][ gid ] = [ 'required' => bool, 'unmet' => [] ]
+            $course_group_data = [];
 
-            $enrolled = array_unique( array_map( 'intval', (array) learndash_group_enrolled_courses( $matched_group_id ) ) );
+            foreach ( $matched_group_ids as $gid ) {
+                $raw_required = get_post_meta( $gid, '_bys_required_course_ids', true );
+                $required_ids = is_array( $raw_required ) ? array_map( 'intval', $raw_required ) : [];
+                $enrolled     = array_unique( array_map( 'intval', (array) learndash_group_enrolled_courses( $gid ) ) );
 
-            foreach ( $enrolled as $cid ) {
-                $unmet = BYS_Groups_Prerequisites::get_unmet_prerequisites( $cid, $matched_group_id, $user_id );
+                foreach ( $enrolled as $cid ) {
+                    $unmet = BYS_Groups_Prerequisites::get_unmet_prerequisites( $cid, $gid, $user_id );
+                    $course_group_data[ $cid ][ $gid ] = [
+                        'required' => in_array( $cid, $required_ids, true ),
+                        'unmet'    => $unmet,
+                    ];
+                }
+            }
+
+            // ── Build merged course meta ──────────────────────────────────────
+            // required: true if required in ANY matched group (required takes precedence).
+            // locked:   true only if prerequisites are unmet in ALL groups where the
+            //           course appears — meeting them in one group is enough to unlock.
+            foreach ( $course_group_data as $cid => $group_entries ) {
+                $is_required  = false;
+                $locked_in_all = true;
+                $all_unmet    = [];
+
+                foreach ( $group_entries as $data ) {
+                    if ( $data['required'] ) {
+                        $is_required = true;
+                    }
+                    if ( empty( $data['unmet'] ) ) {
+                        $locked_in_all = false; // at least one group has prereqs met
+                    } else {
+                        $all_unmet = array_merge( $all_unmet, $data['unmet'] );
+                    }
+                }
+
+                $is_locked = $locked_in_all;
+                $all_unmet = array_unique( $all_unmet );
+
                 $lander_course_meta[ $cid ] = [
-                    'is_required'   => in_array( $cid, $lander_required_ids, true ),
-                    'is_locked'     => ! empty( $unmet ),
-                    'prereq_titles' => array_map( 'get_the_title', $unmet ),
+                    'is_required'   => $is_required,
+                    'is_locked'     => $is_locked,
+                    'prereq_titles' => $is_locked ? array_map( 'get_the_title', $all_unmet ) : [],
                 ];
             }
 
-            $bucket_required = array_values( array_filter( $enrolled, fn( $id ) => $lander_course_meta[ $id ]['is_required'] && ! $lander_course_meta[ $id ]['is_locked'] ) );
-            $bucket_optional = array_values( array_filter( $enrolled, fn( $id ) => ! $lander_course_meta[ $id ]['is_required'] && ! $lander_course_meta[ $id ]['is_locked'] ) );
-            $bucket_locked   = array_values( array_filter( $enrolled, fn( $id ) => $lander_course_meta[ $id ]['is_locked'] ) );
+            $enrolled_all    = array_keys( $course_group_data );
+            $bucket_required = array_values( array_filter( $enrolled_all, fn( $id ) => $lander_course_meta[ $id ]['is_required'] && ! $lander_course_meta[ $id ]['is_locked'] ) );
+            $bucket_optional = array_values( array_filter( $enrolled_all, fn( $id ) => ! $lander_course_meta[ $id ]['is_required'] && ! $lander_course_meta[ $id ]['is_locked'] ) );
+            $bucket_locked   = array_values( array_filter( $enrolled_all, fn( $id ) => $lander_course_meta[ $id ]['is_locked'] ) );
 
-            $course_order = BYS_Course_Order::get_order( $matched_group_id );
+            // ── Merge sort orders from all matched groups ─────────────────────
+            // For courses appearing in multiple group orders, the lowest (earliest)
+            // position wins so the most prominent placement is honoured.
+            $merged_order = []; // [ cid => min_position ]
+            foreach ( $matched_group_ids as $gid ) {
+                foreach ( BYS_Course_Order::get_order( $gid ) as $position => $cid ) {
+                    if ( ! isset( $merged_order[ $cid ] ) || $position < $merged_order[ $cid ] ) {
+                        $merged_order[ $cid ] = $position;
+                    }
+                }
+            }
+            asort( $merged_order );
+            $course_order = array_keys( $merged_order );
+
             if ( ! empty( $course_order ) ) {
                 $order_map     = array_flip( $course_order );
                 $sort_by_order = function ( array &$bucket ) use ( $order_map ) {
