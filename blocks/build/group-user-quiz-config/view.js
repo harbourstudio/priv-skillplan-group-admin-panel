@@ -249,6 +249,73 @@ const api = apiSingleton;
 
 /***/ },
 
+/***/ "./src/_shared/skeleton.js"
+/*!*********************************!*\
+  !*** ./src/_shared/skeleton.js ***!
+  \*********************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   SKELETON: () => (/* binding */ SKELETON),
+/* harmony export */   SKELETONS: () => (/* binding */ SKELETONS),
+/* harmony export */   skeletonCells: () => (/* binding */ skeletonCells),
+/* harmony export */   skeletonRows: () => (/* binding */ skeletonRows)
+/* harmony export */ });
+/**
+ * Shared skeleton helpers.
+ *
+ * Pairs with _shared/skeleton.css. See that file for the markup convention.
+ */
+
+/**
+ * Build a string of <td><span class="skeleton" aria-hidden="true"></span></td>
+ * cells for a single table-row skeleton.
+ *
+ * The caller is responsible for wrapping the row(s) in a <tr> and for setting
+ * `aria-busy="true"` on the surrounding <tbody> (or other wrapper).
+ *
+ * @param {number} colCount Number of <td> skeleton cells to emit.
+ * @returns {string} HTML string.
+ */
+function skeletonCells(colCount) {
+  return Array(colCount).fill('<td><span class="skeleton" aria-hidden="true"></span></td>').join('');
+}
+
+/**
+ * Build one or more skeleton table rows ready to drop inside a <tbody>.
+ *
+ * @param {number} colCount Cells per row.
+ * @param {number} [rowCount=1] Number of rows.
+ * @returns {string} HTML string.
+ */
+function skeletonRows(colCount, rowCount = 1) {
+  const row = `<tr>${skeletonCells(colCount)}</tr>`;
+  return Array(rowCount).fill(row).join('');
+}
+
+/**
+ * Single skeleton bone. Use when a block needs one placeholder element.
+ * Carries its own ARIA — drop it straight into any container.
+ */
+const SKELETON = `
+    <div class="skeleton" role="status" aria-busy="true" aria-live="polite"></div>
+`;
+
+/**
+ * Grouped skeleton bones with wrapper-level ARIA. Use when multiple bones
+ * should be announced as one loading region.
+ */
+const SKELETONS = `
+    <div class="skeletons" role="status" aria-busy="true" aria-live="polite">
+        <div class="skeleton"></div>
+        <div class="skeleton"></div>
+        <div class="skeleton"></div>
+    </div>
+`;
+
+/***/ },
+
 /***/ "./src/_shared/store.js"
 /*!******************************!*\
   !*** ./src/_shared/store.js ***!
@@ -281,7 +348,8 @@ const DEFAULT_STATE = {
   group_id: null,
   users: null,
   leaders: null,
-  courses: null
+  courses: null,
+  pending_users: null
 };
 function loadInitialState() {
   try {
@@ -295,7 +363,8 @@ function loadInitialState() {
       group_id: parsed.group_id ?? null,
       users: parsed.users ?? null,
       leaders: parsed.leaders ?? null,
-      courses: parsed.courses ?? null
+      courses: parsed.courses ?? null,
+      pending_users: parsed.pending_users ?? null
     };
   } catch (_err) {
     return {
@@ -312,6 +381,7 @@ const store = window[KEY] || {
     this.state.users = null;
     this.state.leaders = null;
     this.state.courses = null;
+    this.state.pending_users = null;
     this._emit();
   },
   // Merge by id. Stubs (just { id }) get upgraded in place when a hydrated
@@ -357,6 +427,12 @@ const store = window[KEY] || {
     this.state.leaders = leaders;
     this._emit();
   },
+  // Count of outstanding learner invites for the current group. Sourced from
+  // /base-group-data on group switch; group-stats reads it on paint.
+  setPendingUsers(count) {
+    this.state.pending_users = Number.isFinite(count) ? count : null;
+    this._emit();
+  },
   // Stores course objects with the fields blocks need at render time.
   // - quizzes_show_test_grading_config:  [{step_id, step_title, start, end}, ...]
   //                      (show_test_grading_config=1). Used by group-ungraded-
@@ -394,6 +470,9 @@ const store = window[KEY] || {
   },
   getCourses() {
     return this.state.courses;
+  },
+  getPendingUsers() {
+    return this.state.pending_users;
   },
   // Derived getters: read from the stored arrays, no separate slots.
   getUserIds() {
@@ -3251,6 +3330,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _shared_alert_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../_shared/alert.js */ "./src/_shared/alert.js");
 /* harmony import */ var flatpickr__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! flatpickr */ "./node_modules/flatpickr/dist/esm/index.js");
 /* harmony import */ var flatpickr_dist_flatpickr_min_css__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! flatpickr/dist/flatpickr.min.css */ "./node_modules/flatpickr/dist/flatpickr.min.css");
+/* harmony import */ var _shared_skeleton_js__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../_shared/skeleton.js */ "./src/_shared/skeleton.js");
+
 
 
 
@@ -3262,6 +3343,19 @@ let userQuizAccessDatesMap = {};
 let currentGroupId = null;
 let selectedUserId = null;
 let selectedQuizId = null;
+
+// Cap on how many granted attempts a user can have
+// The backend enforces the same bound (see
+// BYS_Groups_Quiz_Access::MAX_USER_QUIZ_GRANTED_REPEATS in the plugin)
+const MAX_GRANTED_REPEATS = 10;
+
+// Snapshot of the picked learner + quiz's grant state. Two numbers:
+//  - remaining = grant total minus attempts already consumed. Gates the "-"
+//  button and drives the "Additional attempts" cell.
+//  - stored = the leader-set total currently saved on the server.
+//  Gates the "+" button (against MAX_GRANTED_REPEATS).
+let currentAdditionalAttemptsRemaining = 0;
+let currentAdditionalAttemptsStored = 0;
 let startFp = null;
 let endFp = null;
 
@@ -3303,6 +3397,15 @@ jQuery(document).ready($ => {
   const $dateSkeletons = $block.find('.guqc__date-field .guqc__field-skeleton');
   const $startClear = $block.find('.guqc__date-clear[data-field-type="start"]');
   const $endClear = $block.find('.guqc__date-clear[data-field-type="end"]');
+
+  // Granted-repeats controls + info panel.
+  const $attemptsInput = $block.find('.guqc__attempts-value[data-field-type="attempts"]');
+  const $attemptsPlus = $block.find('#guqc__attempts-add');
+  const $attemptsMinus = $block.find('#guqc__attempts-minus');
+  const $attemptsInfo = $block.find('.guqc__attempts-info');
+  const $attemptsBase = $attemptsInfo.find('.guqc__attempts-base');
+  const $attemptsTaken = $attemptsInfo.find('.guqc__attempts-taken');
+  const $attemptsAdditional = $attemptsInfo.find('.guqc__attempts-additional');
 
   // ── Flatpickr init ────────────────────────────────────────────────────────
 
@@ -3380,6 +3483,19 @@ jQuery(document).ready($ => {
     endFp.clear();
     syncClearButton($endClear, false);
   });
+  $attemptsPlus.on('click', e => {
+    e.preventDefault();
+    setAttemptsValue(readAttemptsValue() + 1);
+  });
+  $attemptsMinus.on('click', e => {
+    e.preventDefault();
+    setAttemptsValue(readAttemptsValue() - 1);
+  });
+  // Handles the case where the leader typed a value directly
+  // Clamps to the same bounds as buttons
+  $attemptsInput.on('change', function () {
+    setAttemptsValue(readAttemptsValue());
+  });
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -3438,21 +3554,110 @@ jQuery(document).ready($ => {
     endFp.set('minDate', null);
   }
 
+  // ── Attempts controls ─────────────────────────────────────────────────────
+
+  /**
+   * Read the delta input as a signed integer. Empty or non-numeric
+   * inputs read as 0.
+   */
+  function readAttemptsValue() {
+    const raw = parseInt($attemptsInput.val(), 10);
+    return Number.isFinite(raw) ? raw : 0;
+  }
+
+  /**
+   * Delta bounds, computed from the current state snapshot. The leader
+   * can revoke down to what's still available and grant up to the cap.
+   */
+  function attemptsMinDelta() {
+    return -currentAdditionalAttemptsRemaining;
+  }
+  function attemptsMaxDelta() {
+    return MAX_GRANTED_REPEATS - currentAdditionalAttemptsStored;
+  }
+
+  /**
+   * Mirror the current bounds for the input's min/max
+   */
+  function syncAttemptsBounds() {
+    $attemptsInput.attr('min', attemptsMinDelta());
+    $attemptsInput.attr('max', attemptsMaxDelta());
+  }
+
+  /**
+   * Write a value into the delta input while adhering to current clamps.
+   * Empty string represents "no change".
+   */
+  function setAttemptsValue(delta) {
+    let n = parseInt(delta, 10);
+    if (!Number.isFinite(n)) n = 0;
+    n = Math.min(Math.max(n, attemptsMinDelta()), attemptsMaxDelta());
+    $attemptsInput.val(n === 0 ? '' : n);
+  }
+
+  /**
+   * Fill the info panel from a fresh summary payload. Passing null
+   * puts the panel back into its loading state (skeletons + hidden).
+   */
+  function renderAttemptsInfo(summary) {
+    if (!summary) {
+      currentAdditionalAttemptsRemaining = 0;
+      currentAdditionalAttemptsStored = 0;
+      $attemptsBase.html(_shared_skeleton_js__WEBPACK_IMPORTED_MODULE_5__.SKELETON);
+      $attemptsTaken.html(_shared_skeleton_js__WEBPACK_IMPORTED_MODULE_5__.SKELETON);
+      $attemptsAdditional.html(_shared_skeleton_js__WEBPACK_IMPORTED_MODULE_5__.SKELETON);
+      $attemptsInfo.attr('hidden', '');
+      syncAttemptsBounds();
+      return;
+    }
+    currentAdditionalAttemptsRemaining = parseInt(summary.granted_repeats_remaining, 10) || 0;
+    currentAdditionalAttemptsStored = parseInt(summary.granted_repeats, 10) || 0;
+    const baseText = summary.repeats_unlimited ? 'Unlimited' : parseInt(summary.global_repeats, 10) || 0;
+    $attemptsBase.text(baseText);
+    $attemptsTaken.text(summary.total_attempts ?? 0);
+    $attemptsAdditional.text(currentAdditionalAttemptsRemaining);
+    $attemptsInfo.removeAttr('hidden');
+    syncAttemptsBounds();
+  }
+
+  /**
+   * Show the info panel in loading state
+   */
+  function setAwaitingAttemptsInfo(awaiting) {
+    if (!awaiting) return;
+    $attemptsBase.html(_shared_skeleton_js__WEBPACK_IMPORTED_MODULE_5__.SKELETON);
+    $attemptsTaken.html(_shared_skeleton_js__WEBPACK_IMPORTED_MODULE_5__.SKELETON);
+    $attemptsAdditional.html(_shared_skeleton_js__WEBPACK_IMPORTED_MODULE_5__.SKELETON);
+    $attemptsInfo.removeAttr('hidden');
+  }
+
   // ── Quiz access date loading ───────────────────────────────────────────────
 
   async function loadQuizAccessDates() {
     if (!selectedUserId || !selectedQuizId || !currentGroupId) {
       clearDates();
+      renderAttemptsInfo(null);
+      setAttemptsValue(0);
       return;
     }
     try {
-      const accessDates = await _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.api.get(_shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.endpoints.userQuizAccess(currentGroupId, selectedUserId));
-      const dates = accessDates[selectedQuizId] || {};
-      setDates(dates.start || '', dates.end || '');
-      userQuizAccessDatesMap = accessDates;
+      // Enriched shape: dates + attempts_summary in one call. See
+      // user_quiz_access() in class-groups-router.php.
+      const url = _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.endpoints.userQuizAccess(currentGroupId, selectedUserId) + '?quiz_id=' + encodeURIComponent(selectedQuizId);
+      const data = await _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.api.get(url);
+      setDates(data.start || '', data.end || '');
+      renderAttemptsInfo(data.attempts_summary || null);
+      // Delta input always starts at "no change" for a fresh quiz load.
+      setAttemptsValue(0);
+      userQuizAccessDatesMap[selectedQuizId] = {
+        start: data.start || '',
+        end: data.end || ''
+      };
     } catch (err) {
-      console.error('[uqc] Failed to load quiz access dates:', err);
+      console.error('[uqc] Failed to load quiz access data:', err);
       clearDates();
+      renderAttemptsInfo(null);
+      setAttemptsValue(0);
     }
   }
 
@@ -3490,6 +3695,8 @@ jQuery(document).ready($ => {
     $quizInput.val('');
     clearDates();
     setAwaitingQuiz(true);
+    setAwaitingAttemptsInfo(true);
+    setAttemptsValue(0);
   }
   $learnerInput.on('focus', function () {
     showLearnerSuggestions($(this).val());
@@ -3551,6 +3758,8 @@ jQuery(document).ready($ => {
   function invalidateDatesForQuizChange() {
     clearDates();
     setAwaitingDates(true);
+    setAwaitingAttemptsInfo(true);
+    setAttemptsValue(0);
   }
   $quizInput.on('focus', function () {
     showQuizSuggestions($(this).val());
@@ -3600,26 +3809,47 @@ jQuery(document).ready($ => {
   // ── Save ──────────────────────────────────────────────────────────────────
 
   /**
-   * Persist the current learner/quiz window — pure data op, throws on
-   * failure so callers decide the UI response. Shared by the explicit
-   * Save click AND the auto-save embedded in the Notify click (leaders
-   * routinely change dates and forget to save before notifying).
+   * Save the current access window + any pending grant delta. Pure
+   * data op — throws on failure so the caller (Save button or the
+   * auto-save inside Notify) decides how to react in the UI.
+   *
+   * The Notify path relies on this too, because leaders routinely
+   * edit dates and click Notify without hitting Save first.
    */
   async function persistUserAccessDates() {
-    // Read from the hidden inputs Flatpickr writes its dateFormat value to
+    // Flatpickr writes its dateFormat value into these hidden inputs.
     const startValue = $block.find('.guqc__datetime[data-field-type="start"]').val() || '';
     const endValue = $block.find('.guqc__datetime[data-field-type="end"]').val() || '';
     const start = convertToUTC(startValue);
     const end = convertToUTC(endValue);
-    await _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.api.post(_shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.endpoints.userQuizAccess(currentGroupId, selectedUserId), {
+
+    // Only send granted_repeats when the leader actually moved the
+    // delta off zero. A zero delta means "no grant change" — no
+    // reason to include the field.
+    const payload = {
       quiz_id: selectedQuizId,
       start,
       end
-    });
+    };
+    const delta = readAttemptsValue();
+    if (delta !== 0) payload.granted_repeats = delta;
+    const response = await _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.api.post(_shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.endpoints.userQuizAccess(currentGroupId, selectedUserId), payload);
     userQuizAccessDatesMap[selectedQuizId] = {
       start,
       end
     };
+
+    // The server tells us the post-save state so we can update the
+    // info panel and the +/- clamps without an extra GET. Then reset
+    // the delta input to empty — otherwise a second Save click would
+    // reapply the same delta.
+    if (response && response.granted_repeats) {
+      currentAdditionalAttemptsRemaining = parseInt(response.granted_repeats.remaining, 10) || 0;
+      currentAdditionalAttemptsStored = parseInt(response.granted_repeats.granted, 10) || 0;
+      $attemptsAdditional.text(currentAdditionalAttemptsRemaining);
+      syncAttemptsBounds();
+    }
+    setAttemptsValue(0);
   }
   $saveBtn.on('click', async function () {
     if (!selectedUserId || !selectedQuizId || !currentGroupId) return;
@@ -3765,6 +3995,8 @@ jQuery(document).ready($ => {
     $learnerInput.val('');
     $quizInput.val('');
     clearDates();
+    renderAttemptsInfo(null); // hide the info panel until user+quiz are picked
+    setAttemptsValue(0);
     hideLearnerSuggestions();
     hideQuizSuggestions();
     setAwaitingQuiz(false); // Fresh group → no stale quiz to invalidate.

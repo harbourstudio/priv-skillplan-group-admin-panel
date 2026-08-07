@@ -220,7 +220,8 @@ const DEFAULT_STATE = {
   group_id: null,
   users: null,
   leaders: null,
-  courses: null
+  courses: null,
+  pending_users: null
 };
 function loadInitialState() {
   try {
@@ -234,7 +235,8 @@ function loadInitialState() {
       group_id: parsed.group_id ?? null,
       users: parsed.users ?? null,
       leaders: parsed.leaders ?? null,
-      courses: parsed.courses ?? null
+      courses: parsed.courses ?? null,
+      pending_users: parsed.pending_users ?? null
     };
   } catch (_err) {
     return {
@@ -251,6 +253,7 @@ const store = window[KEY] || {
     this.state.users = null;
     this.state.leaders = null;
     this.state.courses = null;
+    this.state.pending_users = null;
     this._emit();
   },
   // Merge by id. Stubs (just { id }) get upgraded in place when a hydrated
@@ -296,6 +299,12 @@ const store = window[KEY] || {
     this.state.leaders = leaders;
     this._emit();
   },
+  // Count of outstanding learner invites for the current group. Sourced from
+  // /base-group-data on group switch; group-stats reads it on paint.
+  setPendingUsers(count) {
+    this.state.pending_users = Number.isFinite(count) ? count : null;
+    this._emit();
+  },
   // Stores course objects with the fields blocks need at render time.
   // - quizzes_show_test_grading_config:  [{step_id, step_title, start, end}, ...]
   //                      (show_test_grading_config=1). Used by group-ungraded-
@@ -333,6 +342,9 @@ const store = window[KEY] || {
   },
   getCourses() {
     return this.state.courses;
+  },
+  getPendingUsers() {
+    return this.state.pending_users;
   },
   // Derived getters: read from the stored arrays, no separate slots.
   getUserIds() {
@@ -459,8 +471,8 @@ jQuery(document).ready($ => {
   const $totalMembers = $block.find('.total_members');
   const $completedCourses = $block.find('.completed_courses');
   const $incompleteCourses = $block.find('.incomplete_courses');
-  const $totalInactiveMembers = $block.find('.total_inactive_members');
-  const $allStats = $totalMembers.add($completedCourses).add($incompleteCourses).add($totalInactiveMembers);
+  const $pendingUsers = $block.find('.pending_users');
+  const $allStats = $totalMembers.add($completedCourses).add($incompleteCourses).add($pendingUsers);
   function setStat($numberEl, value) {
     $numberEl.html(value);
     $numberEl.siblings('.skeleton').hide();
@@ -472,23 +484,27 @@ jQuery(document).ready($ => {
       $n.siblings('.skeleton').show();
     });
   }
-
-  /**
-   * Data that the block needs to count inactive members are available through the store
-   * Read from store first, then send a request to /group-stats as fallback 
-   * 
-   */
-  function paintMembershipStats(users) {
+  function paintTotalMembers(users) {
     setStat($totalMembers, users.length);
-    const inactive = users.filter(u => u.last_login === null).length;
-    setStat($totalInactiveMembers, inactive);
+  }
+  function paintPendingUsers(count) {
+    setStat($pendingUsers, count);
   }
 
-  // if the store already has users cached (from prior page session), show both stats right away
-  const cachedUsers = _shared_store_js__WEBPACK_IMPORTED_MODULE_1__["default"].getUsers();
-  if (Array.isArray(cachedUsers)) {
-    paintMembershipStats(cachedUsers);
+  // Fallback: /group-stats returns { group_id, pending_users } when the store
+  // is cold (no /base-group-data hit for this group yet).
+  function fetchPendingFromApi(groupId) {
+    _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.api.get(_shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.endpoints.baseGroupStats(groupId), true).then(stats => paintPendingUsers(stats?.pending_users ?? 0)).catch(err => {
+      console.error('[group-stats] Failed to fetch /group-stats', err);
+      paintPendingUsers(0);
+    });
   }
+
+  // Warm-cache paint: hydrate whichever slots the store already has.
+  const cachedUsers = _shared_store_js__WEBPACK_IMPORTED_MODULE_1__["default"].getUsers();
+  if (Array.isArray(cachedUsers)) paintTotalMembers(cachedUsers);
+  const cachedPending = _shared_store_js__WEBPACK_IMPORTED_MODULE_1__["default"].getPendingUsers();
+  if (typeof cachedPending === 'number') paintPendingUsers(cachedPending);
 
   // listen for the custom jquery event triggered by group-select block
   $(document).on('bys:groupSelected', async (_, {
@@ -497,13 +513,15 @@ jQuery(document).ready($ => {
     showAllSkeletons();
     const storeUsers = _shared_store_js__WEBPACK_IMPORTED_MODULE_1__["default"].getUsers();
     if (Array.isArray(storeUsers)) {
-      paintMembershipStats(storeUsers);
+      paintTotalMembers(storeUsers);
     } else {
       setStat($totalMembers, 0);
-      _shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.api.get(_shared_api_client_js__WEBPACK_IMPORTED_MODULE_0__.endpoints.baseGroupStats(groupId), true).then(stats => setStat($totalInactiveMembers, stats?.total_inactive_members ?? 0)).catch(err => {
-        console.error('[group-stats] Failed to fetch /group-stats', err);
-        setStat($totalInactiveMembers, 0);
-      });
+    }
+    const storePending = _shared_store_js__WEBPACK_IMPORTED_MODULE_1__["default"].getPendingUsers();
+    if (typeof storePending === 'number') {
+      paintPendingUsers(storePending);
+    } else {
+      fetchPendingFromApi(groupId);
     }
 
     // Course-completion stats
