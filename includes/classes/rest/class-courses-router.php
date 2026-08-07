@@ -411,7 +411,7 @@ if (!class_exists('BYS_Groups_Courses_Router')) {
             // Override pass when any question is still ungraded
             $statistic_ref_id = isset($meta['statistic_ref_id']) ? intval($meta['statistic_ref_id']) : 0;
             $pass_value       = isset($meta['pass']) ? (bool) intval($meta['pass']) : null;
-            if ($statistic_ref_id && $this->attempt_has_ungraded_questions($statistic_ref_id)) {
+            if ($statistic_ref_id && BYS_Groups_Quiz_Grading::attempt_has_ungraded_questions($statistic_ref_id)) {
                 $pass_value = null;
             }
 
@@ -937,53 +937,6 @@ if (!class_exists('BYS_Groups_Courses_Router')) {
         }
 
         // ─── Private helpers ────────────────────────────────────────────────
-
-        /**
-         * Returns true if the attempt has any questions still requiring manual grading.
-         * Essays use sfwd-essays post_status; assessment/free_answer use the 0,0
-         * correct/incorrect count pattern LD leaves when ungraded.
-         */
-        private function attempt_has_ungraded_questions($statistic_ref_id) {
-            if (!$statistic_ref_id) return false;
-
-            global $wpdb;
-            $stat_table     = LDLMS_DB::get_table_name('quiz_statistic');
-            $question_table = LDLMS_DB::get_table_name('quiz_question');
-
-            if (!$stat_table || !$question_table) return false;
-
-            // assessment_answer / free_answer: LD leaves these at correct=0,incorrect=0 when ungraded
-            $count = (int) $wpdb->get_var($wpdb->prepare(
-                "SELECT COUNT(*)
-                 FROM {$stat_table} s
-                 INNER JOIN {$question_table} q ON q.id = s.question_id
-                 WHERE s.statistic_ref_id = %d
-                   AND q.answer_type IN ('assessment_answer', 'free_answer')
-                   AND s.correct_count = 0 AND s.incorrect_count = 0",
-                $statistic_ref_id
-            ));
-
-            if ($count > 0) return true;
-
-            // Essays: LD sets incorrect_count=1 by default, so post_status is the only reliable signal
-            $essay_answer_data = $wpdb->get_col($wpdb->prepare(
-                "SELECT s.answer_data
-                 FROM {$stat_table} s
-                 INNER JOIN {$question_table} q ON q.id = s.question_id
-                 WHERE s.statistic_ref_id = %d AND q.answer_type = 'essay'",
-                $statistic_ref_id
-            ));
-
-            foreach ($essay_answer_data as $raw) {
-                $data      = json_decode($raw, true);
-                $graded_id = isset($data['graded_id']) ? intval($data['graded_id']) : 0;
-                if (!$graded_id || get_post_status($graded_id) !== 'graded') {
-                    return true;
-                }
-            }
-
-            return false;
-        }
 
         /**
          * Parse a user's answer from the stat table + the question's answer options

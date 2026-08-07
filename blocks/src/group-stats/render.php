@@ -35,9 +35,9 @@ $stats = [
 	],
 	[
 		'icon' => 'inactive-participants.svg',
-		'alt'  => 'inactive',
-		'stat' => 'total_inactive_members',
-		'label' => 'Inactive Participants',
+		'alt'  => 'pending',
+		'stat' => 'pending_users',
+		'label' => 'Pending Participants',
 	],
 ];
 

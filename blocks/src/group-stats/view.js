@@ -8,8 +8,8 @@ jQuery(document).ready(($) => {
   const $totalMembers = $block.find('.total_members');
   const $completedCourses = $block.find('.completed_courses');
   const $incompleteCourses = $block.find('.incomplete_courses');
-  const $totalInactiveMembers = $block.find('.total_inactive_members');
-  const $allStats = $totalMembers.add($completedCourses).add($incompleteCourses).add($totalInactiveMembers);
+  const $pendingUsers = $block.find('.pending_users');
+  const $allStats = $totalMembers.add($completedCourses).add($incompleteCourses).add($pendingUsers);
 
   function setStat($numberEl, value) {
     $numberEl.html(value);
@@ -24,22 +24,30 @@ jQuery(document).ready(($) => {
     });
   }
 
-  /**
-   * Data that the block needs to count inactive members are available through the store
-   * Read from store first, then send a request to /group-stats as fallback 
-   * 
-   */
-  function paintMembershipStats(users) {
+  function paintTotalMembers(users) {
     setStat($totalMembers, users.length);
-    const inactive = users.filter((u) => u.last_login === null).length;
-    setStat($totalInactiveMembers, inactive);
   }
 
-  // if the store already has users cached (from prior page session), show both stats right away
-  const cachedUsers = store.getUsers();
-  if (Array.isArray(cachedUsers)) {
-    paintMembershipStats(cachedUsers);
+  function paintPendingUsers(count) {
+    setStat($pendingUsers, count);
   }
+
+  // Fallback: /group-stats returns { group_id, pending_users } when the store
+  // is cold (no /base-group-data hit for this group yet).
+  function fetchPendingFromApi(groupId) {
+    api.get(endpoints.baseGroupStats(groupId), true)
+      .then((stats) => paintPendingUsers(stats?.pending_users ?? 0))
+      .catch((err) => {
+        console.error('[group-stats] Failed to fetch /group-stats', err);
+        paintPendingUsers(0);
+      });
+  }
+
+  // Warm-cache paint: hydrate whichever slots the store already has.
+  const cachedUsers = store.getUsers();
+  if (Array.isArray(cachedUsers)) paintTotalMembers(cachedUsers);
+  const cachedPending = store.getPendingUsers();
+  if (typeof cachedPending === 'number') paintPendingUsers(cachedPending);
 
   // listen for the custom jquery event triggered by group-select block
   $(document).on('bys:groupSelected', async (_, { groupId }) => {
@@ -48,15 +56,16 @@ jQuery(document).ready(($) => {
 
     const storeUsers = store.getUsers();
     if (Array.isArray(storeUsers)) {
-      paintMembershipStats(storeUsers);
+      paintTotalMembers(storeUsers);
     } else {
       setStat($totalMembers, 0);
-      api.get(endpoints.baseGroupStats(groupId), true)
-        .then((stats) => setStat($totalInactiveMembers, stats?.total_inactive_members ?? 0))
-        .catch((err) => {
-          console.error('[group-stats] Failed to fetch /group-stats', err);
-          setStat($totalInactiveMembers, 0);
-        });
+    }
+
+    const storePending = store.getPendingUsers();
+    if (typeof storePending === 'number') {
+      paintPendingUsers(storePending);
+    } else {
+      fetchPendingFromApi(groupId);
     }
 
     // Course-completion stats

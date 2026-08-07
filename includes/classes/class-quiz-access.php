@@ -2,7 +2,11 @@
 /**
  * BYS_Groups_Quiz_Access
  *
- * Hooks into LD's access control to enforce custom start/end access dates for specific sfwd-quiz at the sfwd-group and group-user levels
+ * Owns two per-user quiz overrides that layer on top of LD:
+ *  1. Access-window: start/end datetimes that gate when a sfwd-quiz
+ *  can be taken at both group-level and user-level 
+ *  2. Granted repeats: additional retakes awarded to a user, added on top
+ *  of the quiz's global `sfwd-quiz_repeats` setting.
  *
  * @package BYS_Groups
  * @since 1.0.0
@@ -14,13 +18,90 @@ if (!class_exists('BYS_Groups_Quiz_Access')) {
     class BYS_Groups_Quiz_Access {
         const GROUP_QUIZ_ACCESS_META = '_bys_quiz_access';
         const GROUP_USER_QUIZ_ACCESS_META = '_bys_user_quiz_access_';
+        const USER_QUIZ_GRANTED_REPEATS_META = '_bys_quiz_granted_repeats_';
+        // Hard cap on the stored granted-repeats total per user + quiz.
+        const MAX_USER_QUIZ_GRANTED_REPEATS = 10;
+        // Attempts count snapshotted the moment a repeats are granted. Consumption is
+        // is measured forward from this baseline so a user's historical over-base
+        // attempts don't retroactively consume new grants
+        const USER_QUIZ_GRANTED_REPEATS_BASELINE_META = '_bys_quiz_granted_repeats_baseline_';
 
         public function __construct() {
-            // apply the custom start/end date
+            // Apply the group/user-level start/end access window on top of
+            // LD's own lesson-access date logic.
             add_filter('ld_lesson_access_from', array($this, 'apply_quiz_access_dates'), 10, 3);
 
-            // hooks into learndash_content to show a gated quiz view by using a custom 'quiz-unavailable' template
+            // When the access window is closed, swap LD's quiz content for
+            // our custom "quiz-unavailable" template.
             add_filter('learndash_content', array($this, 'display_gated_quiz'), 1, 2);
+
+            // Per-user override of the quiz's retake limit. Two filters
+            // cover both paths LD uses:
+            // - learndash_allowed_repeats: read by the deprecated `learndash_can_attempt_again()` helper
+            // - learndash_quiz_attempts: the modern gate used by the [ld_quiz] shortcode
+            add_filter('learndash_allowed_repeats', array($this, 'apply_user_granted_repeats'), 10, 3);
+            add_filter('learndash_quiz_attempts', array($this, 'apply_user_granted_repeats_to_quiz_attempts'), 10, 4);
+        }
+
+        /**
+         * Filter for `learndash_allowed_repeats` (LD's deprecated path).
+         * Composes the user's granted repeats onto the quiz's global `sfwd-quiz_repeats`
+         * value. Unlimited quizzes (base 0/empty) are left alone.
+         */
+        public function apply_user_granted_repeats($repeats, $user_id, $quiz_id) {
+            $grant = self::get_user_quiz_granted_repeats((int) $user_id, (int) $quiz_id);
+            if ($grant <= 0) {
+                return $repeats;
+            }
+            $base = (int) $repeats;
+            return $base > 0 ? $base + $grant : $repeats;
+        }
+
+        /**
+         * Filter for `learndash_quiz_attempts` (LD's modern gate used by
+         * the [ld_quiz] shortcode to decide whether the Start/Restart
+         * button renders). We authoritatively recompute `$attempts_left`
+         * rather than composing with LD's own inputs — LD's `$attempts_count`
+         * is course-scoped and silently drops `_sfwd-quizzes` rows without a
+         * matching `course` field, which makes it under-report for our
+         * purposes. Sourcing the count via `learndash_get_user_quiz_attempt`
+         * keeps the gate aligned with what `get_user_quiz_attempts_summary`
+         * shows the leader.
+         *
+         * base_left = max(0, base - attempts) — untouched base capacity
+         * grant_used = max(0, attempts - baseline) — attempts since grant awarded
+         * grant_left = max(0, grant - grant_used) — granted repeats still available
+         *
+         * The baseline (see USER_QUIZ_GRANTED_REPEATS_BASELINE_META) is what
+         * lets a fresh grant work for a learner who has already exceeded
+         * base, so that their historical over-base attempts don't retroactively
+         * consume the new grant.
+         *
+         * @param bool|int $attempts_left  LD's initial verdict (ignored).
+         * @param int      $attempts_count LD's course-scoped count (ignored).
+         * @param int      $user_id
+         * @param int      $quiz_id
+         * @return bool|int  1 if allowed, 0 if locked.
+         */
+        public function apply_user_granted_repeats_to_quiz_attempts($attempts_left, $attempts_count, $user_id, $quiz_id) {
+            $quiz_settings = learndash_get_setting((int) $quiz_id);
+            $repeats = isset($quiz_settings['repeats']) ? trim((string) $quiz_settings['repeats']) : '';
+            if ('' === $repeats) {
+                return $attempts_left; // Unlimited quiz — nothing to enforce.
+            }
+
+            $grant    = self::get_user_quiz_granted_repeats((int) $user_id, (int) $quiz_id);
+            $baseline = self::get_user_quiz_granted_repeats_baseline((int) $user_id, (int) $quiz_id);
+            $attempts_count = self::count_user_quiz_attempts($user_id, $quiz_id);
+
+            $base       = (int) $repeats;
+            $base_left  = max(0, $base - $attempts_count);
+            $grant_used = max(0, $attempts_count - $baseline);
+            $grant_left = max(0, $grant - $grant_used);
+
+            $has_budget = ($base_left > 0) || ($grant_left > 0);
+
+            return $has_budget ? 1 : 0;
         }
 
         /**
@@ -395,6 +476,173 @@ if (!class_exists('BYS_Groups_Quiz_Access')) {
             }
 
             update_user_meta($user_id, self::GROUP_USER_QUIZ_ACCESS_META . $group_id, $access_dates);
+        }
+
+        /**
+         * Read the leader-set granted-repeats total for this user + quiz.
+         * Returns 0 when nothing has been granted (or the meta row was
+         * deleted by a full revoke).
+         */
+        public static function get_user_quiz_granted_repeats($user_id, $quiz_id) {
+            $value = get_user_meta((int) $user_id, self::USER_QUIZ_GRANTED_REPEATS_META . (int) $quiz_id, true);
+            return $value === '' ? 0 : max(0, (int) $value);
+        }
+
+        /**
+         * Save the leader-set granted-repeats total. Also maintains a
+         * "baseline" — the learner's attempts count at the moment the
+         * current grant was awarded. The baseline is what lets us tell
+         * whether a later attempt was consumed against a granted repeat
+         * or was part of the learner's pre-grant history.
+         *
+         * Returns the previous stored total so callers can diff old vs
+         * new (the notify email uses this to describe what changed).
+         *
+         * How the baseline reacts to each save — three cases:
+         *
+         *  1. First grant awarded to a user who has none
+         *      ($previous = 0, $count > 0)
+         *      Snapshot the baseline to the user's current attempts count.
+         *      Anything the learner has done up to this point si treated as
+         *      history and does not consume new grants.
+         *
+         *  2. Adjusting a grant that's already active
+         *      ($previous > 0, $count > 0 — leader adds or subtracts)
+         *      Baseline is left alone. Attempts taken since the original
+         *      award continue to count against the grant total.
+         *
+         *  3. Fully revoking all grants
+         *      ($previous > 0, $count = 0)
+         *      Delete both the grant and baseline meta rows. If the leader
+         *      awards a new grant, case #1 fires and a fresh baseline is snapshotted
+         */
+        public static function save_user_quiz_granted_repeats($user_id, $quiz_id, $count) {
+            $user_id  = (int) $user_id;
+            $quiz_id  = (int) $quiz_id;
+            $count    = max(0, min(self::MAX_USER_QUIZ_GRANTED_REPEATS, (int) $count));
+            $previous = self::get_user_quiz_granted_repeats($user_id, $quiz_id);
+
+            $grant_key    = self::USER_QUIZ_GRANTED_REPEATS_META . $quiz_id;
+            $baseline_key = self::USER_QUIZ_GRANTED_REPEATS_BASELINE_META . $quiz_id;
+
+            if ($count === 0) {
+                delete_user_meta($user_id, $grant_key);
+                delete_user_meta($user_id, $baseline_key);
+            } else {
+                update_user_meta($user_id, $grant_key, $count);
+
+                // Snapshot only on 0 → positive (start of a new series).
+                if ($previous === 0) {
+                    $attempts_count = self::count_user_quiz_attempts($user_id, $quiz_id);
+                    update_user_meta($user_id, $baseline_key, $attempts_count);
+                }
+            }
+
+            return $previous;
+        }
+
+        /**
+         * Count the user's attempts on this quiz. Sourced via
+         * `learndash_get_user_quiz_attempt` so the value stays consistent
+         * with what `get_user_quiz_attempts_summary` and the gate filter
+         * observe (course-irrespective).
+         */
+        private static function count_user_quiz_attempts($user_id, $quiz_id) {
+            if (!function_exists('learndash_get_user_quiz_attempt')) return 0;
+            $attempts = learndash_get_user_quiz_attempt((int) $user_id, ['quiz' => (int) $quiz_id]);
+            return is_array($attempts) ? count($attempts) : 0;
+        }
+
+        /**
+         * Read the granted-repeats baseline for this user + quiz.
+         * Returns 0 when no baseline has been snapshotted.
+         */
+        public static function get_user_quiz_granted_repeats_baseline($user_id, $quiz_id) {
+            $value = get_user_meta((int) $user_id, self::USER_QUIZ_GRANTED_REPEATS_BASELINE_META . (int) $quiz_id, true);
+            return $value === '' ? 0 : max(0, (int) $value);
+        }
+
+        /**
+         * Snapshot of the user's LD attempt history + our per-user granted
+         * repeats, shaped for the group-user-quiz-config block's info panel.
+         *
+         * Returns:
+         *   total_attempts            (int)    — attempts already logged
+         *   last_attempt_utc          (string) — ISO 8601 UTC of most recent attempt, or ''
+         *   granted_repeats           (int)    — stored total awarded by the leader
+         *   granted_repeats_remaining (int)    — display-side computation:
+         *                                        stored total minus attempts logged
+         *                                        AFTER the grant baseline. Lets the
+         *                                        leader see what's actually still
+         *                                        available to the learner.
+         *   granted_repeats_baseline  (int)    — attempts count snapshotted when the
+         *                                        current grant series began, or 0 if
+         *                                        no series is active
+         *   global_repeats            (int)    — LD's own `sfwd-quiz_repeats` value
+         *   repeats_unlimited         (bool)   — true when global_repeats is 0/empty
+         */
+        public static function get_user_quiz_attempts_summary($user_id, $quiz_id) {
+            $user_id = (int) $user_id;
+            $quiz_id = (int) $quiz_id;
+
+            // Attempts history (from LD)
+            $total_attempts   = 0;
+            $last_attempt_utc = '';
+
+            if (function_exists('learndash_get_user_quiz_attempt')) {
+                $attempts = learndash_get_user_quiz_attempt($user_id, ['quiz' => $quiz_id]);
+                if (is_array($attempts)) {
+                    $total_attempts = count($attempts);
+
+                    $latest_ts = 0;
+                    foreach ($attempts as $attempt) {
+                        $ts = 0;
+                        if (isset($attempt['time'])) {
+                            $ts = (int) $attempt['time'];
+                        } elseif (isset($attempt['completed'])) {
+                            $ts = (int) $attempt['completed'];
+                        }
+                        if ($ts > $latest_ts) {
+                            $latest_ts = $ts;
+                        }
+                    }
+
+                    if ($latest_ts > 0) {
+                        // LD attempt timestamps are Unix (UTC).
+                        $last_attempt_utc = gmdate('c', $latest_ts);
+                    }
+                }
+            }
+
+            // Quiz base capacity (from LD post meta)
+            $quiz_meta      = get_post_meta($quiz_id, '_sfwd-quiz', true);
+            $global_repeats = is_array($quiz_meta) && isset($quiz_meta['sfwd-quiz_repeats'])
+                ? (int) $quiz_meta['sfwd-quiz_repeats']
+                : 0;
+            $repeats_unlimited = $global_repeats <= 0;
+
+            // Granted repeats + remaining
+            $grant    = self::get_user_quiz_granted_repeats($user_id, $quiz_id);
+            $baseline = self::get_user_quiz_granted_repeats_baseline($user_id, $quiz_id);
+
+            // Consumption is measured forward from the baseline, NOT from
+            // the quiz's base allowance. Any attempts the learner had
+            // BEFORE the grant was awarded are grandfathered so they don't
+            // consume fresh grant. Unlimited quizzes never consume grants at all.
+            $grant_used      = $repeats_unlimited
+                ? 0
+                : max(0, $total_attempts - $baseline);
+            $grant_remaining = max(0, $grant - $grant_used);
+
+            return [
+                'total_attempts'            => $total_attempts,
+                'last_attempt_utc'          => $last_attempt_utc,
+                'granted_repeats'           => $grant,
+                'granted_repeats_remaining' => $grant_remaining,
+                'granted_repeats_baseline'  => $baseline,
+                'global_repeats'            => $global_repeats,
+                'repeats_unlimited'         => $repeats_unlimited,
+            ];
         }
     }
 }
