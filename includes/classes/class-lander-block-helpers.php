@@ -100,41 +100,40 @@ function bys_lander_resolve( int $lander_id ): array {
                 $enrolled     = array_unique( array_map( 'intval', (array) learndash_group_enrolled_courses( $gid ) ) );
 
                 foreach ( $enrolled as $cid ) {
-                    $unmet = BYS_Groups_Prerequisites::get_unmet_prerequisites( $cid, $gid, $user_id );
+                    $lock = BYS_Groups_Prerequisites::get_lock_state( $cid, $user_id, $gid );
                     $course_group_data[ $cid ][ $gid ] = [
-                        'required' => in_array( $cid, $required_ids, true ),
-                        'unmet'    => $unmet,
+                        'required'      => in_array( $cid, $required_ids, true ),
+                        'is_locked'     => $lock['is_locked'],
+                        'prereq_titles' => $lock['prereq_titles'],
                     ];
                 }
             }
 
             // ── Build merged course meta ──────────────────────────────────────
             // required: true if required in ANY matched group (required takes precedence).
-            // locked:   true only if prerequisites are unmet in ALL groups where the
-            //           course appears — meeting them in one group is enough to unlock.
+            // locked:   true only if prerequisites (course AND form) are unmet in ALL
+            //           groups where the course appears — satisfying them in one group
+            //           is enough to unlock.
             foreach ( $course_group_data as $cid => $group_entries ) {
-                $is_required  = false;
-                $locked_in_all = true;
-                $all_unmet    = [];
+                $is_required       = false;
+                $locked_in_all     = true;
+                $all_prereq_titles = [];
 
                 foreach ( $group_entries as $data ) {
                     if ( $data['required'] ) {
                         $is_required = true;
                     }
-                    if ( empty( $data['unmet'] ) ) {
-                        $locked_in_all = false; // at least one group has prereqs met
+                    if ( ! $data['is_locked'] ) {
+                        $locked_in_all = false; // at least one group has all prereqs met
                     } else {
-                        $all_unmet = array_merge( $all_unmet, $data['unmet'] );
+                        $all_prereq_titles = array_merge( $all_prereq_titles, $data['prereq_titles'] );
                     }
                 }
 
-                $is_locked = $locked_in_all;
-                $all_unmet = array_unique( $all_unmet );
-
                 $lander_course_meta[ $cid ] = [
                     'is_required'   => $is_required,
-                    'is_locked'     => $is_locked,
-                    'prereq_titles' => $is_locked ? array_map( 'get_the_title', $all_unmet ) : [],
+                    'is_locked'     => $locked_in_all,
+                    'prereq_titles' => $locked_in_all ? array_unique( $all_prereq_titles ) : [],
                 ];
             }
 

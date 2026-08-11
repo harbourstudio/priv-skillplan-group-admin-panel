@@ -345,11 +345,25 @@ if (!class_exists('BYS_Groups_Organization')) {
                         'placeholder'  => 'Select a form',
                         'wrapper'      => ['width' => '50'],
                     ],
+                    [
+                        'key'          => 'field_org_user_update_form',
+                        'label'        => 'User Update Form',
+                        'name'         => 'user_update_form',
+                        'type'         => 'select',
+                        'choices'      => [],
+                        'default_value' => '',
+                        'allow_null'   => 1,
+                        'multiple'     => 0,
+                        'ui'           => 1,
+                        'return_format' => 'value',
+                        'placeholder'  => 'Select a form',
+                        'wrapper'      => ['width' => '50'],
+                    ],
                 ],
             ]);
 
             // Populate Gravity Forms choices dynamically so the select shows form names.
-            foreach ( ['field_org_onboarding_form', 'field_org_registration_form'] as $_fk ) {
+            foreach ( ['field_org_onboarding_form', 'field_org_registration_form', 'field_org_user_update_form'] as $_fk ) {
                 add_filter( "acf/load_field/key={$_fk}", function( $field ) {
                     $field['choices'] = [];
                     if ( class_exists( 'GFAPI' ) ) {

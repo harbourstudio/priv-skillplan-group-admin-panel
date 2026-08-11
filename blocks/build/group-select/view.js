@@ -220,7 +220,8 @@ const DEFAULT_STATE = {
   group_id: null,
   users: null,
   leaders: null,
-  courses: null
+  courses: null,
+  pending_users: null
 };
 function loadInitialState() {
   try {
@@ -234,7 +235,8 @@ function loadInitialState() {
       group_id: parsed.group_id ?? null,
       users: parsed.users ?? null,
       leaders: parsed.leaders ?? null,
-      courses: parsed.courses ?? null
+      courses: parsed.courses ?? null,
+      pending_users: parsed.pending_users ?? null
     };
   } catch (_err) {
     return {
@@ -251,6 +253,7 @@ const store = window[KEY] || {
     this.state.users = null;
     this.state.leaders = null;
     this.state.courses = null;
+    this.state.pending_users = null;
     this._emit();
   },
   // Merge by id. Stubs (just { id }) get upgraded in place when a hydrated
@@ -296,6 +299,12 @@ const store = window[KEY] || {
     this.state.leaders = leaders;
     this._emit();
   },
+  // Count of outstanding learner invites for the current group. Sourced from
+  // /base-group-data on group switch; group-stats reads it on paint.
+  setPendingUsers(count) {
+    this.state.pending_users = Number.isFinite(count) ? count : null;
+    this._emit();
+  },
   // Stores course objects with the fields blocks need at render time.
   // - quizzes_show_test_grading_config:  [{step_id, step_title, start, end}, ...]
   //                      (show_test_grading_config=1). Used by group-ungraded-
@@ -333,6 +342,9 @@ const store = window[KEY] || {
   },
   getCourses() {
     return this.state.courses;
+  },
+  getPendingUsers() {
+    return this.state.pending_users;
   },
   // Derived getters: read from the stored arrays, no separate slots.
   getUserIds() {
@@ -489,12 +501,14 @@ jQuery(document).ready($ => {
       const users = Array.isArray(basegroupdata?.users) ? basegroupdata.users : [];
       const courses = Array.isArray(basegroupdata?.courses) ? basegroupdata.courses : [];
       const leaders = Array.isArray(basegroupdata?.leaders) ? basegroupdata.leaders : [];
+      const pendingUsers = Number.isFinite(basegroupdata?.pending_users) ? basegroupdata.pending_users : 0;
 
-      // Populate the shared store with hydrated users + courses + leaders.
+      // Populate the shared store with hydrated users + courses + leaders + pending count.
       _shared_store_js__WEBPACK_IMPORTED_MODULE_1__["default"].setCurrentGroup(groupId);
       _shared_store_js__WEBPACK_IMPORTED_MODULE_1__["default"].setUsers(users);
       _shared_store_js__WEBPACK_IMPORTED_MODULE_1__["default"].setCourses(courses);
       _shared_store_js__WEBPACK_IMPORTED_MODULE_1__["default"].setLeaders(leaders);
+      _shared_store_js__WEBPACK_IMPORTED_MODULE_1__["default"].setPendingUsers(pendingUsers);
 
       // Group-specific capability flags — server computes them in /me/groups
       // and we surface them on the <option data-*>. Blocks gate UI on

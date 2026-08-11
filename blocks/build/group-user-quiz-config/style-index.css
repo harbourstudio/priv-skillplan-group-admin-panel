@@ -347,46 +347,65 @@
 .wp-block-bys-groups-group-user-quiz-config .guqc__date-field .flatpickr-alt-input::placeholder {
   color: var(--wp--preset--color--gray-400);
 }
-.wp-block-bys-groups-group-user-quiz-config .guqc__date-field[data-tooltip]:hover::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
-  background: #1f2937;
-  color: #fff;
-  font-size: 0.7rem;
-  font-weight: 400;
-  line-height: 1.4;
-  padding: 4px 10px;
-  border-radius: 4px;
-  white-space: nowrap;
-  pointer-events: none;
-  z-index: 100;
-}
 .wp-block-bys-groups-group-user-quiz-config .guqc__date-field--attempts {
   cursor: default;
 }
-.wp-block-bys-groups-group-user-quiz-config .guqc__attempts {
-  flex: 1;
-  border: none;
-  background: transparent;
+.wp-block-bys-groups-group-user-quiz-config .guqc__attempts-group {
   font-size: var(--wp--preset--font-size--small);
-  color: var(--wp--preset--color--gray-700);
-  outline: none;
-  min-width: 0;
-  cursor: text;
-  -moz-appearance: textfield;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--wp--preset--spacing--2);
 }
-.wp-block-bys-groups-group-user-quiz-config .guqc__attempts::-webkit-outer-spin-button, .wp-block-bys-groups-group-user-quiz-config .guqc__attempts::-webkit-inner-spin-button {
+.wp-block-bys-groups-group-user-quiz-config .guqc__attempts {
+  position: relative;
+  display: flex;
+}
+.wp-block-bys-groups-group-user-quiz-config .guqc__attempts button {
+  background-color: var(--wp--preset--color--primary);
+  color: #fff;
+  font-size: var(--wp--preset--font-size--x-small);
+  padding: 0 var(--wp--preset--spacing--1);
+  border: 1px solid var(--wp--preset--color--primary);
+}
+.wp-block-bys-groups-group-user-quiz-config .guqc__attempts-minus {
+  border-radius: 0.5rem 0 0 0.5rem;
+}
+.wp-block-bys-groups-group-user-quiz-config .guqc__attempts-add {
+  border-radius: 0 0.5rem 0.5rem 0;
+}
+.wp-block-bys-groups-group-user-quiz-config .guqc__attempts input {
+  background-color: var(--wp--preset--color--gray-50);
+  border-style: solid;
+  border-color: var(--wp--preset--color--gray-200);
+  border-width: 1px 0 1px 0;
+  max-width: contents;
+  padding: var(--wp--preset--spacing--1);
+  max-width: 3rem;
+  text-align: right;
+}
+.wp-block-bys-groups-group-user-quiz-config .guqc__attempts input::-webkit-outer-spin-button,
+.wp-block-bys-groups-group-user-quiz-config .guqc__attempts input::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
-.wp-block-bys-groups-group-user-quiz-config .guqc__attempts::-moz-placeholder {
-  color: var(--wp--preset--color--gray-400);
+.wp-block-bys-groups-group-user-quiz-config .guqc__attempts input[type=number] {
+  -moz-appearance: textfield;
 }
-.wp-block-bys-groups-group-user-quiz-config .guqc__attempts::placeholder {
-  color: var(--wp--preset--color--gray-400);
+.wp-block-bys-groups-group-user-quiz-config .guqc__attempts-info ul {
+  font-size: var(--wp--preset--font-size--small);
+  color: var(--wp--preset--color--gray-500);
+  list-style: none;
+  padding-left: 0 !important;
+}
+.wp-block-bys-groups-group-user-quiz-config .guqc__attempts-info li {
+  display: flex;
+  justify-content: space-between;
+}
+.wp-block-bys-groups-group-user-quiz-config .guqc__attempts-info li > span {
+  min-width: 2rem;
+  text-align: right;
 }
 .wp-block-bys-groups-group-user-quiz-config .guqc__date-icon {
   font-size: 0.6rem;
@@ -472,6 +491,23 @@
   .wp-block-bys-groups-group-user-quiz-config .guqc__notify {
     width: 100%;
   }
+}
+.wp-block-bys-groups-group-user-quiz-config *[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1f2937;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 400;
+  line-height: 1.4;
+  padding: 4px 10px;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 100;
 }
 
 /*# sourceMappingURL=style-index.css.map*/
