@@ -139,7 +139,9 @@ if (!class_exists('BYS_Groups_Mailer')) {
                 // no signed unsubscribe link is emitted for them.
                 $email = bys_get_comm_email($prompt_type, array(
                     'group_name'       => $group_name,
-                    'recipient_name'   => $recipient_name,
+                    // Keep the greeting blank for Pending recipients
+                    // Pending users have no display name, and skip using the email as fallback
+                    'recipient_name'   => $is_pending_user ? '' : $recipient_name,
                     'site_name'        => get_bloginfo('name'),
                     'site_url'         => home_url(),
                     'sender_email'     => $sender_email,
