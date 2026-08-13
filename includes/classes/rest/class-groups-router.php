@@ -260,35 +260,11 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             $group_id = intval($request['group_id']);
             if (!$group_id) return new WP_Error('bad_request', 'Invalid group ID', ['status' => 400]);
 
-            $auth_header = BYS_Groups_Auth::get_auth_header();
-            if (!$auth_header) return new WP_Error('server_error', 'API credentials not configured', ['status' => 500]);
-
-            // ── 1. Collect user IDs from LD's group-users endpoint (paginated)
-            $user_ids = [];
-            $page     = 1;
-            $per_page = 100;
-
-            do {
-                $url = get_home_url() . "/wp-json/ldlms/v2/groups/{$group_id}/users?_fields=id&per_page={$per_page}&page={$page}";
-                $response = wp_remote_get($url, [
-                    'headers'   => ['Authorization' => $auth_header],
-                    'timeout'   => 30,
-                    'sslverify' => false,
-                ]);
-
-                if (is_wp_error($response)) return new WP_Error('server_error', $response->get_error_message(), ['status' => 500]);
-                if (wp_remote_retrieve_response_code($response) !== 200) {
-                    return new WP_Error('ld_api_failure', 'Failed to fetch users from LearnDash API', ['status' => 502]);
-                }
-
-                $page_users = json_decode(wp_remote_retrieve_body($response), true);
-                if (!is_array($page_users) || empty($page_users)) break;
-
-                foreach ($page_users as $u) {
-                    $user_ids[] = intval($u['id']);
-                }
-                $page++;
-            } while (count($page_users) === $per_page);
+            // ── 1. Collect user IDs directly from LD
+            if (!function_exists('learndash_get_groups_user_ids')) {
+                return new WP_Error('server_error', 'LearnDash not available', ['status' => 500]);
+            }
+            $user_ids = array_map('intval', (array) learndash_get_groups_user_ids($group_id));
 
             // ── 2. Hydrate user objects (mirrors get_group_users shape)
             $users = [];
@@ -323,50 +299,37 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 ];
             }
 
-            // ── 3. Group's enrolled courses (mirrors get_group_courses shape)
+            // ── 3. Get Group's enrolled courses directly from LD
             $courses = [];
-            $courses_url = get_home_url() . "/wp-json/ldlms/v2/groups/{$group_id}/courses?_fields=id,title";
-            $courses_response = wp_remote_get($courses_url, [
-                'headers'   => ['Authorization' => $auth_header],
-                'timeout'   => 30,
-                'sslverify' => false,
-            ]);
-            // Source of truth for "is this course required for this group" lives
-            // in _bys_required_course_ids post meta on the group post. Read once
-            // and lookup-by-id below.
             $required_raw = get_post_meta($group_id, '_bys_required_course_ids', true);
             $required_ids = is_array($required_raw) ? array_map('intval', $required_raw) : [];
-            if (!is_wp_error($courses_response) && wp_remote_retrieve_response_code($courses_response) === 200) {
-                $raw_courses = json_decode(wp_remote_retrieve_body($courses_response), true);
-                if (is_array($raw_courses)) {
-                    $course_ids_collected = [];
-                    foreach ($raw_courses as $course) {
-                        $course_id = $course['id'] ?? null;
-                        $shortname = $course_id ? get_post_meta($course_id, 'shortname', true) : '';
-                        $courses[] = [
-                            'id'        => $course_id,
-                            'title'     => $this->normalize_course_title($course['title'] ?? null),
-                            'shortname' => $shortname ?: null,
-                            'required'  => $course_id ? in_array(intval($course_id), $required_ids, true) : false,
-                            // Filled in below from a single batched query so blocks
-                            // don't fan out per-course /quiz-steps requests.
-                            'quizzes_show_test_grading_config'   => [],
-                            'quizzes_show_in_reporting'  => [],
-                        ];
-                        if ($course_id) $course_ids_collected[] = intval($course_id);
-                    }
 
-                    // Batch query: per-course grading + reporting quiz sets.
-                    if (!empty($course_ids_collected)) {
-                        $quiz_meta = $this->fetch_quiz_meta_by_course($course_ids_collected, $group_id);
-                        foreach ($courses as &$course_ref) {
-                            $cid = intval($course_ref['id']);
-                            $course_ref['quizzes_show_test_grading_config']  = $quiz_meta[$cid]['grading']   ?? [];
-                            $course_ref['quizzes_show_in_reporting'] = $quiz_meta[$cid]['reporting'] ?? [];
-                        }
-                        unset($course_ref);
-                    }
+            $course_ids_collected = function_exists('learndash_group_enrolled_courses')
+                ? array_map('intval', (array) learndash_group_enrolled_courses($group_id))
+                : [];
+
+            foreach ($course_ids_collected as $course_id) {
+                $shortname = get_post_meta($course_id, 'shortname', true);
+                $courses[] = [
+                    'id'        => $course_id,
+                    'title'     => $this->normalize_course_title(get_the_title($course_id)),
+                    'shortname' => $shortname ?: null,
+                    'required'  => in_array($course_id, $required_ids, true),
+                    // Filled in below from a single batched query so blocks
+                    // don't fan out per-course /quiz-steps requests.
+                    'quizzes_show_test_grading_config'   => [],
+                    'quizzes_show_in_reporting'  => [],
+                ];
+            }
+
+            if (!empty($course_ids_collected)) {
+                $quiz_meta = $this->fetch_quiz_meta_by_course($course_ids_collected, $group_id);
+                foreach ($courses as &$course_ref) {
+                    $cid = intval($course_ref['id']);
+                    $course_ref['quizzes_show_test_grading_config']  = $quiz_meta[$cid]['grading']   ?? [];
+                    $course_ref['quizzes_show_in_reporting'] = $quiz_meta[$cid]['reporting'] ?? [];
                 }
+                unset($course_ref);
             }
 
             // ── 4. Group leaders — same shape as the standalone /leaders endpoint.
