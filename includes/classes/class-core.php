@@ -65,8 +65,9 @@ if (!class_exists('BYS_Groups_Core')) {
                 return;
             }
 
-            // Run Activator class with the create_tables() method. Safety net that ensures the cusotm tables exist on every load
-            BYS_Groups_Activator::activate();
+            // Reconcile DB schema when BYS_GROUPS_DB_VERSION is bumped.
+            // Runs only in admin, once per page load — never on the frontend.
+            add_action('admin_init', array('BYS_Groups_Activator', 'maybe_upgrade'));
 
             // Post types and field groups
             new BYS_Groups_Organization();
