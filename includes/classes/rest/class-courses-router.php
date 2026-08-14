@@ -956,7 +956,9 @@ if (!class_exists('BYS_Groups_Courses_Router')) {
                 $q_options = @unserialize($q_answer_raw); // phpcs:ignore
                 if (!is_array($q_options)) return null;
 
-                $s_data = @unserialize($stat_answer_raw, ['allowed_classes' => false]); // phpcs:ignore
+                // LD stores stat.answer_data as JSON. For single/multiple
+                // choice, decodes to 0/1 array keyed by option index
+                $s_data = json_decode($stat_answer_raw, true);
                 if (!is_array($s_data)) $s_data = [];
 
                 $choices = [];

@@ -275,6 +275,14 @@
                 justify-content: space-between;
             }
 
+            // Restore the [hidden] contract — the `li { display: flex; }`
+            // rule above would otherwise override the UA `[hidden] { display: none; }`
+            // baseline, so a JS-toggled hidden attribute wouldn't actually
+            // hide the row.
+            li[hidden] {
+                display: none;
+            }
+
             li > span {
                 min-width: 2rem;
                 text-align: right;

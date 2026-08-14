@@ -1527,30 +1527,36 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
         /**
          * GET|POST /groups/{group_id}/users/{user_id}/quiz-access
          *
-         * Per-user quiz configuration surface. Owns two things:
-         * 1. Quiz access window (start/end datetimes) that gates when this user can take the quiz.
-         * 2. Granted quiz repeats total: additional retakes the leader
-         *    has granted to the user on top of the quiz's global `sfwd-quiz_repeats`.
+         * Per-user quiz configuration surface, powering the
+         * group-user-quiz-config block. Handles two independent overrides
+         * in one endpoint:
+         *   1. Access window — start/end datetimes gating when this user
+         *      can open the quiz.
+         *   2. Granted repeats — extra retakes the leader has awarded on
+         *      top of the quiz's global `sfwd-quiz_repeats` setting.
          *
          * GET forms
-         *   - no query params:  returns { quiz_id: {start, end}, ... } — a
-         *                       map of every saved access window for this
-         *                       user. Legacy shape; kept for older callers.
+         *   - no query params:  returns { quiz_id: {start, end}, ... } —
+         *                       every saved access window for this user.
+         *                       Legacy shape; kept for older callers.
          *   - ?quiz_id=X:       returns { start, end, attempts_summary }
          *                       for a single quiz. The block uses this
-         *                       shape after a learner+quiz selection so it
-         *                       can populate the date pickers AND the
-         *                       attempts info panel in a single round trip.
+         *                       shape after a learner+quiz selection to
+         *                       populate the date pickers AND the attempts
+         *                       info panel in one round trip.
+         *
          * POST body
          *   - quiz_id          (int, required)
-         *   - start, end       (ISO 8601 UTC strings; both empty removes
-         *                       any saved window)
-         *   - granted_repeats  (int, optional — signed delta, see below)
+         *   - start, end       (ISO 8601 UTC; both empty clears the window)
+         *   - granted_repeats  (int, optional signed *delta* — see below)
          *
-         * The `granted_repeats` field is a *delta*, not an absolute total.
-         * A single POST both saves the date window AND, if the field is
-         * present, applies the grant adjustment. Response includes the
-         * post-save state so the block doesn't need a follow-up GET.
+         * `granted_repeats` is a signed delta applied to the stored total,
+         * NOT the new absolute total. +N awards N more repeats, -N revokes
+         * N. This lets the block send whatever the +/- buttons produced
+         * without first reading the current stored value. A single POST
+         * saves the date window AND applies the grant adjustment when the
+         * field is present. The response echoes the post-save grant state
+         * so the block doesn't need a follow-up GET.
          */
         public function user_quiz_access($request) {
             $group_id = intval($request['group_id']);
@@ -1587,17 +1593,21 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
 
                 $response = ['success' => true];
 
-                // Delta model for the grant adjustment:
-                // +N: award N additional repeats (adds to stored total)
-                // -N: revoke N (subtracts; clamped at 0 so the total can never go negative)
-                // 0: no-op
+                // Grant adjustment: apply the signed delta.
+                // +N: award N more repeats
+                // -N: revoke N
+                //  0: no-op (still allowed; the field just gets echoed)
                 if (array_key_exists('granted_repeats', $body)) {
                     $delta    = (int) $body['granted_repeats'];
                     $previous = BYS_Groups_Quiz_Access::get_user_quiz_granted_repeats($user_id, $quiz_id);
-                    // Clamp to [0, MAX] here so the response body reflects the true stored value
+                    // Clamp to [0, MAX] BEFORE saving so the response
+                    // reflects what actually got stored. save_user_quiz_granted_repeats()
+                    // also clamps defensively, but doing it here means the
+                    // frontend sees the same value the DB now holds.
                     $granted  = max(0, min(BYS_Groups_Quiz_Access::MAX_USER_QUIZ_GRANTED_REPEATS, $previous + $delta));
                     BYS_Groups_Quiz_Access::save_user_quiz_granted_repeats($user_id, $quiz_id, $granted);
 
+                    // Re-read the summary for `remaining`, which depends on the baseline
                     $post_summary = BYS_Groups_Quiz_Access::get_user_quiz_attempts_summary($user_id, $quiz_id);
                     $response['granted_repeats'] = [
                         'granted'   => $granted,
@@ -1646,14 +1656,19 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             $start  = $window['start'] ?? '';
             $end    = $window['end']   ?? '';
 
-            // Resolve the learner's total attempts on this quiz for the
-            // email body. attempts_allowed = quiz's base + this user's
-            // granted repeats; attempts_unlimited wins over the count.
+            // Total attempts in the email body.
+            // Retakes disabled: unlimited.
+            // Retakes enabled: 1 initial attempt
+            //                  + LD's configured retakes
+            //                  + this learner's granted repeats.
+            // Note the "1 +" bit: LD's "Number of Retries Allowed" is
+            // retakes ABOVE the initial attempt, so we add the initial
+            // back in to get a total the learner will recognize.
             $summary            = BYS_Groups_Quiz_Access::get_user_quiz_attempts_summary($user_id, $quiz_id);
-            $attempts_unlimited = (bool) $summary['repeats_unlimited'];
+            $attempts_unlimited = !$summary['retakes_enabled'];
             $attempts_allowed   = $attempts_unlimited
                 ? null
-                : ((int) $summary['global_repeats'] + (int) $summary['granted_repeats']);
+                : (1 + (int) $summary['retakes_allowed'] + (int) $summary['granted_repeats']);
 
             $postmark_token = get_option('bys_postmark_token', '');
             if (empty($postmark_token)) {
