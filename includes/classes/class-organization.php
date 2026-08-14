@@ -363,8 +363,25 @@ if (!class_exists('BYS_Groups_Organization')) {
             ]);
 
             // Populate Gravity Forms choices dynamically so the select shows form names.
+            //
+            // acf/load_field fires on every request that calls get_field() — frontend
+            // and backend alike. The choices array only matters when an editor is
+            // actually looking at the field on an organization edit screen. Everywhere
+            // else ACF uses the saved integer (form ID) directly, so loading all GF
+            // forms on every other page is pure CPU waste.
+            //
+            // These are plain `select` fields with ui=>1 (select2 styling only).
+            // Their choices are server-rendered on page load — no AJAX fetch — so
+            // restricting to the organization screen is safe; nothing breaks.
             foreach ( ['field_org_onboarding_form', 'field_org_registration_form', 'field_org_user_update_form'] as $_fk ) {
                 add_filter( "acf/load_field/key={$_fk}", function( $field ) {
+                    if ( ! is_admin() ) {
+                        return $field;
+                    }
+                    $screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+                    if ( ! $screen || $screen->post_type !== 'organization' ) {
+                        return $field;
+                    }
                     $field['choices'] = [];
                     if ( class_exists( 'GFAPI' ) ) {
                         $forms = GFAPI::get_forms();
