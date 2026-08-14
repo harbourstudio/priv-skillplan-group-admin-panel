@@ -26,6 +26,9 @@ if (!class_exists('BYS_Groups_Quiz_Access')) {
         // attempts don't retroactively consume new grants
         const USER_QUIZ_GRANTED_REPEATS_BASELINE_META = '_bys_quiz_granted_repeats_baseline_';
 
+        // Per-request memoization for learndash_get_users_group_ids(). Keyed by user_id.
+        private static $user_groups_cache = array();
+
         public function __construct() {
             // Apply the group/user-level start/end access window on top of
             // LD's own lesson-access date logic.
@@ -41,6 +44,29 @@ if (!class_exists('BYS_Groups_Quiz_Access')) {
             // - learndash_quiz_attempts: the modern gate used by the [ld_quiz] shortcode
             add_filter('learndash_allowed_repeats', array($this, 'apply_user_granted_repeats'), 10, 3);
             add_filter('learndash_quiz_attempts', array($this, 'apply_user_granted_repeats_to_quiz_attempts'), 10, 4);
+        }
+
+        /**
+         * Returns a user's LD group IDs, memoized for the current request.
+         *
+         * Called by methods instead of `learndash_get_users_group_ids()` directly so 
+         * it collapses those N per-quiz lookups into one per user per request.
+         *
+         * Uses `array_key_exists` rather than `isset` so an empty-groups result
+         * is still treated as "already checked" instead of being refetches
+         *
+         * @param int $user_id
+         * @return int[] Group IDs the user belongs to; empty if none or invalid user.
+         */
+        private static function get_user_group_ids($user_id) {
+            $user_id = (int) $user_id;
+            if (!$user_id) {
+                return array();
+            }
+            if (!array_key_exists($user_id, self::$user_groups_cache)) {
+                self::$user_groups_cache[$user_id] = learndash_get_users_group_ids($user_id);
+            }
+            return self::$user_groups_cache[$user_id];
         }
 
         /**
@@ -136,7 +162,7 @@ if (!class_exists('BYS_Groups_Quiz_Access')) {
             }
 
             // Get all sfwd-group this user belongs to
-            $group_ids = learndash_get_users_group_ids($user_id);
+            $group_ids = self::get_user_group_ids($user_id);
 
             if (empty($group_ids)) {
                 return $content;
@@ -243,7 +269,7 @@ if (!class_exists('BYS_Groups_Quiz_Access')) {
          */
         public function render_gated_quiz_layout($post, $user_id) {
             $quiz_id = $post->ID;
-            $group_ids = learndash_get_users_group_ids($user_id);
+            $group_ids = self::get_user_group_ids($user_id);
 
             // Compute quiz status info for the header (used in template)
             $attempts_array = learndash_get_user_quiz_attempt($user_id, ['quiz' => $quiz_id]);
@@ -333,7 +359,7 @@ if (!class_exists('BYS_Groups_Quiz_Access')) {
             }
 
             // Get all sfwd-group this user belongs to
-            $group_ids = learndash_get_users_group_ids($user_id);
+            $group_ids = self::get_user_group_ids($user_id);
             if (empty($group_ids)) {
                 return $access_from;
             }
