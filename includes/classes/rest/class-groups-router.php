@@ -266,6 +266,14 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             }
             $user_ids = array_map('intval', (array) learndash_get_groups_user_ids($group_id));
 
+            // Batch-prime the WP_User cache + last-active state + usermeta for
+            // every user we're about to hydrate. Collapses N raw LD activity
+            // queries + N get_user_by queries + N×M usermeta queries into
+            // three batches: cache_users(), one grouped SELECT on
+            // learndash_user_activity, and one update_meta_cache().
+            cache_users($user_ids);
+            BYS_Groups_Activity_Logger::prime_last_active_ts_for($user_ids);
+
             // ── 2. Hydrate user objects (mirrors get_group_users shape)
             $users = [];
             foreach ($user_ids as $user_id) {
@@ -403,6 +411,11 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             }
 
             if (empty($user_ids)) return [];
+
+            // Batch-prime WP_User cache + last-active state + usermeta before
+            // the hydration loop
+            cache_users($user_ids);
+            BYS_Groups_Activity_Logger::prime_last_active_ts_for($user_ids);
 
             $users = [];
             foreach ($user_ids as $user_id) {

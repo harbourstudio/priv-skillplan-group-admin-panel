@@ -269,6 +269,12 @@ if (!class_exists('BYS_Groups_Conditional_Emails')) {
          * ============================================================ */
 
         private static function filter_outstanding_login($user_ids) {
+            // Batch-prime last-active state for the whole group. Turns N LD
+            // activity queries + N×M usermeta reads into one grouped SELECT
+            // and one update_meta_cache batch. So downstream calls for
+            // get_last_active_ts() hits the primed cache 
+            BYS_Groups_Activity_Logger::prime_last_active_ts_for($user_ids);
+
             $matched = array();
             foreach ($user_ids as $uid) {
                 if (BYS_Groups_Activity_Logger::get_last_active_ts($uid) === 0) {
@@ -282,6 +288,10 @@ if (!class_exists('BYS_Groups_Conditional_Emails')) {
             if ($days < 1) return array();
             $now = time();
             $threshold = $days * DAY_IN_SECONDS;
+
+            // Batch-prime last-active state; see filter_outstanding_login.
+            BYS_Groups_Activity_Logger::prime_last_active_ts_for($user_ids);
+
             $matched = array();
             foreach ($user_ids as $uid) {
                 // Session-presence tracker — refreshed on every authenticated
