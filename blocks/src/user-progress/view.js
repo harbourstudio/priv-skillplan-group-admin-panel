@@ -188,9 +188,10 @@ jQuery(document).ready(async ($) => {
                 }
 
                 // Populate activity columns from augmented step data
-                $topic.find('.topic-visits').text(
-                  topicData?.visits != null ? topicData.visits : '—'
-                );
+                // [on_page_view parked] Visit counts not written. See class-activity-logger.php.
+                // $topic.find('.topic-visits').text(
+                //   topicData?.visits != null ? topicData.visits : '—'
+                // );
                 $topic.find('.topic-timespent').text(
                   formatDuration(topicData?.time_spent_seconds)
                 );

@@ -60,10 +60,10 @@ if (!class_exists('BYS_Groups_Activity_Logger')) {
             add_action('template_redirect', [$this, 'track_group_member_sys_activity'], 5);
             // Learndash events
             add_action('learndash_course_completed',      [$this, 'on_certificate_earned'],   10, 1);
-            add_action('template_redirect',               [$this, 'on_page_view'],            10);
+            
+            // NOTE: parked for performance issues.
+            // add_action('template_redirect',               [$this, 'on_page_view'],            10);
             add_action('learndash_update_course_access',  [$this, 'on_course_access_update'], 10, 4);
-
-            // (visit counter is now incremented directly in on_page_view)
         }
 
         /**
