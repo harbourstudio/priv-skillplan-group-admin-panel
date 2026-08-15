@@ -55,6 +55,7 @@ if (!class_exists('BYS_Groups_Core')) {
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-scheduled-emails.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-conditional-emails.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-lander-block-helpers.php';
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-lander-access.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-user-comms-preferences.php';
         }
 
@@ -83,6 +84,7 @@ if (!class_exists('BYS_Groups_Core')) {
             new BYS_Groups_Quiz_Access();
             new BYS_Groups_Scheduled_Emails();
             new BYS_Groups_User_Comms_Preferences();
+            new BYS_Groups_Lander_Access();
 
             // REST routers
             new BYS_Groups_Webhooks_Router();
