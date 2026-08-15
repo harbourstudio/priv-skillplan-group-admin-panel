@@ -340,6 +340,11 @@ if (!class_exists('BYS_Groups_Users_Router')) {
                     }
                 }
 
+                // [on_page_view parked] Visit counts (bys_topic_visits_*) are no longer
+                // written — the on_page_view hook in class-activity-logger.php is disabled
+                // for perf. Skipping this batch query and the $step['visits'] assignment
+                // in the payload until tracker is resumed.
+                /*
                 // 3. Custom visit counts (bys_topic_visits_{post_id})
                 $step_ids  = array_keys($activity_map);
                 $visit_map = [];
@@ -356,6 +361,7 @@ if (!class_exists('BYS_Groups_Users_Router')) {
                         $visit_map[$pid_from_key] = intval($vr['meta_value']);
                     }
                 }
+                */
 
                 foreach ($all_steps as &$step) {
                     $pid = intval($step['step']);
@@ -376,9 +382,10 @@ if (!class_exists('BYS_Groups_Users_Router')) {
                         if ($diff > 0) $step['time_spent_seconds'] = $diff;
                     }
 
-                    if (isset($visit_map[$pid]) && $visit_map[$pid] > 0) {
-                        $step['visits'] = $visit_map[$pid];
-                    }
+                    // [on_page_view parked] $visit_map is no longer populated — see block above.
+                    // if (isset($visit_map[$pid]) && $visit_map[$pid] > 0) {
+                    //     $step['visits'] = $visit_map[$pid];
+                    // }
                 }
                 unset($step);
             }

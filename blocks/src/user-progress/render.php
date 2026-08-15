@@ -88,7 +88,7 @@ $user_id = isset( $_GET['user_id'] ) ? intval( $_GET['user_id'] ) : 0;
                             <tr>
                                 <th><?php esc_html_e('Lesson', 'bys'); ?></th>
                                 <th><?php esc_html_e('Status', 'bys'); ?></th>
-                                <th><?php esc_html_e('Visits', 'bys'); ?></th>
+                                <?php /* <th><?php esc_html_e('Visits', 'bys'); ?></th> */ ?>
                                 <th><?php esc_html_e('Time Spent', 'bys'); ?></th>
                                 <th><?php esc_html_e('Last Accessed', 'bys'); ?></th>
                             </tr>
@@ -106,7 +106,7 @@ $user_id = isset( $_GET['user_id'] ) ? intval( $_GET['user_id'] ) : 0;
                 <td class="topic-completion">
                     <span class="completion-badge"></span>
                 </td>
-                <td class="topic-visits"></td>
+                <?php /* <td class="topic-visits"></td> */ ?>
                 <td class="topic-timespent"></td>
                 <td class="topic-last-accessed"></td>
             </tr>

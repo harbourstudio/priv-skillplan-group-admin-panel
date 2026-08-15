@@ -45,6 +45,15 @@ if (!class_exists('BYS_Groups_Activity_Logger')) {
         const ACTIVE_THROTTLE_SECONDS = 900;  // 15 min — min interval between writes per user
         const ACTIVE_WINDOW_SECONDS   = 1800; // 30 min — "online" status window (2× throttle for buffer)
 
+        /**
+         * Per-request memoization for get_last_active_ts(). Keyed by user_id.
+         * Endpoints hydrating a full group's roster should call
+         * prime_last_active_ts_for() once up front to collapse N raw LD
+         * activity queries + N×M usermeta queries into one grouped LD query
+         * plus one update_meta_cache('user', ...) batch.
+         */
+        private static $last_active_ts_cache = [];
+
         public function __construct() {
             $this->register_hooks();
         }
@@ -60,10 +69,10 @@ if (!class_exists('BYS_Groups_Activity_Logger')) {
             add_action('template_redirect', [$this, 'track_group_member_sys_activity'], 5);
             // Learndash events
             add_action('learndash_course_completed',      [$this, 'on_certificate_earned'],   10, 1);
-            add_action('template_redirect',               [$this, 'on_page_view'],            10);
+            
+            // NOTE: parked for performance issues.
+            // add_action('template_redirect',               [$this, 'on_page_view'],            10);
             add_action('learndash_update_course_access',  [$this, 'on_course_access_update'], 10, 4);
-
-            // (visit counter is now incremented directly in on_page_view)
         }
 
         /**
@@ -123,7 +132,11 @@ if (!class_exists('BYS_Groups_Activity_Logger')) {
             $user_id = (int) $user_id;
             if ($user_id <= 0) return 0;
 
-            return max(
+            if (array_key_exists($user_id, self::$last_active_ts_cache)) {
+                return self::$last_active_ts_cache[$user_id];
+            }
+
+            return self::$last_active_ts_cache[$user_id] = max(
                 (int) get_user_meta($user_id, self::ACTIVE_META_KEY, true),
                 self::get_ld_activity_ts($user_id),
                 // fallback — wp_login-fired keys
@@ -131,6 +144,63 @@ if (!class_exists('BYS_Groups_Activity_Logger')) {
                 (int) get_user_meta($user_id, 'learndash-last-login',         true),
                 (int) get_user_meta($user_id, 'last_login',                   true)
             );
+        }
+
+        /**
+         * Batch-prime the last-active cache for a set of user IDs.
+         *
+         * Endpoints that hydrate a full group's roster (get_base_group_data,
+         * get_group_users) call this once up front to collapse N per-user LD
+         * activity queries + N×M usermeta reads into:
+         *   - 1 grouped SELECT on learndash_user_activity
+         *   - 1 update_meta_cache('user', $user_ids) batch (WP-native — primes
+         *     every meta key those users have in a single query)
+         *
+         * Users already memoized are skipped, so re-priming inside the same
+         * request is a no-op.
+         *
+         * @param int[] $user_ids
+         */
+        public static function prime_last_active_ts_for(array $user_ids): void {
+            $user_ids = array_values(array_unique(array_filter(array_map('intval', $user_ids))));
+            $user_ids = array_values(array_diff($user_ids, array_keys(self::$last_active_ts_cache)));
+            if (empty($user_ids)) return;
+
+            // Prime WP's usermeta cache — every subsequent get_user_meta()
+            // for these users hits RAM, not the DB.
+            update_meta_cache('user', $user_ids);
+
+            // Batch the LD activity max.
+            global $wpdb;
+            $placeholders = implode(',', array_fill(0, count($user_ids), '%d'));
+            $rows = $wpdb->get_results($wpdb->prepare(
+                "SELECT user_id, GREATEST(
+                    COALESCE(MAX(activity_started),   0),
+                    COALESCE(MAX(activity_updated),   0),
+                    COALESCE(MAX(activity_completed), 0)
+                 ) AS ts
+                 FROM {$wpdb->prefix}learndash_user_activity
+                 WHERE user_id IN ({$placeholders})
+                 GROUP BY user_id",
+                ...$user_ids
+            ));
+            $ld_ts_map = [];
+            foreach ((array) $rows as $r) {
+                $ld_ts_map[(int) $r->user_id] = (int) $r->ts;
+            }
+
+            // Materialize the max() per user using now-cached usermeta +
+            // the batched LD timestamp. Users with no LD activity fall
+            // through to $ld_ts_map[$uid] ?? 0.
+            foreach ($user_ids as $uid) {
+                self::$last_active_ts_cache[$uid] = max(
+                    (int) get_user_meta($uid, self::ACTIVE_META_KEY, true),
+                    $ld_ts_map[$uid] ?? 0,
+                    (int) get_user_meta($uid, '_ld_notifications_last_login', true),
+                    (int) get_user_meta($uid, 'learndash-last-login',         true),
+                    (int) get_user_meta($uid, 'last_login',                   true)
+                );
+            }
         }
 
         /**

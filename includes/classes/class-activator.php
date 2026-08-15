@@ -12,17 +12,24 @@ if (!class_exists('BYS_Groups_Activator')) {
     class BYS_Groups_Activator {
 
         public static function activate() {
+            self::maybe_upgrade();
 
+            // Flag a rewrite flush so new CPTs are recognised on the next load.
+            update_option('bys_flush_rewrite_rules', true, true);
+        }
+
+        /**
+         * Version-gated schema upgrade. Runs on admin_init so deploys that bump
+         * BYS_GROUPS_DB_VERSION reconcile the schema on the next admin visit,
+         * without paying the cost on every frontend request.
+         */
+        public static function maybe_upgrade() {
             $current_version = get_option('bys_groups_db_version');
 
             if (version_compare((string) $current_version, BYS_GROUPS_DB_VERSION, '<')) {
                 self::create_tables();
                 update_option('bys_groups_db_version', BYS_GROUPS_DB_VERSION, true);
             }
-
-            // Flag a rewrite flush so new CPTs are recognised on the next load.
-            // Checked and cleared in BYS_Groups_Core::init() after all CPTs register.
-            update_option('bys_flush_rewrite_rules', true, true);
         }
 
     
