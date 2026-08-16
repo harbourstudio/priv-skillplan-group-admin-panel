@@ -114,27 +114,12 @@ if (!class_exists('BYS_Groups_Me_Router')) {
             }
 
             // Collect group IDs from organizations where this user is an admin
+            // (cached org map — no per-request org scan)
             $org_admin_ids = [];
-            $all_orgs = get_posts([
-                'post_type'      => 'organization',
-                'post_status'    => 'publish',
-                'posts_per_page' => -1,
-                'fields'         => 'ids',
-            ]);
-            foreach ($all_orgs as $org_id) {
-                $raw_admins = get_field('administrators', $org_id);
-                $admin_ids  = [];
-                foreach ((array) $raw_admins as $admin) {
-                    $admin_ids[] = $admin instanceof \WP_User ? $admin->ID : intval($admin);
-                }
-                if (!in_array($user_id, $admin_ids, true)) continue;
-
-                $raw_groups = get_field('groups', $org_id);
-                foreach ((array) $raw_groups as $group) {
-                    $g_id = $group instanceof \WP_Post ? $group->ID : intval($group);
-                    if ($g_id > 0) {
-                        $org_admin_ids[] = $g_id;
-                    }
+            foreach (BYS_Groups_Org_Map::all_org_ids() as $org_id) {
+                if (!BYS_Groups_Org_Map::is_user_org_admin($org_id, $user_id)) continue;
+                foreach (BYS_Groups_Org_Map::org_group_ids($org_id) as $g_id) {
+                    $org_admin_ids[] = $g_id;
                 }
             }
 
@@ -142,6 +127,9 @@ if (!class_exists('BYS_Groups_Me_Router')) {
             $accessible_ids = array_unique(array_merge($led_ids, $org_admin_ids));
 
             if (empty($accessible_ids)) return ['groups' => []];
+
+            // One query for every group post the loop below will read.
+            _prime_post_caches(array_values($accessible_ids), false, false);
 
             // Build response — only published groups. Capability flags per group:
             //  - can_manage_members: org-admin-of-group OR group-leader-of-group
@@ -200,49 +188,44 @@ if (!class_exists('BYS_Groups_Me_Router')) {
                 }
             }
 
-            $all_orgs = get_posts([
-                'post_type'      => 'organization',
-                'post_status'    => 'publish',
-                'posts_per_page' => -1,
-                'orderby'        => 'title',
-                'order'          => 'ASC',
-            ]);
+            // Cached org map instead of a get_posts + per-org ACF scan.
+            // Sort by title to preserve the original orderby=title response order.
+            $org_entries = BYS_Groups_Org_Map::get_map()['orgs'];
+            uasort($org_entries, fn($a, $b) => strcasecmp((string) $a['title'], (string) $b['title']));
+
+            // Prime every org-owned group post in one query — the loop below
+            // reads each group's title and status.
+            $all_map_group_ids = [];
+            foreach ($org_entries as $entry) {
+                foreach ($entry['groups'] as $gid) {
+                    $all_map_group_ids[] = $gid;
+                }
+            }
+            if (!empty($all_map_group_ids)) {
+                _prime_post_caches(array_values(array_unique($all_map_group_ids)), false, false);
+            }
 
             $organizations = [];
             $claimed_ids   = []; // group IDs that belong to at least one org
 
-            foreach ($all_orgs as $org) {
+            foreach ($org_entries as $org_id => $entry) {
                 // Site admins are org admins; graders see everything but aren't org admins
                 if ($is_site_admin) {
                     $is_admin = true;
                 } elseif ($is_grader) {
                     $is_admin = false;
                 } else {
-                    $raw_admins = get_field('administrators', $org->ID);
-                    $admin_ids  = [];
-                    foreach ((array) $raw_admins as $admin) {
-                        $admin_ids[] = $admin instanceof \WP_User ? $admin->ID : intval($admin);
-                    }
-                    $is_admin = in_array($user_id, $admin_ids, true);
+                    $is_admin = in_array($user_id, $entry['admins'], true);
                 }
 
-                // Resolve group IDs — ACF may return WP_Post objects or raw IDs
-                $raw_groups          = get_field('groups', $org->ID);
                 $groups              = [];
                 $archived_candidates = [];
                 $user_leads_a_group  = false;
 
-                foreach ((array) $raw_groups as $group) {
-                    if ($group instanceof \WP_Post) {
-                        $g_id     = $group->ID;
-                        $g_title  = $group->post_title;
-                        $g_status = $group->post_status;
-                    } else {
-                        $g_id    = intval($group);
-                        $g_post  = get_post($g_id);
-                        $g_title  = $g_post ? $g_post->post_title  : '';
-                        $g_status = $g_post ? $g_post->post_status : '';
-                    }
+                foreach ($entry['groups'] as $g_id) {
+                    $g_post   = get_post($g_id);
+                    $g_title  = $g_post ? $g_post->post_title  : '';
+                    $g_status = $g_post ? $g_post->post_status : '';
 
                     if (!$g_id || !$g_title) continue;
 
@@ -273,8 +256,8 @@ if (!class_exists('BYS_Groups_Me_Router')) {
                 if (!($is_site_admin || $is_grader) && !$is_admin && !$user_leads_a_group) continue;
 
                 $organizations[] = [
-                    'id'              => $org->ID,
-                    'name'            => $org->post_title,
+                    'id'              => $org_id,
+                    'name'            => $entry['title'],
                     'is_admin'        => $is_admin,
                     'groups'          => $groups,
                     'archived_groups' => $archived_groups,
@@ -379,7 +362,7 @@ if (!class_exists('BYS_Groups_Me_Router')) {
                     }
                 }
 
-                // Walk every published org to determine visibility scope.
+                // Walk the cached org map to determine visibility scope.
                 // Build two disjoint sets:
                 //   - $org_admin_group_ids: groups the user can unarchive
                 //     (they admin the containing org)
@@ -390,33 +373,12 @@ if (!class_exists('BYS_Groups_Me_Router')) {
                 // is site-admin territory. Leaders who happen to have a
                 // stale learndash_group_leaders_* meta for a standalone
                 // group do NOT see it here.
-                $orgs = get_posts([
-                    'post_type'      => 'organization',
-                    'post_status'    => 'publish',
-                    'posts_per_page' => -1,
-                ]);
-
                 $org_admin_group_ids  = [];
                 $org_member_group_ids = [];
-                $all_org_group_ids    = []; // every group that belongs to any org (used to filter standalones out)
 
-                foreach ($orgs as $org) {
-                    $raw_admins = get_field('administrators', $org->ID);
-                    $admin_ids  = [];
-                    foreach ((array) $raw_admins as $admin) {
-                        $admin_ids[] = $admin instanceof \WP_User ? $admin->ID : intval($admin);
-                    }
-                    $is_org_admin_here = in_array($user_id, $admin_ids, true);
-
-                    $raw_groups    = get_field('groups', $org->ID);
-                    $org_group_ids = [];
-                    foreach ((array) $raw_groups as $g) {
-                        $g_id = $g instanceof \WP_Post ? $g->ID : intval($g);
-                        if ($g_id > 0) {
-                            $org_group_ids[]     = $g_id;
-                            $all_org_group_ids[] = $g_id;
-                        }
-                    }
+                foreach (BYS_Groups_Org_Map::get_map()['orgs'] as $entry) {
+                    $is_org_admin_here = in_array($user_id, $entry['admins'], true);
+                    $org_group_ids     = $entry['groups'];
 
                     $leads_any_in_org = !empty(array_intersect($led_ids, $org_group_ids));
 
@@ -436,6 +398,11 @@ if (!class_exists('BYS_Groups_Me_Router')) {
             // site admin OR org admin of the containing org OR (group leader
             // AND group is standalone). Group leaders viewing org-owned
             // groups see them read-only.
+            if (!empty($visible_ids)) {
+                _prime_post_caches(array_values($visible_ids), false, false);
+                update_postmeta_cache(array_values($visible_ids));
+            }
+
             $archived_groups = [];
             foreach ($visible_ids as $group_id) {
                 $group = get_post($group_id);
@@ -489,37 +456,21 @@ if (!class_exists('BYS_Groups_Me_Router')) {
             $group_ids = learndash_get_users_group_ids($user_id);
             if (empty($group_ids)) return ['groups' => []];
 
-            // Build a group_id => org map from ACF 'groups' field on organization posts.
-            $group_to_org_id = [];
-            $org_titles      = [];
-            $all_org_ids     = get_posts([
-                'post_type'      => 'organization',
-                'post_status'    => 'publish',
-                'posts_per_page' => -1,
-                'fields'         => 'ids',
-            ]);
-            foreach ($all_org_ids as $org_id) {
-                $raw = get_field('groups', $org_id);
-                foreach ((array) $raw as $group) {
-                    $g_id = $group instanceof \WP_Post ? $group->ID : intval($group);
-                    if ($g_id > 0) {
-                        $group_to_org_id[$g_id] = $org_id;
-                    }
-                }
-            }
+            // One query for every group post read in the loop below; the
+            // group → org resolution comes from the cached org map.
+            _prime_post_caches(array_map('intval', (array) $group_ids), false, false);
 
             $groups = [];
             foreach ($group_ids as $group_id) {
                 $post = get_post($group_id);
                 if (!$post || $post->post_status !== 'publish') continue;
 
-                $org_id    = $group_to_org_id[$group_id] ?? null;
-                $org_title = null;
+                $owning_orgs = BYS_Groups_Org_Map::orgs_for_group((int) $group_id);
+                $org_id      = !empty($owning_orgs) ? $owning_orgs[0] : null;
+                $org_title   = null;
                 if ($org_id) {
-                    if (!isset($org_titles[$org_id])) {
-                        $org_titles[$org_id] = get_the_title($org_id);
-                    }
-                    $org_title = $org_titles[$org_id];
+                    $entry     = BYS_Groups_Org_Map::org_entry($org_id);
+                    $org_title = $entry ? $entry['title'] : null;
                 }
 
                 $groups[] = [

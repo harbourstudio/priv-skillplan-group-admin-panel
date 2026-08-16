@@ -26,6 +26,7 @@ if (!class_exists('BYS_Groups_Core')) {
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-lander.php';
 
             // Utilities (load first — referenced by routers and feature classes)
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/utils/class-org-map.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/utils/class-permissions.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/utils/class-postmark.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/utils/class-quiz-grading.php';
@@ -70,6 +71,9 @@ if (!class_exists('BYS_Groups_Core')) {
             // Runs only in admin, once per page load — never on the frontend.
             add_action('admin_init', array('BYS_Groups_Activator', 'maybe_upgrade'));
 
+            // Keep the cached org relationship map in sync with org edits.
+            BYS_Groups_Org_Map::register_invalidation_hooks();
+
             // Post types and field groups
             new BYS_Groups_Organization();
             new BYS_Groups_Lander();
@@ -113,20 +117,70 @@ if (!class_exists('BYS_Groups_Core')) {
                 return;
             }
 
+            // window.bysGroupsAuth is the shared auth payload for ALL plugin
+            // frontend JS — the block api-client reads .nonce for the
+            // X-WP-Nonce header on every REST call (and the theme's
+            // quiz-grading sidebar reads it too). It must exist on every
+            // logged-in page, so it ships as a ~100-byte inline script on an
+            // empty handle rather than riding along with any one script file.
+            wp_register_script('bys-groups-auth', false, array(), BYS_GROUPS_VERSION, true);
+            wp_enqueue_script('bys-groups-auth');
+            wp_add_inline_script(
+                'bys-groups-auth',
+                'window.bysGroupsAuth = ' . wp_json_encode(array(
+                    'userId' => get_current_user_id(),
+                    'nonce'  => wp_create_nonce('wp_rest'),
+                )) . ';',
+                'before'
+            );
+
+            // The certificate tracker script itself is only useful where
+            // certificate links render: single course pages and /account.
+            if (!$this->is_certificate_tracker_page()) {
+                return;
+            }
+
             wp_enqueue_script(
                 'bys-view-certificate',
                 BYS_GROUPS_PLUGIN_URL . 'assets/js/view-certificate.js',
-                array('jquery'),
+                array('jquery', 'bys-groups-auth'),
                 BYS_GROUPS_VERSION,
                 true
             );
-
-            wp_localize_script('bys-view-certificate', 'bysGroupsAuth', array(
-                'userId' => get_current_user_id(),
-                'nonce'  => wp_create_nonce('wp_rest'),
-            ));
         }
 
+
+        /**
+         * True on single sfwd-courses pages and on the /account page or any
+         * of its descendants — the only places certificate links render.
+         */
+        private function is_certificate_tracker_page() {
+            if (is_singular('sfwd-courses')) {
+                return true;
+            }
+
+            if (!is_page()) {
+                return false;
+            }
+
+            $page = get_queried_object();
+            if (!$page instanceof WP_Post) {
+                return false;
+            }
+
+            if ('account' === $page->post_name) {
+                return true;
+            }
+
+            foreach (get_post_ancestors($page->ID) as $ancestor_id) {
+                $ancestor = get_post($ancestor_id);
+                if ($ancestor instanceof WP_Post && 'account' === $ancestor->post_name) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
 
         // Check for LD plugin
         private function is_learndash_active() {

@@ -25,23 +25,11 @@ function bys_lander_resolve( int $lander_id ): array {
     }
 
     // ── Resolve parent organization ───────────────────────────────────────────
+    // Cached org map lookup; first owning org wins (same date-DESC order the
+    // replaced get_posts scan used).
 
-    $org_id = null;
-    $orgs   = get_posts( [
-        'post_type'      => 'organization',
-        'post_status'    => 'publish',
-        'posts_per_page' => -1,
-        'fields'         => 'ids',
-    ] );
-    foreach ( $orgs as $oid ) {
-        foreach ( (array) get_field( 'landers', $oid ) as $l ) {
-            $lid = $l instanceof WP_Post ? $l->ID : intval( $l );
-            if ( $lid === $lander_id ) {
-                $org_id = $oid;
-                break 2;
-            }
-        }
-    }
+    $lander_orgs = BYS_Groups_Org_Map::orgs_for_lander( $lander_id );
+    $org_id      = ! empty( $lander_orgs ) ? $lander_orgs[0] : null;
 
     // ── Org fields ────────────────────────────────────────────────────────────
 
@@ -70,7 +58,7 @@ function bys_lander_resolve( int $lander_id ): array {
     $courses_group_title = '';
 
     if ( $org_id && function_exists( 'learndash_get_users_group_ids' ) ) {
-        $org_groups     = (array) get_field( 'groups', $org_id );
+        $org_group_ids  = BYS_Groups_Org_Map::org_group_ids( $org_id );
         $user_group_ids = array_map( 'intval', array_unique( array_merge(
             (array) learndash_get_users_group_ids( $user_id ),
             (array) learndash_get_administrators_group_ids( $user_id )
@@ -78,13 +66,7 @@ function bys_lander_resolve( int $lander_id ): array {
 
         // Collect ALL groups the user belongs to — the same lander may be shared
         // across multiple groups in one org, so we must not stop at the first hit.
-        $matched_group_ids = [];
-        foreach ( $org_groups as $g ) {
-            $gid = $g instanceof WP_Post ? $g->ID : intval( $g );
-            if ( in_array( $gid, $user_group_ids, true ) ) {
-                $matched_group_ids[] = $gid;
-            }
-        }
+        $matched_group_ids = array_values( array_intersect( $org_group_ids, $user_group_ids ) );
 
         if ( ! empty( $matched_group_ids ) ) {
             // Use the first matched group's title for display.

@@ -106,24 +106,8 @@ if ( ! class_exists( 'BYS_Groups_Lander_Access' ) ) {
             }
 
             // ── 5 & 6. Org-level lander ──────────────────────────────────────────
-            // Walk every org; skip any that don't own this lander.
-            $orgs = get_posts( [
-                'post_type'      => 'organization',
-                'post_status'    => 'publish',
-                'posts_per_page' => -1,
-                'fields'         => 'ids',
-            ] );
-
-            // Batch-warm all org post meta so each get_field() below is a cache hit.
-            if ( ! empty( $orgs ) ) {
-                update_postmeta_cache( $orgs );
-            }
-
-            foreach ( $orgs as $oid ) {
-                $org_landers = array_map( $resolve_id, (array) get_field( 'landers', $oid ) );
-                if ( ! in_array( $lander_id, $org_landers, true ) ) {
-                    continue; // This org doesn't own the lander — skip.
-                }
+            // Cached org map lookup — only the orgs that own this lander.
+            foreach ( BYS_Groups_Org_Map::orgs_for_lander( $lander_id ) as $oid ) {
 
                 // 6. Org admin has access to all landers in their org.
                 if ( BYS_Groups_Permissions::is_org_admin( $oid, $user_id ) ) {
@@ -131,8 +115,7 @@ if ( ! class_exists( 'BYS_Groups_Lander_Access' ) ) {
                 }
 
                 // 5. User is a member/leader of at least one group inside this org.
-                $org_group_ids = array_map( $resolve_id, (array) get_field( 'groups', $oid ) );
-                if ( ! empty( array_intersect( $user_group_ids, $org_group_ids ) ) ) {
+                if ( ! empty( array_intersect( $user_group_ids, BYS_Groups_Org_Map::org_group_ids( $oid ) ) ) ) {
                     return true;
                 }
             }
