@@ -123,33 +123,39 @@ if (!class_exists('BYS_Groups_Courses_Router')) {
         /**
          * GET /courses/{course_id}/steps
          * Returns hierarchical lessons → topics + a flat list of quiz IDs.
-         * Source: LearnDash REST API (/ldlms/v2/sfwd-courses/{id}/steps?_fields=h,t).
+         * Source: LD's course-steps object — the same 'h'/'t' structures its
+         * REST API serves, read locally instead of via a loopback HTTP
+         * request that spawned a nested full WP bootstrap per call.
          */
         public function get_course_steps($request) {
             $course_id = intval($request['course_id']);
             if (!$course_id) return new WP_Error('bad_request', 'Invalid course ID', ['status' => 400]);
 
-            $auth_header = BYS_Groups_Auth::get_auth_header();
-            if (!$auth_header) return new WP_Error('server_error', 'API credentials not configured', ['status' => 500]);
-
-            $url = get_home_url() . "/wp-json/ldlms/v2/sfwd-courses/{$course_id}/steps?_fields=h,t";
-            $response = wp_remote_get($url, [
-                'headers'   => ['Authorization' => $auth_header],
-                'sslverify' => false,
-                'timeout'   => 60, // Large courses need the headroom
-            ]);
-
-            if (is_wp_error($response)) return new WP_Error('server_error', $response->get_error_message(), ['status' => 500]);
-
-            $status = wp_remote_retrieve_response_code($response);
-            if ($status !== 200) {
-                return new WP_Error('ld_api_failure', 'Failed to fetch steps from LearnDash API', ['status' => $status]);
+            if (!class_exists('LDLMS_Factory_Post')) {
+                return new WP_Error('server_error', 'LearnDash not available', ['status' => 500]);
             }
 
-            $data = json_decode(wp_remote_retrieve_body($response), true);
+            $steps_object = LDLMS_Factory_Post::course_steps($course_id);
+            if (!$steps_object) {
+                return ['lessons' => [], 'quiz_ids' => []];
+            }
+
+            $steps_object->load_steps();
+            $h = (array) $steps_object->get_steps('h');
+            $t = (array) $steps_object->get_steps('t');
 
             // Hierarchical lessons → topics
-            $h_lessons = $data['h']['sfwd-lessons'] ?? [];
+            $h_lessons = $h['sfwd-lessons'] ?? [];
+
+            // One query for every lesson/topic title read below.
+            $prime_ids = array_map('intval', array_keys($h_lessons));
+            foreach ($h_lessons as $lesson_data) {
+                $prime_ids = array_merge($prime_ids, array_map('intval', array_keys($lesson_data['sfwd-topic'] ?? [])));
+            }
+            if (!empty($prime_ids)) {
+                _prime_post_caches($prime_ids, false, false);
+            }
+
             $lessons = [];
             foreach ($h_lessons as $lesson_id => $lesson_data) {
                 $lesson      = get_post($lesson_id);
@@ -169,11 +175,11 @@ if (!class_exists('BYS_Groups_Courses_Router')) {
             }
 
             // Flat list of quiz IDs from the type-list format
-            $quiz_ids = $data['t']['sfwd-quiz'] ?? [];
+            $quiz_ids = $t['sfwd-quiz'] ?? [];
 
             return [
                 'lessons'  => $lessons,
-                'quiz_ids' => array_map('intval', $quiz_ids),
+                'quiz_ids' => array_map('intval', (array) $quiz_ids),
             ];
         }
 

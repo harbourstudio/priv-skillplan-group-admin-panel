@@ -245,53 +245,6 @@ if (!class_exists('BYS_Groups_Activity_Logger')) {
         }
 
 
-        private function fetch_from_learndash_api($endpoint) {
-            $auth_header = BYS_Groups_Auth::get_auth_header();
-            if (!$auth_header) {
-                error_log('Activity Logger: LD API auth not configured');
-                return null;
-            }
-
-            $ld_api_url = get_home_url() . '/wp-json/ldlms/v2' . $endpoint;
-
-            $response = wp_remote_get($ld_api_url, [
-                'headers' => [
-                    'Authorization' => $auth_header,
-                ],
-                'timeout'   => 30,
-                'sslverify' => false,
-            ]);
-
-            if (is_wp_error($response)) {
-                error_log('Activity Logger: LD API error - ' . $response->get_error_message());
-                return null;
-            }
-
-            $status = wp_remote_retrieve_response_code($response);
-            if ($status !== 200) {
-                error_log('Activity Logger: LD API returned status ' . $status);
-                return null;
-            }
-
-            $body = wp_remote_retrieve_body($response);
-
-            // Extract JSON from response (may contain PHP warnings/output)
-            if (preg_match('/\[.*\]/s', $body, $matches)) {
-                $body = $matches[0];
-            } elseif (preg_match('/\{.*\}/s', $body, $matches)) {
-                $body = $matches[0];
-            }
-
-            $decoded = json_decode($body, true);
-            if ($decoded === null) {
-                error_log('Activity Logger: JSON decode failed - ' . json_last_error_msg());
-                error_log('Body start: ' . substr($body, 0, 100));
-                return null;
-            }
-
-            return $decoded;
-        }
-
         public function on_user_login($user_login, $user) {
             $this->log_activity(
                 user_id:      $user->ID,
@@ -334,27 +287,30 @@ if (!class_exists('BYS_Groups_Activity_Logger')) {
         public function on_certificate_earned($course_data) {
             $user_id = intval($course_data['user']->ID ?? 0);
             $course_id = intval($course_data['course']->ID ?? 0);
-            
+
             if (!$user_id || !$course_id) {
                 return;
             }
 
-            // Fetch data of the specified course from LD API (includes certificate_id and awarded_certificate_url)
-            $api_data = $this->fetch_from_learndash_api("/users/{$user_id}/courses?include={$course_id}");
-
-            if (!$api_data || !is_array($api_data) || empty($api_data)) {
-                return;
-            }
-
-            // Get first (and only) course from array
-            $course = $api_data[0];
+            // Certificate data from LD's local helpers — the old
+            // implementation fetched the same two fields via a loopback HTTP
+            // request to LD's REST API on every course completion.
+            $cert_id = function_exists('learndash_get_setting')
+                ? intval(learndash_get_setting($course_id, 'certificate'))
+                : 0;
 
             // Verify certificate exists
-            if (empty($course['certificate'])) {
+            if (!$cert_id) {
                 return;
             }
 
-            $course_title = $course['title']['rendered'] ?? 'Unknown Course';
+            $awarded_cert_url = null;
+            if (function_exists('learndash_get_course_certificate_link')) {
+                $link = (string) learndash_get_course_certificate_link($course_id, $user_id);
+                $awarded_cert_url = $link !== '' ? $link : null;
+            }
+
+            $course_title = get_the_title($course_id) ?: 'Unknown Course';
 
             $this->log_activity(
                 user_id:      $user_id,
@@ -364,8 +320,8 @@ if (!class_exists('BYS_Groups_Activity_Logger')) {
                 object_title: $course_title,
                 object_type:  'course',
                 meta:         [
-                    'certificate_id'        => intval($course['certificate'] ?? 0),
-                    'awarded_certificate_url' => $course['awarded_certificate_url'] ?? null,
+                    'certificate_id'        => $cert_id,
+                    'awarded_certificate_url' => $awarded_cert_url,
                 ]
             );
         }

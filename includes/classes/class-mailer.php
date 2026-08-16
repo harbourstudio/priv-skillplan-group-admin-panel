@@ -427,57 +427,26 @@ if (!class_exists('BYS_Groups_Mailer')) {
         }
 
         /**
-         * Get group members with email and display names via LearnDash API.
+         * Get group members with email and display names via LD's local
+         * membership helper. The old implementation paginated through LD's
+         * REST API over loopback HTTP.
          *
          * @param int $group_id Group post ID
-         * @return array Array of arrays with 'email' and 'name' keys
+         * @return array Array of arrays with 'user_id', 'email' and 'name' keys
          */
         private function get_group_users_with_names($group_id) {
-            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-auth.php';
-            $auth_header = BYS_Groups_Auth::get_auth_header();
-
-            if (!$auth_header) {
+            if (!function_exists('learndash_get_groups_user_ids')) {
                 return array();
             }
 
-            $group_users = array();
-            $page = 1;
-            $per_page = 100;
+            $user_ids = array_map('intval', (array) learndash_get_groups_user_ids($group_id));
+            if (empty($user_ids)) {
+                return array();
+            }
 
-            do {
-                $ld_api_url = get_home_url() . "/wp-json/ldlms/v2/groups/{$group_id}/users?_fields=id&per_page={$per_page}&page={$page}";
+            cache_users($user_ids);
 
-                $response = wp_remote_get($ld_api_url, array(
-                    'headers' => array('Authorization' => $auth_header),
-                    'sslverify' => false,
-                ));
-
-                if (is_wp_error($response)) {
-                    return array();
-                }
-
-                $status = wp_remote_retrieve_response_code($response);
-                if ($status !== 200) {
-                    return array();
-                }
-
-                $page_users = json_decode(wp_remote_retrieve_body($response), true);
-                if (!is_array($page_users)) {
-                    return array();
-                }
-
-                if (empty($page_users)) {
-                    break;
-                }
-
-                $group_users = array_merge($group_users, $page_users);
-                $page++;
-            } while (count($page_users) === $per_page);
-
-            // Extract user IDs and fetch with names
-            $user_ids = array_column($group_users, 'id');
             $recipients = array();
-
             foreach ($user_ids as $user_id) {
                 $user = get_user_by('ID', $user_id);
                 if ($user && !empty($user->user_email)) {
@@ -533,72 +502,26 @@ if (!class_exists('BYS_Groups_Mailer')) {
         }
 
         /**
-         * Get email addresses of group members via LearnDash API with pagination.
+         * Get email addresses of group members via LD's local membership
+         * helper. The old implementation paginated through LD's REST API
+         * over loopback HTTP.
          *
          * @param int $group_id Group post ID
          * @return array Array of unique email addresses, empty array on error
          */
         private function get_group_users_emails($group_id) {
-            // Get auth header
-            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-auth.php';
-            $auth_header = BYS_Groups_Auth::get_auth_header();
-
-            if (!$auth_header) {
-                // error_log("[BYS_Mailer::get_group_users_emails] API credentials not configured");
+            if (!function_exists('learndash_get_groups_user_ids')) {
                 return array();
             }
 
-            // Fetch group users from LearnDash API
-            $group_users = array();
-            $page = 1;
-            $per_page = 100;
-
-            do {
-                $ld_api_url = get_home_url() . "/wp-json/ldlms/v2/groups/{$group_id}/users?_fields=id&per_page={$per_page}&page={$page}";
-
-                $response = wp_remote_get($ld_api_url, array(
-                    'headers' => array(
-                        'Authorization' => $auth_header,
-                    ),
-                    'sslverify' => false,
-                ));
-
-                if (is_wp_error($response)) {
-                    // error_log("[BYS_Mailer::get_group_users_emails] LD API error: " . $response->get_error_message());
-                    return array();
-                }
-
-                $status = wp_remote_retrieve_response_code($response);
-                $body = wp_remote_retrieve_body($response);
-
-                if ($status !== 200) {
-                    // error_log("[BYS_Mailer::get_group_users_emails] LD API HTTP {$status}");
-                    return array();
-                }
-
-                $page_users = json_decode($body, true);
-                if (!is_array($page_users)) {
-                    // error_log("[BYS_Mailer::get_group_users_emails] Failed to decode JSON from API");
-                    return array();
-                }
-
-                if (empty($page_users)) {
-                    break;
-                }
-
-                $group_users = array_merge($group_users, $page_users);
-                $page++;
-            } while (count($page_users) === $per_page);
-
-            if (empty($group_users)) {
-                // error_log("[BYS_Mailer::get_group_users_emails] No group members found");
+            $user_ids = array_map('intval', (array) learndash_get_groups_user_ids($group_id));
+            if (empty($user_ids)) {
                 return array();
             }
 
-            // Extract user IDs and fetch email addresses
-            $user_ids = array_column($group_users, 'id');
+            cache_users($user_ids);
+
             $emails = array();
-
             foreach ($user_ids as $user_id) {
                 $user = get_user_by('ID', $user_id);
                 if ($user && !empty($user->user_email)) {
@@ -606,11 +529,7 @@ if (!class_exists('BYS_Groups_Mailer')) {
                 }
             }
 
-            // Remove duplicates and log count
-            $unique_emails = array_unique($emails);
-            // error_log("[BYS_Mailer::get_group_users_emails] Found " . count($unique_emails) . " unique group members");
-
-            return $unique_emails;
+            return array_unique($emails);
         }
 
         /**
