@@ -810,6 +810,10 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
          * Sibling autocomplete picker over all published LD courses.
          * Capped at 100 results. Used by group-course-config to add courses
          * to a group.
+         *
+         * Closed courses are only listed for administrators and editors —
+         * group leaders must not be able to browse (or add) closed courses
+         * they weren't granted.
          */
         public function get_all_courses($request) {
             $search = sanitize_text_field($request->get_param('search') ?? '');
@@ -824,8 +828,15 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             ];
             if ($search) $args['s'] = $search;
 
+            $show_closed = current_user_can('administrator') || current_user_can('editor');
+
             $result = [];
             foreach (get_posts($args) as $course) {
+                if (!$show_closed
+                    && function_exists('learndash_get_setting')
+                    && learndash_get_setting($course->ID, 'course_price_type') === 'closed') {
+                    continue;
+                }
                 $shortname = get_post_meta($course->ID, 'shortname', true);
                 $result[] = [
                     'id'        => $course->ID,

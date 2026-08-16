@@ -141,8 +141,15 @@ foreach ($activity_type_filter_options as $option) {
                         </div>
                         <div class="bys-multiselect__dropdown hidden" role="listbox" aria-multiselectable="true" id="bys-multiselect-activity-dropdown">
                             <ul class="bys-multiselect__list" role="group">
+                                <?php
+                                // [on_page_view parked] Hide lesson_visited/topic_visited from the
+                                // filter dropdown while the writer is disabled. Kept in
+                                // $activity_type_filter_options above so $activity_map still carries
+                                // label+icon for historical rows in the table.
+                                $hidden_activities = ['lesson_visited', 'topic_visited'];
+                                ?>
                                 <?php foreach ($activity_type_filter_options as $option) : ?>
-                                    <?php if (!empty($option['value'])) : ?>
+                                    <?php if (!empty($option['value']) && !in_array($option['value'], $hidden_activities, true)) : ?>
                                         <li class="bys-multiselect__option" role="option">
                                             <label>
                                                 <input

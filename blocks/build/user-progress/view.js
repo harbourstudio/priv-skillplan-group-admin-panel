@@ -646,7 +646,10 @@ jQuery(document).ready(async $ => {
                 }
 
                 // Populate activity columns from augmented step data
-                $topic.find('.topic-visits').text(topicData?.visits != null ? topicData.visits : '—');
+                // [on_page_view parked] Visit counts not written. See class-activity-logger.php.
+                // $topic.find('.topic-visits').text(
+                //   topicData?.visits != null ? topicData.visits : '—'
+                // );
                 $topic.find('.topic-timespent').text((0,_shared_helpers_js__WEBPACK_IMPORTED_MODULE_2__.formatDuration)(topicData?.time_spent_seconds));
                 $topic.find('.topic-last-accessed').text(topicData?.last_accessed_gmt ? (0,_shared_helpers_js__WEBPACK_IMPORTED_MODULE_2__.formatDateTime)(topicData.last_accessed_gmt) : '—');
                 $tbody.append($topic);
