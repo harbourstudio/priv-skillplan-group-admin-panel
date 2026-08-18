@@ -83,6 +83,39 @@ jQuery(document).ready(($) => {
       return;
     }
 
+    // Ordered (sort / matrix_sort) — items shown in the learner's submitted order,
+    // each marked correct (placed in the right slot) or incorrect.
+    if (q.user_answers.type === 'ordered') {
+      const $answers = $card.find('.question-card__answers');
+
+      q.user_answers.items.forEach((item, index) => {
+        const state = item.is_correct ? CHOICE_STATES.selectedCorrect : CHOICE_STATES.selectedIncorrect;
+
+        const $row = $('<div class="answer-choice answer-choice--ordered">').addClass(state.cls);
+        $row.append(`<i class="fa-regular ${state.icon} answer-choice__icon" aria-hidden="true"></i>`);
+
+        const $text = $('<span class="answer-choice__text">');
+
+        // For matrix_sort_answer, append the criterion associated to each answer body
+        if (item.criterion) {
+          $text.append($('<span class="answer-choice__criterion">').text(item.criterion));
+        }
+        const $body = $('<span class="answer-choice__body">');
+        if (item.is_html) {
+          $body.html(item.text);
+        } else {
+          $body.text(item.text);
+        }
+        $text.append($body);
+        $row.append($text);
+
+        $answers.append($row);
+      });
+
+      $answers.removeClass('hidden');
+      return;
+    }
+
     // Free-text / essay
     if (q.user_answers.type === 'text' && q.user_answers.user_text) {
       $card.find('.question-card__user-text')
@@ -102,13 +135,21 @@ jQuery(document).ready(($) => {
 
     $el.attr('data-label', label);
 
-    q.correct_answer.forEach((answer) => {
+    q.correct_answer.forEach((answer, index) => {
       const $item = $('<div class="correct-answer__item">');
-      if (answer.is_html) {
-        $item.html(answer.text);
-      } else {
-        $item.text(answer.text);
+
+      // For matrix_sort_answer, append the criterion associated to each answer body
+      if (answer.criterion) {
+        $item.append($('<span class="correct-answer__criterion">').text(answer.criterion));
       }
+
+      const $body = $('<span class="correct-answer__body">');
+      if (answer.is_html) {
+        $body.html(answer.text);
+      } else {
+        $body.text(answer.text);
+      }
+      $item.append($body);
       $el.append($item);
     });
 

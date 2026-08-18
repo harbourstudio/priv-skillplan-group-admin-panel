@@ -504,11 +504,13 @@ if (!class_exists('BYS_Groups_Courses_Router')) {
             // the LDLMS question title matches the sfwd-question post_title.
             $question_post_id_map = []; // keyed by trimmed question title
 
-            $quiz_post_id = (int) $wpdb->get_var($wpdb->prepare(
-                "SELECT post_id FROM {$wpdb->prefix}learndash_user_activity
+            $activity_row = $wpdb->get_row($wpdb->prepare(
+                "SELECT post_id, user_id FROM {$wpdb->prefix}learndash_user_activity
                  WHERE activity_id = %d AND activity_type = 'quiz'",
                 $activity_id
             ));
+            $quiz_post_id = $activity_row ? (int) $activity_row->post_id : 0;
+            $quiz_user_id = $activity_row ? (int) $activity_row->user_id : 0;
 
             if ($quiz_post_id) {
                 $sfwd_q_rows = $wpdb->get_results($wpdb->prepare(
@@ -590,7 +592,9 @@ if (!class_exists('BYS_Groups_Courses_Router')) {
                     'user_answers'     => $this->parse_question_answers(
                         $stat['answer_data'] ?? '',
                         $qdef['answer_data'] ?? '',
-                        $answer_type
+                        $answer_type,
+                        $quiz_user_id,
+                        $qid
                     ),
                     'correct_answer'   => $this->parse_correct_answer(
                         $qdef['answer_data'] ?? '',
@@ -949,13 +953,63 @@ if (!class_exists('BYS_Groups_Courses_Router')) {
          * into a structured format for the frontend.
          *
          * Supported types:
-         *   - single / multiple  → list of choices with is_correct + was_selected flags
-         *   - free_answer / essay → plain user text
-         *
+         * - single / multiple  → list of choices with is_correct + was_selected flags
+         * - free_answer / essay → plain user text
+         * - sort / matrix sort → JSON array
+         * 
          * Returns null for complex types (sort, matrix, cloze, assessment) where a
          * structured breakdown isn't yet implemented.
          */
-        private function parse_question_answers($stat_answer_raw, $q_answer_raw, $answer_type) {
+        private function parse_question_answers($stat_answer_raw, $q_answer_raw, $answer_type, $user_id = 0, $question_id = 0) {
+
+            // Sort / Matrix Sort — LD stores stat.answer_data as a JSON array of
+            // md5(user_id + question_id + original_position) hashes, indexed by
+            // the position the user placed the item in. See LDLMS_Sort_Answer::get_student_answers().
+            if (in_array($answer_type, ['sort_answer', 'matrix_sort_answer'], true)) {
+                $q_options = @unserialize($q_answer_raw); // phpcs:ignore
+                if (!is_array($q_options)) return null;
+
+                $s_data = json_decode($stat_answer_raw, true);
+                if (!is_array($s_data)) $s_data = [];
+
+                // Map md5 hash → original position so we can look up which
+                // option the user placed at each slot.
+                $hash_to_original = [];
+                foreach ($q_options as $orig_pos => $_) {
+                    $hash_to_original[md5((string) $user_id . (string) $question_id . (string) $orig_pos)] = $orig_pos;
+                }
+
+                $items = [];
+                foreach ($s_data as $user_pos => $hash) {
+                    $orig_pos = $hash_to_original[$hash] ?? null;
+                    if ($orig_pos === null) continue;
+
+                    $opt = $q_options[$orig_pos] ?? null;
+                    if (!is_object($opt) || ($opt instanceof \__PHP_Incomplete_Class)) continue;
+
+                    $text      = method_exists($opt, 'getAnswer')     ? $opt->getAnswer()     : '';
+                    $is_html   = method_exists($opt, 'isHtml')        && $opt->isHtml();
+                    $criterion = method_exists($opt, 'getSortString') ? $opt->getSortString() : '';
+
+                    // Authors sometimes enter answer text via a WYSIWYG that inserts
+                    // HTML entities (&nbsp;, &amp;) without ticking the HTML checkbox.
+                    // Decode entities on the plain-text path so `.text()` in the browser
+                    // doesn't render them literally.
+                    if (!$is_html) {
+                        $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                    }
+                    $criterion = html_entity_decode($criterion, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+                    $items[] = [
+                        'text'       => $is_html ? wp_kses_post($text) : sanitize_text_field($text),
+                        'is_html'    => $is_html,
+                        'criterion'  => $criterion !== '' ? sanitize_text_field($criterion) : '',
+                        'is_correct' => ((int) $user_pos === (int) $orig_pos),
+                    ];
+                }
+
+                return $items ? ['type' => 'ordered', 'items' => $items] : null;
+            }
 
             // Choice-based (single / multiple)
             if (in_array($answer_type, ['single', 'multiple'], true)) {
@@ -1057,6 +1111,36 @@ if (!class_exists('BYS_Groups_Courses_Router')) {
                             'is_html' => $is_html,
                         ];
                     }
+                }
+
+                return $correct ?: null;
+            }
+
+            // Sort / Matrix Sort — the canonical order is the option array's own order.
+            // Matrix Sort additionally has a per-option criterion (sortString) — the
+            // fixed left-column label the item belongs against.
+            if (in_array($answer_type, ['sort_answer', 'matrix_sort_answer'], true)) {
+                $q_options = @unserialize($q_answer_raw); // phpcs:ignore
+                if (!is_array($q_options)) return null;
+
+                $correct = [];
+                foreach ($q_options as $opt) {
+                    if (!is_object($opt) || ($opt instanceof \__PHP_Incomplete_Class)) continue;
+                    $text      = method_exists($opt, 'getAnswer')     ? $opt->getAnswer()     : '';
+                    $is_html   = method_exists($opt, 'isHtml')        && $opt->isHtml();
+                    $criterion = method_exists($opt, 'getSortString') ? $opt->getSortString() : '';
+                    if ($text === '') continue;
+
+                    if (!$is_html) {
+                        $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                    }
+                    $criterion = html_entity_decode($criterion, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+                    $correct[] = [
+                        'text'      => $is_html ? wp_kses_post($text) : sanitize_text_field($text),
+                        'is_html'   => $is_html,
+                        'criterion' => $criterion !== '' ? sanitize_text_field($criterion) : '',
+                    ];
                 }
 
                 return $correct ?: null;
