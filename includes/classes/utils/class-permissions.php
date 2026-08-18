@@ -35,51 +35,25 @@ if (!class_exists('BYS_Groups_Permissions')) {
         }
 
         /**
-         * Checks if the user is an 'administrators' (ACF) of an 'organization' post
+         * Checks if the user is an 'administrators' (ACF) of an 'organization' post.
+         * Reads the cached org map — a hit implies the org is published.
          */
         public static function is_org_admin($org_id, $user_id = null) {
             $org_id  = (int) $org_id;
             $user_id = $user_id ?: get_current_user_id();
             if (!$org_id || !$user_id) return false;
 
-            if (!function_exists('get_field')) return false;
-
-            $org = get_post($org_id);
-            if (!$org || $org->post_type !== 'organization' || $org->post_status !== 'publish') return false;
-
-            $raw_admins = get_field('administrators', $org_id);
-            foreach ((array) $raw_admins as $admin) {
-                $admin_id = $admin instanceof \WP_User ? $admin->ID : intval($admin);
-                if ($admin_id === $user_id) return true;
-            }
-
-            return false;
+            return BYS_Groups_Org_Map::is_user_org_admin($org_id, (int) $user_id);
         }
 
         /**
-         * Iterate 'organization' posts to find one that contains $group_id,
-         * then delegate to is_org_admin() for the actual admin check
+         * True when the user administers ANY organization whose 'groups'
+         * field contains $group_id. Map lookup — no org scan.
          */
         private static function is_org_admin_for_group($user_id, $group_id) {
-            if (!function_exists('get_field')) return false;
-
-            $orgs = get_posts(array(
-                'post_type'      => 'organization',
-                'post_status'    => 'publish',
-                'posts_per_page' => -1,
-                'fields'         => 'ids',
-            ));
-
-            foreach ($orgs as $org_id) {
-                $raw_groups = get_field('groups', $org_id);
-                foreach ((array) $raw_groups as $g) {
-                    $g_id = $g instanceof \WP_Post ? $g->ID : intval($g);
-                    if ($g_id === $group_id) {
-                        return self::is_org_admin($org_id, $user_id);
-                    }
-                }
+            foreach (BYS_Groups_Org_Map::orgs_for_group((int) $group_id) as $org_id) {
+                if (self::is_org_admin($org_id, $user_id)) return true;
             }
-
             return false;
         }
 
@@ -91,21 +65,8 @@ if (!class_exists('BYS_Groups_Permissions')) {
             $user_id = $user_id ?: get_current_user_id();
             if (!$user_id) return false;
 
-            if (!function_exists('get_field')) return false;
-
-            $orgs = get_posts(array(
-                'post_type'      => 'organization',
-                'post_status'    => 'publish',
-                'posts_per_page' => -1,
-                'fields'         => 'ids',
-            ));
-
-            foreach ($orgs as $org_id) {
-                $raw_admins = get_field('administrators', $org_id);
-                foreach ((array) $raw_admins as $admin) {
-                    $admin_id = $admin instanceof \WP_User ? $admin->ID : intval($admin);
-                    if ($admin_id === $user_id) return true;
-                }
+            foreach (BYS_Groups_Org_Map::all_org_ids() as $org_id) {
+                if (BYS_Groups_Org_Map::is_user_org_admin($org_id, (int) $user_id)) return true;
             }
 
             return false;
@@ -210,23 +171,9 @@ if (!class_exists('BYS_Groups_Permissions')) {
          */
         public static function is_group_in_any_org($group_id) {
             $group_id = (int) $group_id;
-            if ($group_id <= 0 || !function_exists('get_field')) return false;
+            if ($group_id <= 0) return false;
 
-            $orgs = get_posts([
-                'post_type'      => 'organization',
-                'post_status'    => 'publish',
-                'posts_per_page' => -1,
-            ]);
-
-            foreach ($orgs as $org) {
-                $raw_groups = get_field('groups', $org->ID);
-                foreach ((array) $raw_groups as $g) {
-                    $g_id = $g instanceof \WP_Post ? $g->ID : intval($g);
-                    if ($g_id === $group_id) return true;
-                }
-            }
-
-            return false;
+            return !empty(BYS_Groups_Org_Map::orgs_for_group($group_id));
         }
 
         /**

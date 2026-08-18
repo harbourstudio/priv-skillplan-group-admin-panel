@@ -770,12 +770,22 @@ if (!class_exists('BYS_Groups_Prerequisites')) {
          *     prereq_titles: string[]  Human-readable labels for the tooltip/notice
          * }
          */
+        /** @var array<string,array> Request-level lock-state cache. */
+        private static array $lock_cache = [];
+
         public static function get_lock_state(int $course_id, int $user_id, ?int $group_id = null): array {
             $empty = ['is_locked' => false, 'unmet_courses' => [], 'unmet_forms' => [], 'prereq_titles' => []];
             if (!$user_id) return $empty;
 
+            $cache_key = $user_id . ':' . $course_id . ':' . ($group_id ?? 0);
+            if (isset(self::$lock_cache[$cache_key])) {
+                return self::$lock_cache[$cache_key];
+            }
+
             if ($group_id !== null) {
-                return self::evaluate_lock_for_group($course_id, $group_id, $user_id);
+                $result = self::evaluate_lock_for_group($course_id, $group_id, $user_id);
+                self::$lock_cache[$cache_key] = $result;
+                return $result;
             }
 
             // Cross-group: unlock if all prereqs are met in any single group
@@ -793,14 +803,19 @@ if (!class_exists('BYS_Groups_Prerequisites')) {
                 $form_data   = get_post_meta((int) $gid, self::FORMS_META_KEY, true);
                 $has_course  = is_array($course_data) && isset($course_data[$course_id]);
                 $has_form    = is_array($form_data)   && isset($form_data[$course_id]);
-                if (!$has_course && !$has_form) continue; // no config for this course in this group
+                if (!$has_course && !$has_form) continue;
 
                 $lock = self::evaluate_lock_for_group($course_id, (int) $gid, $user_id);
-                if (!$lock['is_locked']) return $empty; // fully satisfied → accessible
+                if (!$lock['is_locked']) {
+                    self::$lock_cache[$cache_key] = $empty;
+                    return $empty;
+                }
                 if ($locking_result === null) $locking_result = $lock;
             }
 
-            return $locking_result ?? $empty;
+            $result = $locking_result ?? $empty;
+            self::$lock_cache[$cache_key] = $result;
+            return $result;
         }
 
         /**

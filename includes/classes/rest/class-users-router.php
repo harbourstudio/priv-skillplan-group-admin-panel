@@ -261,8 +261,12 @@ if (!class_exists('BYS_Groups_Users_Router')) {
          * with completion status, last_accessed_gmt, time_spent_seconds, and
          * custom visit counts (bys_topic_visits_*).
          *
-         * Fetches paginated step data from the LD REST API, then enriches via
-         * three batch $wpdb queries (no N+1).
+         * Steps are built locally from the same primitives LD's own REST
+         * controller uses (LDLMS course-steps object + the reports activity
+         * query) — the old implementation made one loopback HTTP request per
+         * 100 steps, each spawning a nested full WP bootstrap. Row shape is
+         * unchanged: step, post_type, step_name, step_status,
+         * date_started(_gmt), date_completed(_gmt), awarded_certificate_url.
          */
         public function get_user_course_steps_progress($request) {
             $user_id   = intval($request['user_id']);
@@ -271,36 +275,7 @@ if (!class_exists('BYS_Groups_Users_Router')) {
                 return new WP_Error('bad_request', 'Invalid user_id or course_id', ['status' => 400]);
             }
 
-            $auth_header = BYS_Groups_Auth::get_auth_header();
-            if (!$auth_header) return new WP_Error('server_error', 'API credentials not configured', ['status' => 500]);
-
-            // Fetch all paginated steps from LD API
-            $all_steps = [];
-            $page      = 1;
-            $per_page  = 100;
-            while (true) {
-                $url = get_home_url() . "/wp-json/ldlms/v2/users/{$user_id}/course-progress/{$course_id}/steps?per_page={$per_page}&page={$page}";
-                $response = wp_remote_get($url, [
-                    'headers'   => ['Authorization' => $auth_header],
-                    'timeout'   => 30,
-                    'sslverify' => false,
-                ]);
-
-                if (is_wp_error($response)) {
-                    return new WP_Error('server_error', $response->get_error_message(), ['status' => 500]);
-                }
-                $status = wp_remote_retrieve_response_code($response);
-                if ($status !== 200) {
-                    return new WP_Error('ld_api_failure', 'Failed to fetch course steps progress from LearnDash API', ['status' => $status]);
-                }
-
-                $data = json_decode(wp_remote_retrieve_body($response), true);
-                if (!is_array($data) || empty($data)) break;
-
-                $all_steps = array_merge($all_steps, $data);
-                if (count($data) < $per_page) break;
-                $page++;
-            }
+            $all_steps = $this->build_course_steps_progress($user_id, $course_id);
 
             // Enrich steps via batch DB queries
             if (!empty($all_steps)) {
@@ -396,15 +371,13 @@ if (!class_exists('BYS_Groups_Users_Router')) {
         /**
          * GET /users/{user_id}/quiz-progress
          * Returns a summary row per quiz the user has attempted, with highest/latest
-         * scores. Queries LD activity table for quiz IDs, then LD REST for per-quiz
-         * attempt detail.
+         * scores. Queries LD activity table for quiz IDs, then reads attempt
+         * detail from LD's local attempt store — the old implementation made
+         * one loopback HTTP request per quiz the user had ever attempted.
          */
         public function get_user_quiz_progress_summary($request) {
             $user_id = intval($request['user_id']);
             if (!$user_id) return new WP_Error('bad_request', 'user_id parameter required', ['status' => 400]);
-
-            $auth_header = BYS_Groups_Auth::get_auth_header();
-            if (!$auth_header) return new WP_Error('server_error', 'API credentials not configured', ['status' => 500]);
 
             global $wpdb;
             $rows = $wpdb->get_results($wpdb->prepare(
@@ -426,27 +399,19 @@ if (!class_exists('BYS_Groups_Users_Router')) {
                 }
             }
 
+            // Prime quiz + course posts once for the title lookups below.
+            $prime_ids = array_values(array_unique(array_merge(
+                array_keys($quiz_course_map),
+                array_filter(array_values($quiz_course_map))
+            )));
+            if (!empty($prime_ids)) {
+                _prime_post_caches($prime_ids, false, false);
+            }
+
             $result = [];
             foreach ($quiz_course_map as $quiz_id => $course_id) {
-                $url = get_home_url() . "/wp-json/ldlms/v2/users/{$user_id}/quiz-progress?quiz={$quiz_id}";
-                $response = wp_remote_get($url, [
-                    'headers'   => ['Authorization' => $auth_header],
-                    'timeout'   => 60,
-                    'sslverify' => false,
-                ]);
-
-                if (is_wp_error($response)) {
-                    error_log('[BYS Groups] Quiz progress fetch failed for quiz ' . $quiz_id . ': ' . $response->get_error_message());
-                    continue;
-                }
-                $status = wp_remote_retrieve_response_code($response);
-                if ($status !== 200) {
-                    error_log('[BYS Groups] Quiz progress API returned status ' . $status . ' for quiz ' . $quiz_id);
-                    continue;
-                }
-
-                $attempts = json_decode(wp_remote_retrieve_body($response), true);
-                if (!is_array($attempts) || empty($attempts)) continue;
+                $attempts = $this->fetch_user_quiz_attempts_local($user_id, $quiz_id);
+                if (empty($attempts)) continue;
 
                 $quiz         = get_post($quiz_id);
                 $title        = $quiz ? $quiz->post_title : 'Quiz #' . $quiz_id;
@@ -495,7 +460,9 @@ if (!class_exists('BYS_Groups_Users_Router')) {
         /**
          * GET /users/{user_id}/quiz-attempts/{quiz_id}
          * Returns the full list of attempts for one quiz, normalized and sorted
-         * by completion time descending.
+         * by completion time descending. Sourced from LD's local attempt store
+         * (the old implementation fetched the same rows via a loopback HTTP
+         * request to LD's REST API).
          */
         public function get_user_quiz_attempts($request) {
             $user_id = intval($request['user_id']);
@@ -504,25 +471,7 @@ if (!class_exists('BYS_Groups_Users_Router')) {
                 return new WP_Error('bad_request', 'user_id and quiz_id parameters required', ['status' => 400]);
             }
 
-            $auth_header = BYS_Groups_Auth::get_auth_header();
-            if (!$auth_header) return new WP_Error('server_error', 'API credentials not configured', ['status' => 500]);
-
-            $url = get_home_url() . "/wp-json/ldlms/v2/users/{$user_id}/quiz-progress?quiz={$quiz_id}";
-            $response = wp_remote_get($url, [
-                'headers'   => ['Authorization' => $auth_header],
-                'timeout'   => 60,
-                'sslverify' => false,
-            ]);
-
-            if (is_wp_error($response)) return new WP_Error('server_error', $response->get_error_message(), ['status' => 500]);
-
-            $status = wp_remote_retrieve_response_code($response);
-            if ($status !== 200) {
-                return new WP_Error('ld_api_failure', 'Failed to fetch quiz attempts from LearnDash API', ['status' => $status]);
-            }
-
-            $attempts = json_decode(wp_remote_retrieve_body($response), true);
-            if (!is_array($attempts)) $attempts = [];
+            $attempts = $this->fetch_user_quiz_attempts_local($user_id, $quiz_id);
 
             $normalized = [];
             foreach ($attempts as $attempt) {
@@ -716,33 +665,16 @@ if (!class_exists('BYS_Groups_Users_Router')) {
 
             $course_title = get_the_title($course_id);
 
-            // Fetch certificate details from LD API (best-effort enrichment)
-            $cert_id          = null;
+            // Certificate details from LD's local helpers (best-effort
+            // enrichment — the old implementation fetched the same two fields
+            // via a loopback HTTP request to LD's REST API).
+            $cert_id = function_exists('learndash_get_setting')
+                ? intval(learndash_get_setting($course_id, 'certificate'))
+                : 0;
             $awarded_cert_url = null;
-            $auth_header      = BYS_Groups_Auth::get_auth_header();
-            if ($auth_header) {
-                $url = get_home_url() . "/wp-json/ldlms/v2/users/{$user_id}/courses?include={$course_id}";
-                $response = wp_remote_get($url, [
-                    'headers'   => ['Authorization' => $auth_header],
-                    'timeout'   => 30,
-                    'sslverify' => false,
-                ]);
-
-                if (!is_wp_error($response) && wp_remote_retrieve_response_code($response) === 200) {
-                    $body = wp_remote_retrieve_body($response);
-                    // Defensive: LD sometimes wraps its JSON in extra output
-                    if (preg_match('/\[.*\]/s', $body, $matches)) {
-                        $body = $matches[0];
-                    } elseif (preg_match('/\{.*\}/s', $body, $matches)) {
-                        $body = $matches[0];
-                    }
-                    $data = json_decode($body, true);
-                    if (is_array($data) && !empty($data)) {
-                        $course = $data[0];
-                        $cert_id          = intval($course['certificate'] ?? 0);
-                        $awarded_cert_url = $course['awarded_certificate_url'] ?? null;
-                    }
-                }
+            if ($cert_id && function_exists('learndash_get_course_certificate_link')) {
+                $link = (string) learndash_get_course_certificate_link($course_id, $user_id);
+                $awarded_cert_url = $link !== '' ? $link : null;
             }
 
             global $wpdb;
@@ -772,6 +704,162 @@ if (!class_exists('BYS_Groups_Users_Router')) {
         }
 
         // ─── Private helpers ────────────────────────────────────────────────
+
+        /**
+         * Build the per-step progress rows for a user + course locally,
+         * mirroring LD's users/{id}/course-progress/{course}/steps REST
+         * response: one row per course step in course order, defaulted to
+         * not_started, overlaid with activity data where it exists.
+         *
+         * Sources (identical to LD's controller):
+         *   - LDLMS_Factory_Post::course_steps() 'l' (linear) step list
+         *   - learndash_reports_get_activity() for started/completed times
+         *   - the Quiz model's is_complete() for passed/failed quiz status
+         *
+         * @return array[] LD-REST-shaped step rows.
+         */
+        private function build_course_steps_progress($user_id, $course_id) {
+            if (!class_exists('LDLMS_Factory_Post')) return [];
+
+            $course_steps_object = LDLMS_Factory_Post::course_steps($course_id);
+            if (!$course_steps_object) return [];
+
+            $course_steps_object->load_steps();
+            $course_steps = (array) $course_steps_object->get_steps('l');
+            if (empty($course_steps)) return [];
+
+            // step_id => post_type, in course order.
+            $step_ids = [];
+            foreach ($course_steps as $step_key) {
+                if (!is_string($step_key) || strpos($step_key, ':') === false) continue;
+                list($step_type, $step_id) = explode(':', $step_key);
+                $step_ids[(int) $step_id] = $step_type;
+            }
+            if (empty($step_ids)) return [];
+
+            _prime_post_caches(array_keys($step_ids), false, false);
+
+            // One activity query for every step (same source LD REST uses).
+            $activity_by_step = [];
+            if (function_exists('learndash_reports_get_activity')) {
+                $reports = learndash_reports_get_activity([
+                    'user_ids'   => [absint($user_id)],
+                    'course_ids' => [absint($course_id)],
+                    'post_ids'   => array_keys($step_ids),
+                    'per_page'   => 0,
+                ]);
+                foreach ((array) ($reports['results'] ?? []) as $result) {
+                    $activity_by_step[absint($result->post_id)] = $result;
+                }
+            }
+
+            $rows = [];
+            foreach ($step_ids as $step_id => $step_type) {
+                $row = [
+                    'step'                    => absint($step_id),
+                    'post_type'               => esc_attr($step_type),
+                    'step_name'               => get_the_title($step_id),
+                    'step_status'             => 'not_started',
+                    'date_started_gmt'        => '',
+                    'date_started'            => '',
+                    'date_completed_gmt'      => '',
+                    'date_completed'          => '',
+                    'awarded_certificate_url' => '',
+                ];
+
+                if ('sfwd-quiz' === $step_type && function_exists('learndash_get_certificate_link')) {
+                    $row['awarded_certificate_url'] = (string) learndash_get_certificate_link($step_id, $user_id, true);
+                }
+
+                $result = $activity_by_step[$step_id] ?? null;
+                if ($result && esc_attr($result->post_type) === $step_type) {
+                    if (!empty($result->activity_started)) {
+                        $date_started            = gmdate('Y-m-d H:i:s', (int) $result->activity_started);
+                        $row['date_started_gmt'] = mysql_to_rfc3339($date_started);
+                        $row['date_started']     = mysql_to_rfc3339(get_date_from_gmt($date_started));
+                    }
+                    if (!empty($result->activity_completed)) {
+                        $date_completed            = gmdate('Y-m-d H:i:s', (int) $result->activity_completed);
+                        $row['date_completed_gmt'] = mysql_to_rfc3339($date_completed);
+                        $row['date_completed']     = mysql_to_rfc3339(get_date_from_gmt($date_completed));
+                    }
+
+                    if ('sfwd-quiz' === $step_type) {
+                        // Quiz-specific status: passed/failed once there is a
+                        // result, mirroring LD's controller.
+                        $quiz_status = 'failed';
+                        if (class_exists('LearnDash\\Core\\Models\\Quiz')) {
+                            $quiz = \LearnDash\Core\Models\Quiz::find((int) $step_id);
+                            if ($quiz && $quiz->is_complete($user_id)) {
+                                $quiz_status = 'passed';
+                            }
+                        }
+                        if ($result->activity_status) {
+                            $row['step_status'] = $quiz_status;
+                        } elseif (empty($row['date_started'])) {
+                            $row['step_status'] = 'not_started';
+                        } elseif (empty($row['date_completed'])) {
+                            $row['step_status'] = 'in_progress';
+                        } else {
+                            $row['step_status'] = $quiz_status;
+                        }
+                    } else {
+                        if ($result->activity_status) {
+                            $row['step_status'] = 'completed';
+                        } elseif (empty($row['date_started'])) {
+                            $row['step_status'] = 'not_started';
+                        } elseif (empty($row['date_completed'])) {
+                            $row['step_status'] = 'in_progress';
+                        } else {
+                            $row['step_status'] = 'completed';
+                        }
+                    }
+                }
+
+                $rows[] = $row;
+            }
+
+            return $rows;
+        }
+
+        /**
+         * Read a user's attempts for one quiz straight from LD's attempt
+         * store (the _sfwd-quizzes usermeta LD's own REST controller reads),
+         * shaped like the ldlms/v2 quiz-progress rows the old loopback
+         * returned: id, percentage, pass, points_scored, points_total,
+         * started, completed.
+         *
+         * @return array[] Attempt rows, unsorted (callers sort).
+         */
+        private function fetch_user_quiz_attempts_local($user_id, $quiz_id) {
+            if (!function_exists('learndash_get_user_quiz_attempt')) return [];
+
+            $raw = learndash_get_user_quiz_attempt((int) $user_id, ['quiz' => (int) $quiz_id]);
+            if (!is_array($raw)) return [];
+
+            $attempts = [];
+            foreach ($raw as $attempt) {
+                if (!is_array($attempt)) continue;
+
+                $time_ts      = (int) ($attempt['time'] ?? 0);
+                $started_ts   = (int) ($attempt['started'] ?? 0);
+                $completed_ts = (int) ($attempt['completed'] ?? 0);
+
+                $attempts[] = [
+                    'id'            => $time_ts . '-' . (int) ($attempt['quiz'] ?? $quiz_id) . '-' . (int) ($attempt['course'] ?? 0),
+                    'quiz'          => (int) ($attempt['quiz'] ?? $quiz_id),
+                    'course'        => (int) ($attempt['course'] ?? 0),
+                    'percentage'    => floatval($attempt['percentage'] ?? 0),
+                    'pass'          => (bool) intval($attempt['pass'] ?? 0),
+                    'points_scored' => floatval($attempt['points'] ?? 0),
+                    'points_total'  => floatval($attempt['total_points'] ?? 0),
+                    'started'       => $started_ts ? mysql_to_rfc3339(gmdate('Y-m-d H:i:s', $started_ts)) : '',
+                    'completed'     => $completed_ts ? mysql_to_rfc3339(gmdate('Y-m-d H:i:s', $completed_ts)) : '',
+                ];
+            }
+
+            return $attempts;
+        }
 
         /**
          * Coerce a REST param to an array of sanitized strings, dropping empty values.
@@ -831,50 +919,49 @@ if (!class_exists('BYS_Groups_Users_Router')) {
         }
 
         /**
-         * Fetch GamiPress achievement earnings via the gamipress-user-earnings REST endpoint,
-         * cross-referenced with gamipress-logs to determine trigger type (system vs admin award).
-         * Returns activity-shaped items ready for the merged feed.
+         * Fetch GamiPress achievement earnings straight from the
+         * gamipress_user_earnings table, cross-referenced with gamipress_logs
+         * to determine trigger type (system vs admin award). The old
+         * implementation made two loopback HTTP requests to GamiPress's REST
+         * endpoints per feed load. Returns activity-shaped items ready for
+         * the merged feed.
          */
         private function get_gamipress_achievements($user_id, $date_from = '', $date_to = '') {
             $user_id = intval($user_id);
             if (!$user_id) return [];
 
-            $base_url = get_home_url() . '/wp-json/wp/v2/gamipress-user-earnings';
-            $url = add_query_arg([
-                'user_id'  => $user_id,
-                'per_page' => 100,
-                'orderby'  => 'date',
-                'order'    => 'desc',
-            ], $base_url);
+            global $wpdb;
 
-            $auth_header  = BYS_Groups_Auth::get_auth_header();
-            $request_args = ['timeout' => 10, 'sslverify' => false];
-            if ($auth_header) $request_args['headers'] = ['Authorization' => $auth_header];
+            $earnings_table = $wpdb->prefix . 'gamipress_user_earnings';
+            if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $earnings_table)) !== $earnings_table) {
+                return []; // GamiPress not installed.
+            }
 
-            $response = wp_remote_get($url, $request_args);
-            if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) return [];
+            $earnings = $wpdb->get_results($wpdb->prepare(
+                "SELECT user_earning_id AS id, title, post_id, post_type, points, points_type, date
+                 FROM {$earnings_table}
+                 WHERE user_id = %d
+                 ORDER BY date DESC
+                 LIMIT 100",
+                $user_id
+            ), ARRAY_A);
+            if (empty($earnings)) return [];
 
-            $earnings = json_decode(wp_remote_retrieve_body($response), true);
-            if (!is_array($earnings)) return [];
-
-            // Fetch matching logs to derive trigger_type (used for initiated_by classification)
-            $logs_url = add_query_arg([
-                'user_id'  => $user_id,
-                'type'     => 'achievement_award',
-                'per_page' => 100,
-                'orderby'  => 'date',
-                'order'    => 'desc',
-            ], get_home_url() . '/wp-json/wp/v2/gamipress-logs');
-
-            $logs_response = wp_remote_get($logs_url, $request_args);
-            $logs_by_date  = [];
-            if (!is_wp_error($logs_response) && wp_remote_retrieve_response_code($logs_response) === 200) {
-                $logs = json_decode(wp_remote_retrieve_body($logs_response), true);
-                if (is_array($logs)) {
-                    foreach ($logs as $log) {
-                        $logs_by_date[$log['date']] = $log;
-                    }
-                }
+            // Matching award logs keyed by date — used to classify
+            // initiated_by (system-earned vs admin-awarded), mirroring the
+            // old REST cross-reference.
+            $logs_by_date = [];
+            $logs_table   = $wpdb->prefix . 'gamipress_logs';
+            $logs = $wpdb->get_results($wpdb->prepare(
+                "SELECT date, trigger_type
+                 FROM {$logs_table}
+                 WHERE user_id = %d AND type = 'achievement_award'
+                 ORDER BY date DESC
+                 LIMIT 100",
+                $user_id
+            ), ARRAY_A);
+            foreach ((array) $logs as $log) {
+                $logs_by_date[$log['date']] = $log;
             }
 
             $items = [];
@@ -920,41 +1007,38 @@ if (!class_exists('BYS_Groups_Users_Router')) {
         }
 
         /**
-         * Fetch Gravity Forms submissions for the user across mapped forms.
+         * Fetch Gravity Forms submissions for the user across mapped forms
+         * via GFAPI — the old implementation made one loopback HTTP request
+         * to GF's REST API per form.
          * Form ID → activity slug mapping: 16=profile_update, 15=account_settings_update.
          */
         private function get_gravity_forms_submissions($user_id, $date_from = '', $date_to = '') {
             $user_id = intval($user_id);
-            if (!$user_id) return [];
+            if (!$user_id || !class_exists('GFAPI')) return [];
 
             $form_map = [
                 16 => 'profile_update',
                 15 => 'account_settings_update',
             ];
 
-            $auth_header  = BYS_Groups_Auth::get_auth_header();
-            $request_args = ['timeout' => 10, 'sslverify' => false];
-            if ($auth_header) $request_args['headers'] = ['Authorization' => $auth_header];
-
             $items = [];
             foreach ($form_map as $form_id => $activity_slug) {
-                $url = add_query_arg([
-                    'search'  => json_encode([
+                $entries = GFAPI::get_entries(
+                    $form_id,
+                    [
+                        'status'        => 'active',
                         'field_filters' => [
                             ['key' => 'created_by', 'value' => $user_id],
                         ],
-                    ]),
-                    'sorting' => json_encode(['key' => 'date_created', 'direction' => 'DESC']),
-                    'paging'  => json_encode(['page_size' => 100]),
-                ], get_home_url() . "/wp-json/gf/v2/forms/{$form_id}/entries");
+                    ],
+                    ['key' => 'date_created', 'direction' => 'DESC'],
+                    ['offset' => 0, 'page_size' => 100]
+                );
+                if (is_wp_error($entries) || !is_array($entries)) continue;
 
-                $response = wp_remote_get($url, $request_args);
-                if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) continue;
+                $form       = GFAPI::get_form($form_id);
+                $form_title = (is_array($form) && !empty($form['title'])) ? $form['title'] : '';
 
-                $data = json_decode(wp_remote_retrieve_body($response), true);
-                if (!is_array($data)) continue;
-
-                $entries = $data['entries'] ?? (is_array($data) ? $data : []);
                 foreach ($entries as $entry) {
                     $entry_date = $entry['date_created'] ?? null;
                     if (!$entry_date) continue;
@@ -974,7 +1058,7 @@ if (!class_exists('BYS_Groups_Users_Router')) {
                         'activity'     => $activity_slug,
                         'initiated_by' => 'self',
                         'object_id'    => $form_id,
-                        'object_title' => $entry['form_title'] ?? '',
+                        'object_title' => $form_title,
                         'object_type'  => 'form',
                         'meta'         => [
                             'entry_id' => intval($entry['id'] ?? 0),

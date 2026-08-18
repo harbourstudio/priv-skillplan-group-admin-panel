@@ -521,62 +521,51 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
 
         /**
          * GET /groups/{group_id}/courses
-         * Returns the group's enrolled courses (id, title, shortname) via the LD
-         * REST API. Shortname comes from local post meta.
+         * Returns the group's enrolled courses (id, title, shortname) straight
+         * from LD's local helper — same source /base-group-data uses. The old
+         * implementation made a loopback HTTP request to LD's own REST API,
+         * which spawned a nested full WP bootstrap per call.
          */
         public function get_group_courses($request) {
             $group_id = intval($request['group_id']);
             if (!$group_id) return new WP_Error('bad_request', 'Invalid group ID', ['status' => 400]);
 
-            $auth_header = BYS_Groups_Auth::get_auth_header();
-            if (!$auth_header) return new WP_Error('server_error', 'API credentials not configured', ['status' => 500]);
-
-            $url = get_home_url() . "/wp-json/ldlms/v2/groups/{$group_id}/courses?_fields=id,title";
-            $response = wp_remote_get($url, [
-                'headers'   => ['Authorization' => $auth_header],
-                'timeout'   => 30,
-                'sslverify' => false,
-            ]);
-
-            if (is_wp_error($response)) return new WP_Error('server_error', $response->get_error_message(), ['status' => 500]);
-
-            $status = wp_remote_retrieve_response_code($response);
-            if ($status !== 200) {
-                return new WP_Error('ld_api_failure', 'Failed to fetch courses from LearnDash API', ['status' => $status]);
+            if (!function_exists('learndash_group_enrolled_courses')) {
+                return new WP_Error('server_error', 'LearnDash not available', ['status' => 500]);
             }
 
-            $courses = json_decode(wp_remote_retrieve_body($response), true);
+            $course_ids_collected = array_map('intval', (array) learndash_group_enrolled_courses($group_id));
 
             // Look up which course IDs are flagged as required for this group.
             $required_raw = get_post_meta($group_id, '_bys_required_course_ids', true);
             $required_ids = is_array($required_raw) ? array_map('intval', $required_raw) : [];
 
-            $formatted_courses = [];
-            $course_ids_collected = [];
-            if (is_array($courses)) {
-                foreach ($courses as $course) {
-                    $course_id = $course['id'] ?? null;
-                    $shortname = $course_id ? get_post_meta($course_id, 'shortname', true) : '';
-                    $formatted_courses[] = [
-                        'id'        => $course_id,
-                        'title'     => $this->normalize_course_title($course['title'] ?? null),
-                        'shortname' => $shortname ?: null,
-                        'required'  => $course_id ? in_array(intval($course_id), $required_ids, true) : false,
-                        'quizzes_show_test_grading_config'   => [],
-                        'quizzes_show_in_reporting'  => [],
-                    ];
-                    if ($course_id) $course_ids_collected[] = intval($course_id);
-                }
+            if (!empty($course_ids_collected)) {
+                _prime_post_caches($course_ids_collected, false, false);
+                update_postmeta_cache($course_ids_collected);
+            }
 
-                if (!empty($course_ids_collected)) {
-                    $quiz_meta = $this->fetch_quiz_meta_by_course($course_ids_collected, $group_id);
-                    foreach ($formatted_courses as &$c) {
-                        $cid = intval($c['id']);
-                        $c['quizzes_show_test_grading_config']  = $quiz_meta[$cid]['grading']   ?? [];
-                        $c['quizzes_show_in_reporting'] = $quiz_meta[$cid]['reporting'] ?? [];
-                    }
-                    unset($c);
+            $formatted_courses = [];
+            foreach ($course_ids_collected as $course_id) {
+                $shortname = get_post_meta($course_id, 'shortname', true);
+                $formatted_courses[] = [
+                    'id'        => $course_id,
+                    'title'     => $this->normalize_course_title(get_the_title($course_id)),
+                    'shortname' => $shortname ?: null,
+                    'required'  => in_array($course_id, $required_ids, true),
+                    'quizzes_show_test_grading_config'   => [],
+                    'quizzes_show_in_reporting'  => [],
+                ];
+            }
+
+            if (!empty($course_ids_collected)) {
+                $quiz_meta = $this->fetch_quiz_meta_by_course($course_ids_collected, $group_id);
+                foreach ($formatted_courses as &$c) {
+                    $cid = intval($c['id']);
+                    $c['quizzes_show_test_grading_config']  = $quiz_meta[$cid]['grading']   ?? [];
+                    $c['quizzes_show_in_reporting'] = $quiz_meta[$cid]['reporting'] ?? [];
                 }
+                unset($c);
             }
 
             return new WP_REST_Response($formatted_courses, 200);
@@ -586,11 +575,14 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
          * GET /groups/{group_id}/course-completion-stats[?course_ids=1,2,3]
          * Returns aggregate completed/incomplete counts across the group.
          *
-         * Without ?course_ids: enumerates the group's courses via the LD API.
+         * Without ?course_ids: enumerates the group's courses locally.
          * With ?course_ids: scopes the count to the supplied courses only.
          *
-         * Known performance issue: nested user × course loop with one LD REST call
-         * per pair (N*M HTTP calls). Flagged for Phase 2 caching/batching work.
+         * Completion comes from LD's activity table (activity_type='course',
+         * activity_status=1) in ONE grouped query — the same source LD's own
+         * reporting uses. Replaces the previous N users × M courses loopback
+         * HTTP pattern (one nested full WP request per pair) that could tie
+         * up the PHP worker pool for tens of seconds on a single view.
          */
         public function get_group_course_completion_stats($request) {
             $group_id         = intval($request['group_id']);
@@ -598,78 +590,45 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
 
             if (!$group_id) return new WP_Error('bad_request', 'Invalid group_id', ['status' => 400]);
 
-            $auth_header = BYS_Groups_Auth::get_auth_header();
-            if (!$auth_header) return new WP_Error('server_error', 'API credentials not configured', ['status' => 500]);
-
-            // Fetch all user IDs in this group from LD API
-            $url = get_home_url() . "/wp-json/ldlms/v2/groups/{$group_id}/users?_fields=id";
-            $response = wp_remote_get($url, [
-                'headers'   => ['Authorization' => $auth_header],
-                'timeout'   => 30,
-                'sslverify' => false,
-            ]);
-
-            if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
-                return new WP_Error('server_error', 'Failed to fetch group users', ['status' => 500]);
+            if (!function_exists('learndash_get_groups_user_ids') || !function_exists('learndash_group_enrolled_courses')) {
+                return new WP_Error('server_error', 'LearnDash not available', ['status' => 500]);
             }
 
-            $group_users = json_decode(wp_remote_retrieve_body($response), true);
-            if (!is_array($group_users) || empty($group_users)) {
+            $user_ids = array_map('intval', (array) learndash_get_groups_user_ids($group_id));
+            if (empty($user_ids)) {
                 return ['total_completed' => 0, 'total_incomplete' => 0];
             }
 
-            $user_ids = array_map(fn($u) => intval($u['id']), $group_users);
-
-            // Resolve course IDs — explicit param wins, otherwise enumerate via LD API
+            // Resolve course IDs — explicit param wins, otherwise enumerate locally
             if (!empty($course_ids_param)) {
                 $course_ids = array_filter(array_map('intval', explode(',', $course_ids_param)));
             } else {
-                $group_courses = $this->fetch_group_courses_minimal($group_id, $auth_header);
-                if ($group_courses === null) {
-                    return new WP_Error('server_error', 'Failed to fetch group courses', ['status' => 500]);
-                }
-                $course_ids = array_map(fn($c) => intval($c['id']), $group_courses);
+                $course_ids = array_map('intval', (array) learndash_group_enrolled_courses($group_id));
             }
 
             if (empty($course_ids)) {
                 return ['total_completed' => 0, 'total_incomplete' => 0];
             }
 
-            $total_completed  = 0;
-            $total_incomplete = 0;
+            global $wpdb;
+            $user_placeholders   = implode(',', array_fill(0, count($user_ids), '%d'));
+            $course_placeholders = implode(',', array_fill(0, count($course_ids), '%d'));
 
-            // For each user × course, fetch progress_status from LD API.
-            // This is the known N*M bottleneck — preserved verbatim; Phase 2 perf work.
-            foreach ($user_ids as $user_id) {
-                foreach ($course_ids as $course_id) {
-                    $progress_url = get_home_url() . "/wp-json/ldlms/v2/users/{$user_id}/course-progress/{$course_id}?_fields=progress_status";
-                    $response = wp_remote_get($progress_url, [
-                        'headers'   => ['Authorization' => $auth_header],
-                        'timeout'   => 30,
-                        'sslverify' => false,
-                    ]);
+            $total_completed = (int) $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(DISTINCT user_id, post_id)
+                 FROM {$wpdb->prefix}learndash_user_activity
+                 WHERE activity_type = 'course'
+                   AND activity_status = 1
+                   AND user_id IN ({$user_placeholders})
+                   AND post_id IN ({$course_placeholders})",
+                ...array_merge($user_ids, $course_ids)
+            ));
 
-                    if (is_wp_error($response) || wp_remote_retrieve_response_code($response) !== 200) {
-                        continue; // Skip on individual failure rather than abort the aggregate
-                    }
-
-                    $progress = json_decode(wp_remote_retrieve_body($response), true);
-                    if (!is_array($progress) || empty($progress)) {
-                        $total_incomplete++;
-                        continue;
-                    }
-
-                    if (($progress['progress_status'] ?? '') === 'completed') {
-                        $total_completed++;
-                    } else {
-                        $total_incomplete++;
-                    }
-                }
-            }
+            $total_pairs = count($user_ids) * count($course_ids);
 
             return [
                 'total_completed'  => $total_completed,
-                'total_incomplete' => $total_incomplete,
+                'total_incomplete' => max(0, $total_pairs - $total_completed),
             ];
         }
         
@@ -810,6 +769,10 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
          * Sibling autocomplete picker over all published LD courses.
          * Capped at 100 results. Used by group-course-config to add courses
          * to a group.
+         *
+         * Closed courses are only listed for administrators and editors —
+         * group leaders must not be able to browse (or add) closed courses
+         * they weren't granted.
          */
         public function get_all_courses($request) {
             $search = sanitize_text_field($request->get_param('search') ?? '');
@@ -824,8 +787,15 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             ];
             if ($search) $args['s'] = $search;
 
+            $show_closed = current_user_can('administrator') || current_user_can('editor');
+
             $result = [];
             foreach (get_posts($args) as $course) {
+                if (!$show_closed
+                    && function_exists('learndash_get_setting')
+                    && learndash_get_setting($course->ID, 'course_price_type') === 'closed') {
+                    continue;
+                }
                 $shortname = get_post_meta($course->ID, 'shortname', true);
                 $result[] = [
                     'id'        => $course->ID,
@@ -1792,21 +1762,10 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             $start       = $window['start'] ?? '';
             $end         = $window['end']   ?? '';
 
-            // Resolve recipients via LearnDash group membership.
-            $auth_header = BYS_Groups_Auth::get_auth_header();
-            if (!$auth_header) return new WP_Error('server_error', 'API credentials not configured', ['status' => 500]);
-
-            $user_ids = [];
-            $page = 1; $per_page = 100;
-            do {
-                $url = get_home_url() . "/wp-json/ldlms/v2/groups/{$group_id}/users?_fields=id&per_page={$per_page}&page={$page}";
-                $resp = wp_remote_get($url, ['headers' => ['Authorization' => $auth_header], 'timeout' => 30, 'sslverify' => false]);
-                if (is_wp_error($resp) || wp_remote_retrieve_response_code($resp) !== 200) break;
-                $page_users = json_decode(wp_remote_retrieve_body($resp), true);
-                if (!is_array($page_users) || empty($page_users)) break;
-                foreach ($page_users as $u) $user_ids[] = intval($u['id']);
-                $page++;
-            } while (count($page_users) === $per_page);
+            // Resolve recipients via LearnDash group membership (local).
+            $user_ids = function_exists('learndash_get_groups_user_ids')
+                ? array_map('intval', (array) learndash_get_groups_user_ids($group_id))
+                : [];
 
             if (empty($user_ids)) {
                 return new WP_Error('no_recipients', 'No members in this group', ['status' => 404]);
@@ -2144,18 +2103,22 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
         /**
          * GET /groups/{group_id}/communication-log
          *
-         * Returns paginated batches of outbound emails for the group, fused
-         * from three sources:
-         *   1. Postmark Messages/Outbound API (live delivery state)
-         *   2. bys_group_communication_log table (DB rows for all batch members)
-         *   3. Scheduled-but-not-yet-sent rows (delivery_status='scheduled', message_id=NULL)
+         * Returns paginated batches of outbound emails for the group, served
+         * entirely from the bys_group_communication_log table. Delivery state
+         * is maintained by the Postmark webhook (see class-webhooks-router.php),
+         * which writes delivered/bounced/spam per message as events arrive —
+         * so no live Postmark API calls run inside this request. The previous
+         * implementation polled Postmark's outbound list plus one message-detail
+         * call per batch (up to ~25 sequential external HTTPS calls per page
+         * view), holding a PHP worker for the full duration.
          *
-         * Aggregation rules:
-         *   - all recipients failed       → 'failed'
-         *   - all recipients scheduled    → 'scheduled'
-         *   - any recipients failed +     → 'partial_failure'
-         *     others delivered/pending
-         *   - otherwise use live Postmark MessageEvents (delivered/bounced/spam/pending)
+         * Aggregation rules per batch:
+         *   - all recipients failed/opted-out → 'failed'
+         *   - all recipients scheduled        → 'scheduled'
+         *   - any bounced → 'bounced'; any spam → 'spam'
+         *   - any still pending/scheduled     → 'pending'
+         *   - otherwise                       → 'delivered'
+         *   - some failed + some accepted     → 'partial_failure'
          */
         public function get_group_communication_log($request) {
             $group_id = intval($request['group_id']);
@@ -2166,121 +2129,25 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 return new WP_Error('not_found', 'Group not found', ['status' => 404]);
             }
 
-            $token = get_option('bys_postmark_token', '');
-            if (empty($token)) {
-                return new WP_Error('server_error', 'Postmark token not configured', ['status' => 500]);
-            }
-
             $count  = 25;
             $offset = max(0, intval($request->get_param('offset') ?: 0));
 
-            // Fetch outbound page from Postmark
-            $postmark_url = add_query_arg(
-                ['count' => $count, 'offset' => $offset],
-                'https://api.postmarkapp.com/messages/outbound'
-            );
-            $response = wp_remote_get($postmark_url, [
-                'headers' => [
-                    'X-Postmark-Server-Token' => $token,
-                    'Accept'                  => 'application/json',
-                ],
-                'timeout'   => 30,
-                'sslverify' => true,
-            ]);
-
-            if (is_wp_error($response)) {
-                return new WP_Error('server_error', 'Postmark API error: ' . $response->get_error_message(), ['status' => 500]);
-            }
-
-            $status = wp_remote_retrieve_response_code($response);
-            $body   = json_decode(wp_remote_retrieve_body($response), true);
-
-            if ($status !== 200) {
-                $pm_error = $body['Message'] ?? 'Unknown Postmark error';
-                return new WP_Error('postmark_error', 'Postmark returned ' . $status . ': ' . $pm_error, ['status' => 502]);
-            }
-
-            // Filter to message IDs that belong to this group
-            $postmark_ids = array_column($body['Messages'] ?? [], 'MessageID');
-            if (empty($postmark_ids)) {
-                return [
-                    'total'    => 0,
-                    'messages' => [],
-                    'offset'   => $offset,
-                    'count'    => $count,
-                ];
-            }
-
             global $wpdb;
-            $placeholders = implode(',', array_fill(0, count($postmark_ids), '%s'));
+            $table = $wpdb->prefix . BYS_GROUPS_COMMS_TABLE;
 
-            // Resolve which batches in our log table are represented in the Postmark page.
-            // We pull batch_ids first so we can include sibling rows with NULL message_id
-            // (rejected sends — they share a batch_id with successful peers) in the aggregation.
-            $batch_id_rows = $wpdb->get_results(
-                $wpdb->prepare(
-                    "SELECT DISTINCT batch_id FROM {$wpdb->prefix}" . BYS_GROUPS_COMMS_TABLE . "
-                     WHERE message_id IN ($placeholders) AND group_id = %d",
-                    array_merge($postmark_ids, [$group_id])
-                ),
-                ARRAY_A
-            );
-            $batch_ids_in_postmark = array_filter(array_column((array) $batch_id_rows, 'batch_id'));
+            // Page of batch IDs, newest first. Scheduled batches sort by their
+            // scheduled_at; everything else by created_at.
+            $batch_page = $wpdb->get_col($wpdb->prepare(
+                "SELECT batch_id
+                 FROM {$table}
+                 WHERE group_id = %d AND batch_id IS NOT NULL AND batch_id <> ''
+                 GROUP BY batch_id
+                 ORDER BY MAX(COALESCE(scheduled_at, created_at)) DESC
+                 LIMIT %d OFFSET %d",
+                $group_id, $count, $offset
+            ));
 
-            $log_rows = [];
-            if (!empty($batch_ids_in_postmark)) {
-                $batch_placeholders = implode(',', array_fill(0, count($batch_ids_in_postmark), '%s'));
-                $log_rows = $wpdb->get_results(
-                    $wpdb->prepare(
-                        "SELECT message_id, batch_id, prompt_type, subject, delivery_status, bounce_type, sender_user_id, scheduled_at
-                         FROM {$wpdb->prefix}" . BYS_GROUPS_COMMS_TABLE . "
-                         WHERE batch_id IN ($batch_placeholders) AND group_id = %d",
-                        array_merge($batch_ids_in_postmark, [$group_id])
-                    ),
-                    ARRAY_A
-                );
-            }
-
-            // Authoritative batch → recipient count (includes failed/scheduled rows
-            // with NULL message_id that would otherwise be invisible)
-            $recipient_counts = [];
-            $count_rows = $wpdb->get_results(
-                $wpdb->prepare(
-                    "SELECT batch_id, COUNT(*) AS cnt
-                     FROM {$wpdb->prefix}" . BYS_GROUPS_COMMS_TABLE . "
-                     WHERE group_id = %d
-                     GROUP BY batch_id",
-                    $group_id
-                ),
-                ARRAY_A
-            );
-            foreach ((array) $count_rows as $cr) {
-                $recipient_counts[$cr['batch_id']] = (int) $cr['cnt'];
-            }
-
-            // Rows that never reached Postmark are invisible to the outbound
-            // list join above. Three sources produce them:
-            //   • scheduled queue (delivery_status='scheduled')
-            //   • opted-out recipients (delivery_status='comms_disabled')
-            //   • submit-time rejects with no MessageID (delivery_status='failed')
-            // Pull them separately so batches surface in the log even
-            // when every row in the batch is unsent.
-            $unsent_rows = $wpdb->get_results(
-                $wpdb->prepare(
-                    "SELECT batch_id, prompt_type, subject, delivery_status, sender_user_id, scheduled_at, created_at
-                     FROM {$wpdb->prefix}" . BYS_GROUPS_COMMS_TABLE . "
-                     WHERE group_id = %d
-                       AND message_id IS NULL
-                       AND delivery_status IN ('scheduled', 'comms_disabled', 'failed')
-                     ORDER BY COALESCE(scheduled_at, created_at) DESC
-                     LIMIT %d",
-                    $group_id,
-                    $count
-                ),
-                ARRAY_A
-            );
-
-            if (empty($log_rows) && empty($unsent_rows)) {
+            if (empty($batch_page)) {
                 return [
                     'total'    => 0,
                     'messages' => [],
@@ -2289,107 +2156,70 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                 ];
             }
 
-            // Index Postmark messages by ID for quick lookup
-            $postmark_msgs_by_id = [];
-            foreach ((array) ($body['Messages'] ?? []) as $msg) {
-                $mid = $msg['MessageID'] ?? '';
-                if (!empty($mid)) $postmark_msgs_by_id[$mid] = $msg;
-            }
+            $batch_placeholders = implode(',', array_fill(0, count($batch_page), '%s'));
+            $log_rows = $wpdb->get_results($wpdb->prepare(
+                "SELECT message_id, batch_id, prompt_type, subject, delivery_status,
+                        bounce_type, sender_user_id, scheduled_at, created_at
+                 FROM {$table}
+                 WHERE batch_id IN ($batch_placeholders) AND group_id = %d
+                 ORDER BY created_at ASC",
+                array_merge($batch_page, [$group_id])
+            ), ARRAY_A);
 
-            // Group sent rows by batch_id
+            // Group rows by batch_id.
             $batches_by_id = [];
             foreach ($log_rows as $row) {
                 $batch_id = $row['batch_id'];
                 if (!isset($batches_by_id[$batch_id])) {
                     $batches_by_id[$batch_id] = [
-                        'batch_id'           => $batch_id,
-                        'message_ids'        => [],
-                        'prompt_type'        => $row['prompt_type'],
-                        'subject'            => $row['subject'],
-                        'delivery_statuses'  => [],
-                        'first_message_id'   => $row['message_id'],
-                        'first_postmark_msg' => null,
-                        'sender_user_id'     => $row['sender_user_id'],
-                        'scheduled_at'       => $row['scheduled_at'],
+                        'batch_id'          => $batch_id,
+                        'prompt_type'       => $row['prompt_type'],
+                        'subject'           => $row['subject'],
+                        'delivery_statuses' => [],
+                        'first_message_id'  => null,
+                        'sender_user_id'    => $row['sender_user_id'],
+                        'scheduled_at'      => $row['scheduled_at'],
+                        'created_at'        => $row['created_at'],
+                        'recipient_count'   => 0,
                     ];
                 }
-                $batches_by_id[$batch_id]['message_ids'][]       = $row['message_id'];
-                $batches_by_id[$batch_id]['delivery_statuses'][] = $row['delivery_status'] ?? 'pending';
+                $batches_by_id[$batch_id]['delivery_statuses'][] = $row['delivery_status'] ?: 'pending';
+                $batches_by_id[$batch_id]['recipient_count']++;
 
-                // Cache the first Postmark message for subject/sent_at extraction below
-                if ($batches_by_id[$batch_id]['first_postmark_msg'] === null
-                    && isset($postmark_msgs_by_id[$row['message_id']])) {
-                    $batches_by_id[$batch_id]['first_postmark_msg'] = $postmark_msgs_by_id[$row['message_id']];
+                if ($batches_by_id[$batch_id]['first_message_id'] === null && !empty($row['message_id'])) {
+                    $batches_by_id[$batch_id]['first_message_id'] = $row['message_id'];
+                }
+                if (empty($batches_by_id[$batch_id]['subject']) && !empty($row['subject'])) {
+                    $batches_by_id[$batch_id]['subject'] = $row['subject'];
                 }
             }
 
-            // Fold in fully-unsent batches (scheduled queue, opted-out recipients,
-            // submit-time failures)
-            foreach ($unsent_rows as $row) {
-                $batch_id = $row['batch_id'];
-                if (!isset($batches_by_id[$batch_id])) {
-                    $batches_by_id[$batch_id] = [
-                        'batch_id'           => $batch_id,
-                        'message_ids'        => [],
-                        'prompt_type'        => $row['prompt_type'],
-                        'subject'            => $row['subject'],
-                        'delivery_statuses'  => [$row['delivery_status']],
-                        'first_message_id'   => null,
-                        'first_postmark_msg' => null,
-                        'sender_user_id'     => $row['sender_user_id'],
-                        'scheduled_at'       => $row['scheduled_at'],
-                        'created_at'         => $row['created_at'],
-                    ];
-                } else {
-                    $batches_by_id[$batch_id]['delivery_statuses'][] = $row['delivery_status'];
-                }
-            }
-
-            $postmark_token_for_detail = get_option('bys_postmark_token', '');
-
-            // Per-batch: resolve final delivery_status, subject, sent_at
+            // Emit in the paginated order.
             $messages = [];
-            foreach ($batches_by_id as $batch_id => $batch) {
-                $prompt_type      = $batch['prompt_type'];
-                $postmark_msg     = $batch['first_postmark_msg'] ?? [];
-                $subject          = !empty($batch['subject']) ? $batch['subject'] : ($postmark_msg['Subject'] ?? '(No subject)');
-                $sent_at          = $postmark_msg['ReceivedAt'] ?? '';
-                $first_message_id = $batch['first_message_id'];
-
-                $delivery_status = 'pending';
-                $postmark_detail = null;
+            foreach ($batch_page as $batch_id) {
+                if (!isset($batches_by_id[$batch_id])) continue;
+                $batch    = $batches_by_id[$batch_id];
+                $statuses = $batch['delivery_statuses'];
 
                 $unsent_statuses  = ['failed', 'comms_disabled'];
-                $has_failed       = count(array_intersect($unsent_statuses, $batch['delivery_statuses'])) > 0;
-                $non_failed_count = count(array_filter(
-                    $batch['delivery_statuses'],
-                    fn($s) => !in_array($s, $unsent_statuses, true)
-                ));
+                $has_failed       = count(array_intersect($unsent_statuses, $statuses)) > 0;
+                $accepted         = array_values(array_filter($statuses, fn($s) => !in_array($s, $unsent_statuses, true)));
+                $non_failed_count = count($accepted);
 
                 if ($has_failed && $non_failed_count === 0) {
-                    // Every recipient failed at submit time (no Postmark delivery to fetch)
+                    // Every recipient failed at submit time or was opted out.
                     $delivery_status = 'failed';
-                } elseif (count($batch['delivery_statuses']) > 0
-                    && count($batch['delivery_statuses']) === count(array_filter($batch['delivery_statuses'], fn($s) => $s === 'scheduled'))) {
+                } elseif ($non_failed_count > 0 && $non_failed_count === count(array_filter($accepted, fn($s) => $s === 'scheduled'))) {
                     $delivery_status = 'scheduled';
-                } elseif (!empty($postmark_token_for_detail) && !empty($first_message_id)) {
-                    // Live status from Postmark MessageEvents
-                    $postmark_detail = BYS_Groups_Postmark::fetch_message_detail($first_message_id, $postmark_token_for_detail);
-                    if ($postmark_detail && isset($postmark_detail['MessageEvents'])) {
-                        $status_info     = BYS_Groups_Postmark::extract_delivery_status_from_events($postmark_detail['MessageEvents']);
-                        $delivery_status = $status_info['status'];
-                    } elseif (!empty($batch['delivery_statuses'])) {
-                        // Fallback to DB aggregate when the live fetch failed
-                        if (in_array('bounced', $batch['delivery_statuses'])) {
-                            $delivery_status = 'bounced';
-                        } elseif (in_array('spam', $batch['delivery_statuses'])) {
-                            $delivery_status = 'spam';
-                        } elseif (in_array('scheduled', $batch['delivery_statuses'])) {
-                            $delivery_status = 'pending';
-                        } elseif (!in_array('pending', $batch['delivery_statuses'])) {
-                            $delivery_status = 'delivered';
-                        }
-                    }
+                } elseif (in_array('bounced', $accepted, true)) {
+                    $delivery_status = 'bounced';
+                } elseif (in_array('spam', $accepted, true)) {
+                    $delivery_status = 'spam';
+                } elseif (in_array('pending', $accepted, true) || in_array('scheduled', $accepted, true)) {
+                    // Webhook hasn't confirmed every recipient yet.
+                    $delivery_status = 'pending';
+                } else {
+                    $delivery_status = 'delivered';
                 }
 
                 // Partial-failure overlay: some recipients failed at submit but others were accepted
@@ -2397,38 +2227,26 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
                     $delivery_status = 'partial_failure';
                 }
 
-                // Late-bind subject + sent_at from the detail fetch if still missing
-                if ($subject === '(No subject)' && !empty($postmark_detail['Subject'])) {
-                    $subject = $postmark_detail['Subject'];
-                }
-                if (empty($sent_at) && !empty($postmark_detail['ReceivedAt'])) {
-                    $sent_at = $postmark_detail['ReceivedAt'];
-                }
-
                 // Scheduled emails use scheduled_at, which is stored as UTC
-                // (gmdate) → convert to local for display. Batches that never
-                // reached Postmark fall back to created_at, which is written
-                // with current_time('mysql') and is ALREADY site-local —
-                // passing it through utc_to_local_datetime would shift it a
-                // second time.
-                if ($delivery_status === 'scheduled') {
-                    $display_time = $this->utc_to_local_datetime($batch['scheduled_at']);
-                } elseif (empty($sent_at) && !empty($batch['created_at'])) {
-                    $display_time = $batch['created_at'];
-                } else {
-                    $display_time = $sent_at;
-                }
+                // (gmdate) → convert to local for display. Sent batches use
+                // created_at, written with current_time('mysql') and ALREADY
+                // site-local.
+                $display_time = $delivery_status === 'scheduled'
+                    ? $this->utc_to_local_datetime($batch['scheduled_at'])
+                    : (string) $batch['created_at'];
+
+                $prompt_type = $batch['prompt_type'];
 
                 $messages[] = [
                     'batch_id'        => $batch_id,
-                    'message_id'      => $first_message_id,
-                    'subject'         => $subject,
+                    'message_id'      => $batch['first_message_id'],
+                    'subject'         => !empty($batch['subject']) ? $batch['subject'] : '(No subject)',
                     'sent_at'         => $display_time,
                     'prompt_type'     => $prompt_type,
                     'badge_type'      => $prompt_type === 'custom'
                         ? 'custom'
                         : (in_array($prompt_type, ['group-quiz-access', 'user-quiz-access'], true) ? 'quiz' : 'prompt'),
-                    'recipient_count' => $recipient_counts[$batch_id] ?? count($batch['message_ids']),
+                    'recipient_count' => $batch['recipient_count'],
                     'delivery_status' => $delivery_status,
                     'sender_user_id'  => $batch['sender_user_id'],
                 ];
@@ -2466,13 +2284,6 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             return 'offline';
         }
 
-        /**
-         * Fetch the group's courses from LD with minimal fields (id, title).
-         * Returns an array of [id, title] pairs, or null on any error.
-         *
-         * Internal-only — different shape than the public get_group_courses()
-         * which adds shortname and wraps in the standard response envelope.
-         */
         /**
          * Return a per-course map of quiz step data for both dashboard surfaces:
          *   - grading[]:   [{step_id, step_title, start, end}, ...]   (show_test_grading_config=1)
@@ -2561,33 +2372,6 @@ if (!class_exists('BYS_Groups_Groups_Router')) {
             }
             if (!is_string($raw) || $raw === '') return 'Untitled';
             return html_entity_decode($raw, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        }
-
-        private function fetch_group_courses_minimal($group_id, $auth_header) {
-            $url = get_home_url() . "/wp-json/ldlms/v2/groups/{$group_id}/courses?_fields=id,title";
-
-            $response = wp_remote_get($url, [
-                'headers'   => ['Authorization' => $auth_header],
-                'timeout'   => 30,
-                'sslverify' => false,
-            ]);
-
-            if (is_wp_error($response)) return null;
-            if (wp_remote_retrieve_response_code($response) !== 200) return null;
-
-            $courses = json_decode(wp_remote_retrieve_body($response), true);
-            if (!is_array($courses)) return [];
-
-            $result = [];
-            foreach ($courses as $course) {
-                if (!isset($course['id'])) continue;
-                $result[] = [
-                    'id'    => intval($course['id']),
-                    'title' => $this->normalize_course_title($course['title'] ?? null),
-                ];
-            }
-
-            return $result;
         }
 
         /**
