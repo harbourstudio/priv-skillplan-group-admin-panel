@@ -1035,6 +1035,10 @@ if (!class_exists('BYS_Groups_Courses_Router')) {
 
                     $was_selected = isset($s_data[$i]) && (int) $s_data[$i] === 1;
 
+                    if (!$is_html) {
+                        $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                    }
+
                     $choices[] = [
                         'text'         => $is_html ? wp_kses_post($text) : sanitize_text_field($text),
                         'is_html'      => $is_html,
@@ -1106,6 +1110,9 @@ if (!class_exists('BYS_Groups_Courses_Router')) {
                     $text    = method_exists($opt, 'getAnswer') ? $opt->getAnswer() : '';
                     $is_html = method_exists($opt, 'isHtml')    && $opt->isHtml();
                     if ($text !== '') {
+                        if (!$is_html) {
+                            $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                        }
                         $correct[] = [
                             'text'    => $is_html ? wp_kses_post($text) : sanitize_text_field($text),
                             'is_html' => $is_html,
@@ -1174,6 +1181,7 @@ if (!class_exists('BYS_Groups_Courses_Router')) {
                         fn($m) => str_replace('|', ' / ', $m[1]),
                         $formatted
                     );
+                    $formatted = html_entity_decode($formatted, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
                     $correct[] = [
                         'text'    => sanitize_text_field($formatted),
@@ -1194,6 +1202,7 @@ if (!class_exists('BYS_Groups_Courses_Router')) {
                     if (!is_object($opt) || ($opt instanceof \__PHP_Incomplete_Class)) continue;
                     $text = method_exists($opt, 'getAnswer') ? $opt->getAnswer() : '';
                     if ($text !== '') {
+                        $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
                         $correct[] = [
                             'text'    => nl2br(esc_html($text)),
                             'is_html' => true,
