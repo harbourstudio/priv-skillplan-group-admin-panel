@@ -78,7 +78,8 @@ jQuery(document).ready(($) => {
     const $attemptsPlus       = $block.find('#guqc__attempts-add');
     const $attemptsMinus      = $block.find('#guqc__attempts-minus');
     const $attemptsInfo       = $block.find('.guqc__attempts-info');
-    const $attemptsBase       = $attemptsInfo.find('.guqc__attempts-base');
+    const $retakesEnabled     = $attemptsInfo.find('.guqc__retakes-enabled');
+    const $retakesAllowed     = $attemptsInfo.find('.guqc__retakes-allowed');
     const $attemptsTaken      = $attemptsInfo.find('.guqc__attempts-taken');
     const $attemptsAdditional = $attemptsInfo.find('.guqc__attempts-additional');
 
@@ -280,10 +281,19 @@ jQuery(document).ready(($) => {
      * puts the panel back into its loading state (skeletons + hidden).
      */
     function renderAttemptsInfo(summary) {
+        // The <li> wrapping "Base Retakes allowed" — hidden entirely when
+        // Restrict Retakes is Off, mirroring LD's own quiz settings UI
+        // where the "Number of Retries Allowed" field only appears when
+        // the parent toggle is on. Leaders with quiz-edit rights are used
+        // to that pattern from the LD settings screen.
+        const $retakesAllowedRow = $retakesAllowed.closest('li');
+
         if (!summary) {
             currentAdditionalAttemptsRemaining = 0;
             currentAdditionalAttemptsStored    = 0;
-            $attemptsBase.html(SKELETON);
+            $retakesEnabled.html(SKELETON);
+            $retakesAllowed.html(SKELETON);
+            $retakesAllowedRow.removeAttr('hidden');
             $attemptsTaken.html(SKELETON);
             $attemptsAdditional.html(SKELETON);
             $attemptsInfo.attr('hidden', '');
@@ -292,10 +302,17 @@ jQuery(document).ready(($) => {
         }
         currentAdditionalAttemptsRemaining = parseInt(summary.granted_repeats_remaining, 10) || 0;
         currentAdditionalAttemptsStored    = parseInt(summary.granted_repeats, 10) || 0;
-        const baseText = summary.repeats_unlimited
-            ? 'Unlimited'
-            : (parseInt(summary.global_repeats, 10) || 0);
-        $attemptsBase.text(baseText);
+
+        // Mirrors LD's "Restrict Quiz Retakes" toggle. When Off, the
+        // "Number of Retries Allowed" row is hidden — same as in LD's
+        // own settings panel.
+        $retakesEnabled.text(summary.retakes_enabled ? 'Yes' : 'No');
+        if (summary.retakes_enabled) {
+            $retakesAllowed.text(String(parseInt(summary.retakes_allowed, 10) || 0));
+            $retakesAllowedRow.removeAttr('hidden');
+        } else {
+            $retakesAllowedRow.attr('hidden', '');
+        }
         $attemptsTaken.text(summary.total_attempts ?? 0);
         $attemptsAdditional.text(currentAdditionalAttemptsRemaining);
         $attemptsInfo.removeAttr('hidden');
@@ -303,11 +320,13 @@ jQuery(document).ready(($) => {
     }
 
     /**
-     * Show the info panel in loading state
+     * Show the info panel in loading state.
      */
     function setAwaitingAttemptsInfo(awaiting) {
         if (!awaiting) return;
-        $attemptsBase.html(SKELETON);
+        $retakesEnabled.html(SKELETON);
+        $retakesAllowed.html(SKELETON);
+        $retakesAllowed.closest('li').removeAttr('hidden');
         $attemptsTaken.html(SKELETON);
         $attemptsAdditional.html(SKELETON);
         $attemptsInfo.removeAttr('hidden');

@@ -33,13 +33,10 @@ jQuery(document).ready(($) => {
     ungraded:  { label: 'Ungraded',          cls: 'result-badge--ungraded' },
   };
 
-  // Icon and visual state for each answer choice
-  // Note: LearnDash does not store which specific option the user selected for single/multiple
-  // choice questions — only overall correctness is available. We therefore only mark which
-  // options are correct vs wrong; the card border + badge conveys the overall result.
   const CHOICE_STATES = {
-    correct: { icon: 'fa-circle-check', cls: 'answer-choice--correct' },
-    wrong:   { icon: 'fa-circle',       cls: '' },
+    selectedCorrect:   { icon: 'fa-circle-check', cls: 'answer-choice--correct' },
+    selectedIncorrect: { icon: 'fa-circle-xmark', cls: 'answer-choice--incorrect' },
+    unselected:        { icon: 'fa-circle',       cls: '' },
   };
 
   // ── Edit mode state ─────────────────────────────────────────────────────────
@@ -64,7 +61,9 @@ jQuery(document).ready(($) => {
       const $answers = $card.find('.question-card__answers');
 
       q.user_answers.items.forEach((choice) => {
-        const state = choice.is_correct ? CHOICE_STATES.correct : CHOICE_STATES.wrong;
+        const state = choice.was_selected
+          ? (choice.is_correct ? CHOICE_STATES.selectedCorrect : CHOICE_STATES.selectedIncorrect)
+          : CHOICE_STATES.unselected;
 
         const $item = $('<div class="answer-choice">').addClass(state.cls);
         $item.append(`<i class="fa-regular ${state.icon} answer-choice__icon" aria-hidden="true"></i>`);
