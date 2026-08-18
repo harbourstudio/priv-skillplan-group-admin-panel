@@ -370,6 +370,9 @@ jQuery(document).ready(function($) {
                 userIds:        recipients.filter(r => !r.is_pending_user).map(r => r.user_id),
                 pendingUserIds: recipients.filter(r =>  r.is_pending_user).map(r => r.pending_user_id),
             };
+            // Pending set is finalized after this async resolve, so sync the
+            // preview greeting now — cheap DOM edit, no re-fetch.
+            updatePreviewGreeting(currentPromptType);
 
             if (recipients.length === 0) {
                 $conditionalRecipientsTable.hide();
@@ -548,6 +551,36 @@ jQuery(document).ready(function($) {
      *    server-rendered HTML with the group's name + site context already
      *    substituted in.
      */
+
+    /**
+     * Sync the preview greeting to the current recipient state.
+     *
+     * For welcome-reminder + condition mode with any pending users, swap the
+     * template's "Hi <name>," greeting to "Hi,". Reverts to "Hi Learner,"
+     * when the pending set empties out.
+     *
+     * Coupled to bys_build_email_template()'s greeting shape — keep in
+     * sync if that ever changes.
+     */
+    function updatePreviewGreeting(promptType) {
+        if (promptType !== 'welcome-reminder') return;
+        const recipientMode = $modal.find('input[name="recipient"]:checked').val();
+        const shouldSwap = recipientMode === 'condition'
+            && conditionRecipients.pendingUserIds.length > 0;
+        $preview.find('.bys-body').each(function () {
+            const $p = $(this);
+            const text = $p.text().trim();
+            if (shouldSwap && /^Hi\s+[^,\n]+,$/.test(text)) {
+                $p.text('Hi,');
+                return false;
+            }
+            if (!shouldSwap && text === 'Hi,') {
+                $p.text('Hi Learner,');
+                return false;
+            }
+        });
+    }
+
     async function loadPromptTemplate(promptType, groupId, courseId = 0) {
         try {
             // courseId > 0 deep-links the CTA button to that course's page —
@@ -574,6 +607,7 @@ jQuery(document).ready(function($) {
             } else {
                 $message.hide().val('');
                 $preview.show().html(response.html || '');
+                updatePreviewGreeting(promptType);
             }
         } catch (err) {
             console.error('[group-communication-send-modal] Template fetch failed:', err);

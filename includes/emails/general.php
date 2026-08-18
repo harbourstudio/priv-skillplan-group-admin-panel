@@ -121,7 +121,7 @@ function bys_build_email_template(
 									<?php echo esc_html($heading); ?>
 								</h1>
 								<p class="bys-body" style="margin:0 0 16px;font-size:17px;color:#4F5C6F;line-height:1.6;">
-									Hi <?php echo esc_html($recipient_name); ?>,
+									Hi<?php echo $recipient_name !== '' ? ' ' . esc_html($recipient_name) : ''; ?>,
 								</p>
 								<div class="bys-body" style="margin:0 0 32px;font-size:17px;color:#4F5C6F;line-height:1.6;">
 									<?php echo wp_kses_post($content); ?>
