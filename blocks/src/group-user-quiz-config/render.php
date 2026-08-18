@@ -160,10 +160,10 @@ $tz_offset_hours = $tz_offset_seconds / 3600;
 
         <div class="guqc__attempts-info" hidden>
             <ul>
-                <li><?php esc_html_e( 'Quiz Restrict Retakes:', 'bys' ); ?> <span class="guqc__retakes-enabled"><span class="skeleton"></span></span></li>
-                <li><?php esc_html_e( 'Base Retakes allowed:', 'bys' ); ?> <span class="guqc__retakes-allowed"><span class="skeleton"></span></span></li>
-                <li><?php esc_html_e( 'Attempts taken:', 'bys' ); ?> <span class="guqc__attempts-taken"><span class="skeleton"></span></span></li>
+                <li><?php esc_html_e( 'Retakes restricted:', 'bys' ); ?> <span class="guqc__retakes-enabled"><span class="skeleton"></span></span></li>
+                <li><?php esc_html_e( 'Base retakes allowed:', 'bys' ); ?> <span class="guqc__retakes-allowed"><span class="skeleton"></span></span></li>
                 <li><?php esc_html_e( 'Additional retakes:', 'bys' ); ?> <span class="guqc__attempts-additional"><span class="skeleton"></span></span></li>
+                <li><?php esc_html_e( 'Attempts taken:', 'bys' ); ?> <span class="guqc__attempts-taken"><span class="skeleton"></span></span></li>
             </ul>
         </div>
 
