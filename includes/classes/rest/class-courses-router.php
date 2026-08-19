@@ -578,11 +578,52 @@ if (!class_exists('BYS_Groups_Courses_Router')) {
                 $stat_answer_data = json_decode($stat['answer_data'] ?? '', true);
                 $manually_graded  = !empty($stat_answer_data['manually_graded']);
 
+                $wp_question_post_id = intval($stat['question_post_id']) ?: ($question_post_id_map[trim($qdef['title'] ?? '')] ?? 0);
+
+                // Default question text: LD's authored content, run through the_content
+                // for WYSIWYG artefacts (wpautop, shortcodes) and sanitized.
+                $question_text = $qdef ? wp_kses_post(apply_filters('the_content', $qdef['question'])) : '';
+
+                // bys_calculated_formula: append the var-substituted formula and
+                // _bys_show_answer_decimal_prompt (when enabled) below the question
+                // content, mirroring what the learner saw during their attempt
+                if ($answer_type === 'bys_calculated_formula' && $wp_question_post_id) {
+                    $parsed  = $this->parse_bys_cf_response($stat['answer_data'] ?? '');
+                    $cf_meta = get_post_meta($wp_question_post_id, '_bys_calculated_formula_questions', true);
+
+                    if ($parsed !== null && is_array($cf_meta) && !empty($cf_meta[0]['question'])) {
+                        $template = (string) $cf_meta[0]['question'];
+                        foreach ($parsed['vars'] as $var_name => $val) {
+                            $template = str_replace('[' . $var_name . ']', $val, $template);
+                        }
+
+                        $question_text .= '<div class="question-card__cf-template">'
+                            . wp_kses_post(apply_filters('the_content', $template))
+                            . '</div>';
+
+                        $dec_limit  = $parsed['dec'] !== null
+                            ? $parsed['dec']
+                            : (int) ($cf_meta[0]['decimal_points_limit'] ?? 0);
+                        $show_prompt = get_post_meta($wp_question_post_id, '_bys_show_answer_decimal_prompt', true) === 'yes';
+
+                        if ($show_prompt && $dec_limit > 0) {
+                            $prompt_text = sprintf(
+                                /* translators: %d: number of decimal places */
+                                _n('Round your answer to %d decimal place.', 'Round your answer to %d decimal places.', $dec_limit, 'bys'),
+                                $dec_limit
+                            );
+                            $question_text .= '<p class="question-card__cf-decimal-prompt prompt">'
+                                . esc_html($prompt_text)
+                                . '</p>';
+                        }
+                    }
+                }
+
                 $result[] = [
                     'question_id'      => $qid,
                     'question_post_id' => intval($stat['question_post_id']),
                     'title'            => $qdef ? sanitize_text_field($qdef['title']) : '',
-                    'question_text'    => $qdef ? wp_kses_post(apply_filters('the_content', $qdef['question'])) : '',
+                    'question_text'    => $question_text,
                     'answer_type'      => $answer_type,
                     'points_earned'    => $points_earned,
                     'points_max'       => $points_max,
@@ -599,8 +640,9 @@ if (!class_exists('BYS_Groups_Courses_Router')) {
                     'correct_answer'   => $this->parse_correct_answer(
                         $qdef['answer_data'] ?? '',
                         $answer_type,
-                        intval($stat['question_post_id']) ?: ($question_post_id_map[trim($qdef['title'] ?? '')] ?? 0),
-                        $qid
+                        $wp_question_post_id,
+                        $qid,
+                        $stat['answer_data'] ?? ''
                     ),
                 ];
             }
@@ -949,6 +991,37 @@ if (!class_exists('BYS_Groups_Courses_Router')) {
         // ─── Private helpers ────────────────────────────────────────────────
 
         /**
+         * Parse the bys_calculated_formula stat.answer_data pipe string:
+         * ["<selection>|<var:val,var:val,...>|dec:<n>"]
+         *
+         * Returns [ 'selection' => string, 'vars' => array<name,float>, 'dec' => int|null ]
+         * or null if the payload isn't in the expected shape.
+         */
+        private function parse_bys_cf_response($stat_answer_raw) {
+            $decoded = json_decode($stat_answer_raw, true);
+            if (!is_array($decoded) || empty($decoded[0]) || !is_string($decoded[0]) || strpos($decoded[0], '|') === false) {
+                return null;
+            }
+
+            $parts = explode('|', $decoded[0], 3);
+            if (count($parts) < 2) return null;
+
+            $selection = trim($parts[0]);
+            $vars_str  = $parts[1];
+            $dec       = isset($parts[2]) ? (int) str_replace('dec:', '', $parts[2]) : null;
+
+            $vars = [];
+            foreach (explode(',', $vars_str) as $pair) {
+                $p = explode(':', $pair, 2);
+                if (count($p) === 2 && trim($p[0]) !== '') {
+                    $vars[sanitize_text_field($p[0])] = floatval($p[1]);
+                }
+            }
+
+            return ['selection' => $selection, 'vars' => $vars, 'dec' => $dec];
+        }
+
+        /**
          * Parse a user's answer from the stat table + the question's answer options
          * into a structured format for the frontend.
          *
@@ -956,11 +1029,21 @@ if (!class_exists('BYS_Groups_Courses_Router')) {
          * - single / multiple  → list of choices with is_correct + was_selected flags
          * - free_answer / essay → plain user text
          * - sort / matrix sort → JSON array
-         * 
-         * Returns null for complex types (sort, matrix, cloze, assessment) where a
-         * structured breakdown isn't yet implemented.
+         * - bys_calculated_formula → learner's submitted numeric answer
+         *
+         * Returns null for complex types (assessment) where a structured breakdown
+         * isn't yet implemented.
          */
         private function parse_question_answers($stat_answer_raw, $q_answer_raw, $answer_type, $user_id = 0, $question_id = 0) {
+
+            // bys_calculated_formula — LD stores the learner's response as a pipe
+            // string in stat.answer_data. See parse_bys_cf_response().
+            if ($answer_type === 'bys_calculated_formula') {
+                $parsed = $this->parse_bys_cf_response($stat_answer_raw);
+                if ($parsed === null || $parsed['selection'] === '') return null;
+                return ['type' => 'text', 'user_text' => esc_html($parsed['selection'])];
+            }
+
 
             // Sort / Matrix Sort — LD stores stat.answer_data as a JSON array of
             // md5(user_id + question_id + original_position) hashes, indexed by
@@ -1091,12 +1174,15 @@ if (!class_exists('BYS_Groups_Courses_Router')) {
         /**
          * Extract the expected correct answer(s) for a question.
          *
-         *   - single / multiple : deserialise answer_data, return options where isCorrect() is true
-         *   - cloze_answer      : deserialise answer_data, format {word}/[a|b] template for display
-         *   - free_answer       : all listed options are valid — return all
-         *   - essay             : no programmatic answer; look up 'essay_answer_key' post meta
+         * - single / multiple : deserialise answer_data, return options where isCorrect() is true
+         * - cloze_answer : deserialise answer_data, format {word}/[a|b] template for display
+         * - free_answer : all listed options are valid — return all
+         * - essay : no programmatic answer; look up 'essay_answer_key' post meta
+         * - bys_calculated_formula : evaluate the formula against the attempt's variable values
+         *
+         * $stat_answer_raw is only used by bys_calculated_formula
          */
-        private function parse_correct_answer($q_answer_raw, $answer_type, $question_post_id = 0, $question_id = 0) {
+        private function parse_correct_answer($q_answer_raw, $answer_type, $question_post_id = 0, $question_id = 0, $stat_answer_raw = '') {
 
             // Choice-based (single / multiple)
             if (in_array($answer_type, ['single', 'multiple'], true)) {
@@ -1221,7 +1307,44 @@ if (!class_exists('BYS_Groups_Courses_Router')) {
                 }
             }
 
+            // bys_calculated_formula — the correct answer depends on the variables
+            // shown to THIS learner in THIS attempt, so we need both the
+            // question's formula (from post_meta on the sfwd-question post) and
+            // the vars from the stat.answer_data pipe string. This method uses bys-quiz
+            // plugin's public method to evaluate the formula
+            if ($answer_type === 'bys_calculated_formula') {
+                if (!$question_post_id || !class_exists('BYS_LD_Questions_Frontend')
+                    || !method_exists('BYS_LD_Questions_Frontend', 'evaluate_formula')) {
+                    return null;
+                }
+
+                $parsed = $this->parse_bys_cf_response($stat_answer_raw);
+                if ($parsed === null) return null;
+
+                $ans = get_post_meta($question_post_id, '_bys_calculated_formula_questions', true);
+                if (!is_array($ans) || empty($ans[0]['formula'])) return null;
+
+                $dec_limit = $parsed['dec'] !== null
+                    ? $parsed['dec']
+                    : (int) ($ans[0]['decimal_points_limit'] ?? 0);
+
+                // use the bys-ld-quiz plugin's public method to evaluate the formula 
+                $correct_val = \BYS_LD_Questions_Frontend::evaluate_formula(
+                    (string) $ans[0]['formula'],
+                    $parsed['vars'],
+                    $dec_limit
+                );
+                if ($correct_val === null) return null;
+
+                return [[
+                    'text'    => number_format($correct_val, $dec_limit, '.', ''),
+                    'is_html' => false,
+                ]];
+            }
+
             return null;
         }
     }
 }
+
+
