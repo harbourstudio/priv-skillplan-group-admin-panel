@@ -620,24 +620,27 @@ if (!class_exists('BYS_Groups_Courses_Router')) {
                 }
 
                 $result[] = [
-                    'question_id'      => $qid,
-                    'question_post_id' => intval($stat['question_post_id']),
-                    'title'            => $qdef ? sanitize_text_field($qdef['title']) : '',
-                    'question_text'    => $question_text,
-                    'answer_type'      => $answer_type,
-                    'points_earned'    => $points_earned,
-                    'points_max'       => $points_max,
-                    'result'           => $question_result,
-                    'manually_graded'  => $manually_graded,
-                    'sort'             => $qdef ? intval($qdef['sort']) : 0,
-                    'user_answers'     => $this->parse_question_answers(
+                    'question_id'         => $qid,
+                    'question_post_id'    => intval($stat['question_post_id']),
+                    // Resolved sfwd-question post ID (stat table's column is often
+                    // 0 in LD 4.x); used below for the pool draw-order sort.
+                    'wp_question_post_id' => $wp_question_post_id,
+                    'title'               => $qdef ? sanitize_text_field($qdef['title']) : '',
+                    'question_text'       => $question_text,
+                    'answer_type'         => $answer_type,
+                    'points_earned'       => $points_earned,
+                    'points_max'          => $points_max,
+                    'result'              => $question_result,
+                    'manually_graded'     => $manually_graded,
+                    'sort'                => $qdef ? intval($qdef['sort']) : 0,
+                    'user_answers'        => $this->parse_question_answers(
                         $stat['answer_data'] ?? '',
                         $qdef['answer_data'] ?? '',
                         $answer_type,
                         $quiz_user_id,
                         $qid
                     ),
-                    'correct_answer'   => $this->parse_correct_answer(
+                    'correct_answer'      => $this->parse_correct_answer(
                         $qdef['answer_data'] ?? '',
                         $answer_type,
                         $wp_question_post_id,
@@ -647,8 +650,31 @@ if (!class_exists('BYS_Groups_Courses_Router')) {
                 ];
             }
 
-            // Sort by quiz question order
-            usort($result, fn($a, $b) => $a['sort'] - $b['sort']);
+            // Sort by presentation order when available. skillplan-bys-quiz
+            // writes `_bys_pool_draw_order` (ordered post IDs) to activity_meta
+            // on submission for pool attempts. Entries not in the map — legacy
+            // attempts, native questions in a pool quiz, unresolved post_ids —
+            // fall back to ProQuiz `sort`.
+            $draw_order_raw = $wpdb->get_var($wpdb->prepare(
+                "SELECT activity_meta_value FROM {$meta_table}
+                 WHERE activity_id = %d AND activity_meta_key = '_bys_pool_draw_order'",
+                $activity_id
+            ));
+            $draw_order = $draw_order_raw ? maybe_unserialize($draw_order_raw) : null;
+
+            if (is_array($draw_order) && !empty($draw_order)) {
+                $position = array_flip(array_map('intval', $draw_order));
+                usort($result, function ($a, $b) use ($position) {
+                    $ap = $position[$a['wp_question_post_id']] ?? PHP_INT_MAX;
+                    $bp = $position[$b['wp_question_post_id']] ?? PHP_INT_MAX;
+                    if ($ap === $bp) {
+                        return ($a['sort'] ?? 0) - ($b['sort'] ?? 0);
+                    }
+                    return $ap - $bp;
+                });
+            } else {
+                usort($result, fn($a, $b) => $a['sort'] - $b['sort']);
+            }
 
             return $result;
         }
