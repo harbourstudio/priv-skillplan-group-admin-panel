@@ -60,13 +60,19 @@ if ( $footer_colour || $footer_text_colour || $button_colour || $page_colour ) :
         }
     <?php endif; ?>
     <?php if ( $button_colour ) : ?>
+        main.bys-lander a:not(.btn, .wp-block-button__link, #primary-menu > li > a, .navbar-brand) {
+            color: <?php echo esc_attr( $button_colour ); ?>;
+        }
         .wp-block-bys-groups-lander-course-list .btn.btn-primary:not([disabled], .bys-lander-completion-alert__btn),
         #content :is(.wp-block-button__link.wp-element-button, .btn.btn-primary):not([disabled], .bys-lander-completion-alert__btn),
         #colophon .btn.btn-primary:not([disabled]) {
             background-color: <?php echo esc_attr( $button_colour ); ?> !important;
             border-color: <?php echo esc_attr( $button_colour ); ?> !important;
         }
-        main.bys-lander .wp-block-bys-groups-lander-course-list .hs-dropdown-toggle i {
+        main.bys-lander .wp-block-bys-groups-lander-course-list .hs-tooltip-toggle i {
+            color: <?php echo esc_attr( $button_colour ); ?> !important;
+        }
+        main.bys-lander .wp-block-bys-groups-lander-course-list h3 a:hover {
             color: <?php echo esc_attr( $button_colour ); ?> !important;
         }
     <?php endif; ?>
