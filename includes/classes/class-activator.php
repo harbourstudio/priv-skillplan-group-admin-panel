@@ -96,6 +96,21 @@ if (!class_exists('BYS_Groups_Activator')) {
                 ) $charset_collate;";
             dbDelta($sql_comms);
 
+            // Per-user LD active-time tracker. Tracks time in which a user is interacting
+            // with LD pages (course, lesson, topic, quiz) and are not idle.
+            // Consumed by reporting endpoints and the total-time shortcode.
+            // PK mirrors Uncanny CourseTimer module's meta-key shape (uo_timer_{course_id}_{post_id}) for 1:1 backfill.
+            $sql_time_tracking = "CREATE TABLE {$wpdb->prefix}" . BYS_GROUPS_TIME_TRACKING_TABLE . " (
+                user_id           BIGINT UNSIGNED NOT NULL,
+                course_id         BIGINT UNSIGNED NOT NULL,
+                post_id           BIGINT UNSIGNED NOT NULL,
+                seconds_total     INT UNSIGNED    NOT NULL DEFAULT 0,
+                first_started_gmt DATETIME        NOT NULL,
+                last_updated_gmt  DATETIME        NOT NULL,
+                PRIMARY KEY  (user_id, course_id, post_id)
+                ) $charset_collate;";
+            dbDelta($sql_time_tracking);
+
         }
     }
 }

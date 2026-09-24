@@ -19,7 +19,7 @@ if (!defined('ABSPATH')) {
 
 // Define constants
 define( 'BYS_GROUPS_VERSION', '2.0.1' );
-define( 'BYS_GROUPS_DB_VERSION', '1.1.0' );
+define( 'BYS_GROUPS_DB_VERSION', '1.2.0' );
 define( 'BYS_GROUPS_PLUGIN_FILE', __FILE__);
 define( 'BYS_GROUPS_PLUGIN_DIR', plugin_dir_path( __FILE__ ));
 define( 'BYS_GROUPS_PLUGIN_URL', plugin_dir_url( __FILE__ ));
@@ -27,6 +27,7 @@ define( 'BYS_GROUPS_PLUGIN_BASENAME', plugin_basename( __FILE__ ));
 define( 'BYS_GROUPS_USER_ACTIVITY_TABLE', 'bys_groups_user_activity' );
 define( 'BYS_GROUPS_INVITES_TABLE', 'bys_group_invites' );
 define( 'BYS_GROUPS_COMMS_TABLE', 'bys_group_communication_log' );
+define( 'BYS_GROUPS_TIME_TRACKING_TABLE', 'bys_groups_time_tracking' );
 
 // File includes
 require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-core.php';
