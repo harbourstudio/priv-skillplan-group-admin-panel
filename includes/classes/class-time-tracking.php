@@ -106,21 +106,18 @@ if (!class_exists('BYS_Groups_Time_Tracking')) {
         }
 
         /**
-         * Wipe the given user's tracker rows when the LD "Delete user data"
+         * Wipe this module's tracker rows when the LD "Delete user data"
          * checkbox is ticked on the user profile screen.
+         *
+         * Scoped to data this module wrote — the bys_groups_time_tracking
+         * table only. Legacy Uncanny CourseTimer meta (uo_timer_* and
+         * course_timer_completed_*) is left alone; Uncanny's own module owns
+         * cleanup of its own data.
          *
          * Guarded by:
          * - manage_options capability (only admins can trigger)
          * - the $_POST['learndash_delete_user_data'] value matching the user
          *   being edited (the checkbox posts the target user_id as its value)
-         *
-         * Deletes:
-         * - Rows in the new bys_groups_time_tracking table.
-         * - Legacy uo_timer_* meta (so a reset clears history from either
-         *   source, whether or not Uncanny CourseTimer is still active).
-         * - Legacy course_timer_completed_* meta (same reason — mirrors
-         *   Uncanny's own cleanup so orphaned rows don't accumulate after
-         *   the module is deactivated).
          */
         public function handle_user_data_reset($user_id) {
             if (!current_user_can('manage_options')) return;
@@ -128,8 +125,10 @@ if (!class_exists('BYS_Groups_Time_Tracking')) {
             $user = get_user_by('id', $user_id);
             if (empty($user->ID)) return;
 
-            $ld_delete = filter_input(INPUT_POST, 'learndash_delete_user_data');
-            if (empty($ld_delete) || (int) $ld_delete !== (int) $user->ID) return;
+            $ld_delete = isset($_POST['learndash_delete_user_data'])
+                ? sanitize_text_field(wp_unslash($_POST['learndash_delete_user_data']))
+                : '';
+            if ('' === $ld_delete || (int) $ld_delete !== (int) $user->ID) return;
 
             global $wpdb;
             $table = $wpdb->prefix . BYS_GROUPS_TIME_TRACKING_TABLE;
@@ -137,16 +136,6 @@ if (!class_exists('BYS_Groups_Time_Tracking')) {
             $wpdb->query($wpdb->prepare(
                 "DELETE FROM {$table} WHERE user_id = %d",
                 $user_id
-            ));
-
-            $wpdb->query($wpdb->prepare(
-                "DELETE FROM {$wpdb->usermeta} WHERE user_id = %d AND meta_key LIKE %s",
-                $user_id, 'uo_timer_%'
-            ));
-
-            $wpdb->query($wpdb->prepare(
-                "DELETE FROM {$wpdb->usermeta} WHERE user_id = %d AND meta_key LIKE %s",
-                $user_id, 'course_timer_completed_%'
             ));
         }
 
