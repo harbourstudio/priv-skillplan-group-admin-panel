@@ -60,6 +60,7 @@ if (!class_exists('BYS_Groups_Core')) {
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-lander-access.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-user-comms-preferences.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-time-tracking.php';
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/cli/class-time-tracking-migration.php';
         }
 
         public function init() {

@@ -299,19 +299,36 @@ if (!class_exists('BYS_Groups_Users_Router')) {
                     if (!isset($activity_map[$pid])) $activity_map[$pid] = $row;
                 }
 
-                // 2. Timespent + count meta (Uncanny Owl xAPI)
+                // 2. Timespent + count meta (Tin Canny — SCORM/xAPI packages).
                 $meta_map     = [];
                 $activity_ids = array_column($activity_rows, 'activity_id');
                 if (!empty($activity_ids)) {
                     $placeholders = implode(',', array_fill(0, count($activity_ids), '%d'));
                     $meta_rows = $wpdb->get_results($wpdb->prepare(
-                        "SELECT activity_id, meta_key, meta_value
+                        "SELECT activity_id, activity_meta_key, activity_meta_value
                          FROM {$meta_table}
-                         WHERE activity_id IN ({$placeholders}) AND meta_key IN ('timespent','count')",
+                         WHERE activity_id IN ({$placeholders}) AND activity_meta_key IN ('timespent','count')",
                         ...$activity_ids
                     ), ARRAY_A);
                     foreach ($meta_rows as $m) {
-                        $meta_map[intval($m['activity_id'])][$m['meta_key']] = $m['meta_value'];
+                        $meta_map[intval($m['activity_id'])][$m['activity_meta_key']] = $m['activity_meta_value'];
+                    }
+                }
+
+                // 3. Batched query for custom time-tracking rows(bys_groups_time_tracking). See
+                // class-time-tracking.php and class-time-tracking-router.php.
+                $time_tracking_table = $wpdb->prefix . BYS_GROUPS_TIME_TRACKING_TABLE;
+                $tracker_map = [];
+                $step_ids    = array_column($all_steps, 'step');
+                if (!empty($step_ids)) {
+                    $step_id_placeholders = implode(',', array_fill(0, count($step_ids), '%d'));
+                    $tracker_rows = $wpdb->get_results($wpdb->prepare(
+                        "SELECT post_id, seconds_total FROM {$time_tracking_table}
+                         WHERE user_id = %d AND course_id = %d AND post_id IN ({$step_id_placeholders})",
+                        ...array_merge([$user_id, $course_id], array_map('intval', $step_ids))
+                    ), ARRAY_A);
+                    foreach ($tracker_rows as $tr) {
+                        $tracker_map[intval($tr['post_id'])] = intval($tr['seconds_total']);
                     }
                 }
 
@@ -340,21 +357,27 @@ if (!class_exists('BYS_Groups_Users_Router')) {
 
                 foreach ($all_steps as &$step) {
                     $pid = intval($step['step']);
-                    if (!isset($activity_map[$pid])) continue;
 
-                    $act  = $activity_map[$pid];
-                    $meta = $meta_map[intval($act['activity_id'])] ?? [];
+                    $scorm_seconds = 0;
+                    if (isset($activity_map[$pid])) {
+                        $act  = $activity_map[$pid];
+                        $meta = $meta_map[intval($act['activity_id'])] ?? [];
 
-                    if (!empty($act['activity_updated'])) {
-                        $step['last_accessed_gmt'] = gmdate('Y-m-d\TH:i:s', intval($act['activity_updated']));
+                        if (!empty($act['activity_updated'])) {
+                            $step['last_accessed_gmt'] = gmdate('Y-m-d\TH:i:s', intval($act['activity_updated']));
+                        }
+                        if (isset($meta['timespent'])) {
+                            $scorm_seconds = intval($meta['timespent']);
+                        }
                     }
 
-                    // time_spent_seconds — prefer Uncanny Owl meta, fall back to (completed - started)
-                    if (isset($meta['timespent']) && intval($meta['timespent']) > 0) {
-                        $step['time_spent_seconds'] = intval($meta['timespent']);
-                    } elseif (!empty($act['activity_completed']) && !empty($act['activity_started'])) {
-                        $diff = intval($act['activity_completed']) - intval($act['activity_started']);
-                        if ($diff > 0) $step['time_spent_seconds'] = $diff;
+                    // Sum our tracker (parent-page interaction) + Tin Canny
+                    // (SCORM iframe interaction). Sums both values since iframe events don't reach parent-document
+                    // listeners; bounded double-count during the initial overlap is acceptable.
+                    $tracker_seconds = $tracker_map[$pid] ?? 0;
+                    $total_seconds   = $tracker_seconds + $scorm_seconds;
+                    if ($total_seconds > 0) {
+                        $step['time_spent_seconds'] = $total_seconds;
                     }
 
                     // [on_page_view parked] $visit_map is no longer populated — see block above.
