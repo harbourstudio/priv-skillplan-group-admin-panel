@@ -22,6 +22,42 @@ if (!class_exists('BYS_Groups_Time_Tracking')) {
 
         public function __construct() {
             add_action('wp_enqueue_scripts', [$this, 'enqueue_assets']);
+            add_shortcode('bys_time_tracking_total', [$this, 'shortcode_total']);
+
+            // Wipe our tracker rows when an admin uses LD's "Delete user data"
+            // checkbox on the user profile screen. personal_options_update fires
+            // when a user edits themselves; edit_user_profile_update fires when
+            // an admin edits another user. LD only shows the checkbox on admin
+            // edits, but binding both matches Uncanny CourseTimer's pattern.
+            add_action('personal_options_update',  [$this, 'handle_user_data_reset']);
+            add_action('edit_user_profile_update', [$this, 'handle_user_data_reset']);
+        }
+
+        /**
+         * Shortcode [bys_time_tracking_total user_id="123"]
+         *
+         * Returns a user's total tracked active time across LD posts
+         * (defined in LD_CONTENT_TYPES); formatted as "Xh Ym". Sums all rows for
+         * that user in a single indexed query.
+         * Returns empty string on invalid user_id.
+         * 
+         * Usage: do_shortcode('[bys_time_tracking_total user_id="123"]')
+         */
+        public function shortcode_total($atts) {
+            $atts = shortcode_atts(['user_id' => 0], $atts, 'bys_time_tracking_total');
+            $user_id = (int) $atts['user_id'];
+            if ($user_id < 1) return '';
+
+            global $wpdb;
+            $table = $wpdb->prefix . BYS_GROUPS_TIME_TRACKING_TABLE;
+            $seconds = (int) $wpdb->get_var($wpdb->prepare(
+                "SELECT COALESCE(SUM(seconds_total), 0) FROM {$table} WHERE user_id = %d",
+                $user_id
+            ));
+
+            $h = (int) floor($seconds / 3600);
+            $m = (int) floor(($seconds % 3600) / 60);
+            return sprintf('%dh %dm', $h, $m);
         }
 
         /**
@@ -67,6 +103,51 @@ if (!class_exists('BYS_Groups_Time_Tracking')) {
                 'window.bysTimeTracking = ' . wp_json_encode($config) . ';',
                 'before'
             );
+        }
+
+        /**
+         * Wipe the given user's tracker rows when the LD "Delete user data"
+         * checkbox is ticked on the user profile screen.
+         *
+         * Guarded by:
+         * - manage_options capability (only admins can trigger)
+         * - the $_POST['learndash_delete_user_data'] value matching the user
+         *   being edited (the checkbox posts the target user_id as its value)
+         *
+         * Deletes:
+         * - Rows in the new bys_groups_time_tracking table.
+         * - Legacy uo_timer_* meta (so a reset clears history from either
+         *   source, whether or not Uncanny CourseTimer is still active).
+         * - Legacy course_timer_completed_* meta (same reason — mirrors
+         *   Uncanny's own cleanup so orphaned rows don't accumulate after
+         *   the module is deactivated).
+         */
+        public function handle_user_data_reset($user_id) {
+            if (!current_user_can('manage_options')) return;
+
+            $user = get_user_by('id', $user_id);
+            if (empty($user->ID)) return;
+
+            $ld_delete = filter_input(INPUT_POST, 'learndash_delete_user_data');
+            if (empty($ld_delete) || (int) $ld_delete !== (int) $user->ID) return;
+
+            global $wpdb;
+            $table = $wpdb->prefix . BYS_GROUPS_TIME_TRACKING_TABLE;
+
+            $wpdb->query($wpdb->prepare(
+                "DELETE FROM {$table} WHERE user_id = %d",
+                $user_id
+            ));
+
+            $wpdb->query($wpdb->prepare(
+                "DELETE FROM {$wpdb->usermeta} WHERE user_id = %d AND meta_key LIKE %s",
+                $user_id, 'uo_timer_%'
+            ));
+
+            $wpdb->query($wpdb->prepare(
+                "DELETE FROM {$wpdb->usermeta} WHERE user_id = %d AND meta_key LIKE %s",
+                $user_id, 'course_timer_completed_%'
+            ));
         }
 
         /**

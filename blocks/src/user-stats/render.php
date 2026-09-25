@@ -25,12 +25,9 @@ if ($user_id) {
     // total_logins - from user meta
     $server_stats['total_logins'] = intval(get_user_meta($user_id, 'my_user_count', true) ?: 0);
 
-    // total_time — Uncanny Owl shortcode
-    $time_string = trim(do_shortcode("[uo_time_total user-id=\"{$user_id}\"]"));
-    $server_stats['total_time'] = '0h 0m';
-    if (preg_match('/^(\d+):(\d{2}):\d{2}$/', $time_string, $m)) {
-        $server_stats['total_time'] = "{$m[1]}h {$m[2]}m";
-    }
+    // total_time — BYS Groups active-time tracker (see class-time-tracking.php).
+    $total_time = trim(do_shortcode("[bys_time_tracking_total user_id=\"{$user_id}\"]"));
+    $server_stats['total_time'] = $total_time !== '' ? $total_time : '0h 0m';
 
     // total_courses - total enrolled courses (published only)
     if (function_exists('learndash_user_get_enrolled_courses')) {
