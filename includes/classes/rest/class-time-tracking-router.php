@@ -38,9 +38,13 @@ if (!class_exists('BYS_Groups_Time_Tracking_Router')) {
             $course_id = intval($request->get_param('course_id'));
             $post_id = intval($request->get_param('post_id'));
             $delta_seconds = intval($request->get_param('delta_seconds'));
-            
+
             if ($user_id < 1 || $course_id < 1 || $post_id < 1 || $delta_seconds < 1) {
                 return new WP_Error('bad_request', 'Invalid payload', ['status' => 400]);
+            }
+
+            if (!in_array(get_post_type($post_id), BYS_Groups_Time_Tracking::LD_CONTENT_TYPES, true)) {
+                return new WP_Error('bad_request', 'post_id is not a tracked LearnDash content type', ['status' => 400]);
             }
 
             $update_interval = $this->get_update_interval();
