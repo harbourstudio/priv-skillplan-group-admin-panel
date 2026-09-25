@@ -28,6 +28,8 @@ define( 'BYS_GROUPS_USER_ACTIVITY_TABLE', 'bys_groups_user_activity' );
 define( 'BYS_GROUPS_INVITES_TABLE', 'bys_group_invites' );
 define( 'BYS_GROUPS_COMMS_TABLE', 'bys_group_communication_log' );
 define( 'BYS_GROUPS_TIME_TRACKING_TABLE', 'bys_groups_time_tracking' );
+define( 'BYS_GROUPS_TIME_TRACKING_UPDATE_INTERVAL_DEFAULT', 60 );
+define( 'BYS_GROUPS_TIME_TRACKING_IDLE_THRESHOLD_DEFAULT', 300 );
 
 // File includes
 require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-core.php';

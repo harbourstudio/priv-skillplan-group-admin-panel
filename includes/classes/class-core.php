@@ -41,6 +41,7 @@ if (!class_exists('BYS_Groups_Core')) {
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/rest/class-courses-router.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/rest/class-groups-router.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/rest/class-comms-preferences-router.php';
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/rest/class-time-tracking-router.php';
 
             // Core classes
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-activator.php';
@@ -100,6 +101,7 @@ if (!class_exists('BYS_Groups_Core')) {
             new BYS_Groups_Courses_Router();
             new BYS_Groups_Groups_Router();
             new BYS_Groups_Comms_Preferences_Router();
+            new BYS_Groups_Time_Tracking_Router();
 
             // Flush rewrite rules once after activation so new CPTs are reachable.
             if (get_option('bys_flush_rewrite_rules')) {
