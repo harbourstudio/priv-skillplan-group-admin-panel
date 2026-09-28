@@ -315,20 +315,29 @@ if (!class_exists('BYS_Groups_Users_Router')) {
                     }
                 }
 
-                // 3. Batched query for custom time-tracking rows(bys_groups_time_tracking). See
-                // class-time-tracking.php and class-time-tracking-router.php.
+                // 3. Custom time-tracking rows from bys_groups_time_tracking.
+                // See class-time-tracking.php (writer) and
+                // class-time-tracking-router.php (REST endpoint).
+                //
+                // Pulls last_updated_gmt in addition to seconds_total to get a 
+                // more accurate "last accessed" signal than LD's activity_updated:
+                // LD only bumps activity_updated on state change (start/complete/reset).
+                // The merge loops picks the max of the tw to reflect the more current val.
                 $time_tracking_table = $wpdb->prefix . BYS_GROUPS_TIME_TRACKING_TABLE;
                 $tracker_map = [];
                 $step_ids    = array_column($all_steps, 'step');
                 if (!empty($step_ids)) {
                     $step_id_placeholders = implode(',', array_fill(0, count($step_ids), '%d'));
                     $tracker_rows = $wpdb->get_results($wpdb->prepare(
-                        "SELECT post_id, seconds_total FROM {$time_tracking_table}
+                        "SELECT post_id, seconds_total, last_updated_gmt FROM {$time_tracking_table}
                          WHERE user_id = %d AND course_id = %d AND post_id IN ({$step_id_placeholders})",
                         ...array_merge([$user_id, $course_id], array_map('intval', $step_ids))
                     ), ARRAY_A);
                     foreach ($tracker_rows as $tr) {
-                        $tracker_map[intval($tr['post_id'])] = intval($tr['seconds_total']);
+                        $tracker_map[intval($tr['post_id'])] = [
+                            'seconds'         => intval($tr['seconds_total']),
+                            'last_updated_ts' => strtotime($tr['last_updated_gmt'] . ' UTC') ?: 0,
+                        ];
                     }
                 }
 
@@ -357,24 +366,32 @@ if (!class_exists('BYS_Groups_Users_Router')) {
 
                 foreach ($all_steps as &$step) {
                     $pid = intval($step['step']);
+                    $tracker = $tracker_map[$pid] ?? null;
 
-                    $scorm_seconds = 0;
+                    $scorm_seconds       = 0;
+                    $ld_last_accessed_ts = 0;
                     if (isset($activity_map[$pid])) {
                         $act  = $activity_map[$pid];
                         $meta = $meta_map[intval($act['activity_id'])] ?? [];
 
                         if (!empty($act['activity_updated'])) {
-                            $step['last_accessed_gmt'] = gmdate('Y-m-d\TH:i:s', intval($act['activity_updated']));
+                            $ld_last_accessed_ts = intval($act['activity_updated']);
                         }
                         if (isset($meta['timespent'])) {
                             $scorm_seconds = intval($meta['timespent']);
                         }
                     }
 
-                    // Sum our tracker (parent-page interaction) + Tin Canny
-                    // (SCORM iframe interaction). Sums both values since iframe events don't reach parent-document
-                    // listeners; bounded double-count during the initial overlap is acceptable.
-                    $tracker_seconds = $tracker_map[$pid] ?? 0;
+                    $tt_last_accessed_ts = $tracker['last_updated_ts'] ?? 0;
+                    $last_accessed_ts    = max($ld_last_accessed_ts, $tt_last_accessed_ts);
+                    if ($last_accessed_ts > 0) {
+                        $step['last_accessed_gmt'] = gmdate('Y-m-d\TH:i:s', $last_accessed_ts);
+                    }
+
+                    // time_spent_seconds = tracker seconds + Tin Canny's timespent.
+                    // Tracker measures interaction with the parent LD page,
+                    // Tin Canny measures interaction inside SCORM iframes.
+                    $tracker_seconds = $tracker['seconds'] ?? 0;
                     $total_seconds   = $tracker_seconds + $scorm_seconds;
                     if ($total_seconds > 0) {
                         $step['time_spent_seconds'] = $total_seconds;
