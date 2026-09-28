@@ -37,7 +37,8 @@ class-time-tracking-router.php
   │  Consumers:
   │
   ├─▶ class-users-router.php (get_user_course_steps_progress)
-  │   Sums tracker seconds + Tin Canny timespent → Time Spent column
+  │   ├─ Sums tracker seconds + Tin Canny timespent  → Time Spent column
+  │   └─ Max(tracker last_updated, LD activity_updated) → Last Accessed column
   │
   └─▶ [bys_time_tracking_total user_id="X"] shortcode
       Sums all tracker seconds for a user → Total Time widget
@@ -107,6 +108,23 @@ time_spent_seconds = bys_groups_time_tracking.seconds_total
 - **Tracker seconds** cover parent-page interaction (topic pages, lesson pages, etc.).
 - **Tin Canny seconds** cover interaction *inside* SCORM iframes, which our parent-document event listeners can't see. The two sources are complementary; overlap at the start of a SCORM session is bounded by one idle-threshold window and considered acceptable.
 
+### Reporting endpoint (Last Accessed column)
+
+**File:** `includes/classes/rest/class-users-router.php`, `get_user_course_steps_progress()`
+
+For each step in a course, `last_accessed_gmt` is computed as:
+
+```
+last_accessed_gmt = max(
+  bys_groups_time_tracking.last_updated_gmt,
+  learndash_user_activity.activity_updated
+)
+```
+
+- **Tracker `last_updated_gmt`** bumps on every heartbeat while the learner is on the page — so this reflects real "last touched" time, including revisits after completion.
+- **LD `activity_updated`** only bumps on state transitions (start / complete / reset), so it's a fallback for short sessions the tracker never saw and for topics only touched by admin actions.
+- Taking the max of the two prevents the tracker value from silently regressing when LD writes a fresher state-change timestamp (e.g. an admin marks something complete manually).
+
 ### Total-time shortcode
 
 **File:** `includes/classes/class-time-tracking.php`, `shortcode_total()`
@@ -135,13 +153,47 @@ Runtime effect: settings apply to each learner on their next page load.
 
 ## Data reset
 
-**Hook:** `personal_options_update` / `edit_user_profile_update`
+Three admin actions on the WP user-profile page can wipe tracker rows. All hook off `personal_options_update` / `edit_user_profile_update`.
 
-When an admin ticks LD's "Delete user data" checkbox on the user profile screen, `handle_user_data_reset()` deletes all rows from `bys_groups_time_tracking` for that user. 
+### (A) LD's "Delete user data" checkbox
+
+**Handler:** `handle_user_data_reset()`
+
+Wipes ALL rows for the user across every course. Scoped to data this module wrote — legacy Uncanny meta (`uo_timer_*`, `course_timer_completed_*`) is left alone; Uncanny's own module owns cleanup of its own data.
 
 Guarded by:
 - `manage_options` capability
 - `$_POST['learndash_delete_user_data']` value equal to the user being edited
+
+### (B) LD's per-course progress edits (regression detection)
+
+**Handlers:** `snapshot_sfwd_progress()` (priority 0) + `detect_course_progress_regression()` (priority 20)
+
+LD writes course-progress edits straight into `_sfwd-course_progress` user_meta without firing a dedicated hook, so we diff the meta ourselves:
+
+- **Priority 0** → snapshot the meta BEFORE LD writes.
+- **Priority 20** → read the meta AFTER LD wrote, compare.
+
+A course counts as "regressed" (reset) when either:
+- its `completed` count dropped between snapshot and now, OR
+- it disappeared from the meta entirely.
+
+Both indicate an admin cleared progress — learners can only INCREASE their completion count, so a drop is unambiguous. Any regressed course has its tracker rows wiped for that (user, course).
+
+Working off the meta diff (rather than the `$_POST` payload shape) catches every LD reset UI: individual step-checkbox toggles, the "Course All Complete" master, and the per-course reset action in the details section.
+
+### (C) Tin Canny's per-course "Purge Resume Records" dropdown
+
+**Handler:** `handle_tincanny_course_purge()`
+
+Tin Canny (the Uncanny SCORM/xAPI reporting plugin) adds a per-course purge dropdown to the same profile screen. It clears its own tables directly without firing a hook or touching `_sfwd-course_progress`, so we detect its POST field:
+
+- `$_POST['purge_course_resume_records']` = target course_id
+- Value `0` is the "— No Action —" placeholder; skipped.
+
+Wipes all tracker rows for that (user, course).
+
+Guarded by `manage_options` capability (matches Tin Canny's own gate). Profile-form nonce verification is handled by WP core before this hook fires.
 
 
 ## Backfill from legacy data
