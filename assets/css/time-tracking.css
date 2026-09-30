@@ -28,11 +28,11 @@
     background: #ffffff;
     border-radius: 2rem;
     box-shadow: 0 1.25rem 3.125rem rgba(15, 23, 42, 0.35);
-    padding: var(--wp--preset--spacing--5) var(--wp--preset--spacing--6);
+    padding: var(--wp--preset--spacing--5) var(--wp--preset--spacing--5);
     box-sizing: border-box;
 
     @media screen and (min-width: 768px) {
-        padding: var(--wp--preset--spacing--6) var(--wp--preset--spacing--7);   
+        padding: var(--wp--preset--spacing--6) var(--wp--preset--spacing--6);   
     }
 }
 
@@ -53,12 +53,17 @@
 .bys-time-tracking-modal__actions {
     display: flex;
     gap: 0.5rem;
-    justify-content: center;
+    justify-content: start;
     flex-wrap: wrap;
     margin-top: var(--wp--preset--spacing--5);
     
     button {
         flex-grow: 1;
+
+        &.bys-time-tracking-modal__btn--secondary{
+            background: transparent;
+            color: var(--wp--preset--color--primary);
+        }
     }
 
     @media screen and (min-width: 768px) {
