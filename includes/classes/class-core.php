@@ -41,6 +41,7 @@ if (!class_exists('BYS_Groups_Core')) {
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/rest/class-courses-router.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/rest/class-groups-router.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/rest/class-comms-preferences-router.php';
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/rest/class-time-tracking-router.php';
 
             // Core classes
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-activator.php';
@@ -58,6 +59,8 @@ if (!class_exists('BYS_Groups_Core')) {
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-lander-block-helpers.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-lander-access.php';
             require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-user-comms-preferences.php';
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-time-tracking.php';
+            require_once BYS_GROUPS_PLUGIN_DIR . 'includes/cli/class-time-tracking-migration.php';
         }
 
         public function init() {
@@ -90,6 +93,7 @@ if (!class_exists('BYS_Groups_Core')) {
             new BYS_Groups_Scheduled_Emails();
             new BYS_Groups_User_Comms_Preferences();
             new BYS_Groups_Lander_Access();
+            new BYS_Groups_Time_Tracking();
 
             // REST routers
             new BYS_Groups_Webhooks_Router();
@@ -100,6 +104,7 @@ if (!class_exists('BYS_Groups_Core')) {
             new BYS_Groups_Courses_Router();
             new BYS_Groups_Groups_Router();
             new BYS_Groups_Comms_Preferences_Router();
+            new BYS_Groups_Time_Tracking_Router();
 
             // Flush rewrite rules once after activation so new CPTs are reachable.
             if (get_option('bys_flush_rewrite_rules')) {

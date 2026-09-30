@@ -1,0 +1,69 @@
+/**
+ * BYS Groups — Time Tracking modal styles
+ * Injected on demand when the idle threshold fires.
+ */
+
+.bys-time-tracking-modal {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    max-width: none;
+    max-height: none;
+    color: inherit;
+    z-index: 999;
+    padding: var(--wp--preset--spacing--5);
+}
+
+.bys-time-tracking-modal::backdrop {
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+}
+
+
+.bys-time-tracking-modal__dialog {
+    max-width: 32rem;
+    width: 100% !important;
+    position: relative;
+    background: #ffffff;
+    border-radius: 2rem;
+    box-shadow: 0 1.25rem 3.125rem rgba(15, 23, 42, 0.35);
+    padding: var(--wp--preset--spacing--5) var(--wp--preset--spacing--6);
+    box-sizing: border-box;
+
+    @media screen and (min-width: 768px) {
+        padding: var(--wp--preset--spacing--6) var(--wp--preset--spacing--7);   
+    }
+}
+
+.bys-time-tracking-modal__title {
+    padding-right: var(--wp--preset--spacing--4);
+}
+
+.bys-time-tracking-modal__close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: transparent;
+    border: 0;
+    padding-bottom: var(--wp--preset--spacing--2);
+    color: var(--wp--preset--color--gray-500);
+}
+
+.bys-time-tracking-modal__actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: var(--wp--preset--spacing--5);
+    
+    button {
+        flex-grow: 1;
+    }
+
+    @media screen and (min-width: 768px) {
+        button {
+            flex-grow: unset;
+        }
+    }
+}
