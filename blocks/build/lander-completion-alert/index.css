@@ -1,1 +1,85 @@
-.wp-block-bys-groups-lander-completion-alert .bys-lander-completion-alert{align-items:flex-start;border:1px solid;border-radius:.125rem;display:flex;flex-wrap:wrap;gap:var(--wp--preset--spacing--4);justify-content:space-between;padding:var(--wp--preset--spacing--5)}.wp-block-bys-groups-lander-completion-alert .bys-lander-completion-alert--locked{background-color:var(--wp--preset--color--yellow-100);border-color:var(--wp--preset--color--yellow-300);color:var(--wp--preset--color--yellow-800)}.wp-block-bys-groups-lander-completion-alert .bys-lander-completion-alert--unlocked{background-color:var(--wp--preset--color--green-50);border-color:var(--wp--preset--color--green-200);color:var(--wp--preset--color--green-700)}.wp-block-bys-groups-lander-completion-alert .bys-ca__body{align-items:flex-start;display:flex;flex:1;gap:var(--wp--preset--spacing--3);min-width:0}.wp-block-bys-groups-lander-completion-alert .bys-ca__icon{flex-shrink:0;font-size:1.1em;margin-top:.1em}.bys-lander-completion-alert--locked .wp-block-bys-groups-lander-completion-alert .bys-ca__icon{color:var(--wp--preset--color--yellow-700)}.bys-lander-completion-alert--unlocked .wp-block-bys-groups-lander-completion-alert .bys-ca__icon{color:var(--wp--preset--color--green-500)}.wp-block-bys-groups-lander-completion-alert .bys-ca__message{font-size:var(--wp--preset--font-size--x-small);line-height:1.5;margin:0!important}.wp-block-bys-groups-lander-completion-alert .bys-ca__cta{align-items:center;display:flex;flex-shrink:0;gap:var(--wp--preset--spacing--2)}.wp-block-bys-groups-lander-completion-alert .bys-ca__btn{border-radius:4px;cursor:text;display:inline-block;font-size:var(--wp--preset--font-size--x-small);font-weight:500;padding:.45em 1.1em;white-space:nowrap}.wp-block-bys-groups-lander-completion-alert .bys-ca__btn--active{background-color:var(--wp--preset--color--green-500);border:1px solid var(--wp--preset--color--green-500);color:var(--wp--preset--color--white)}.wp-block-bys-groups-lander-completion-alert .bys-ca__btn--disabled{background-color:var(--wp--preset--color--gray-100);border:1px solid var(--wp--preset--color--gray-100);color:var(--wp--preset--color--gray-500);opacity:.7}.wp-block-bys-groups-lander-completion-alert .bys-ca__modal-badge{background-color:var(--wp--preset--color--purple-50);border:1px solid var(--wp--preset--color--purple-100);border-radius:3px;color:var(--wp--preset--color--purple-700);display:inline-block;font-size:var(--wp--preset--font-size--x-small);font-weight:500;padding:.15em .5em;white-space:nowrap}
+/*!************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ./node_modules/css-loader/dist/cjs.js??ruleSet[1].rules[4].use[1]!./node_modules/postcss-loader/dist/cjs.js??ruleSet[1].rules[4].use[2]!./node_modules/@wordpress/scripts/node_modules/sass-loader/dist/cjs.js??ruleSet[1].rules[4].use[3]!./src/lander-completion-alert/editor.scss ***!
+  \************************************************************************************************************************************************************************************************************************************************************************************************/
+.wp-block-bys-groups-lander-completion-alert .bys-lander-completion-alert {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--wp--preset--spacing--4);
+  border-radius: 0.125rem;
+  border: 1px solid;
+  padding: var(--wp--preset--spacing--5);
+}
+.wp-block-bys-groups-lander-completion-alert .bys-lander-completion-alert--locked {
+  background-color: var(--wp--preset--color--yellow-100);
+  border-color: var(--wp--preset--color--yellow-300);
+  color: var(--wp--preset--color--yellow-800);
+}
+.wp-block-bys-groups-lander-completion-alert .bys-lander-completion-alert--unlocked {
+  background-color: var(--wp--preset--color--green-50);
+  border-color: var(--wp--preset--color--green-200);
+  color: var(--wp--preset--color--green-700);
+}
+.wp-block-bys-groups-lander-completion-alert .bys-ca__body {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--wp--preset--spacing--3);
+  flex: 1;
+  min-width: 0;
+}
+.wp-block-bys-groups-lander-completion-alert .bys-ca__icon {
+  flex-shrink: 0;
+  font-size: 1.1em;
+  margin-top: 0.1em;
+}
+.bys-lander-completion-alert--locked .wp-block-bys-groups-lander-completion-alert .bys-ca__icon {
+  color: var(--wp--preset--color--yellow-700);
+}
+.bys-lander-completion-alert--unlocked .wp-block-bys-groups-lander-completion-alert .bys-ca__icon {
+  color: var(--wp--preset--color--green-500);
+}
+.wp-block-bys-groups-lander-completion-alert .bys-ca__message {
+  margin: 0 !important;
+  font-size: var(--wp--preset--font-size--x-small);
+  line-height: 1.5;
+}
+.wp-block-bys-groups-lander-completion-alert .bys-ca__cta {
+  display: flex;
+  align-items: center;
+  gap: var(--wp--preset--spacing--2);
+  flex-shrink: 0;
+}
+.wp-block-bys-groups-lander-completion-alert .bys-ca__btn {
+  display: inline-block;
+  padding: 0.45em 1.1em;
+  border-radius: 4px;
+  font-size: var(--wp--preset--font-size--x-small);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: text;
+}
+.wp-block-bys-groups-lander-completion-alert .bys-ca__btn--active {
+  background-color: var(--wp--preset--color--green-500);
+  border: 1px solid var(--wp--preset--color--green-500);
+  color: var(--wp--preset--color--white);
+}
+.wp-block-bys-groups-lander-completion-alert .bys-ca__btn--disabled {
+  background-color: var(--wp--preset--color--gray-100);
+  border: 1px solid var(--wp--preset--color--gray-100);
+  color: var(--wp--preset--color--gray-500);
+  opacity: 0.7;
+}
+.wp-block-bys-groups-lander-completion-alert .bys-ca__modal-badge {
+  display: inline-block;
+  padding: 0.15em 0.5em;
+  background-color: var(--wp--preset--color--purple-50);
+  border: 1px solid var(--wp--preset--color--purple-100);
+  color: var(--wp--preset--color--purple-700);
+  border-radius: 3px;
+  font-size: var(--wp--preset--font-size--x-small);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/*# sourceMappingURL=index.css.map*/
