@@ -20,31 +20,93 @@
     if (!config || !auth || !auth.nonce) return;
 
     const INTERACTION_EVENTS = ['mousemove', 'mousedown', 'keydown', 'scroll', 'wheel', 'touchstart'];
-    const INTERACTION_THROTTLE_MS = 5000;
 
     // Local state
     let activeSecondsBuffer = 0;
     let lastInteractionTs = Date.now();
-    let lastInteractionUpdateTs = 0;
     let modalEl = null;
     let isPaused = false;
 
     /**
      * Detect interaction
+     * Records the time of the user's most recent interaction.
+     * isIdle() compares against this timestamp once per tick.
      */
     function onInteraction() {
-        const now = Date.now();
-        if (now - lastInteractionUpdateTs < INTERACTION_THROTTLE_MS) return;
-
-        lastInteractionUpdateTs = now;
-        lastInteractionTs = now;
+        lastInteractionTs = Date.now();
     }
 
-    INTERACTION_EVENTS.forEach(function(e) {
-        document.addEventListener(e, onInteraction, {
-            passive: true
+    /**
+     * Listen for interaction inside iframes
+     * Events that happen inside an iframe (e.g. SCORM), which would
+     * not reach the page document. To detect, listeners are attached
+     * directly to each iframe's document.
+     */
+
+    // WeakSet lets the browser free a document once its iframe is gone
+    const attachedDocs = new WeakSet();
+
+    /**
+     * Add interaction listeners to a document
+     */
+    function attachToDocument(doc) {
+        if (!doc || attachedDocs.has(doc)) return;
+        attachedDocs.add(doc);
+
+        // `capture: true` runs our listener before the page's own handlers,
+        // so it still fires if the SCORM player calls stopPropagation().
+        // `passive: true` tells the browser we never block scrolling.
+        INTERACTION_EVENTS.forEach(function(e) {
+            doc.addEventListener(e, onInteraction, { passive: true, capture: true });
         });
-    });
+
+        // Iframes already in this document.
+        doc.querySelectorAll('iframe').forEach(attachToIframe);
+
+        // Iframes added later, e.g. SCORM modules that open after click
+        // The observer reports every element added to the document
+        new MutationObserver(function(mutations) {
+            for (let i = 0; i < mutations.length; i++) {
+                const added = mutations[i].addedNodes;
+                for (let j = 0; j < added.length; j++) {
+                    const node = added[j];
+                    if (node.nodeType !== Node.ELEMENT_NODE) continue; // skip text/comment nodes
+                    if (node.tagName === 'IFRAME') attachToIframe(node);
+                    node.querySelectorAll('iframe').forEach(attachToIframe);
+                }
+            }
+        }).observe(doc.documentElement, { childList: true, subtree: true });
+    }
+
+    /**
+     * Attach to an iframe's current document, and again each time it loads
+     * a new page. Every time an iframe loads a page, the browser replaces its
+     * document with a brand-new one that has no listeners.
+     * The `load` handler re-attaches to that new document.
+     */
+    function attachToIframe(iframe) {
+        function tryAttach() {
+            let doc = null;
+            try {
+                // null (or throws in some browsers) for cross-origin iframes.
+                doc = iframe.contentDocument;
+            } catch (e) {
+                // Cross-origin: can't listen inside it, so leave it alone.
+            }
+            attachToDocument(doc);
+        }
+
+        // Bind the load handler once per iframe element.
+        if (!iframe._bysTtLoadBound) {
+            iframe._bysTtLoadBound = true;
+            iframe.addEventListener('load', tryAttach);
+        }
+
+        // The iframe may have already loaded
+        tryAttach();
+    }
+
+    attachToDocument(document);
 
     /**
      * Check idle state
