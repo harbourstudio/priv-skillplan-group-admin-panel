@@ -1,0 +1,36 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "bys-groups/group-onboarding-modal",
+  "version": "0.1.0",
+  "title": "BYS - Group Onboarding Modal",
+  "category": "custom-blocks",
+  "icon": "welcome-learn-more",
+  "description": "Welcome modal shown automatically on first visit to the group dashboard.",
+  "textdomain": "bys",
+  "supports": {
+    "anchor": true,
+    "html": false,
+    "spacing": {
+      "margin": true
+    }
+  },
+  "keywords": [
+    "group",
+    "onboarding",
+    "tutorial",
+    "welcome",
+    "dashboard"
+  ],
+  "attributes": {
+    "blockId": {
+      "type": "string",
+      "default": ""
+    }
+  },
+  "editorScript": "file:./index.js",
+  "editorStyle": "file:./index.css",
+  "render": "file:./render.php",
+  "style": "file:./style-index.css",
+  "viewScript": "file:./view.js"
+}

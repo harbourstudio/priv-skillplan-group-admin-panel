@@ -1,0 +1,27 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "bys-groups/skill-level-wrapper",
+  "version": "1.0.0",
+  "title": "BYS - Skill Level Wrapper",
+  "category": "custom-blocks",
+  "icon": "shield-alt",
+  "description": "Shows its inner content only to users whose trade_experience matches the selected skill level.",
+  "textdomain": "bys",
+  "supports": {
+    "anchor": true,
+    "html": false,
+    "align": false,
+    "color": false,
+    "spacing": false
+  },
+  "attributes": {
+    "skillLevel": {
+      "type": "string",
+      "default": ""
+    }
+  },
+  "editorScript": "file:./index.js",
+  "render": "file:./render.php",
+  "editorStyle": "file:./index.css"
+}

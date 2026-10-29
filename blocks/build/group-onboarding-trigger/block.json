@@ -1,0 +1,34 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "bys-groups/group-onboarding-trigger",
+  "version": "0.1.0",
+  "title": "BYS - Group Onboarding Trigger",
+  "category": "custom-blocks",
+  "icon": "info",
+  "description": "Button that opens the group onboarding tutorial modal.",
+  "textdomain": "bys",
+  "supports": {
+    "anchor": true,
+    "html": false,
+    "spacing": {
+      "margin": true
+    }
+  },
+  "keywords": [
+    "group",
+    "onboarding",
+    "tutorial",
+    "trigger",
+    "button"
+  ],
+  "attributes": {
+    "blockId": {
+      "type": "string",
+      "default": ""
+    }
+  },
+  "editorScript": "file:./index.js",
+  "render": "file:./render.php",
+  "style": "file:./style-index.css"
+}
