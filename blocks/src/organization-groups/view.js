@@ -14,6 +14,7 @@ function formatArchivedDate(timestamp) {
 function buildGroupRow(group) {
     const $row = jQuery(`
         <div class="org-groups__item" data-group-id="${group.id}">
+            <span class="org-groups__group-badge">New</span>
             <span class="org-groups__group-name">${group.name}</span>
             <button class="org-groups__manage-btn btn-unstyled" type="button">
                 Manage <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
@@ -22,7 +23,7 @@ function buildGroupRow(group) {
     `);
 
     $row.find('.org-groups__manage-btn').on('click', function () {
-        sessionStorage.setItem('bys_selected_group_id', group.id);
+        localStorage.setItem('bys_selected_group_id', group.id);
         window.location.href = '/administrator-dashboard';
     });
 
@@ -81,13 +82,7 @@ function buildNewGroupFooter(createFn, $section) {
                 <button class="org-groups__new-group-submit btn-unstyled" type="button">Create</button>
                 <button class="org-groups__new-group-cancel btn-unstyled" type="button">Cancel</button>
             </div>
-            <div class="org-groups__created-confirm">
-                <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
-                <span class="org-groups__created-name"></span> created.
-                <button class="org-groups__go-to-group btn-unstyled" type="button">
-                    Manage group <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
-                </button>
-            </div>
+            
         </div>
     `);
 
@@ -96,7 +91,6 @@ function buildNewGroupFooter(createFn, $section) {
     const $input   = $footer.find('.org-groups__new-group-input');
     const $submit  = $footer.find('.org-groups__new-group-submit');
     const $cancel  = $footer.find('.org-groups__new-group-cancel');
-    const $confirm = $footer.find('.org-groups__created-confirm');
     const $goBtn   = $footer.find('.org-groups__go-to-group');
 
     function openForm() {
@@ -135,24 +129,28 @@ function buildNewGroupFooter(createFn, $section) {
 
             // Add the new row to the active items list
             const $items = $section.find('.org-groups__items');
-            $items.append(buildGroupRow(group));
+            const $newGroup = buildGroupRow(group)
+            $items.append($newGroup);
             $section.find('.org-groups__empty').remove();
 
             // Update group count label
             const count = $section.find('.org-groups__item').length;
             $section.find('.org-groups__org-meta').text(`${count} group${count !== 1 ? 's' : ''}`);
 
-            // Show confirmation
-            $form.removeClass('is-open');
-            $confirm.find('.org-groups__created-name').text(`"${group.name}"`);
-            $confirm.addClass('is-open');
+            // Closes creation form and shows new tag on row
+            closeForm();
+            $newGroup.find('.org-groups__group-badge').css('display', 'inline-block');
 
             $goBtn.on('click', function () {
-                sessionStorage.setItem('bys_selected_group_id', group.id);
+                localStorage.setItem('bys_selected_group_id', group.id);
                 window.location.href = '/administrator-dashboard';
             });
         } catch (err) {
             console.error('[org-groups] Failed to create group', err);
+            $submit.prop('disabled', false).text('Create');
+            $cancel.prop('disabled', false);
+        } finally {
+            // Reenable the submit and cancel buttons
             $submit.prop('disabled', false).text('Create');
             $cancel.prop('disabled', false);
         }
