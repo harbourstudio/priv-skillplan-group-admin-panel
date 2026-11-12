@@ -183,23 +183,20 @@
         gap: var(--wp--preset--spacing--4);
         padding: var(--wp--preset--spacing--4) var(--wp--preset--spacing--5);
 
-        .org-groups__group-badge {
-            padding: var(--wp--preset--spacing--1) var(--wp--preset--spacing--2);
-            background-color: var(--wp--preset--color--green-100);
-            border: 1px solid var(--wp--preset--color--green-400);
-            border-radius: .25rem;
-            color: #16a34a;
-            font-size: var(--wp--preset--font-size--small);
-            display: none;
-        }
-
         &:not(:last-of-type) {
             border-bottom: 1px solid var(--wp--preset--color--gray-100);
         }
     }
 
-    .org-groups__group-name {
+    .org-groups__group-label {
         flex: 1;
+        display: flex;
+        align-items: center;
+        gap: var(--wp--preset--spacing--3);
+        min-width: 0;
+    }
+
+    .org-groups__group-name {
         font-size: var(--wp--preset--font-size--base);
         font-weight: 500;
         color: var(--wp--preset--color--gray-800);
@@ -207,6 +204,15 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+    }
+
+    .org-groups__group-badge {
+        flex-shrink: 0;
+        padding: var(--wp--preset--spacing--1) var(--wp--preset--spacing--2);
+        background-color: var(--wp--preset--color--green-100);
+        color: var(--wp--preset--color--green-700);
+        font-size: var(--wp--preset--font-size--x-small);
+        border-radius: 0.25rem;
     }
 
     .org-groups__manage-btn {

@@ -11,11 +11,13 @@ function formatArchivedDate(timestamp) {
     return 'Archived ' + date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function buildGroupRow(group) {
+function buildGroupRow(group, {isNew = false} = {}) {
     const $row = jQuery(`
         <div class="org-groups__item" data-group-id="${group.id}">
-            <span class="org-groups__group-badge">New</span>
-            <span class="org-groups__group-name">${group.name}</span>
+            <div class="org-groups__group-label">
+                <span class="org-groups__group-name">${group.name}</span>
+                ${isNew ? '<span class="org-groups__group-badge">New</span>' : ''}
+            </div>
             <button class="org-groups__manage-btn btn-unstyled" type="button">
                 Manage <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
             </button>
@@ -129,7 +131,7 @@ function buildNewGroupFooter(createFn, $section) {
 
             // Add the new row to the active items list
             const $items = $section.find('.org-groups__items');
-            const $newGroup = buildGroupRow(group)
+            const $newGroup = buildGroupRow(group, {isNew: true});
             $items.append($newGroup);
             $section.find('.org-groups__empty').remove();
 
@@ -137,9 +139,7 @@ function buildNewGroupFooter(createFn, $section) {
             const count = $section.find('.org-groups__item').length;
             $section.find('.org-groups__org-meta').text(`${count} group${count !== 1 ? 's' : ''}`);
 
-            // Closes creation form and shows new tag on row
             closeForm();
-            $newGroup.find('.org-groups__group-badge').css('display', 'inline-block');
 
             $goBtn.on('click', function () {
                 localStorage.setItem('bys_selected_group_id', group.id);
