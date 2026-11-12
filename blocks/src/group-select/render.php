@@ -29,24 +29,34 @@ require_once BYS_GROUPS_PLUGIN_DIR . 'includes/classes/class-auth.php';
 
 <div <?= $wrapper_attributes ?>>
 	<div class="group-select__wrapper">
-		<select id="group-select" class="group-select__select" name="group">
-			<option value="" selected></option>
-			<?php if ($groups > 0) : ?>
-				<?php foreach ($groups as $group): ?>
-					<option
-						class="group-option"
-						value="<?php echo $group['id']; ?>"
+		<input
+			type="text"
+			class="group-select__input"
+			role="combobox"
+			aria-expanded="false"
+			aria-controls="group-select-list"
+			autocomplete="off"
+			placeholder="<?php esc_attr_e( 'Search groups', 'bys' ); ?>"
+		>
+		<input type="hidden" class="group-select__value" name="group" value="">
+
+		<ul id="group-select-list" class="group-select__list" role="listbox" hidden>
+				<?php foreach ($groups as $group) : ?>
+					<li 
+						class="group-select__option"
+						data-group-id="<?php echo esc_attr( $group['id'] ); ?>"
 						data-is-org-admin="<?php echo !empty($group['is_org_admin']) ? '1' : '0'; ?>"
 						data-can-manage-members="<?php echo !empty($group['can_manage_members']) ? '1' : '0'; ?>"
 						data-can-manage-group="<?php echo !empty($group['can_manage_group']) ? '1' : '0'; ?>"
+						role="option"
 					>
-						<?php echo $group['title']; ?>
-					</option>
-				<?php endforeach; ?>
-			<?php else: ?>
-				<option><?php echo esc_html__('No Groups available', 'bys'); ?></option>
-			<?php endif; ?>
-		</select>
+						<?= esc_html( $group['title'] ); ?>
+					</li>
+				<?php endforeach ?>
+			<li class="group-select__empty" hidden>
+				<?php esc_html_e( 'No groups found', 'bys' ); ?>
+			</li>
+		</ul>
 
 		<!-- Loading spinner overlay -->
 		<div class="group-select__spinner-wrapper" style="display: none;">
